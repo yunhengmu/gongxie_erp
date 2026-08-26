@@ -1,0 +1,122 @@
+Python 异步编程
+1. 异步编程概述
+异步编程允许程序在等待 I/O 操作（如网络请求、文件读写、数据库查询）时切换执行其他任务，从而提高 CPU 利用率，尤其适合高并发 I/O 密集型应用。Python 通过 asyncio 库及 async/await 语法提供原生异步支持。
+
+2. 核心概念
+协程（Coroutine）：使用 async def 定义的函数，调用时返回协程对象，不立即执行。
+
+事件循环（Event Loop）：负责调度和执行协程、处理 I/O 就绪事件，是异步运行的核心。
+
+Future / Task：Task 是 Future 的子类，用于包装协程并调度执行，支持取消、回调等。
+
+可等待对象（Awaitable）：协程、Task、Future 均可使用 await 等待。
+
+3. 快速入门
+python
+import asyncio
+
+async def fetch_data(delay):
+    await asyncio.sleep(delay)   # 模拟 I/O
+    return f"Data after {delay}s"
+
+async def main():
+    task1 = asyncio.create_task(fetch_data(2))
+    task2 = asyncio.create_task(fetch_data(1))
+    result1 = await task1
+    result2 = await task2
+    print(result1, result2)
+
+asyncio.run(main())
+4. 并发与并行
+并发：通过事件循环在单线程内交替执行多个任务（适合 I/O 密集型）。
+
+并行：利用多核 CPU，可使用 concurrent.futures.ThreadPoolExecutor 或 ProcessPoolExecutor 与 asyncio 结合，在异步中执行 CPU 密集型任务。
+
+5. 常用异步库
+HTTP 客户端：aiohttp、httpx（支持异步）。
+
+数据库驱动：asyncpg（PostgreSQL）、aiomysql、aioredis。
+
+Web 框架：FastAPI、Sanic、Tornado。
+
+消息队列：aio-pika（RabbitMQ）、aiokafka。
+
+6. 并发模式与任务管理
+gather：并发执行多个协程，返回所有结果。
+
+python
+results = await asyncio.gather(*[fetch_data(i) for i in range(5)])
+wait：更精细控制，可设置超时、返回完成/未完成任务集合。
+
+as_completed：按完成顺序迭代结果，适合处理耗时不一的任务。
+
+7. 超时与取消
+使用 asyncio.wait_for(coro, timeout) 设置超时，超时后自动取消任务。
+
+手动取消任务：task.cancel()，需捕获 asyncio.CancelledError 清理资源。
+
+python
+try:
+    result = await asyncio.wait_for(fetch_data(5), timeout=3)
+except asyncio.TimeoutError:
+    print("Task timed out")
+8. 异步上下文管理器与迭代器
+使用 async with 管理需要异步初始化和清理的资源（如数据库连接）。
+
+使用 async for 异步迭代数据流（如分页查询、WebSocket 消息）。
+
+9. 错误处理与调试
+异常传播：未捕获的异常会冒泡到调用者，需在 await 处处理。
+
+使用 asyncio.get_event_loop().set_debug(True) 启用调试模式，可检测未等待的协程、阻塞调用。
+
+设置 PYTHONASYNCIODEBUG=1 环境变量。
+
+谨慎混合同步阻塞代码：使用 loop.run_in_executor() 将阻塞函数放到线程池执行，避免阻塞事件循环。
+
+10. 最佳实践
+优先使用高层 API：asyncio.run() 管理事件循环，避免手动管理循环生命周期。
+
+避免在协程内使用 time.sleep，使用 asyncio.sleep 替代。
+
+限制并发量：使用 asyncio.Semaphore 控制同时发起的请求数，防止压垮下游。
+
+python
+sem = asyncio.Semaphore(10)
+async def limited_fetch(url):
+    async with sem:
+        return await fetch(url)
+结构化并发：将相关任务组合为子任务，使用 asyncio.TaskGroup（Python 3.11+）简化错误处理。
+
+测试：使用 pytest-asyncio 编写异步测试用例。
+
+生产部署：使用 uvicorn（FastAPI）或 gunicorn + uvicorn worker 启动多 worker 进程，利用多核。
+
+11. 与多线程/多进程的对比
+异步适合 I/O 密集型，开销小，但无法利用多核 CPU。
+
+多线程适合 I/O 密集型，但受 GIL 限制，存在线程切换开销。
+
+多进程适合 CPU 密集型，可实现真正并行，但进程间通信成本高。
+
+实际场景可混合使用：异步主循环 + 线程/进程池执行 CPU 或阻塞任务。
+
+12. 示例：异步 HTTP 爬虫
+python
+import aiohttp
+import asyncio
+
+async def fetch_url(session, url):
+    async with session.get(url) as resp:
+        return await resp.text()
+
+async def main():
+    urls = ["https://api.example.com/1", "https://api.example.com/2"]
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_url(session, url) for url in urls]
+        pages = await asyncio.gather(*tasks)
+    for page in pages:
+        print(len(page))
+
+asyncio.run(main())
+以上三份文档涵盖了核心概念、实践指南和代码示例，可直接用于团队培训或作为设计参考。如有具体场景需要深入展开，可在此基础上进一步补充。

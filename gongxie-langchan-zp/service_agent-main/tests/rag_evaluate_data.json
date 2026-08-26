@@ -1,0 +1,47 @@
+[
+  {
+    "question": "什么是RAG检索增强生成？",
+    "ground_truth": "RAG（Retrieval-Augmented Generation，检索增强生成）是一种结合了信息检索与文本生成的AI技术架构，通过从外部知识库中检索相关文档来增强大语言模型的回答质量。",
+    "answer": "",
+    "contexts": [
+      "RAG将检索系统和生成模型结合，先从知识库中检索相关文档，再基于检索结果生成回答。",
+      "检索增强生成可以显著减少大语言模型的幻觉问题，提高回答的事实准确性。"
+    ]
+  },
+  {
+    "question": "向量数据库的主要应用场景有哪些？",
+    "ground_truth": "向量数据库主要用于语义搜索、推荐系统、图像检索、异常检测等场景，通过计算向量之间的相似度来实现高效检索。",
+    "answer": "",
+    "contexts": [
+      "向量数据库通过存储和索引高维向量嵌入，支持高效的相似度搜索。",
+      "常见应用包括语义搜索、推荐系统、图像相似度检索、人脸识别、异常检测等。"
+    ]
+  },
+  {
+    "question": "FastAPI和Flask的主要区别是什么？",
+    "ground_truth": "FastAPI是异步Web框架，支持自动生成API文档、数据验证和类型提示，性能优于Flask；Flask是同步框架，更轻量灵活。",
+    "answer": "",
+    "contexts": [
+      "FastAPI基于Starlette和Pydantic，原生支持异步处理和自动生成OpenAPI文档。",
+      "Flask是Python最流行的微框架之一，以简洁和灵活著称，适合小型项目和快速原型开发。"
+    ]
+  },
+  {
+    "question": "LangChain的核心组件有哪些？",
+    "ground_truth": "LangChain的核心组件包括Models（模型）、Prompts（提示词）、Chains（链）、Agents（代理）、Memory（记忆）和Indexes（索引）。",
+    "answer": "",
+    "contexts": [
+      "LangChain是一个用于构建大语言模型应用的框架，提供了Models、Prompts、Chains、Agents、Memory等核心组件。",
+      "Agents允许LLM自主决定使用哪些工具和采取什么行动，Memory用于保持对话上下文。"
+    ]
+  },
+  {
+    "question": "什么是BM25算法？",
+    "ground_truth": "BM25是一种基于概率检索模型的关键词检索算法，是TF-IDF的改进版本，广泛用于信息检索和搜索引擎中。",
+    "answer": "",
+    "contexts": [
+      "BM25（Best Match 25）是信息检索中常用的排序函数，基于词频和文档长度归一化来计算文档与查询的相关性。",
+      "BM25是TF-IDF的改进版本，引入了文档长度归一化和词频饱和机制，性能优于TF-IDF。"
+    ]
+  }
+]
