@@ -51,5 +51,8 @@ rebel.xml
 application-my.yaml
 
 /yudao-ui-app/unpackage/
+
+# 数据库初始化脚本(sql/)含各厂商示例密钥，不入库
+/sql/
 .DS_Store
 **/.DS_Store
