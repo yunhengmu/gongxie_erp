@@ -8,10 +8,7 @@ packages:
   - packages/@core/*
   - packages/effects/*
   - packages/business/*
-  - apps/*
   - scripts/*
-  - docs
-  - playground
 
 publicHoistPattern:
   - lefthook
@@ -34,6 +31,7 @@ overrides:
   '@ctrl/tinycolor': 'catalog:'
   clsx: 'catalog:'
   pinia: 'catalog:'
+  vite: 'catalog:'
   vue: 'catalog:'
 catalog:
   '@ast-grep/napi': ^0.43.0
