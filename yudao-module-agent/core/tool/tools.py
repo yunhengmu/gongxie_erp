@@ -25,7 +25,7 @@ def _search_duckduckgo(query: str, max_results: int = 5) -> str:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=max_results))
         if not results:
-            return f"[DuckDuckGo] 未找到与 "{query}" 相关的结果。"
+            return f"[DuckDuckGo] 未找到与 '{query}' 相关的结果。"
 
         lines = []
         for i, r in enumerate(results, 1):
@@ -48,7 +48,7 @@ def _search_tavily(query: str, max_results: int = 5) -> str:
         response = client.search(query, max_results=max_results, search_depth="basic")
         results = response.get("results", [])
         if not results:
-            return f"[Tavily] 未找到与 "{query}" 相关的结果。"
+            return f"[Tavily] 未找到与 '{query}' 相关的结果。"
 
         lines = []
         for i, r in enumerate(results, 1):

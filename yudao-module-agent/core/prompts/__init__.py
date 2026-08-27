@@ -6,13 +6,13 @@
 内部已改为"模板文件 + 加载器 + 构建器"的工程化结构,
 便于后续扩展多版本 / A-B 测试。
 """
-from langchain_core.prompts import ChatPromptTemplate
+from core.prompts.loader import load_template
 
-from core.prompts.builders import build_research_prompt, build_code_review_prompt, build_rag_prompt
-
-# 对外暴露构建好的 Prompt Bean(singleton,进程级缓存)
-RESEARCH_PROMPT: ChatPromptTemplate = build_research_prompt()
-CODE_REVIEW_PROMPT: ChatPromptTemplate = build_code_review_prompt()
-RAG_PROMPT: ChatPromptTemplate = build_rag_prompt()
+# 对外暴露模板原始文本(进程级缓存)。
+# 注意: 这里直接返回 str, 因为 langchain 的 create_agent 要求
+# system_prompt 为 str / SystemMessage, 传 ChatPromptTemplate 会报错。
+RESEARCH_PROMPT: str = load_template("research")
+CODE_REVIEW_PROMPT: str = load_template("code_review")
+RAG_PROMPT: str = load_template("rag")
 
 __all__ = ["RESEARCH_PROMPT", "CODE_REVIEW_PROMPT", "RAG_PROMPT"]
