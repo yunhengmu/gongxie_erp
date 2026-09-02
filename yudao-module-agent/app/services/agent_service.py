@@ -13,7 +13,7 @@ import logging
 
 from fastapi.responses import StreamingResponse
 
-from core.agent import research_agent, code_reviewer_agent, rag_agent
+from core.agent import build_agent
 from core.rag.classifier import classify_query, CATEGORY_CODE_REVIEW, CATEGORY_SPECIALIZED, CATEGORY_GREETING
 from core.rag.strategy import select_strategy, RetrievalStrategy
 from app.schemas.chat import ChatResponse
@@ -65,7 +65,7 @@ class AgentService:
             },
         )
 
-    def select_agent(self, message: str):
+    def select_agent(self, message: str, tenant_id: str = "", user_id: str = ""):
         """智能 Agent 选择 — 基于 BERT 分类器 + 策略选择器。
 
         替代原有的简单前缀匹配 ("review:" → code_reviewer)。
@@ -73,11 +73,14 @@ class AgentService:
         路由逻辑:
           1. BERT 分类器分析问题类型
           2. 策略选择器决定检索策略
-          3. 返回最优 Agent:
-             - 专业知识 + 向量库可用 → rag_agent (混合检索)
-             - 代码审查 → code_reviewer_agent
-             - 通用知识 → research_agent
-             - 问候 → research_agent (直接回复)
+          3. 返回按 (tenant_id, user_id) 组装的最优 Agent:
+             - 专业知识 + 向量库可用 → rag (混合检索)
+             - 代码审查 → code_reviewer
+             - 通用知识 → research
+             - 问候 → research (直接回复)
+
+        长期记忆工具按 (tenant_id, user_id) 闭包生成，namespace 固化，
+        因此 agent 无法在启动时静态构建，只能按请求组装（build_agent）。
         """
         # 1. 使用 BERT 分类器分析问题
         classification = classify_query(message)
@@ -88,12 +91,12 @@ class AgentService:
             classification.category, strategy.value, strategy_note,
         )
 
-        # 2. 根据策略选择 Agent
+        # 2. 根据策略选择 Agent（按租户/用户上下文组装，含长期记忆工具）
         if strategy == RetrievalStrategy.HYBRID_SEARCH:
-            return rag_agent, strategy.value
+            return build_agent("rag", tenant_id, user_id), strategy.value
 
         if strategy == RetrievalStrategy.CODE_REVIEW:
-            return code_reviewer_agent, strategy.value
+            return build_agent("code_reviewer", tenant_id, user_id), strategy.value
 
-        # 通用知识 / 问候 → research_agent
-        return research_agent, strategy.value
+        # 通用知识 / 问候 → research
+        return build_agent("research", tenant_id, user_id), strategy.value

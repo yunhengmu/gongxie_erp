@@ -1,0 +1,447 @@
+diff --git a/CODE-WIKI/README.md b/CODE-WIKI/README.md
+index 75ad68b..9a2561f 100644
+--- a/CODE-WIKI/README.md
++++ b/CODE-WIKI/README.md
+@@ -4,6 +4,8 @@
+ 
+ ## 文档目录
+ 
++### 一、基础架构篇（01–06）
++
+ | 文档 | 内容 |
+ |------|------|
+ | [01 - 整体架构](01-architecture.md) | 平台定位、微服务架构、技术栈、请求流转、目录总览 |
+@@ -13,6 +15,21 @@
+ | [05 - 依赖关系](05-dependencies.md) | 模块间依赖、中间件依赖、分层依赖关系说明 |
+ | [06 - 运行方式](06-run.md) | 环境准备、启动步骤、端口与配置、内置基础设施 |
+ 
++### 二、AI 模块进阶篇（07–14）
++
++| 文档 | 内容 |
++|------|------|
++| [07 - MCP 工具配置指南](07-mcp-tool-config-guide.md) | 在 module-ai 配 Tool 走 HTTP 版 MCP 供 module-agent 使用（含权限防越权） |
++| [08 - AI 顾问后端设计](08-ai-advisor-backend-design.md) | 从「一次对话」到「一个产品」要补的 9 件事 |
++| [09 - AI 顾问完整范例](09-ai-advisor-full-example.md) | 从零到能跑的一个完整功能 |
++| [10 - 单接口串起全部功能](10-one-endpoint-everything.md) | AI 顾问对话接口，从第一行到最后一行 |
++| [11 - 多租户鉴权落地](11-tenant-isolation-in-module-ai.md) | module-ai 租户隔离是怎么「写死」的（tenant_id 鉴权分配） |
++| [12 - 多租户 RBAC 工具权限](12-multi-tenant-rbac-agent-tool.md) | Agent 工具权限：从业界共识到芋道落地（四步） |
++| [12 附 - 代码目录编排](12-代码目录编排.md) | 文档 12 第四章两段代码的文件落点目录树版 |
++| [13 - MCP × LangChain 规范与现状](13-mcp-langchain-multitenant-agent-chat.md) | 多租户 RBAC 工具经 MCP 被 LangChain 使用：规范综述 + 本项目现状 |
++| [13 附 - 代码目录编排](13-代码目录编排.md) | 文档 13 两段代码的文件落点目录树版 |
++| [14 - 完整落地代码](14-mcp-langchain-production-code.md) | 代码 ① module-ai 工具注册 + 代码 ② `/v2/chat` 生产级会话接口（完整代码） |
++
+ ## 快速导览
+ 
+ - **项目性质**：芋道（Yudao）**Spring Cloud Alibaba 微服务完整版**，全部代码开源（MIT License），以开发者为中心的一站式快速开发平台。
+diff --git a/yudao-module-agent/README.md b/yudao-module-agent/README.md
+index ba56772..d061415 100644
+--- a/yudao-module-agent/README.md
++++ b/yudao-module-agent/README.md
+@@ -85,7 +85,7 @@
+ │   │   └── user_dict.txt             # AI 领域专业词汇
+ │   ├── tool/                         # 工具定义
+ │   │   ├── tools.py                  # 搜索 + 代码审查 + 向量库检索
+-│   │   ├── memory_tools.py           # 长期记忆工具（增删改查）
++│   │   ├── memory_tools_tenant.py    # 长期记忆工具工厂（按租户/用户隔离）
+ │   │   └── api_tools.py              # 微服务调用工具（安全网关）
+ │   ├── prompts/                      # 提示词模块
+ │   │   ├── __init__.py               # 统一出口
+@@ -173,16 +173,16 @@ BERT 分类器（5 分类）
+ | `code_review` | tools.py | LLM（deepseek_model） | 覆盖 Bug/安全/性能/风格/建议 5 维度 |
+ | `kb_search` | tools.py | Chroma 向量库（可选） | 向量语义检索，依赖 BGE-M3 + fastembed |
+ 
+-#### 3.2 长期记忆工具
++#### 3.2 长期记忆工具（租户安全）
+ 
+ | 工具 | 说明 |
+ |------|------|
+ | `save_user_info` | 保存用户信息到长期记忆 |
+-| `get_user_info` | 读取用户长期记忆 |
++| `get_user_info` | 读取当前用户长期记忆 |
+ | `forget_user_info` | 删除用户记忆 |
+-| `list_user_memories` | 列出所有记忆条目 |
++| `list_user_memories` | 列出当前用户所有记忆条目 |
+ 
+-使用 LangGraph 的 `InjectedStore` 机制，Agent 调用时自动注入 Store 实例。
++通过 `core/tool/memory_tools_tenant.py` 的工厂 `make_memory_tools(tenant_id, user_id)` 按身份生成，namespace 固化为 `("users", 租户, 用户)`——不同租户/用户互相隔离。工具闭包捕获 `core.memory.store` 单例（`InjectedStore` 的替代）。Agent 经 `core/agent.py` 的 `build_agent(kind, tenant_id, user_id)` 按请求组装时挂载，并追加 `MEMORY_TOOLS_PROMPT` 提示词段；启动时静态构建的三个 agent 不挂载记忆工具。
+ 
+ #### 3.3 微服务调用工具（安全网关）
+ 
+diff --git a/yudao-module-agent/app/routers/chat.py b/yudao-module-agent/app/routers/chat.py
+index d1c22f3..6e6dca5 100644
+--- a/yudao-module-agent/app/routers/chat.py
++++ b/yudao-module-agent/app/routers/chat.py
+@@ -32,7 +32,7 @@ async def chat(
+ ):
+     """通用聊天入口。智能路由: BERT 分类 → 策略选择 → Agent 分发。"""
+     last_msg = request.messages[-1]["content"] if request.messages else ""
+-    agent, strategy = svc.select_agent(last_msg)
++    agent, strategy = svc.select_agent(last_msg, request.tenant_id, request.user_id)
+     logger.info("chat 路由: strategy=%s", strategy)
+ 
+     if request.stream:
+@@ -53,7 +53,7 @@ async def chat_stream(
+ ):
+     """通用聊天流式入口。智能路由。"""
+     last_msg = request.messages[-1]["content"] if request.messages else ""
+-    agent, strategy = svc.select_agent(last_msg)
++    agent, strategy = svc.select_agent(last_msg, request.tenant_id, request.user_id)
+     logger.info("chat_stream 路由: strategy=%s", strategy)
+     return await svc.stream(agent, request.messages, request.thread_id)
+ 
+@@ -67,12 +67,13 @@ async def research(
+     svc: AgentService = Depends(),  # ← @Autowired
+ ):
+     """指定 research_agent 调用。"""
+-    from core.agent import research_agent
++    from core.agent import build_agent
+ 
++    agent = build_agent("research", request.tenant_id, request.user_id)
+     if request.stream:
+-        return await svc.stream(research_agent, request.messages, request.thread_id)
++        return await svc.stream(agent, request.messages, request.thread_id)
+     try:
+-        return await svc.invoke(research_agent, request.messages, request.thread_id)
++        return await svc.invoke(agent, request.messages, request.thread_id)
+     except Exception as e:
+         logger.exception("research error")
+         raise HTTPException(status_code=500, detail=str(e))
+@@ -85,12 +86,13 @@ async def review(
+     svc: AgentService = Depends(),  # ← @Autowired
+ ):
+     """指定 code_reviewer_agent 调用。"""
+-    from core.agent import code_reviewer_agent
++    from core.agent import build_agent
+ 
++    agent = build_agent("code_reviewer", request.tenant_id, request.user_id)
+     if request.stream:
+-        return await svc.stream(code_reviewer_agent, request.messages, request.thread_id)
++        return await svc.stream(agent, request.messages, request.thread_id)
+     try:
+-        return await svc.invoke(code_reviewer_agent, request.messages, request.thread_id)
++        return await svc.invoke(agent, request.messages, request.thread_id)
+     except Exception as e:
+         logger.exception("review error")
+         raise HTTPException(status_code=500, detail=str(e))
+\ No newline at end of file
+diff --git a/yudao-module-agent/app/schemas/chat.py b/yudao-module-agent/app/schemas/chat.py
+index 63f8bb2..f302f93 100644
+--- a/yudao-module-agent/app/schemas/chat.py
++++ b/yudao-module-agent/app/schemas/chat.py
+@@ -7,6 +7,8 @@ class ChatRequest(BaseModel):
+     messages: list[dict]  # [{"role": "user", "content": "..."}]
+     thread_id: str = ""
+     stream: bool = False
++    tenant_id: str = ""  # 租户标识（长期记忆 namespace 隔离用）
++    user_id: str = ""  # 用户标识（长期记忆 namespace 隔离用）
+ 
+ 
+ class ChatResponse(BaseModel):
+diff --git a/yudao-module-agent/app/services/agent_service.py b/yudao-module-agent/app/services/agent_service.py
+index 7b14b50..77d3dc6 100644
+--- a/yudao-module-agent/app/services/agent_service.py
++++ b/yudao-module-agent/app/services/agent_service.py
+@@ -13,7 +13,7 @@ import logging
+ 
+ from fastapi.responses import StreamingResponse
+ 
+-from core.agent import research_agent, code_reviewer_agent, rag_agent
++from core.agent import build_agent
+ from core.rag.classifier import classify_query, CATEGORY_CODE_REVIEW, CATEGORY_SPECIALIZED, CATEGORY_GREETING
+ from core.rag.strategy import select_strategy, RetrievalStrategy
+ from app.schemas.chat import ChatResponse
+@@ -65,7 +65,7 @@ class AgentService:
+             },
+         )
+ 
+-    def select_agent(self, message: str):
++    def select_agent(self, message: str, tenant_id: str = "", user_id: str = ""):
+         """智能 Agent 选择 — 基于 BERT 分类器 + 策略选择器。
+ 
+         替代原有的简单前缀匹配 ("review:" → code_reviewer)。
+@@ -73,11 +73,14 @@ class AgentService:
+         路由逻辑:
+           1. BERT 分类器分析问题类型
+           2. 策略选择器决定检索策略
+-          3. 返回最优 Agent:
+-             - 专业知识 + 向量库可用 → rag_agent (混合检索)
+-             - 代码审查 → code_reviewer_agent
+-             - 通用知识 → research_agent
+-             - 问候 → research_agent (直接回复)
++          3. 返回按 (tenant_id, user_id) 组装的最优 Agent:
++             - 专业知识 + 向量库可用 → rag (混合检索)
++             - 代码审查 → code_reviewer
++             - 通用知识 → research
++             - 问候 → research (直接回复)
++
++        长期记忆工具按 (tenant_id, user_id) 闭包生成，namespace 固化，
++        因此 agent 无法在启动时静态构建，只能按请求组装（build_agent）。
+         """
+         # 1. 使用 BERT 分类器分析问题
+         classification = classify_query(message)
+@@ -88,12 +91,12 @@ class AgentService:
+             classification.category, strategy.value, strategy_note,
+         )
+ 
+-        # 2. 根据策略选择 Agent
++        # 2. 根据策略选择 Agent（按租户/用户上下文组装，含长期记忆工具）
+         if strategy == RetrievalStrategy.HYBRID_SEARCH:
+-            return rag_agent, strategy.value
++            return build_agent("rag", tenant_id, user_id), strategy.value
+ 
+         if strategy == RetrievalStrategy.CODE_REVIEW:
+-            return code_reviewer_agent, strategy.value
++            return build_agent("code_reviewer", tenant_id, user_id), strategy.value
+ 
+-        # 通用知识 / 问候 → research_agent
+-        return research_agent, strategy.value
+\ No newline at end of file
++        # 通用知识 / 问候 → research
++        return build_agent("research", tenant_id, user_id), strategy.value
+\ No newline at end of file
+diff --git a/yudao-module-agent/core/agent.py b/yudao-module-agent/core/agent.py
+index 3bea382..c9c4533 100644
+--- a/yudao-module-agent/core/agent.py
++++ b/yudao-module-agent/core/agent.py
+@@ -7,13 +7,13 @@ from langchain.agents import create_agent
+ 
+ from core.models import deepseek_model
+ from core.tool.tools import web_search, code_review, make_retriever_tool
+-from core.tool.memory_tools import memory_tools
+ from core.tool.api_tools import api_tools
++from core.tool.memory_tools_tenant import make_memory_tools, MEMORY_TOOLS_PROMPT
+ from core.prompts import RESEARCH_PROMPT, CODE_REVIEW_PROMPT, RAG_PROMPT
+ from core.memory import checkpointer, store
+ 
+-# 基础工具列表（含长期记忆 + 微服务调用）
+-tools = [web_search] + memory_tools + api_tools
++# 基础工具列表（微服务调用）
++tools = [web_search] + api_tools
+ 
+ # 尝试加载向量库检索工具
+ kb_tool = make_retriever_tool()
+@@ -22,7 +22,7 @@ if kb_tool:
+ 
+ research_agent = create_agent(
+     model=deepseek_model,
+-    tools=[web_search] + memory_tools + api_tools,
++    tools=[web_search] + api_tools,
+     system_prompt=RESEARCH_PROMPT,
+     checkpointer=checkpointer,
+     store=store,
+@@ -30,16 +30,16 @@ research_agent = create_agent(
+ 
+ code_reviewer_agent = create_agent(
+     model=deepseek_model,
+-    tools=[code_review] + memory_tools,
++    tools=[code_review],
+     system_prompt=CODE_REVIEW_PROMPT,
+     checkpointer=checkpointer,
+     store=store,
+ )
+ 
+ # RAG Agent: 使用 RAG 专用提示词，挂载知识库检索工具
+-rag_tools = [web_search] + memory_tools + api_tools
++rag_tools = [web_search] + api_tools
+ if kb_tool:
+-    rag_tools = [kb_tool, web_search] + memory_tools + api_tools  # kb_search 优先
++    rag_tools = [kb_tool, web_search] + api_tools  # kb_search 优先
+ 
+ rag_agent = create_agent(
+     model=deepseek_model,
+@@ -47,4 +47,46 @@ rag_agent = create_agent(
+     system_prompt=RAG_PROMPT,
+     checkpointer=checkpointer,
+     store=store,
+-)
+\ No newline at end of file
++)
++
++
++def build_agent(kind: str, tenant_id: str, user_id: str):
++    """按租户上下文组装 agent：静态工具集 + 租户化长期记忆工具。
++
++    静态 agent（上方三个）不携带记忆工具——记忆工具必须按 (tenant, user)
++    闭包生成，无法在启动时静态构建。create_agent 只是构建图定义，开销很小；
++    checkpointer / store / model 仍是进程级单例，不重复创建。
++
++    Args:
++        kind: "research" | "code_reviewer" | "rag"
++        tenant_id: 租户 ID（长期记忆 namespace 第一段）
++        user_id: 用户 ID（长期记忆 namespace 第二段）
++    """
++    memory = make_memory_tools(tenant_id, user_id)
++
++    if kind == "code_reviewer":
++        return create_agent(
++            model=deepseek_model,
++            tools=[code_review] + memory,
++            system_prompt=CODE_REVIEW_PROMPT + MEMORY_TOOLS_PROMPT,
++            checkpointer=checkpointer,
++            store=store,
++        )
++
++    if kind == "rag":
++        return create_agent(
++            model=deepseek_model,
++            tools=rag_tools + memory,
++            system_prompt=RAG_PROMPT + MEMORY_TOOLS_PROMPT,
++            checkpointer=checkpointer,
++            store=store,
++        )
++
++    # 默认 research
++    return create_agent(
++        model=deepseek_model,
++        tools=[web_search] + api_tools + memory,
++        system_prompt=RESEARCH_PROMPT + MEMORY_TOOLS_PROMPT,
++        checkpointer=checkpointer,
++        store=store,
++    )
+\ No newline at end of file
+diff --git a/yudao-module-agent/core/prompts/templates/code_review.md b/yudao-module-agent/core/prompts/templates/code_review.md
+index db19ace..2324700 100644
+--- a/yudao-module-agent/core/prompts/templates/code_review.md
++++ b/yudao-module-agent/core/prompts/templates/code_review.md
+@@ -1,10 +1,2 @@
+ You are a code reviewer.
+ Point out bugs, security issues, and suggest improvements.
+-
+-## Long-term Memory
+-You have access to long-term memory tools (save_user_info, get_user_info, forget_user_info, list_user_memories).
+-Use them proactively:
+-- When the user shares personal info (name, preferences, tech stack, role), call save_user_info to remember it.
+-- When the user asks about something you should remember, call get_user_info first.
+-- When the user asks you to forget something, call forget_user_info.
+-- Before answering user-specific questions, check list_user_memories for context.
+diff --git a/yudao-module-agent/core/prompts/templates/rag.md b/yudao-module-agent/core/prompts/templates/rag.md
+index fb3939d..49d8f5a 100644
+--- a/yudao-module-agent/core/prompts/templates/rag.md
++++ b/yudao-module-agent/core/prompts/templates/rag.md
+@@ -8,14 +8,6 @@ Rules:
+ 4. Be concise and accurate.
+ 5. For educational questions, explain concepts clearly with examples when helpful.
+ 
+-## Long-term Memory
+-You have access to long-term memory tools (save_user_info, get_user_info, forget_user_info, list_user_memories).
+-Use them proactively:
+-- When the user shares personal info (name, preferences, tech stack, role), call save_user_info to remember it.
+-- When the user asks about something you should remember, call get_user_info first.
+-- When the user asks you to forget something, call forget_user_info.
+-- Before answering user-specific questions, check list_user_memories for context.
+-
+ Context:
+ {context}
+ 
+diff --git a/yudao-module-agent/core/prompts/templates/research.md b/yudao-module-agent/core/prompts/templates/research.md
+index 55d8635..a43888b 100644
+--- a/yudao-module-agent/core/prompts/templates/research.md
++++ b/yudao-module-agent/core/prompts/templates/research.md
+@@ -1,10 +1,2 @@
+ You are a research assistant.
+ Be concise and accurate. Cite sources when possible.
+-
+-## Long-term Memory
+-You have access to long-term memory tools (save_user_info, get_user_info, forget_user_info, list_user_memories).
+-Use them proactively:
+-- When the user shares personal info (name, preferences, tech stack, role), call save_user_info to remember it.
+-- When the user asks about something you should remember, call get_user_info first.
+-- When the user asks you to forget something, call forget_user_info.
+-- Before answering user-specific questions, check list_user_memories for context.
+diff --git a/yudao-module-agent/core/tool/memory_tools.py b/yudao-module-agent/core/tool/memory_tools.py
+deleted file mode 100644
+index 4a1bd88..0000000
+--- a/yudao-module-agent/core/tool/memory_tools.py
++++ /dev/null
+@@ -1,77 +0,0 @@
+-"""长期记忆工具 — 跨会话持久化用户信息。
+-
+-工具列表:
+-  - save_user_info:   保存用户信息到长期记忆
+-  - get_user_info:    读取当前用户的长期记忆
+-  - forget_user_info: 删除用户信息（用户要求"忘记"时使用）
+-  - list_user_memories: 列出所有已存储的记忆条目
+-
+-使用 LangGraph 的 InjectedStore 机制，Agent 调用时自动注入 Store 实例。
+-"""
+-from langgraph.prebuilt import InjectedStore
+-from langchain.tools import tool
+-
+-
+-@tool
+-def save_user_info(
+-    key: str,
+-    info: str,
+-    store: InjectedStore,
+-) -> str:
+-    """将用户信息保存到长期记忆（跨会话保留）。
+-
+-    Args:
+-        key: 记忆的键名，如 "name", "preferences", "tech_stack", "role"
+-        info: 要保存的用户信息详情
+-    """
+-    store.put(("users",), key, {"info": info})
+-    return f"已记住: {key} = {info}"
+-
+-
+-@tool
+-def get_user_info(
+-    key: str,
+-    store: InjectedStore,
+-) -> str:
+-    """从长期记忆中读取用户信息。
+-
+-    Args:
+-        key: 记忆的键名，如 "name", "preferences", "tech_stack"
+-    """
+-    item = store.get(("users",), key)
+-    if item is None:
+-        return f"未找到关于 {key} 的记忆。"
+-    return str(item.value.get("info", ""))
+-
+-
+-@tool
+-def forget_user_info(
+-    key: str,
+-    store: InjectedStore,
+-) -> str:
+-    """删除用户要求遗忘的长期记忆。
+-
+-    Args:
+-        key: 要遗忘的记忆键名，如 "name", "preferences"
+-    """
+-    store.delete(("users",), key)
+-    return f"已遗忘: {key}"
+-
+-
+-@tool
+-def list_user_memories(
+-    store: InjectedStore,
+-) -> str:
+-    """列出当前用户所有的长期记忆条目。"""
+-    items = store.search(("users",))
+-    if not items:
+-        return "暂无任何长期记忆。"
+-
+-    lines = []
+-    for item in items:
+-        lines.append(f"- {item.key}: {item.value.get('info', '')}")
+-    return "\n".join(lines) if lines else "暂无任何长期记忆。"
+-
+-
+-# 工具列表，供 agent.py 导入
+-memory_tools = [save_user_info, get_user_info, forget_user_info, list_user_memories]
+\ No newline at end of file
+diff --git a/yudao-module-ai/yudao-module-ai-server/src/main/java/cn/iocoder/yudao/module/ai/tool/method/Person.java b/yudao-module-ai/yudao-module-ai-server/src/main/java/cn/iocoder/yudao/module/ai/tool/method/Person.java
+index 66bab5a..3f34ac8 100644
+--- a/yudao-module-ai/yudao-module-ai-server/src/main/java/cn/iocoder/yudao/module/ai/tool/method/Person.java
++++ b/yudao-module-ai/yudao-module-ai-server/src/main/java/cn/iocoder/yudao/module/ai/tool/method/Person.java
+@@ -2,7 +2,7 @@ package cn.iocoder.yudao.module.ai.tool.method;
+ 
+ /**
+  * 来自 Spring AI 官方文档
+- *
++ * <p>
+  * Represents a person with basic information.
+  * This is an immutable record.
+  */

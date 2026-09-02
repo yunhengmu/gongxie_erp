@@ -32,7 +32,7 @@ async def chat(
 ):
     """通用聊天入口。智能路由: BERT 分类 → 策略选择 → Agent 分发。"""
     last_msg = request.messages[-1]["content"] if request.messages else ""
-    agent, strategy = svc.select_agent(last_msg)
+    agent, strategy = svc.select_agent(last_msg, request.tenant_id, request.user_id)
     logger.info("chat 路由: strategy=%s", strategy)
 
     if request.stream:
@@ -53,7 +53,7 @@ async def chat_stream(
 ):
     """通用聊天流式入口。智能路由。"""
     last_msg = request.messages[-1]["content"] if request.messages else ""
-    agent, strategy = svc.select_agent(last_msg)
+    agent, strategy = svc.select_agent(last_msg, request.tenant_id, request.user_id)
     logger.info("chat_stream 路由: strategy=%s", strategy)
     return await svc.stream(agent, request.messages, request.thread_id)
 
@@ -67,12 +67,13 @@ async def research(
     svc: AgentService = Depends(),  # ← @Autowired
 ):
     """指定 research_agent 调用。"""
-    from core.agent import research_agent
+    from core.agent import build_agent
 
+    agent = build_agent("research", request.tenant_id, request.user_id)
     if request.stream:
-        return await svc.stream(research_agent, request.messages, request.thread_id)
+        return await svc.stream(agent, request.messages, request.thread_id)
     try:
-        return await svc.invoke(research_agent, request.messages, request.thread_id)
+        return await svc.invoke(agent, request.messages, request.thread_id)
     except Exception as e:
         logger.exception("research error")
         raise HTTPException(status_code=500, detail=str(e))
@@ -85,12 +86,13 @@ async def review(
     svc: AgentService = Depends(),  # ← @Autowired
 ):
     """指定 code_reviewer_agent 调用。"""
-    from core.agent import code_reviewer_agent
+    from core.agent import build_agent
 
+    agent = build_agent("code_reviewer", request.tenant_id, request.user_id)
     if request.stream:
-        return await svc.stream(code_reviewer_agent, request.messages, request.thread_id)
+        return await svc.stream(agent, request.messages, request.thread_id)
     try:
-        return await svc.invoke(code_reviewer_agent, request.messages, request.thread_id)
+        return await svc.invoke(agent, request.messages, request.thread_id)
     except Exception as e:
         logger.exception("review error")
         raise HTTPException(status_code=500, detail=str(e))

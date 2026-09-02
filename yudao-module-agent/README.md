@@ -85,7 +85,7 @@
 │   │   └── user_dict.txt             # AI 领域专业词汇
 │   ├── tool/                         # 工具定义
 │   │   ├── tools.py                  # 搜索 + 代码审查 + 向量库检索
-│   │   ├── memory_tools.py           # 长期记忆工具（增删改查）
+│   │   ├── memory_tools_tenant.py    # 长期记忆工具工厂（按租户/用户隔离）
 │   │   └── api_tools.py              # 微服务调用工具（安全网关）
 │   ├── prompts/                      # 提示词模块
 │   │   ├── __init__.py               # 统一出口
@@ -173,16 +173,16 @@ BERT 分类器（5 分类）
 | `code_review` | tools.py | LLM（deepseek_model） | 覆盖 Bug/安全/性能/风格/建议 5 维度 |
 | `kb_search` | tools.py | Chroma 向量库（可选） | 向量语义检索，依赖 BGE-M3 + fastembed |
 
-#### 3.2 长期记忆工具
+#### 3.2 长期记忆工具（租户安全）
 
 | 工具 | 说明 |
 |------|------|
 | `save_user_info` | 保存用户信息到长期记忆 |
-| `get_user_info` | 读取用户长期记忆 |
+| `get_user_info` | 读取当前用户长期记忆 |
 | `forget_user_info` | 删除用户记忆 |
-| `list_user_memories` | 列出所有记忆条目 |
+| `list_user_memories` | 列出当前用户所有记忆条目 |
 
-使用 LangGraph 的 `InjectedStore` 机制，Agent 调用时自动注入 Store 实例。
+通过 `core/tool/memory_tools_tenant.py` 的工厂 `make_memory_tools(tenant_id, user_id)` 按身份生成，namespace 固化为 `("users", 租户, 用户)`——不同租户/用户互相隔离。工具闭包捕获 `core.memory.store` 单例（`InjectedStore` 的替代）。Agent 经 `core/agent.py` 的 `build_agent(kind, tenant_id, user_id)` 按请求组装时挂载，并追加 `MEMORY_TOOLS_PROMPT` 提示词段；启动时静态构建的三个 agent 不挂载记忆工具。
 
 #### 3.3 微服务调用工具（安全网关）
 

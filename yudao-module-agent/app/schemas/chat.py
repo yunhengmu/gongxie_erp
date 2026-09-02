@@ -7,6 +7,8 @@ class ChatRequest(BaseModel):
     messages: list[dict]  # [{"role": "user", "content": "..."}]
     thread_id: str = ""
     stream: bool = False
+    tenant_id: str = ""  # 租户标识（长期记忆 namespace 隔离用）
+    user_id: str = ""  # 用户标识（长期记忆 namespace 隔离用）
 
 
 class ChatResponse(BaseModel):

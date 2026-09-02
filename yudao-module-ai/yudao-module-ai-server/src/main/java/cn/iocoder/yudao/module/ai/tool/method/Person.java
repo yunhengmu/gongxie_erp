@@ -2,7 +2,7 @@ package cn.iocoder.yudao.module.ai.tool.method;
 
 /**
  * 来自 Spring AI 官方文档
- *
+ * <p>
  * Represents a person with basic information.
  * This is an immutable record.
  */
