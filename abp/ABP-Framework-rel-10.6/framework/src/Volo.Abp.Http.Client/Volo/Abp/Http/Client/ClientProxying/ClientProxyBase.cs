@@ -1,0 +1,482 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
+using Volo.Abp.Content;
+using Volo.Abp.DependencyInjection;
+using Volo.Abp.EventBus.Local;
+using Volo.Abp.Http.Client.Authentication;
+using Volo.Abp.Http.Client.Proxying;
+using Volo.Abp.Http.Modeling;
+using Volo.Abp.Http.ProxyScripting.Generators;
+using Volo.Abp.Json;
+using Volo.Abp.Json.SystemTextJson;
+using Volo.Abp.MultiTenancy;
+using Volo.Abp.Reflection;
+using Volo.Abp.Threading;
+using Volo.Abp.Timing;
+using Volo.Abp.Tracing;
+
+namespace Volo.Abp.Http.Client.ClientProxying;
+
+public class ClientProxyBase<TService> : ITransientDependency
+{
+    public IAbpLazyServiceProvider LazyServiceProvider { get; set; } = default!;
+
+    protected IClientProxyApiDescriptionFinder ClientProxyApiDescriptionFinder => LazyServiceProvider.LazyGetRequiredService<IClientProxyApiDescriptionFinder>();
+    protected ICancellationTokenProvider CancellationTokenProvider => LazyServiceProvider.LazyGetRequiredService<ICancellationTokenProvider>();
+    protected ICorrelationIdProvider CorrelationIdProvider => LazyServiceProvider.LazyGetRequiredService<ICorrelationIdProvider>();
+    protected ICurrentTenant CurrentTenant => LazyServiceProvider.LazyGetRequiredService<ICurrentTenant>();
+    protected IOptions<AbpCorrelationIdOptions> AbpCorrelationIdOptions => LazyServiceProvider.LazyGetRequiredService<IOptions<AbpCorrelationIdOptions>>();
+    protected ICurrentTimezoneProvider CurrentTimezoneProvider => LazyServiceProvider.LazyGetRequiredService<ICurrentTimezoneProvider>();
+    protected IProxyHttpClientFactory HttpClientFactory => LazyServiceProvider.LazyGetRequiredService<IProxyHttpClientFactory>();
+    protected IRemoteServiceConfigurationProvider RemoteServiceConfigurationProvider => LazyServiceProvider.LazyGetRequiredService<IRemoteServiceConfigurationProvider>();
+    protected IOptions<AbpHttpClientOptions> ClientOptions => LazyServiceProvider.LazyGetRequiredService<IOptions<AbpHttpClientOptions>>();
+    protected IJsonSerializer JsonSerializer => LazyServiceProvider.LazyGetRequiredService<IJsonSerializer>();
+    protected IRemoteServiceHttpClientAuthenticator ClientAuthenticator => LazyServiceProvider.LazyGetRequiredService<IRemoteServiceHttpClientAuthenticator>();
+    protected ClientProxyRequestPayloadBuilder ClientProxyRequestPayloadBuilder => LazyServiceProvider.LazyGetRequiredService<ClientProxyRequestPayloadBuilder>();
+    protected ClientProxyUrlBuilder ClientProxyUrlBuilder => LazyServiceProvider.LazyGetRequiredService<ClientProxyUrlBuilder>();
+    protected ICurrentApiVersionInfo CurrentApiVersionInfo => LazyServiceProvider.LazyGetRequiredService<ICurrentApiVersionInfo>();
+    protected ILocalEventBus LocalEventBus => LazyServiceProvider.LazyGetRequiredService<ILocalEventBus>();
+    protected IOptions<AbpSystemTextJsonSerializerOptions>? SystemTextJsonSerializerOptions => LazyServiceProvider.LazyGetService<IOptions<AbpSystemTextJsonSerializerOptions>>();
+
+    protected virtual async Task RequestAsync(string methodName, ClientProxyRequestTypeValue? arguments = null)
+    {
+        using (await RequestAsync(BuildHttpProxyClientProxyContext(methodName, arguments)))
+        {
+        }
+    }
+
+    protected virtual async Task<T> RequestAsync<T>(string methodName, ClientProxyRequestTypeValue? arguments = null)
+    {
+        return await RequestAsync<T>(BuildHttpProxyClientProxyContext(methodName, arguments));
+    }
+
+    protected virtual async IAsyncEnumerable<T> RequestAsyncEnumerable<T>(string methodName, ClientProxyRequestTypeValue? arguments = null)
+    {
+        var requestContext = BuildHttpProxyClientProxyContext(methodName, arguments);
+        var responseContent = await RequestAsync(requestContext);
+        var options = SystemTextJsonSerializerOptions?.Value.JsonSerializerOptions;
+        var stream = await responseContent.ReadAsStreamAsync();
+        var items = options != null
+            ? System.Text.Json.JsonSerializer.DeserializeAsyncEnumerable<T>(stream, options)
+            : System.Text.Json.JsonSerializer.DeserializeAsyncEnumerable<T>(stream);
+        await foreach (var item in items)
+        {
+            yield return item!;
+        }
+    }
+
+    protected virtual ClientProxyRequestContext BuildHttpProxyClientProxyContext(string methodName, ClientProxyRequestTypeValue? arguments = null)
+    {
+        if (arguments == null)
+        {
+            arguments = new ClientProxyRequestTypeValue();
+        }
+
+        var methodUniqueName = $"{typeof(TService).FullName}.{methodName}.{string.Join("-", arguments.Values.Select(x => TypeHelper.GetFullNameHandlingNullableAndGenerics(x.Key)))}";
+        var action = ClientProxyApiDescriptionFinder.FindAction(methodUniqueName);
+        if (action == null)
+        {
+            throw new AbpException($"The API description of the {typeof(TService).FullName}.{methodName} method was not found!");
+        }
+
+        var actionArguments = action.Parameters.GroupBy(x => x.NameOnMethod).ToList();
+        if (action.SupportedVersions != null && action.SupportedVersions.Any())
+        {
+            //TODO: make names configurable
+            actionArguments.RemoveAll(x => x.Key == "api-version" || x.Key == "apiVersion");
+        }
+
+        return new ClientProxyRequestContext(
+            action,
+                actionArguments
+                .Select((x, i) => new KeyValuePair<string, object?>(x.Key, arguments.Values[i].Value))
+                .ToDictionary(x => x.Key, x => x.Value),
+            typeof(TService));
+    }
+
+    protected virtual async Task<T> RequestAsync<T>(ClientProxyRequestContext requestContext)
+    {
+        var responseContent = await RequestAsync(requestContext);
+
+        if (typeof(T) == typeof(IRemoteStreamContent) || typeof(T) == typeof(RemoteStreamContent))
+        {
+            /* returning a class that holds a reference to response
+             * content just to be sure that GC does not dispose of
+             * it before we finish doing our work with the stream */
+            return (T)(object)new RemoteStreamContent(
+                await responseContent.ReadAsStreamAsync(),
+                responseContent.Headers?.ContentDisposition?.FileNameStar ??
+                RemoveQuotes(responseContent.Headers?.ContentDisposition?.FileName).ToString(),
+                responseContent.Headers?.ContentType?.ToString(),
+                responseContent.Headers?.ContentLength);
+        }
+
+        using (responseContent)
+        {
+            var stringContent = await responseContent.ReadAsStringAsync();
+            if (typeof(T) == typeof(string))
+            {
+                var unwrapped = UnwrapStringResponse(stringContent, responseContent.Headers?.ContentType?.MediaType);
+                return (T)(object)unwrapped!;
+            }
+
+            if (stringContent.IsNullOrWhiteSpace())
+            {
+                return default!;
+            }
+
+            return JsonSerializer.Deserialize<T>(stringContent);
+        }
+    }
+
+    protected virtual string? UnwrapStringResponse(string body, string? contentType)
+    {
+        if (body.IsNullOrEmpty() || contentType.IsNullOrWhiteSpace())
+        {
+            return body;
+        }
+
+        if (!IsJsonMediaType(NormalizeMediaType(contentType!)))
+        {
+            return body;
+        }
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<string>(body);
+            return parsed ?? string.Empty;
+        }
+        catch
+        {
+            return body;
+        }
+    }
+
+    protected static string NormalizeMediaType(string mediaType)
+    {
+        if (mediaType.IsNullOrWhiteSpace())
+        {
+            return string.Empty;
+        }
+        var semi = mediaType.IndexOf(';');
+        return (semi < 0 ? mediaType : mediaType.Substring(0, semi)).Trim().ToLowerInvariant();
+    }
+
+    protected virtual async Task<HttpContent> RequestAsync(ClientProxyRequestContext requestContext)
+    {
+        var clientConfig = ClientOptions.Value.HttpClientProxies.GetOrDefault(requestContext.ServiceType) ?? throw new AbpException($"Could not get HttpClientProxyConfig for {requestContext.ServiceType.FullName}.");
+        var remoteServiceConfig = await RemoteServiceConfigurationProvider.GetConfigurationOrDefaultAsync(clientConfig.RemoteServiceName);
+
+        var client = HttpClientFactory.Create(clientConfig.RemoteServiceName);
+
+        var apiVersion = await GetApiVersionInfoAsync(requestContext);
+        var url = remoteServiceConfig.BaseUrl.EnsureEndsWith('/') + await GetUrlWithParametersAsync(requestContext, apiVersion);
+
+        var requestMessage = new HttpRequestMessage(requestContext.Action.GetHttpMethod(), url)
+        {
+            Content = await ClientProxyRequestPayloadBuilder.BuildContentAsync(requestContext.Action, requestContext.Arguments, JsonSerializer, apiVersion)
+        };
+
+        AddHeaders(requestContext.Arguments, requestContext.Action, requestMessage, apiVersion);
+
+        if (requestContext.Action.AllowAnonymous != true)
+        {
+            await ClientAuthenticator.Authenticate(
+                new RemoteServiceHttpClientAuthenticateContext(
+                    client,
+                    requestMessage,
+                    remoteServiceConfig,
+                    clientConfig.RemoteServiceName
+                )
+            );
+        }
+
+        HttpResponseMessage response;
+        try
+        {
+            foreach (var preSendAction in ClientOptions.Value.ProxyHttpClientPreSendActions.Where(x => x.Key  == clientConfig.RemoteServiceName).SelectMany(x => x.Value))
+            {
+                preSendAction(clientConfig, requestContext, client);
+            }
+
+            response = await client.SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead /*this will buffer only the headers, the content will be used as a stream*/,
+                GetCancellationToken(requestContext.Arguments)
+            );
+        }
+        catch (Exception ex)
+        {
+            throw new AbpRemoteCallException($"An error occurred during the ABP remote HTTP request. ({ex.Message}) See the inner exception for details.", ex);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            try
+            {
+                await ThrowExceptionForResponseAsync(response);
+            }
+            catch
+            {
+                response.Dispose();
+                throw;
+            }
+        }
+
+        return response.Content;
+    }
+
+    protected virtual async Task<ApiVersionInfo> GetApiVersionInfoAsync(ClientProxyRequestContext requestContext)
+    {
+        if (CurrentApiVersionInfo.ApiVersionInfo != null)
+        {
+            return CurrentApiVersionInfo.ApiVersionInfo;
+        }
+
+        var apiVersion = await FindBestApiVersionAsync(requestContext);
+
+        //TODO: Make names configurable?
+        var versionParam = requestContext.Action.Parameters.FirstOrDefault(p => p.Name == "apiVersion" && p.BindingSourceId == ParameterBindingSources.Path) ??
+                           requestContext.Action.Parameters.FirstOrDefault(p => p.Name == "api-version" && p.BindingSourceId == ParameterBindingSources.Query);
+
+        return new ApiVersionInfo(versionParam?.BindingSourceId!, apiVersion);
+    }
+
+    protected virtual async Task<string> GetUrlWithParametersAsync(ClientProxyRequestContext requestContext, ApiVersionInfo apiVersion)
+    {
+        return await ClientProxyUrlBuilder.GenerateUrlWithParametersAsync(requestContext.Action, requestContext.Arguments, apiVersion);
+    }
+
+    protected virtual async Task<HttpContent?> GetHttpContentAsync(ClientProxyRequestContext requestContext, ApiVersionInfo apiVersion)
+    {
+        return await ClientProxyRequestPayloadBuilder.BuildContentAsync(requestContext.Action, requestContext.Arguments, JsonSerializer, apiVersion);
+    }
+
+    protected virtual async Task<string> FindBestApiVersionAsync(ClientProxyRequestContext requestContext)
+    {
+        var configuredVersion = await GetConfiguredApiVersionAsync(requestContext);
+
+        if (requestContext.Action.SupportedVersions.IsNullOrEmpty())
+        {
+            return configuredVersion ?? "1.0";
+        }
+
+        if (requestContext.Action.SupportedVersions!.Contains(configuredVersion!))
+        {
+            return configuredVersion!;
+        }
+
+        return requestContext.Action.SupportedVersions.Last(); //TODO: Ensure to get the latest version!
+    }
+
+    protected virtual async Task<string?> GetConfiguredApiVersionAsync(ClientProxyRequestContext requestContext)
+    {
+        var clientConfig = ClientOptions.Value.HttpClientProxies.GetOrDefault(requestContext.ServiceType)
+                           ?? throw new AbpException($"Could not get DynamicHttpClientProxyConfig for {requestContext.ServiceType.FullName}.");
+
+        return (await RemoteServiceConfigurationProvider
+            .GetConfigurationOrDefaultOrNullAsync(clientConfig.RemoteServiceName))?.Version;
+    }
+
+    protected virtual async Task ThrowExceptionForResponseAsync(HttpResponseMessage response)
+    {
+        var wwwAuthenticate = response.Headers.WwwAuthenticate.ToString() ?? string.Empty;
+        var errorMatch = Regex.Match(wwwAuthenticate, "error=\"([^\"]+)\"");
+        var errorDescriptionMatch = Regex.Match(wwwAuthenticate, "error_description=\"([^\"]+)\"");
+        var errorUriMatch = Regex.Match(wwwAuthenticate, "error_uri=\"([^\"]+)\"");
+        var error = errorMatch.Success ? errorMatch.Groups.Count == 2 ? errorMatch.Groups[1].Value : null : null;
+        var errorDescription = errorDescriptionMatch.Success ? errorDescriptionMatch.Groups.Count == 2 ? errorDescriptionMatch.Groups[1].Value : null : null;
+        var errorUri = errorUriMatch.Success ? errorUriMatch.Groups.Count == 2 ? errorUriMatch.Groups[1].Value : null : null;
+
+        await LocalEventBus.PublishAsync(new ClientProxyExceptionEventData()
+        {
+            StatusCode = (int?)response.StatusCode,
+            ReasonPhrase = response.ReasonPhrase,
+            Error = error,
+            ErrorDescription = errorDescription,
+            ErrorUri = errorUri,
+        });
+
+        if (response.Headers.Contains(AbpHttpConsts.AbpErrorFormat))
+        {
+            RemoteServiceErrorResponse errorResponse;
+            try
+            {
+                errorResponse = JsonSerializer.Deserialize<RemoteServiceErrorResponse>(
+                    await response.Content.ReadAsStringAsync()
+                );
+            }
+            catch (Exception ex)
+            {
+                throw new AbpRemoteCallException(
+                    new RemoteServiceErrorInfo
+                    {
+                        Message = response.ReasonPhrase,
+                        Code = response.StatusCode.ToString(),
+                        Details = errorDescription
+                    },
+                    ex
+                )
+                {
+                    HttpStatusCode = (int)response.StatusCode
+                };
+            }
+
+            throw new AbpRemoteCallException(errorResponse.Error)
+            {
+                HttpStatusCode = (int)response.StatusCode
+            };
+        }
+        else
+        {
+            throw new AbpRemoteCallException(
+                new RemoteServiceErrorInfo
+                {
+                    Message = response.ReasonPhrase,
+                    Code = response.StatusCode.ToString(),
+                    Details = errorDescription
+                }
+            )
+            {
+                HttpStatusCode = (int)response.StatusCode
+            };
+        }
+    }
+
+    protected virtual void AddHeaders(
+        IReadOnlyDictionary<string, object?> argumentsDictionary,
+        ActionApiDescriptionModel action,
+        HttpRequestMessage requestMessage,
+        ApiVersionInfo apiVersion)
+    {
+        AddAcceptHeaders(action, requestMessage, apiVersion);
+
+        //Header parameters
+        var headers = action.Parameters.Where(p => p.BindingSourceId == ParameterBindingSources.Header).ToArray();
+        foreach (var headerParameter in headers)
+        {
+            var value = HttpActionParameterHelper.FindParameterValue(argumentsDictionary, headerParameter);
+            if (value != null)
+            {
+                requestMessage.Headers.Add(headerParameter.Name, value.ToString());
+            }
+        }
+
+        //CorrelationId
+        var correlationId = CorrelationIdProvider.Get();
+        if (correlationId != null)
+        {
+            requestMessage.Headers.Add(AbpCorrelationIdOptions.Value.HttpHeaderName, correlationId);
+        }
+
+        //TenantId
+        if (CurrentTenant.Id.HasValue)
+        {
+            //TODO: Use AbpAspNetCoreMultiTenancyOptions to get the key
+            requestMessage.Headers.Add(TenantResolverConsts.DefaultTenantKey, CurrentTenant.Id.Value.ToString());
+        }
+
+        //Culture
+        //TODO: Is that the way we want? Couldn't send the culture (not ui culture)
+        var currentCulture = CultureInfo.CurrentUICulture.Name ?? CultureInfo.CurrentCulture.Name;
+        if (!currentCulture.IsNullOrEmpty())
+        {
+            requestMessage.Headers.AcceptLanguage.Add(new StringWithQualityHeaderValue(currentCulture));
+        }
+
+        //X-Requested-With
+        requestMessage.Headers.Add("X-Requested-With", "XMLHttpRequest");
+
+        //Timezone
+        if (!CurrentTimezoneProvider.TimeZone.IsNullOrWhiteSpace())
+        {
+            requestMessage.Headers.Add(TimeZoneConsts.DefaultTimeZoneKey, CurrentTimezoneProvider.TimeZone);
+        }
+    }
+
+    protected virtual void AddAcceptHeaders(
+        ActionApiDescriptionModel action,
+        HttpRequestMessage requestMessage,
+        ApiVersionInfo apiVersion)
+    {
+        var acceptForReturn = GetAcceptForActionReturn(action);
+        var versionSuffix = apiVersion.Version.IsNullOrEmpty() ? string.Empty : $"; v={apiVersion.Version}";
+
+        if (!acceptForReturn.IsNullOrEmpty())
+        {
+            requestMessage.Headers.Add("accept", acceptForReturn + versionSuffix);
+        }
+        else
+        {
+            requestMessage.Headers.Add("accept", MimeTypes.Text.Plain + versionSuffix);
+            requestMessage.Headers.Add("accept", MimeTypes.Application.Json + versionSuffix);
+        }
+
+        if (!apiVersion.Version.IsNullOrEmpty())
+        {
+            requestMessage.Headers.Add("api-version", apiVersion.Version);
+        }
+    }
+
+    protected virtual string? GetAcceptForActionReturn(ActionApiDescriptionModel action)
+    {
+        if (action.ReturnValue.IsRemoteStream ||
+            action.ReturnValue.Type == typeof(IRemoteStreamContent).FullName ||
+            action.ReturnValue.Type == typeof(RemoteStreamContent).FullName)
+        {
+            return MimeTypes.Application.OctetStream;
+        }
+
+        var contentTypes = action.ReturnValue.ContentTypes;
+        if (contentTypes == null || contentTypes.Count == 0)
+        {
+            return null;
+        }
+
+        var normalized = contentTypes.Select(NormalizeMediaType).ToList();
+
+        return normalized.FirstOrDefault(IsJsonMediaType) ?? normalized[0];
+    }
+
+    private static bool IsJsonMediaType(string normalizedMediaType)
+    {
+        return normalizedMediaType.Equals(MimeTypes.Application.Json, StringComparison.OrdinalIgnoreCase) ||
+               normalizedMediaType.Equals("text/json", StringComparison.OrdinalIgnoreCase) ||
+               normalizedMediaType.EndsWith("+json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    protected virtual StringSegment RemoveQuotes(StringSegment input)
+    {
+        if (!StringSegment.IsNullOrEmpty(input) && input.Length >= 2 && input[0] == '"' && input[input.Length - 1] == '"')
+        {
+            input = input.Subsegment(1, input.Length - 2);
+        }
+
+        return input;
+    }
+
+    protected virtual CancellationToken GetCancellationToken(IReadOnlyDictionary<string, object?> arguments)
+    {
+        var cancellationTokenArg = arguments.LastOrDefault();
+
+        if (cancellationTokenArg.Value is CancellationToken cancellationToken)
+        {
+            if (cancellationToken != default)
+            {
+                return cancellationToken;
+            }
+        }
+
+        return CancellationTokenProvider.Token;
+    }
+}

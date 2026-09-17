@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="Ktve4H0UZ6dF3EnEiCDdpi">
+<head data-page-node-id="PFh1WOhxJODK5RY8urIzMq">
+<meta charset="UTF-8" data-page-node-id="Yk16fD3HQ6Ae9BlGoLKztn">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="00Ypw74L4j79Z91wabKuBb">
+<title>ABP 仓库目录逐层导览</title>
+<style>
+:root{
+  --bg:#ffffff; --bg-sub:#f7f8fa; --bg-code:#f4f6f8; --bg-inline:#eef1f5;
+  --text:#1f2328; --text-sub:#59636e; --text-mute:#8b949e;
+  --border:#d8dee4; --border-soft:#e6e9ed;
+  --blue:#0969da; --blue-bg:#ddf4ff; --green:#1a7f37; --green-bg:#dafbe1;
+  --amber:#9a6700; --amber-bg:#fff8c5; --red:#cf222e; --red-bg:#ffebe9;
+  --purple:#8250df; --purple-bg:#fbefff; --teal:#0f6e56; --teal-bg:#e1f5ee;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117; --bg-sub:#161b22; --bg-code:#161b22; --bg-inline:#21262d;
+    --text:#e6edf3; --text-sub:#9198a1; --text-mute:#6e7681;
+    --border:#30363d; --border-soft:#21262d;
+    --blue:#4493f8; --blue-bg:#0c2d6b; --green:#3fb950; --green-bg:#0f2f1a;
+    --amber:#d29922; --amber-bg:#3a2d00; --red:#f85149; --red-bg:#3d1418;
+    --purple:#ab7df8; --purple-bg:#2b1c4a; --teal:#3fb9a0; --teal-bg:#0c2f28;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.72;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1060px;margin:0 auto;padding:46px 26px 100px}
+header.doc{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:30px}
+header.doc .eyebrow{font-size:12.5px;letter-spacing:.12em;color:var(--text-mute);text-transform:uppercase;font-weight:600}
+header.doc h1{font-size:29px;line-height:1.3;margin:12px 0;font-weight:700;letter-spacing:-.01em}
+header.doc p.lead{color:var(--text-sub);font-size:15.5px;margin:0;max-width:820px}
+h2{font-size:21px;font-weight:700;margin:46px 0 6px;padding-top:14px;letter-spacing:-.01em}
+h2 .num{color:var(--blue);font-variant-numeric:tabular-nums;margin-right:8px}
+h3{font-size:16px;font-weight:650;margin:26px 0 8px}
+p{margin:12px 0}
+ul,ol{margin:12px 0;padding-left:24px}
+li{margin:5px 0}
+code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  font-size:12.5px;background:var(--bg-inline);padding:2px 6px;border-radius:5px;
+  word-break:break-all;white-space:normal}
+pre{background:var(--bg-code);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:15px 17px;overflow-x:auto;margin:14px 0;line-height:1.58}
+pre code{background:none;padding:0;font-size:12.5px;white-space:pre;word-break:normal}
+.callout{border-left:3px solid var(--blue);background:var(--blue-bg);padding:13px 18px;
+  border-radius:0 var(--radius) var(--radius) 0;margin:18px 0;font-size:14.3px}
+.callout.warn{border-color:var(--amber);background:var(--amber-bg)}
+.callout.tip{border-color:var(--green);background:var(--green-bg)}
+.callout.danger{border-color:var(--red);background:var(--red-bg)}
+.callout p:first-child{margin-top:0}.callout p:last-child{margin-bottom:0}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.4px}
+th,td{border:1px solid var(--border-soft);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--bg-sub);font-weight:650;white-space:nowrap}
+td code{font-size:12.1px}
+.card{border:1px solid var(--border-soft);border-radius:var(--radius);padding:16px 20px;margin:16px 0;background:var(--bg)}
+.card .hd{font-size:16px;font-weight:650;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card .hd .n{font-family:monospace;font-size:14.5px;color:var(--blue)}
+.card .meta{font-size:12.5px;color:var(--text-mute);margin-top:4px}
+.card p{margin:9px 0}
+.pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:20px;font-weight:600;vertical-align:middle}
+.pill.hit{background:var(--green-bg);color:var(--green)}
+.pill.mid{background:var(--amber-bg);color:var(--amber)}
+.pill.low{background:var(--bg-inline);color:var(--text-mute)}
+.pill.fw{background:var(--purple-bg);color:var(--purple)}
+.pill.new{background:var(--red-bg);color:var(--red)}
+.toc{background:var(--bg-sub);border:1px solid var(--border-soft);border-radius:var(--radius);padding:18px 24px;margin:24px 0}
+.toc h3{margin:0 0 10px;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-mute)}
+.toc ol{margin:0;padding-left:20px;columns:2;column-gap:30px}
+@media(max-width:760px){.toc ol{columns:1}}
+.toc li{margin:4px 0;font-size:13.8px}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.foot{margin-top:56px;padding-top:20px;border-top:1px solid var(--border);color:var(--text-mute);font-size:13px}
+</style>
+</head>
+<body data-page-node-id="GEex5E8H74IlMpd0EyoSsr">
+<div class="wrap" data-page-node-id="aHUFWRxTPvlDRBPXG9Gvjp">
+
+<header class="doc" data-page-node-id="xMZiTVOiJg1foZ0GihD82q">
+  <div class="eyebrow" data-page-node-id="QYH8tkjJkeiW8VyMvbLdeQ">ABP Framework rel-10.6 · 仓库导览</div>
+  <h1 data-page-node-id="mFoqUuGqs3bWrSfxvlzijj">从根目录开始：ABP 仓库逐层导览</h1>
+  <p class="lead" data-page-node-id="lNRBhkE50KcHp3j30F4zjF">工作区根目录 <code data-page-node-id="ie21mQqjlGwIoho1E291Dk">D:\yudao\abp\ABP-Framework-rel-10.6</code> 下有 16 个业务目录 + 若干个隐藏目录。本文逐个说明「它是什么、里面有什么、你什么时候会来」，全部基于实际文件系统遍历，并标注了每个目录的重要度。</p>
+</header>
+
+<div class="toc" data-page-node-id="2zrLxaPHIR7qbW9GX1vB3A">
+  <h3 data-page-node-id="yi6O4cuOEkbVyMyYlCVMzs">导览目录</h3>
+  <ol data-page-node-id="wHLXKaIHRqL3L20SDaOoGA">
+    <li data-page-node-id="4aJowvV2Lm5xH0NaAPOeyk"><a href="#s0" data-page-node-id="WunvaYZuRXGgf28JcBloTk">根目录全景与体量</a></li>
+    <li data-page-node-id="ytCiLzKM6upObYbBwBaGqt"><a href="#s1" data-page-node-id="rDDQKmnEUAVUKf4VtziXlZ">开发主战场（4 个）</a></li>
+    <li data-page-node-id="WMfsxg0W3yCew7FQlOifi5"><a href="#s2" data-page-node-id="mqQKxEGPfne02cB9rk2mt2">规范与文档（4 个）</a></li>
+    <li data-page-node-id="G6cIhmHt1Ef631l8XbUq7s"><a href="#s3" data-page-node-id="VDmeHkv7Sfm4RBKh0XQjc5">工程化与发布（5 个）</a></li>
+    <li data-page-node-id="FpInDBd9KCnCXocwar7swP"><a href="#s4" data-page-node-id="Q2bSGTuB8YdXP8DNyxe4e6">边缘辅助（6 个）</a></li>
+    <li data-page-node-id="V0uFC421qhaCOHxUXML4s6"><a href="#s5" data-page-node-id="cCCLLFd2Pm4C0WMQODXDig">隐藏目录（.agents 等）</a></li>
+    <li data-page-node-id="q6CbwnB8gSKgI6pkDrzYWA"><a href="#s6" data-page-node-id="AL9NBcHvWWGm1dqehCqSbn">根级配置文件逐个说</a></li>
+    <li data-page-node-id="wYDcPtG5Ep1leeEYjx1F8T"><a href="#s7" data-page-node-id="hoThyRJWTYdLFGppUrShHI">给你的阅读路线建议</a></li>
+  </ol>
+</div>
+
+<!-- ============ 0 ============ -->
+<h2 id="s0" data-page-node-id="V6RXJF92vgSmMlbnqPCB4h"><span class="num" data-page-node-id="OVkynE1WlsgrEqeWZD9QF7">00</span>根目录全景与体量</h2>
+
+<p data-page-node-id="Vndx00MGgJjz6vTNt1XA5E">先看体量。这能帮你判断「哪个是主角、哪个是配角」——<b data-page-node-id="bSdFXB80cxxvuBJ85DW35j">文件数就是注意力的分配依据</b>。</p>
+
+<table data-page-node-id="vK7L0crh8mJpiTGfE1FGoC">
+<thead data-page-node-id="1Q3nesgGl86bFZ7gaXADYx"><tr data-page-node-id="mTMAtcX4Dec715iryrt1oP"><th data-page-node-id="Fgld7SOz11FOpOXgXBO3oI">目录</th><th data-page-node-id="qbUQpE6r8uMIUGD573lV7L">文件数</th><th data-page-node-id="mAsG5olQjB8KIaw0i87QCQ">一句话定位</th><th data-page-node-id="IXGmpjZJXVaAlypepARnGI">重要度</th></tr></thead>
+<tbody data-page-node-id="1IXjT2bybuyETwa1a5meva">
+<tr data-page-node-id="h2Mn7xUxqAhHb5sod6jN2R"><td data-page-node-id="gmD9TmGYDkEa35Gb6OqZcf"><code data-page-node-id="fPGWEn1MXmqeC1UVWfdv7Y">framework/</code></td><td data-page-node-id="FDhfGC5J7YGLR2KkZvVqLk">7574</td><td data-page-node-id="CCybGeI4udAv6s0HKeU7L7">框架内核源码（177 个 <code data-page-node-id="wzKMhaeeg1nqVXuWaBRokI">Volo.Abp.*</code> 包）</td><td data-page-node-id="CHHnB03GDoRU6nV2i9bONQ"><span class="pill hit" data-page-node-id="dCGC45edoKSR5ZVoJYo7xW">高</span></td></tr>
+<tr data-page-node-id="tWWVc3O0nITquDfkv0zwgh"><td data-page-node-id="nMTEY17anZjeQmUo8iAEjm"><code data-page-node-id="Jxt0gIZJqF6xfOfkwURCt3">modules/</code></td><td data-page-node-id="QMhPKFP960GbK4HKo6XEsH">5524</td><td data-page-node-id="Epms0CVpNYO1a7siVFvHBH">官方预置应用模块（19 个）</td><td data-page-node-id="ekX8oEyRcbbQUyqKdJbkMO"><span class="pill hit" data-page-node-id="GQttTYcVO170jfoXOYz6kU">高</span></td></tr>
+<tr data-page-node-id="7RVZK2G1uwpti6OXtHyjy0"><td data-page-node-id="mef4Cb9i1rNDzQMPYpNAB6"><code data-page-node-id="rjbZapFNKZDGAfUat9Vj0k">docs/</code></td><td data-page-node-id="vZNBMAdTMYPfgPeqcyRHJy">5024</td><td data-page-node-id="dH8anvEby3l4mspUsBlBEt">官方文档源码</td><td data-page-node-id="d68WhCnRj19IVbCeJrWEws"><span class="pill hit" data-page-node-id="IFWipeBWZCAuDf2wAoTHmS">高</span></td></tr>
+<tr data-page-node-id="0OhIycbpxJPToTZ0HxkA7L"><td data-page-node-id="JWRdFLNh1SCEHSpsnRtxKs"><code data-page-node-id="HYLSd66xUY1vXiuaBMF4yK">npm/</code></td><td data-page-node-id="7XigFIBV4jO2LekDi3UA5z">1759</td><td data-page-node-id="E9zc1GbPoHbYZzukmd0N0a">前端包（Angular/MVC 两套）</td><td data-page-node-id="wZrX5l3QcQu9Ekv9QxM5B4"><span class="pill hit" data-page-node-id="fwBCfDxexccoI2PCxMDMeh">高</span></td></tr>
+<tr data-page-node-id="P3ruu6dm3A4E60CMIV1qtc"><td data-page-node-id="vDmWWiT028edF03wvX5K7v"><code data-page-node-id="iqBfoAZN9j6HMrJAtsSDhF">templates/</code></td><td data-page-node-id="YVfOdrs6VqASwImdhLcFYi">1509</td><td data-page-node-id="ysH9NhMWaZq0KldH8ZTGFN">启动模板（7 类），你建项目就用它</td><td data-page-node-id="jxsA2vKkpkIPtowJxD5Z1f"><span class="pill hit" data-page-node-id="IjumX2ABBXEHuYrS0hvpBR">高</span></td></tr>
+<tr data-page-node-id="UlrGufl4VP6w1LEK6cTo0w"><td data-page-node-id="ABMveC9ididixtVI1LaEyI"><code data-page-node-id="mk4AQ5H8o5PtATgWD7INMR">test/</code></td><td data-page-node-id="TijUzwA3zNYdHwE3BifK44">291</td><td data-page-node-id="l23zlescgx6F1pZAPM2RmR">性能压测项目</td><td data-page-node-id="9EYB3ZHPRmpo8MAqnjT29T"><span class="pill low" data-page-node-id="2OXChrWJTg0aJMXHLwGFKG">低</span></td></tr>
+<tr data-page-node-id="zAxKIZGtJlU4xsNm0v3Rcm"><td data-page-node-id="Acza0hFiWoYd38LYrI6BAD"><code data-page-node-id="kijUoo82kaYs7FkY9SCSPo">abp_io/</code></td><td data-page-node-id="RNXyvDny7KSKEjj8eEobvK">233</td><td data-page-node-id="UrAFapYcYQ2mMtHkKOVMdp">官网相关的多语言资源</td><td data-page-node-id="AID0TCNz082mveqIJDprs0"><span class="pill low" data-page-node-id="yiFTJDSmsOzDwX7yTu7i1e">低</span></td></tr>
+<tr data-page-node-id="j9BlicW7cDGWdUNCU0Boje"><td data-page-node-id="t2HvklDnlbzvy5Ke4UGl8m"><code data-page-node-id="5dBK4z1n6hJV8gRHl5zyLa">source-code/</code></td><td data-page-node-id="Lcmw4p8QcUMaAdeBOhSLph">73</td><td data-page-node-id="nu5DVNjE4CjkFWrgGgvI4w">模块源码打包产物（.zip）</td><td data-page-node-id="KSZeBnFe8XAj1vNYl6mrT7"><span class="pill low" data-page-node-id="HoHpfLtsV65yrle1e4wnaE">低</span></td></tr>
+<tr data-page-node-id="IxHcJP7D7cFNZVLFrakZ1d"><td data-page-node-id="A9rmZG5YfR7zWBNtOzJAER"><code data-page-node-id="sDrALgSpy2KHDyaUkF2YLT">schemas/</code></td><td data-page-node-id="qMew5eP94VvnyAThRp2kJF">38</td><td data-page-node-id="vcTEboPOvaih7pYB7qiy20">低代码 JSON schema</td><td data-page-node-id="eRhwF8mfjlExTbaOo0qahx"><span class="pill low" data-page-node-id="viizuhvHKkRtNoZh2D9Ngd">低</span></td></tr>
+<tr data-page-node-id="NG5OI7wLmGOYtzSfgG9EKK"><td data-page-node-id="UQ7PKJBEdfRI7vlYxIQBvD"><code data-page-node-id="DyfOZUpbylJTGkVxaQz1Bb">studio/</code></td><td data-page-node-id="BwjEVnI3KOsOAQ0bi8BEOE">36</td><td data-page-node-id="InNMAUj2IZ9CHGNFgquIXJ">ABP Studio 桌面端相关</td><td data-page-node-id="3B0kdE3kvCwra2vugnbgOZ"><span class="pill low" data-page-node-id="l6417FCKiEMQ7h4XfNgK2d">低</span></td></tr>
+<tr data-page-node-id="Xb5Pboqac72lpF7Kg7XujI"><td data-page-node-id="1lJxl8mAY1qBFhZ9Ew8ZaK"><code data-page-node-id="pdcA8miQ9cNYYbeLFRJUbD">tools/</code></td><td data-page-node-id="grkEdv8nZbWw9g0WqT5G22">31</td><td data-page-node-id="ocRckYhwqbHVSJVg61fDqR">开发辅助小工具</td><td data-page-node-id="3wUbL07ENTItX0s5jkp3iA"><span class="pill mid" data-page-node-id="U1kbaNxryfYLtmybHJAwyc">中</span></td></tr>
+<tr data-page-node-id="g4z7ifqwljF7rWDuzHrnDA"><td data-page-node-id="HiBckApUFW5iMlqbCKdUJQ"><code data-page-node-id="Jx5cdJWgKrAFgwLDxODJFT">ai-rules/</code></td><td data-page-node-id="4AA6FOpjh2QrXppkC3ZpGj">19</td><td data-page-node-id="TDtW7HUR4n7jalllahkPNW"><strong data-page-node-id="sstDlGVFxp5TSfMWyaPCu4">AI 编码规则</strong>（.mdc 分主题）</td><td data-page-node-id="5F0N4YbOk502vlsihmKALT"><span class="pill hit" data-page-node-id="Xcn0hgRWEa0YvkgwpvmaSt">高</span></td></tr>
+<tr data-page-node-id="0Wvh5iamABVCVuaQ5xTnk4"><td data-page-node-id="pQCVWFEXBzHmEQnlpoiTtA"><code data-page-node-id="THGBBJoxV3AJ1Jz8xJ6Qwn">deploy/</code></td><td data-page-node-id="B5qf4P59EqNhxCRgGFAk9u">12</td><td data-page-node-id="E5rFUdRlnwHqyau3AGjuxq">官方发布流水线脚本</td><td data-page-node-id="ORhf7GPzXCsoPVITfVQPCi"><span class="pill low" data-page-node-id="I4FAH0sPSq41ZQDhx5LmED">低</span></td></tr>
+<tr data-page-node-id="JHjNN5vBfZnFGNzquFYRy2"><td data-page-node-id="09AUSUg8z7vy1xJdp9KFbn"><code data-page-node-id="QMdIfcUK5bh8oNOkOU75Z6">nupkg/</code></td><td data-page-node-id="cRedNVuEErEMtcCwg33tZM">7</td><td data-page-node-id="oCLJxgse89J7ZBZTSqGjKK">NuGet 打包脚本</td><td data-page-node-id="G8cf4kcQesDAVlLimH4EDC"><span class="pill low" data-page-node-id="yv6bRJACC6ff4DwMNGn7C5">低</span></td></tr>
+<tr data-page-node-id="CWLg6eVit2VI8ZSwsASDoQ"><td data-page-node-id="FKq0rT85Tyzz74O6GuwCWP"><code data-page-node-id="kQpruTa8bHJ4Z8NymOviDK">build/</code></td><td data-page-node-id="pLtFsEcoqxqreRsU1xFirU">4</td><td data-page-node-id="uksbQWxIV4w2OYPc7VBJPW">全量构建/测试脚本</td><td data-page-node-id="DJCnaeYSkqR7sktJg3hbV1"><span class="pill mid" data-page-node-id="wrDk4zWAArn5ri4L3PsPPh">中</span></td></tr>
+<tr data-page-node-id="XwGaFeafelHEPvS9CXNEz6"><td data-page-node-id="Z8d7h82V9k1YBGb6btg9Hx"><code data-page-node-id="vL6mMnhn8oHgh95OxP3DQh">apiSpec/</code></td><td data-page-node-id="V0WsIayYtlS63WENfAAGiI">1</td><td data-page-node-id="PWVZ3HU7pQwW9A5fghDm6Z">一份 API 设计笔记</td><td data-page-node-id="WnC1ADYeMd4q4WwY4yQdLx"><span class="pill low" data-page-node-id="6Xxx5vk27l0EEZeFguzTu7">低</span></td></tr>
+</tbody>
+</table>
+
+<p data-page-node-id="cvCkiB3BS31IneCzz59xLu">另有隐藏目录：<code data-page-node-id="4Gp2UoIdkw9M6D8WEDhZeC">.agents/</code>、<code data-page-node-id="3rLx83lcnnZobblFLzyv2l">.claude/</code>、<code data-page-node-id="TwD2jFEktENbhbqMg1yHA5">.github/</code>、<code data-page-node-id="vee6awsqS8YGqZY5Ou87kD">.workbuddy/</code>，以及 <code data-page-node-id="bEUi9zuXs2vHds9fZHVg0f">.cursorrules</code>、<code data-page-node-id="id7mjEP9ZQdR4VshoRMraL">.editorconfig</code> 等根级文件（第 05、06 节细说）。</p>
+
+<div class="callout" data-page-node-id="BI5OkuINWzRCXr36jN1vZX">
+<p data-page-node-id="RlKN4szKKZnZ8i1XZNr3Aj"><strong data-page-node-id="ZEdROp8gZEU6QbtWuDjKcb">一个反直觉的事实：</strong><code data-page-node-id="PEe6zGWTSkHN0frMj8YsFj">framework/</code> 有 7574 个文件，是仓库最大的一块，但<b data-page-node-id="hLBeojT3wXfDOA8Om1DHOG">作为业务开发者，你 90% 的时间不该看它</b>。你真正要读的是 <code data-page-node-id="pE3twq3iDVFJ4uNOfriKwv">modules/</code>（学写法）和 <code data-page-node-id="68ppbpXsozdGAazM6OGhr1">templates/</code>（抄结构），加起来 7000 个文件，但结构清晰得多。<code data-page-node-id="hCmeTQIFmJnJdEqksY060b">framework/</code> 只在你想搞清「框架内部怎么实现」时才翻。</p>
+</div>
+
+<!-- ============ 1 ============ -->
+<h2 id="s1" data-page-node-id="zLl3o2uXEESLBvNUmgASRd"><span class="num" data-page-node-id="zqmtJgwHzgxesU4BV6XoUC">01</span>开发主战场（4 个）</h2>
+
+<div class="card" data-page-node-id="ItbcwM1K8h5NOaOUV96R92">
+<div class="hd" data-page-node-id="sItxCSaqUKjvsTXNeOntZB"><span class="n" data-page-node-id="7e6xAzNlBF2rVDGLPKiD6L">framework/</span> <span class="pill hit" data-page-node-id="1gB9zpVVAK6fKpgf1ep5f1">高</span> <span class="pill fw" data-page-node-id="uDQld69OXtHFNLLNah7xfs">只读为主</span></div>
+<div class="meta" data-page-node-id="jtqneq6p52xstnqRebbV3M">D:\yudao\abp\ABP-Framework-rel-10.6\framework · 7574 个文件</div>
+<p data-page-node-id="dgAIDDNafWAPV6ClgEDjry"><b data-page-node-id="ujDxSUuqyBTZkyY0Joy0GE">是什么：</strong>ABP 框架本体的全部源码。这就是你在 NuGet 上看到的 <code data-page-node-id="KUkPFyMrUghcEDWTOiyZrB">Volo.Abp.Core</code>、<code data-page-node-id="CFdc3v9SEgYIWW1F6zysu1">Volo.Abp.Ddd.Domain</code> 这些包的源仓库。</p>
+<p data-page-node-id="EFglwY5gQykZF9Wixu9Hpp"><b data-page-node-id="nMLE3ug2JR5ZFM9AvA1MYu">里面有什么：</b></p>
+<pre data-page-node-id="H7rHr4JEcVLI1TewamMXmh"><code data-page-node-id="bOFAPiorgmu7ayN4EJjuZX">framework\
+├── Volo.Abp.slnx                框架解决方案
+├── Volo.Abp.abpmdl / .abpsln    ABP Studio 用的模块/解决方案描述
+├── src\                         177 个包源码目录
+│   ├── Volo.Abp.Core\                    内核：模块系统、DI 约定、AOP
+│   ├── Volo.Abp.Ddd.Domain\              实体基类、仓储基类
+│   ├── Volo.Abp.Ddd.Application\         ApplicationService 基类
+│   ├── Volo.Abp.AspNetCore.Mvc\          动态 API、AbpControllerBase
+│   ├── Volo.Abp.EntityFrameworkCore\     AbpDbContext、EfCoreRepository
+│   ├── Volo.Abp.Authorization\           授权
+│   ├── Volo.Abp.Localization\            本地化
+│   ├── Volo.Abp.Auditing\                审计
+│   ├── Volo.Abp.EventBus\                事件总线
+│   ├── Volo.Abp.BackgroundJobs\          后台任务
+│   ├── Volo.Abp.MultiTenancy\            多租户
+│   ├── Volo.Abp.Uow\                     工作单元
+│   └── ...（约 165 个其它包）
+└── test\                        各包对应的单元测试（数十个 .Tests 工程）</code></pre>
+<p data-page-node-id="HW3tXVnLQpjzn39SfM3WJX"><b data-page-node-id="Qck2lRi6TG1yiBlVl2I3pD">什么时候来：</b>① 想知道「<code data-page-node-id="LcvHSTCeGTJrF48iqVRbPE">FullAuditedAggregateRoot</code> 到底给你加了哪些字段」；② 想确认「<code data-page-node-id="X8ndypFzpQylGglSsQQ5OB">ListService</code> 为什么没有 <code data-page-node-id="LGoIgyRNbxRSFJQPxQTZgW">providedIn:'root'</code>」这类框架行为；③ 想给框架提 PR。</p>
+<p data-page-node-id="4vDRCIM53nXFo2PxPgUdQN"><b data-page-node-id="HYadoJvUrapA9dwQFxcyRv">怎么找：</b>包名即目录名。<code data-page-node-id="80XalYDhpc7kYhLchRbeUR">Volo.Abp.Identity.Domain</code> 就在 <code data-page-node-id="nOgYPiSTZBOSLEnYJ6INPi">framework\src\Volo.Abp.Identity.Domain\</code>。</p>
+</div>
+
+<div class="card" data-page-node-id="ZCQcuQCienVElS1Mq3DFpc">
+<div class="hd" data-page-node-id="AGR4G44Bizr8FKZmyJE6zr"><span class="n" data-page-node-id="G7UUgOnHLdr2H8fKBTfdKt">modules/</span> <span class="pill hit" data-page-node-id="TxyjW7xePF33kJMaab8PEd">高 · 最推荐</span></div>
+<div class="meta" data-page-node-id="oClxwh1BpDXEU2qnYsJ4FL">D:\yudao\abp\ABP-Framework-rel-10.6\modules · 5524 个文件 · 19 个模块</div>
+<p data-page-node-id="Av43Q5djleEPoyMOLFU9DN"><b data-page-node-id="Y7X105xuATDHdCr3ZJ9nGR">是什么：</strong>官方预置的<b data-page-node-id="AKFTfCUlQxYRHGoKKMar0v">应用模块</b>——即「已经做好的业务功能」，可以直接装进你的项目（比如身份管理、租户管理、审计日志）。但对你来说，<b data-page-node-id="96i3KZrPyVTh8KAgUXamDO">它更大的价值是：这是「ABP 项目该怎么写」的官方标准答案</b>。</p>
+<p data-page-node-id="NNPyTeS6Kiig1lZrV8E3eo"><b data-page-node-id="cVvXrhI0HR6BH9SKCjPDGw">19 个模块：</b></p>
+<pre data-page-node-id="xLiV8Gt6OtOL0vTBdeUpZC"><code data-page-node-id="pNNd8DoEVbyBjIrCpnyw9v">modules\
+├── blogging\                ★ 博客模块 —— 最适合初学者读的完整业务范例
+├── identity\                身份：用户、角色、组织单元
+├── tenant-management\       租户管理（SaaS 多租户）
+├── permission-management\   权限管理
+├── setting-management\      设置管理
+├── feature-management\      功能开关
+├── audit-logging\           审计日志
+├── background-jobs\         后台任务
+├── blob-storing-database\   文件存储
+├── cms-kit\                 CMS（含博客、评论、标签、菜单等）
+├── account\                 账户（登录/注册/找回密码）
+├── identityserver\          IdentityServer 集成
+├── openiddict\              OpenIddict 集成
+├── users\                   用户抽象
+├── docs\                    文档站模块
+├── basic-theme\             基础主题
+├── virtual-file-explorer\   虚拟文件浏览
+├── client-simulation\       客户端模拟（压测用）
+└── README.md</code></pre>
+<p data-page-node-id="iMWHpCpCUcDss9grRqNlNr"><b data-page-node-id="eSTZkq3a6ClBl4EubCzo05">什么时候来：</b>想写一个业务功能但不确定「实体该不该有仓储接口」「DTO 怎么拆」「权限怎么定义」时，来这找一个结构类似的模块对照。</p>
+<p data-page-node-id="LT6qAGjU1E2hMhplyTbO4x"><b data-page-node-id="EVkOouRWalgLv7djl5jXgM">强烈建议起点：</b><code data-page-node-id="eMXaCys5v4sXxg882FU2gr">modules\blogging\</code>。它规模适中、业务好懂（文章/评论/标签），而且<b data-page-node-id="8IRvN7pOfmBuX3K4ZXNizB">没有占位名干扰</b>（不像 templates 里全是 <code data-page-node-id="wkhOfljm64iLmmDXv9KJcM">MyCompanyName.MyProjectName</code>）。</p>
+</div>
+
+<div class="card" data-page-node-id="abuzoiMS5D8tHGw5SuJYjj">
+<div class="hd" data-page-node-id="NnzCOJqZezZatlQpn1lYe5"><span class="n" data-page-node-id="QouOxzKiMAMsZQgixYQhro">templates/</span> <span class="pill hit" data-page-node-id="GtcVBgwLMNV5oZgR4lnjFq">高</span> <span class="pill new" data-page-node-id="1oN7crQDK0UaB2Aov4l7eC">全是占位名</span></div>
+<div class="meta" data-page-node-id="vKwM0FnajPqC9gPwhGDnsW">D:\yudao\abp\ABP-Framework-rel-10.6\templates · 1509 个文件 · 7 类模板</div>
+<p data-page-node-id="atPx8LaUkKEG4OhC6SHUsY"><b data-page-node-id="EnbGTPhVs7cUBDRiKbsQWZ">是什么：</strong>启动模板。<code data-page-node-id="LDjuYZV0v5Mxk9Wdodtfxf">abp new</code> 命令就是拿这里的模板，把占位名替换成你的项目名，生成一套可运行的项目骨架。</p>
+<pre data-page-node-id="DENUluGBGhev2Kw1C6Dlvl"><code data-page-node-id="AfPaAVl7aTWxM4EGNrDD7H">templates\
+├── app\              ★ 单应用模板（最常用）—— 含 angular + aspnet-core 双端
+├── module\           ★ 可复用模块模板 —— 内含官方最小范例 Samples\
+├── app-nolayers\     单层极简模板（不分层，适合小项目/微服务）
+├── console\          控制台应用模板
+├── maui\             MAUI 桌面/移动模板
+├── wpf\              WPF 桌面模板
+└── zip-templates.ps1 打包脚本</code></pre>
+<p data-page-node-id="2boRNufOY3zsqLvtjT82js"><b data-page-node-id="udawfER4yhgm73cq8LAzwR">什么时候来：</b>① 想知道「一个标准 ABP 项目长什么样」；② 想看七层分层到底怎么切；③ 想对照自己的项目缺了什么文件。</p>
+<div class="callout warn" data-page-node-id="v2CJfRP9jF0NHUZYPuJP5G">
+<p data-page-node-id="W6BtzOBbqR6xkjuujCVUF4"><b data-page-node-id="7mYHySBW2howVZPDqxjGc6">务必记住：</b>这里所有路径都含占位名 <code data-page-node-id="34nx31gjAXkRhfhWB0vfRe">MyCompanyName.MyProjectName</code>（C#）和 <code data-page-node-id="HSqBU8HDf9i7dN7Kb7LC6a">my-project-name</code>（Angular）。它们不是真实项目名，读的时候当变量看。详见《ABP 文件路径总索引》第 0 节。</p>
+</div>
+</div>
+
+<div class="card" data-page-node-id="DeegNF7YqMKOwql4gDIa9e">
+<div class="hd" data-page-node-id="JI0I3aTlhGiW3gFTFqc6lT"><span class="n" data-page-node-id="7xthbECfFKhPpZKgsn2Xby">npm/</span> <span class="pill hit" data-page-node-id="I5Pe9yRMJuLjo9YsTMqACb">高</span></div>
+<div class="meta" data-page-node-id="pocJJaTFo1EFFgPoPWLsXe">D:\yudao\abp\ABP-Framework-rel-10.6\npm · 1759 个文件</div>
+<p data-page-node-id="Fg7MXgdwDnU9rCqxBkKhbg"><b data-page-node-id="Yxmru4dW4cGAhraAJ7d2oF">是什么：</strong>所有前端相关的包。<b data-page-node-id="eNS4VSN1jMSVnGOMVTK0ZC">分成两套完全不同的东西</b>，这是最容易混淆的地方：</p>
+<pre data-page-node-id="WNHeYG0zrda7y0jHFIWvBT"><code data-page-node-id="zP1Gptq2fKuRk74YyObg6F">npm\
+├── ng-packs\        ★ Angular 生态（@abp/ng.* 包）
+│   ├── packages\      源码：core / components / theme-shared / identity /
+│   │                  tenant-management / setting-management / cms-kit / oauth ...
+│   ├── apps\          dev-app（开发调试用的壳应用）
+│   ├── guides\        贡献指南
+│   └── nx.json / jest.config.ts / lerna.*.json    构建工具链
+├── packs\           MVC/Razor Pages 生态（前端资源包，gulp 打包）
+│   ├── aspnetcore.mvc.ui\ / aspnetcore.mvc.ui.theme.basic\ / .shared\
+│   ├── bootstrap\ / anchor-js\ / bootstrap-datepicker\ ...
+│   └── blogging\ / ...
+├── lerna.json / package.json / yarn.lock            monorepo 工具
+└── publish-ng.ps1 / publish-mvc.ps1                 发布脚本</code></pre>
+<p data-page-node-id="KJIQ4Qrs5GTNzwUaID1BSp"><b data-page-node-id="7jipWFpzAqZ6ZIrausBTDD">两套的区别：</b><code data-page-node-id="XgnYQLkaQ8RNxNF2Cgpqce">ng-packs</code> 是 Angular SPA 用的（TypeScript + npm）；<code data-page-node-id="rDBoYeBmMTGqLZyR2D9zgP">packs</code> 是 MVC/Razor Pages 用的（CSS/JS 资源，通过 ABP 的 bundling 机制引入）。<b data-page-node-id="3k8UdlQ165UaF5xxofQiF3">你用哪种 UI 形态，就只看哪一套</b>。</p>
+<p data-page-node-id="QAv3g2DGZoeu2O5CmsJfuL"><b data-page-node-id="TuBHELMqR6U1r17SmJ232h">什么时候来：</b>想搞清 Angular 侧某个组件/服务怎么实现的。比如 <code data-page-node-id="UXGDdTqLeVjFjoUHI5DQEs">npm\ng-packs\packages\core\src\lib\services\list.service.ts</code>。</p>
+</div>
+
+<!-- ============ 2 ============ -->
+<h2 id="s2" data-page-node-id="9Z7LRQFgXXhXTf7ET5f9bW"><span class="num" data-page-node-id="BMZMsOzFzANUFzlLPYLxRc">02</span>规范与文档（4 个）</h2>
+
+<div class="card" data-page-node-id="GGtlGSGlQwROUnokkcuvsD">
+<div class="hd" data-page-node-id="WIggdCCro1uucZxpENPjLr"><span class="n" data-page-node-id="XdEAdPAuoKHuipslnhjZwa">docs/</span> <span class="pill hit" data-page-node-id="gTkUmbYv6swyM0Bt1Slxl8">高</span></div>
+<div class="meta" data-page-node-id="sn1HEcTad3yyvTyOzMDOq8">D:\yudao\abp\ABP-Framework-rel-10.6\docs · 5024 个文件</div>
+<p data-page-node-id="d5wk4NNtx8T8vEF0Ng5b8u"><b data-page-node-id="zQxBEXfTGPX1bSR9O8cZsa">是什么：</b>官网文档（abp.io/docs）的源文件。都是 Markdown，可以离线读。</p>
+<pre data-page-node-id="jpdrz20GWGuFJWE03RGIkM"><code data-page-node-id="zCpHeNuwJ2G9eUrF9jdHCN">docs\
+├── docs-langs.json     语言清单
+└── en\                 英文版（目前仓库里只有英文）
+    ├── get-started\          入门
+    ├── framework\            ★ 框架文档主体：api-development / architecture /
+    │                           fundamentals / infrastructure / data / ui / real-time / dapr
+    ├── guides\               各种专题指南
+    ├── cli\                  ABP CLI 命令文档
+    ├── apps\                 应用相关
+    ├── deployment\           部署
+    ├── kb\                   知识库（FAQ 式）
+    ├── contribution\         贡献指南
+    ├── Community-Articles\   社区文章
+    ├── Blog-Posts\           博客文章
+    ├── images\               文档配图（数千张）
+    └── _resources\ / _deleted\</code></pre>
+<p data-page-node-id="jA5NAll07LNtoWv1uK00Z7"><b data-page-node-id="n58zvEBIdgrpjzWEiB453Z">什么时候来：</b>想深入某个主题时的第一手资料。<code data-page-node-id="mxZqMvEQyxsmGiLZRviOYU">docs\en\framework\</code> 是最常翻的，按主题分得很细。</p>
+<p data-page-node-id="PAblGXg35us6TIDQfU3ZGH"><b data-page-node-id="G9y8j6VoerHxweotZQpdHR">提示：</b>文档配图有 3000+ 张 PNG，占了大部分文件数；真正可读的 Markdown 约 1240 篇。</p>
+</div>
+
+<div class="card" data-page-node-id="5CoPXPgK4pWNBv441lMvii">
+<div class="hd" data-page-node-id="o4OsmEA2Wzx2ovnB4SdT2A"><span class="n" data-page-node-id="dZuXk1rHCs3koZJbeVBuPm">ai-rules/</span> <span class="pill hit" data-page-node-id="AjIkiDwZrswqQ0Sxy685pz">高 · 建议先读</span></div>
+<div class="meta" data-page-node-id="GgxCoskrFLxwWsANcTHfDQ">D:\yudao\abp\ABP-Framework-rel-10.6\ai-rules · 19 个 .mdc 文件</div>
+<p data-page-node-id="0GGwMUDWlMRXuUQ9g6RNzC"><b data-page-node-id="9JT2FetTkw5wnNuyaBnP7e">是什么：</b>把 <code data-page-node-id="uuMm1N6U70epFyjAjeph8I">.cursorrules</code> 那套规范<b data-page-node-id="NfFuJViLeJA4Dvuhav8LTT">按主题拆成了 19 份</b>，每份专注一个领域。比单文件版更好读、更适合按需查阅。</p>
+<pre data-page-node-id="WlE3juKDK6YWmb6vbH9RVC"><code data-page-node-id="Aze1UjRO2UT9ejntVgmqKn">ai-rules\
+├── README.md
+├── common\              通用规范
+│   ├── abp-core.mdc             内核约定
+│   ├── application-layer.mdc    应用层规范
+│   ├── authorization.mdc        授权
+│   ├── cli-commands.mdc         CLI 命令
+│   ├── ddd-patterns.mdc         DDD 模式
+│   ├── dependency-rules.mdc ★   分层依赖规则（最该先读）
+│   ├── development-flow.mdc ★   开发流程
+│   ├── infrastructure.mdc       基础设施
+│   └── multi-tenancy.mdc        多租户
+├── data\
+│   ├── ef-core.mdc         ★ EF Core 集成规范
+│   └── mongodb.mdc         MongoDB 集成规范
+├── template-specific\
+│   ├── app-nolayers.mdc    单层模板专属
+│   ├── microservice.mdc    微服务模板专属
+│   └── module.mdc          模块模板专属
+├── testing\patterns.mdc    测试模式
+└── ui\
+    ├── angular.mdc         ★ Angular 规范
+    ├── blazor.mdc          Blazor 规范
+    └── mvc.mdc             MVC 规范</code></pre>
+<p data-page-node-id="HEQ5dOis7BtmXUbQe6sHWa"><b data-page-node-id="jWwljbVppLy9got0tno2qN">什么时候来：</b>动手前查对应主题。<b data-page-node-id="D5agypccxFQsZgkOVK8B9p">如果你想快速建立框架的正确认知，<code data-page-node-id="Y8fmadwwiNWI3iygBm2fqK">dependency-rules.mdc</code> + <code data-page-node-id="geKmr6BXDzWmJTEO4qRgHB">development-flow.mdc</code> + <code data-page-node-id="X7blOTKeNQIgUOJSu35H4N">ddd-patterns.mdc</code> 这三份读完，比翻整个文档站效率高得多。</b></p>
+</div>
+
+<div class="card" data-page-node-id="2XHXDJPh4c2nRcGDZlTyiT">
+<div class="hd" data-page-node-id="ILw9vxTbdsoValCb6CBQkO"><span class="n" data-page-node-id="7oZtPhOAvAzyCXRnfo0XWA">.cursorrules</span> <span class="pill hit" data-page-node-id="X7oVu5BvbxkyXLY0dH82m0">高 · 单文件总纲</span></div>
+<div class="meta" data-page-node-id="02mxltxrdG2RYlJQRay0zS">D:\yudao\abp\ABP-Framework-rel-10.6\.cursorrules · 约 270 行</div>
+<p data-page-node-id="enJIn0vz8VTaFbiZaDLbGS"><b data-page-node-id="AqJsaqffoAFatWMyyQeHbC">是什么：</b>整个仓库的<b data-page-node-id="h0kD5EssWzmhKi1sHzDDbX">编码规范总纲</b>。头两行就写明了适用范围：</p>
+<pre data-page-node-id="P3C80ot4Uk5gfNleY2fABO"><code data-page-node-id="dbPDtZ5i9ekLjFPo1MRIY7"># ABP Framework – Cursor Rules
+# Scope: ABP Framework repository (abpframework/abp)
+#        — for developing ABP itself, not ABP-based applications.</code></pre>
+<p data-page-node-id="xZB9JLmzNeKZ5tjIoeFewB"><b data-page-node-id="HQjBWpv22KuBL3qxESnxNC">内容覆盖：</b>分层依赖、实体/聚合根、仓储、领域服务、应用服务、DTO、EF Core、MongoDB、模块类、可扩展性、向后兼容、本地化、设置与功能、权限、事件总线、测试、PR 规范、审查清单。</p>
+<div class="callout tip" data-page-node-id="az0xnC2wB4ZvhtJUjRT3lN">
+<p data-page-node-id="tMcNvFfdmSWfKrU8HHOULu"><b data-page-node-id="c29dBtlvnYIvxuS5ytDLLC">读法建议：</b>这是「逐条规则」式的文档，适合当手册查，不适合通读。配合 <code data-page-node-id="BUcjpMDOPyTGgBz27mxgGS">ai-rules/common/dependency-rules.mdc</code>（展开版）一起看效果最好。</p>
+</div>
+</div>
+
+<div class="card" data-page-node-id="hQ1ryiqdicB7MooF0AN7Le">
+<div class="hd" data-page-node-id="oJagHF3P3bPXhK6BdPPhRw"><span class="n" data-page-node-id="8afbXU9FD0DYYjih0FohGF">apiSpec/</span> <span class="pill low" data-page-node-id="3EW1J8GsXfMrJGcIX1JxAF">低</span></div>
+<div class="meta" data-page-node-id="0wUuCQj5Q8nSzuqs3zbbPy">D:\yudao\abp\ABP-Framework-rel-10.6\apiSpec · 1 个文件</div>
+<p data-page-node-id="Pr49Oq6zP82xWZn5orPViD"><b data-page-node-id="0q6JqxRxUurB58sK32vvZh">是什么：</b>只有一份 <code data-page-node-id="b2r9dJzSZ4Bn9aZgfMVPLQ">Microsoft_AspNetCore_Routing_AbpEndpointRouterOptions.md</code>——关于 ASP.NET Core 路由与 ABP 端点路由配置的笔记。是个边缘目录，可以忽略。</p>
+</div>
+
+<!-- ============ 3 ============ -->
+<h2 id="s3" data-page-node-id="2VxGQbHZVfH0kBlbIjjn3A"><span class="num" data-page-node-id="ACi5raaUKuJ4arwLtqKp8B">03</span>工程化与发布（5 个）</h2>
+
+<p data-page-node-id="dcBIMRh7r2AE4Eu008JMLG">这几个目录是<b data-page-node-id="gz4hLHjQ4Ssji3gGCJqk4E">ABP 团队自己发版用的</b>，业务开发完全不需要碰。但知道它们存在，能帮你理解「NuGet 包是怎么来的」。</p>
+
+<div class="card" data-page-node-id="Jw6a3KjlEkSDeGhP9Kqw8C">
+<div class="hd" data-page-node-id="xScvcubCKBuJik2KGXUA0k"><span class="n" data-page-node-id="2wd7YrHXtvXAsAKnbQxtDN">deploy/</span> <span class="pill low" data-page-node-id="hn9LfYk7CaTnCC2bBqmM23">低</span></div>
+<div class="meta" data-page-node-id="1BhUHQItwb7aTRbo94NF8c">D:\yudao\abp\ABP-Framework-rel-10.6\deploy · 12 个文件</div>
+<p data-page-node-id="CzOrkrGvUnEbd548ud06LL"><b data-page-node-id="DMamB9NR4JPFkGGMImxo8L">官方发版流水线。</b>脚本按序号执行，看名字就知道整条链路：</p>
+<pre data-page-node-id="WNfkJamcr97lyaqdqgtBq1"><code data-page-node-id="zGyy0AgCCcKg43h6BbwFH2">deploy\
+├── 1-fetch-and-build.ps1        拉代码并构建
+├── 2-nuget-pack.ps1             NuGet 打包
+├── 3-nuget-push.ps1             推送到 NuGet
+├── 4-npm-publish-mvc.ps1        发布 MVC 前端包
+├── 5-npm-publish-angular.ps1    发布 Angular 包
+├── 6-git-commit.ps1             提交版本变更
+├── 7-publish-github-release.ps1  发 GitHub Release
+├── 8-download-release-zip.ps1   下载发布包
+├── _run_all.ps1                 一键全流程
+├── new-github-release-function.psm1
+└── plink.exe                    （PuTTY 命令行，用于远程执行）</code></pre>
+</div>
+
+<div class="card" data-page-node-id="haby2EOgNInU2GfDkelxbX">
+<div class="hd" data-page-node-id="LLMln50aP0jpoBTxXyqykc"><span class="n" data-page-node-id="sr7F3PpPzHP72udhUKFQyf">build/</span> <span class="pill mid" data-page-node-id="RNkOTQj6mpjTuZ2iy2dS3h">中</span></div>
+<div class="meta" data-page-node-id="A8B3MIPdslfyds4sgPEWVW">D:\yudao\abp\ABP-Framework-rel-10.6\build · 4 个文件</div>
+<p data-page-node-id="DNBMAXp5DErHGG6wpdLvjC"><b data-page-node-id="Rl6GUkXxg990vNeWeYYKpn">你唯一可能用到的工程化脚本。</b></p>
+<pre data-page-node-id="usam4jFQ4g2TsSUVF4wZQf"><code data-page-node-id="qBB3jCfA26R0uYzAIES8hS">build\
+├── build-all.ps1           构建全部解决方案
+├── build-all-release.ps1   Release 模式构建
+├── test-all.ps1            跑全部测试
+└── common.ps1              公共函数</code></pre>
+<p data-page-node-id="tZDl1LeFAmQgTJeif5eTZ2"><b data-page-node-id="1dnpUJ1ZELR5dWfIYC78cb">什么时候来：</b>如果你想在本地把整个框架编译一遍，或跑框架自带的测试。</p>
+</div>
+
+<div class="card" data-page-node-id="WsaRMB2JhHT7wCRWEyqBpu">
+<div class="hd" data-page-node-id="NFH82bozfHzwAxAHz2iOeW"><span class="n" data-page-node-id="L9ZMvDpr19oolsm7fuZ42f">nupkg/</span> <span class="pill low" data-page-node-id="HertBa792MUJ0ZY2f41LrR">低</span></div>
+<div class="meta" data-page-node-id="2jNEAGRYtgtFgCICAVjQ3K">D:\yudao\abp\ABP-Framework-rel-10.6\nupkg · 7 个文件</div>
+<p data-page-node-id="kKGgjqFYqTdPGWAfknrADv"><b data-page-node-id="TzhiRLZbNfw21PycOFw73M">NuGet 打包脚本</b>：<code data-page-node-id="58HUBgV3qKVZiBh86kHxMR">pack.ps1</code>（打包）、<code data-page-node-id="OILGzPhzF5E6VuinMDbd76">push_packages.ps1</code>（推送）、<code data-page-node-id="Hthy1lK86LRYhhELH4ruLG">push-nightly-packages-myget.ps1</code>（推 nightly 到 MyGet）、<code data-page-node-id="ph60EDn9yG7mdfQV3NNfyZ">unit_test.ps1</code>。另有 <code data-page-node-id="dlh3LSmRxOArWS4vO8SuHO">0</code> 目录和 <code data-page-node-id="SRY59OQxDhvyJW23dZM87C">common.ps1</code>。</p>
+</div>
+
+<div class="card" data-page-node-id="BS1NcVZZAbXpgSHr93B9Ni">
+<div class="hd" data-page-node-id="YAaTOsATNhHaQlPBzpkToU"><span class="n" data-page-node-id="Vb6gnPcPq8H1Hp5NO8Q0Qf">tools/</span> <span class="pill mid" data-page-node-id="YoE4gw77RR2DEfG8DtZ5lv">中</span></div>
+<div class="meta" data-page-node-id="spfa8u3g9laY4sr4NhXhOi">D:\yudao\abp\ABP-Framework-rel-10.6\tools · 31 个文件</div>
+<p data-page-node-id="Br5cDwQyjlzd02IapLq9Vf"><b data-page-node-id="DDij8T9YVGIfPtsOQ3h4fk">开发辅助小工具</b>，其中第一个对多语言项目很有用：</p>
+<pre data-page-node-id="9gM7rZfXhM4revlEICKW2G"><code data-page-node-id="ncW4956MSVdl0Q3tn3CRPk">tools\
+├── localization-key-synchronizer\   ★ 本地化 key 同步器
+│                                     （检查各国 JSON 里缺了哪些 key）
+├── github-changelog-generator\     自动生成 CHANGELOG
+├── nuget\                          NuGet 相关工具
+└── smtp-prober-email-sender.exe    邮件发送测试器</code></pre>
+</div>
+
+<div class="card" data-page-node-id="8Rfesx51bfXe4JVdemP2wo">
+<div class="hd" data-page-node-id="IXM0JaRsHWA0ueAuHPJ9O1"><span class="n" data-page-node-id="Ymsuu4uFeLueweFQNSnfHo">test/</span> <span class="pill low" data-page-node-id="C0Z1go79LcmcvOmYn5j1X2">低</span></div>
+<div class="meta" data-page-node-id="AdQfAF9rxe1m76F9GmSJIv">D:\yudao\abp\ABP-Framework-rel-10.6\test · 291 个文件</div>
+<p data-page-node-id="znCADdaZiRbdXiyVyXhdDI"><b data-page-node-id="k2gBTkHvvJrCGmPR0i3Xmh">注意：这不是框架的单元测试</b>（那些在各包的 <code data-page-node-id="OK4PzLppaDZWFXdyoTzkdJ">.Tests</code> 里）。这里是<b data-page-node-id="FMKnFkgihOdAlmeJpulGTz">性能压测项目</b>：</p>
+<pre data-page-node-id="vgc8qCDPEQExlugMIqX34S"><code data-page-node-id="gWVtAWQYk1wTlYIzZEaabn">test\AbpPerfTest\
+├── AbpPerfTest.WithAbp\      使用 ABP 的对照实现
+├── AbpPerfTest.WithoutAbp\   不用 ABP 的裸实现
+├── _jmeter\                  JMeter 压测脚本
+├── _results\                 压测结果
+└── AbpPerfTest.slnx</code></pre>
+<p data-page-node-id="FQVj88ENsnCFiH4oTIF2wH">用途是量化「引入 ABP 后性能损耗多少」——用同一个场景跑两个实现做对比。</p>
+</div>
+
+<!-- ============ 4 ============ -->
+<h2 id="s4" data-page-node-id="dUTfZjyIAoCkZByF4W3tmY"><span class="num" data-page-node-id="ugFtHk5vsHl5uD5m0XxsB7">04</span>边缘辅助（6 个）</h2>
+
+<div class="card" data-page-node-id="mBFL3KbIoPOKHYRBmAJnk3">
+<div class="hd" data-page-node-id="NZzNp1QCrz65CCY9JlPvBu"><span class="n" data-page-node-id="IaUecwSwUmivY347C1COal">schemas/</span> <span class="pill low" data-page-node-id="xLEREv9u1QSfid6cYm2rGw">低</span></div>
+<div class="meta" data-page-node-id="SkigbAPfAt124Ns25fiOn5">D:\yudao\abp\ABP-Framework-rel-10.6\schemas · 38 个文件</div>
+<p data-page-node-id="B15tG8cjilpsD2pFr5RGRL">只有一个子目录 <code data-page-node-id="1aaamZLkj73prnN7MzGKCs">low-code\</code>，内含 <code data-page-node-id="ldvvpmZxJRxvKXT2O3C4Ab">manifest.json</code> + <code data-page-node-id="N8dhMG5e5tpGWqWHKB0JdD">definitions\</code>。<b data-page-node-id="f7kedLG10bdLyMlT7J4txU">这是低代码/可视化建模用的 JSON Schema</b>（ABP Studio 的图形化建模功能依赖它）。</p>
+</div>
+
+<div class="card" data-page-node-id="WIwaSNN1q3EkEoxglB650O">
+<div class="hd" data-page-node-id="TOuLT1szNqOr2ZLsohDmLZ"><span class="n" data-page-node-id="SajUwV9K1fgqefdjTZsklb">studio/</span> <span class="pill low" data-page-node-id="oua0KR9s3wqZaknIrAtN7j">低</span></div>
+<div class="meta" data-page-node-id="3Pjpvx2XJUSbju5nBy4PZq">D:\yudao\abp\ABP-Framework-rel-10.6\studio · 36 个文件</div>
+<p data-page-node-id="HTcD9dvuP6AzT72U4eQx1a">只有一个子目录 <code data-page-node-id="32spggRTART1SqNQ4ZupRz">source-codes\</code>，里面是一批 <code data-page-node-id="FdrrJmeJYRdAZLFCVwfEVd">Volo.Abp.*.SourceCode</code> 目录。<b data-page-node-id="zmTEEpGDyBvivurSqFfrE0">这是给 ABP Studio 用的「模块源码包」</b>——Studio 里点「查看模块源码」时展开的内容。</p>
+</div>
+
+<div class="card" data-page-node-id="vvvQssSTfewlUKOMDlosYP">
+<div class="hd" data-page-node-id="UBh5gCWZM9TUgf5TuTS2lj"><span class="n" data-page-node-id="z1r68BuJjZKHSHE9LVS28D">source-code/</span> <span class="pill low" data-page-node-id="R9WMxlbJnBAQZ1pDM9NX78">低</span></div>
+<div class="meta" data-page-node-id="A9zbXHGmV8gKCMGIomeLza">D:\yudao\abp\ABP-Framework-rel-10.6\source-code · 73 个文件</div>
+<p data-page-node-id="jOAoePqPlB8qOb0sonq3Wa">和上面 <code data-page-node-id="P7uzNoAwRG2Md2FdjH4S14">studio\source-codes\</code> 内容几乎一样（都是 <code data-page-node-id="hLnFuMvCLWXwsD5glF1BJt">Volo.Abp.Identity.SourceCode</code> 这类），差别是这里多了 <code data-page-node-id="gj6XFBealfWCmbUACA0nPJ">.slnx</code>、<code data-page-node-id="ZBtxhYtD6vOLeA0zTWNywo">.csproj</code>、<code data-page-node-id="BrYd93ZXA2DwY4oDkGkHoH">.zip</code>、<code data-page-node-id="cCx54cZ0MSn1Hnm9WYUglq">.xml</code> 等<b data-page-node-id="bDcZHLvbdivMPOgj2GV66h">打包产物</b>。</p>
+<div class="callout warn" data-page-node-id="IszucpvNQd14jk6Xgbvsam">
+<p data-page-node-id="E0GIHzkYhDCLjCFfIh0c82"><b data-page-node-id="dD8vl8Lc34cj3totn6ZU3J">别搞混：</b><code data-page-node-id="vNTreCwDHQSKX9713WcrLs">framework\src\</code>（可读可改的源码）≠ <code data-page-node-id="xkkCz1qpdYjuwEaXoQIu6K">source-code\</code>（.zip/.nuspec 分发产物）≠ <code data-page-node-id="iDGoRNifkITxZhWZimw6Dw">nupkg\</code>（打包脚本）。要找源码去 <code data-page-node-id="rpKFbUHv3JLd4l6kb5m07V">framework\src\</code>。</p>
+</div>
+</div>
+
+<div class="card" data-page-node-id="zfAa0vAg28H3V47p9o3VAK">
+<div class="hd" data-page-node-id="dP1Q3POxgA2Bb95ctzGZuO"><span class="n" data-page-node-id="QqsFQ0kiK3qjGKzAyshHXw">abp_io/</span> <span class="pill low" data-page-node-id="Jtq88KLZgq5tZEyETtHFIl">低</span></div>
+<div class="meta" data-page-node-id="5hSpPnEgEoHixDLdZUzEX0">D:\yudao\abp\ABP-Framework-rel-10.6\abp_io · 233 个文件</div>
+<p data-page-node-id="u9FXZ6M7WFzfB85knXBUGC">只有一个 <code data-page-node-id="2jiJw5m8Jo93pEPPW9GF2x">AbpIoLocalization\</code> 子目录 + README。<b data-page-node-id="4BMbzkAd14kHiJ6ly1ZFWM">是 abp.io 官网界面自身的多语言资源</b>（不是框架的多语言，是网站文案的翻译）。</p>
+</div>
+
+<div class="card" data-page-node-id="1fDocGxGx4RjgW4OT171Bk">
+<div class="hd" data-page-node-id="FkREF3KecNFtBTLArbYn5E"><span class="n" data-page-node-id="eFAMTDESvCIz0CRfrdNoc2">.github/</span> <span class="pill mid" data-page-node-id="wtulbNzLO0EfTG8RMkXG90">中</span></div>
+<div class="meta" data-page-node-id="4Y4iEfiLAybBEybzMANEyc">D:\yudao\abp\ABP-Framework-rel-10.6\.github</div>
+<p data-page-node-id="GMkUPESaOWp41ynI6s0oSX"><b data-page-node-id="DtGEn4ORYcn23ZaJQuhm4d">CI/CD 与协作文档。</b>两样东西值得看：</p>
+<pre data-page-node-id="mLCS949KIFsJlWr6MriUBu"><code data-page-node-id="rNaNrAEZVLnPPWg8G7xxrP">.github\
+├── copilot-instructions.md     ★ GitHub Copilot 的仓库级指令
+├── workflows\                  ★ CI 流水线（build-and-test.yml 等 20+ 个）
+│   ├── build-and-test.yml          主构建测试流程
+│   ├── angular.yml                 Angular 侧
+│   └── ...
+├── ISSUE_TEMPLATE\             各种 issue 模板
+├── scripts\                    维护脚本（更新版本号、依赖变更等）
+├── pull_request_template.md    PR 模板
+└── labeler.yml / stale.yml / lock.yml</code></pre>
+<p data-page-node-id="CtCCzV2pew7reVx0lPBxAI"><b data-page-node-id="eTsa5De95VETlSekDSlsVE">价值：</b><code data-page-node-id="zYYGubCGhtJ7llY1EFzEbv">workflows\</code> 告诉了你「官方怎么构建和测试这个仓库」，如果你要自己搭 CI 可以直接参考。</p>
+</div>
+
+<!-- ============ 5 ============ -->
+<h2 id="s5" data-page-node-id="x3YHhNwhuNh49yoc5tRTGh"><span class="num" data-page-node-id="odMmPXNzAD03sqfJJkwiz6">05</span>隐藏目录（这里有个大发现）</h2>
+
+<div class="callout tip" data-page-node-id="YJ7MvZu3O9D4eyxEWripdH">
+<p data-page-node-id="3R2ED9HMYco3YDJGVW6QkI"><strong data-page-node-id="Ja257htoAaapYhqNnH7hGC">意外发现：这个仓库自带一套 18 个「ABP 专用 AI 技能」。</strong>位置在 <code data-page-node-id="ILw9iDhNUCBAXJFCCfwqKY">.agents\skills\</code> 和 <code data-page-node-id="9JS2TcPwiCeFiWMgdbJNNQ">.claude\skills\</code>（两处内容相同，分别给不同 AI 工具用）。每个技能是一份结构化的 ABP 知识文件，包含正确的代码范式和约定。</p>
+</div>
+
+<pre data-page-node-id="IQKakoQCdOJulsr11PCs6J"><code data-page-node-id="HHIS8FBTQavdGhkzKOgY0W">.agents\skills\   （与 .claude\skills\ 内容一致，各 18 个）
+├── abp-core\               内核
+├── abp-ddd\                DDD 模式
+├── abp-dependency-rules\   ★ 依赖规则
+├── abp-development-flow\   ★ 开发全流程（实体→迁移→服务→本地化→权限→测试）
+├── abp-application-layer\  应用层
+├── abp-ef-core\            ★ EF Core 集成
+├── abp-mongodb\            MongoDB 集成
+├── abp-authorization\      授权
+├── abp-multi-tenancy\      多租户
+├── abp-infrastructure\     基础设施
+├── abp-module\             模块开发
+├── abp-microservice\       微服务
+├── abp-app-nolayers\       单层模板
+├── abp-testing\            测试
+├── abp-cli\                CLI 命令
+├── abp-angular\            ★ Angular 前端
+├── abp-blazor\             Blazor 前端
+└── abp-mvc\                MVC 前端</code></pre>
+
+<p data-page-node-id="pyUnh7SOB4RqsoOHapZvwH">举个例子，<code data-page-node-id="U73JLOk7NpWueNiF32fM34">abp-development-flow\SKILL.md</code> 开门见山就是一条完整流程，代码范式都是对的：</p>
+
+<pre data-page-node-id="nqtDSdoeW5tszOXIzyTrDo"><code data-page-node-id="6LhZiue7qlG8d69w3Kne72">---
+name: abp-development-flow
+description: ABP development workflow - step-by-step guide for adding new
+  entities, migrations, application services, localization, permissions,
+  and tests. Use when adding new features or entities to an ABP project.
+---
+
+## Adding a New Entity (Full Flow)
+
+### 1. Domain Layer
+Create entity (location varies by template: `*.Domain/Entities/` for layered,
+`Entities/` for single-layer/microservice):
+
+public class Book : AggregateRoot&lt;Guid&gt;
+{
+    public string Name { get; private set; }
+    public decimal Price { get; private set; }
+
+    protected Book() { }   // 给 ORM
+
+    public Book(Guid id, string name, decimal price, Guid authorId) : base(id)
+    {
+        Name = Check.NotNullOrWhiteSpace(name, nameof(name));
+        SetPrice(price);
+    }
+
+    public void SetPrice(decimal price)
+        =&gt; Price = Check.Range(price, nameof(price), 0, 9999);
+}
+...</code></pre>
+
+<p data-page-node-id="X5SWt0iucdtPJ4lwUDceh8"><b data-page-node-id="JEEBXLjQHJGvlgEjz1c7ik">对你的价值：</b>这 18 份文件相当于把 <code data-page-node-id="8vd7xmRG2h4PcBiKnscrYa">docs\</code> 里最关键的开发知识<b data-page-node-id="Px7xQfpulkFQubUGuYyMFk">压缩成了可检索的规则集</b>，而且每份都带正确代码。<b data-page-node-id="R9WIW7Exw37TNofxPPAu8n">比读文档站快，比读 <code data-page-node-id="WKkVKX2lhkFNoPAze8eFxC">.cursorrules</code> 聚焦。</b></p>
+
+<div class="card" data-page-node-id="epNCSx44XSmIZ6sC46NBM4">
+<div class="hd" data-page-node-id="Ca957YApouEuaXZtqamPe1"><span class="n" data-page-node-id="KrXhWA0C24uAfdSdxJnSP4">.workbuddy/</span> <span class="pill mid" data-page-node-id="AotPlTM0C685yfXkg1kun7">你的工作区</span></div>
+<div class="meta" data-page-node-id="Rw14izoxhGon59tO6VG4Cq">D:\yudao\abp\ABP-Framework-rel-10.6\.workbuddy</div>
+<p data-page-node-id="7ZyAwjlFVIfTW7OUZaQU02"><b data-page-node-id="CJUbVWke7hiC43CwKyZzBQ">这是本次对话产生的工作目录，不属于 ABP 仓库本身。</b>请勿删除。</p>
+<pre data-page-node-id="xsZArNb4v11mB4FCCsINjP"><code data-page-node-id="GC0s82wrOHdcdAv66IKWlL">.workbuddy\
+├── memory\
+│   └── 2026-09-10.md                        工作记录
+└── outputs\
+    ├── ABP-Framework-深度解析.md              框架内核源码级解析
+    ├── ABP-Framework-应用开发指南.html        分层+后端+前端全景指南
+    ├── ABP-前端开发工作流.html                前端八步工作流
+    └── ABP-文件路径总索引.html                路径倒查速查表</code></pre>
+</div>
+
+<p data-page-node-id="6XGpEUOi3jowQm1dhCFR9H">另外还有 <code data-page-node-id="fEV2OCR7H4sqVvrabg7b0D">.claude\settings.local.json</code>（Claude Code 本地配置）。</p>
+
+<!-- ============ 6 ============ -->
+<h2 id="s6" data-page-node-id="W6qJ9qqWoQCj4rGIZF0Ayn"><span class="num" data-page-node-id="jjyKEmfPjL89I2x7a1twAy">06</span>根级配置文件逐个说</h2>
+
+<table data-page-node-id="nwRmVymaaVARHFfmXQbhuP">
+<thead data-page-node-id="GR5f42aZQ7vLMBa5RiELgW"><tr data-page-node-id="akJMCUmtxdv0DWCpndUVZp"><th data-page-node-id="reBh8oZFFjptWUOGneF5m3">文件</th><th data-page-node-id="DtjxKmia7vvNhTxqPEcXJh">作用</th><th data-page-node-id="RRecPBEewKuM7YoyK3fQll">你要动吗</th></tr></thead>
+<tbody data-page-node-id="EH3e18wXsqZ6iotWAjeAZf">
+<tr data-page-node-id="ksk24dRSkPbZyhMitbKuVX"><td data-page-node-id="PEKjMdjLH37HyFt9uVuGg7"><code data-page-node-id="WjfQeaX2YSMhINyQQ4RC07">.cursorrules</code></td><td data-page-node-id="rWrxPLDn6Fyryu9azdjFQb">编码规范总纲（约 270 行）</td><td data-page-node-id="PD8TViRtDErlSDKGfufM3U">读，别改</td></tr>
+<tr data-page-node-id="HsVofLomzGqvYte6y2SLzg"><td data-page-node-id="1rhffPNLLUePUpG3oF88Eq"><code data-page-node-id="aEMaV8wjLbR0OxSNnEsEwB">.editorconfig</code></td><td data-page-node-id="rLjucN6F07hBZyW0VsWnXs">编辑器代码风格（缩进、换行、编码）</td><td data-page-node-id="d966PjMmgRABw2bGPfQ7ZH">一般不改</td></tr>
+<tr data-page-node-id="nmpX72zIxXnEWa30hG6930"><td data-page-node-id="ioBuoIagozz9IBumgxTEBz"><code data-page-node-id="OyHFisdCr6bDPkTyeGER87">Directory.Build.props</code></td><td data-page-node-id="pOGiuqEdY4miS6gajajMCN">全仓库通用的 MSBuild 属性（所有 .csproj 隐式继承）</td><td data-page-node-id="HuxPcvxjDBUsUVYi9c8lAC">不改</td></tr>
+<tr data-page-node-id="K5gVK4x4BfCb2HOtBEYN7u"><td data-page-node-id="NFKlndqZnWi1vD6uL4uE0B"><code data-page-node-id="o9nH6bNpke7IvhG5MAcy5i">Directory.Packages.props</code></td><td data-page-node-id="KoWCMIdCfDt7KDhjhSZ7aV"><strong data-page-node-id="JMzWixYr2YhF8HicsQcVuY">全仓库 NuGet 包版本集中管理</strong>（Central Package Management）</td><td data-page-node-id="QX7vHMcfy8RqTOyliYEDoF">查版本时看</td></tr>
+<tr data-page-node-id="FzNWNoQENrLHAZAtKhcI61"><td data-page-node-id="qFTKOt4gwdq37kgtcmrMNm"><code data-page-node-id="MgfZqiv0AjfT8uLxAnT1iT">common.props</code> / <code data-page-node-id="g14nxg40cKrZG7hFH4qF9L">common.test.props</code></td><td data-page-node-id="Uy3TGTt6dgjpIdnIDxV3Pc">项目共用的属性片段</td><td data-page-node-id="TghUe2EizkLZJplsY2YB5U">不改</td></tr>
+<tr data-page-node-id="n10A3ixzB3wNSAfAoFsymv"><td data-page-node-id="Ip7MEO5H0PP4MO9NLQ8HGq"><code data-page-node-id="ezWHLAwuUzpIir7RQ6W1gn">configureawait.props</code></td><td data-page-node-id="qCW0CUOnyYxUj2Dpn7Qqey"><code data-page-node-id="9vsKLSa7d9ZVvGNBcgC5zH">ConfigureAwait</code> 相关编译属性</td><td data-page-node-id="pGb4VsCBEMaxVtg95TSaXI">不改</td></tr>
+<tr data-page-node-id="JFVIZ6pa5sXr2T9H3aUU8k"><td data-page-node-id="NkIVegWut0Wt58Fvng9RiE"><code data-page-node-id="zx4sTrAAu6wdOjTJfvGENM">global.json</code></td><td data-page-node-id="7LgruvIiYvK0y446qfJC7B"><strong data-page-node-id="wqMfFIOEujy01pRcVDA594">锁定 .NET SDK 版本</strong>——编译报 SDK 错时来看</td><td data-page-node-id="zgFLXKV1RBDY0AA6EzTeJ4">查</td></tr>
+<tr data-page-node-id="GwUqFzdCikT2zj5JwyG1AH"><td data-page-node-id="sRXLrgKi6G8VDtlYS8pq8E"><code data-page-node-id="k3eoPPh81EVaRJukbQP45w">NuGet.Config</code></td><td data-page-node-id="rQOBEJsrK9CaFEvg21gfsc">NuGet 源配置（含私有源/预览源）</td><td data-page-node-id="gO0fnVpE1RrGk9qjWcqxdo">还原失败时看</td></tr>
+<tr data-page-node-id="J93NqTwBLdLGtiAlH0HnNm"><td data-page-node-id="lZmvzpg0DAcI1oDNk4ANnJ"><code data-page-node-id="GCDbirGD3BkgPDPPXd4IU8">latest-versions.json</code></td><td data-page-node-id="vGKBvrGiNoA9632SPB2XBi">各组件最新版本清单</td><td data-page-node-id="nWHqhFWIDEEVNCZDlMGR6B">查</td></tr>
+<tr data-page-node-id="3m3LzvFqAxJBdb6mAeWfAb"><td data-page-node-id="ZFBPMWpDiltGWglS38OnWV"><code data-page-node-id="Uon2K1yKauSm7BaMzx5bOM">common.DotSettings</code></td><td data-page-node-id="yVQE1aPwd6GnTCFtSjWsTl">ReSharper / Rider 的代码风格设置</td><td data-page-node-id="DzXYtUQv2i7DGctrMoWqZH">不改</td></tr>
+<tr data-page-node-id="X8BbQQAJyu8QMG4NGcf4rt"><td data-page-node-id="ZwJnt0vxX49TWKaP6jAqhm"><code data-page-node-id="1CydzHhpS5mURBqUpOjUkK">codecov.yml</code></td><td data-page-node-id="b5FsAPfdRGoGlshJ0j8Gco">代码覆盖率上报配置</td><td data-page-node-id="mBoTYSvJ2tU4pDjqP9Pcqa">不改</td></tr>
+<tr data-page-node-id="ThIdJAEibWetygvJExyXxT"><td data-page-node-id="D7p6POyj4lIL80ftirvdaG"><code data-page-node-id="6z6ib6CE7WD83QrSqOryUk">delete-bin-obj.ps1</code></td><td data-page-node-id="6TGUYsHlqx9W1E1GJVwJhM"><strong data-page-node-id="kmAlJHm7zMQKZiy60fPIzI">清理所有 bin/obj 目录</strong>——编译出现诡异错误时可跑一下</td><td data-page-node-id="8uFOvs3RB412ywNUT47RcD">可用</td></tr>
+<tr data-page-node-id="3nJFuujXBlsKF6LrEyqiIC"><td data-page-node-id="7ThBNuZGT2IeEjFqd3G0GE"><code data-page-node-id="9ifmpGmvZTrH1Rv9gSt5MQ">README.md</code></td><td data-page-node-id="Cs6PxQnCffU2graMk6Ag6s">项目介绍与快速上手链接</td><td data-page-node-id="R2zSIYGJEuV5LjTEPQF7k2">读</td></tr>
+<tr data-page-node-id="Ousyy2l3tZz1nGwffyIsfo"><td data-page-node-id="1ZG7Y0ZMX3DFesvU4KtOXg"><code data-page-node-id="bcHqNe2BaH1LcuiDyATYtY">CONTRIBUTING.md</code></td><td data-page-node-id="zK0Hgz2GaIiMOHW2RbKRwk">贡献指南（内容很短，指向文档站）</td><td data-page-node-id="CU4nNQM6CC3mzggf5QPWkj">读</td></tr>
+<tr data-page-node-id="auYyVqE8UYqYGTUG8BfYNQ"><td data-page-node-id="HJVrPy5nqmvE5jx8DnCE7t"><code data-page-node-id="h2KBXXO2RGdAoAatG8PHP6">CODE_OF_CONDUCT.md</code> / <code data-page-node-id="gMVfUpmVpxHHpoQK0NpW7Q">SECURITY.md</code> / <code data-page-node-id="NYXsxvF950TSM2KrZSVobp">LICENSE.md</code></td><td data-page-node-id="cEy8jzzHsXCapKN4EkbNPZ">行为准则 / 安全政策 / 开源协议（LGPL-3.0）</td><td data-page-node-id="mFDwlGVGQnv9UcPX8V1Jan">读</td></tr>
+<tr data-page-node-id="sq6Z2BrdcPUss9ld74gzj0"><td data-page-node-id="EpIOdBSYBJdOGC30a7FXZA"><code data-page-node-id="JTNz5X7icpXG8gF5AwlhuA">NuGet.md</code></td><td data-page-node-id="99XBf535MlwGaJFOmlqV6p">NuGet 包相关的说明</td><td data-page-node-id="qViDw29w464Z3knPZINbzT">低优先</td></tr>
+<tr data-page-node-id="CAc827xU5H5F8vfCurZDjD"><td data-page-node-id="aMJPbkTZxKYaC5xJUCjSOc"><code data-page-node-id="JuaWdTnIcKCZGT8QRdHGQ8">.gitignore</code> / <code data-page-node-id="VFvifESxWmRilIatKndREV">.gitattributes</code> / <code data-page-node-id="IQ0Daxsk8K0Fun9seMfRGl">.dockerignore</code></td><td data-page-node-id="TjmSTbZGEreGcxfldb597l">Git 与 Docker 忽略规则</td><td data-page-node-id="U5qPow7rGK6BjIBrFrs9eo">不改</td></tr>
+</tbody>
+</table>
+
+<!-- ============ 7 ============ -->
+<h2 id="s7" data-page-node-id="4iSrWmESGaN0qEXD6NxK83"><span class="num" data-page-node-id="KHvjuZAvgF9RoBH1T0fQa7">07</span>给你的阅读路线建议</h2>
+
+<p data-page-node-id="ANKsTZLEHIsgNOMJ7Wsmnd">仓库有 2 万多个文件，漫无目的地翻必然迷路。按下面这个顺序走，两周能建立完整认知。</p>
+
+<ol data-page-node-id="Q8FhhyCC3lm3hKVefplvgY">
+<li data-page-node-id="e461TzgcOmT7FEaIp03Gbf"><b data-page-node-id="ahVYoghAvVe56gg5arOfGP">第一天 · 建立规范认知（约 1 小时）</b><br data-page-node-id="o7hRaVVtLJn8qz73XZD1IE">
+读这三份，它们决定后面所有代码长什么样：<br data-page-node-id="nHX9mT0meW0scHjAEGYbij">
+<code data-page-node-id="s2AYWLFR4WrzPwl70DsxL3">ai-rules\common\dependency-rules.mdc</code>（分层依赖）<br data-page-node-id="unxbKiBGUwCoiCzggEuMfx">
+<code data-page-node-id="n3R304w1B0zzLhbLxkx4xL">ai-rules\common\ddd-patterns.mdc</code>（DDD 模式）<br data-page-node-id="kXXfVEBiDGnHQkHGs82MH0">
+<code data-page-node-id="KCLc0uxrWJqApZ8Kl2NITF">.cursorrules</code>（扫一遍标题，当手册备查）</li>
+
+<li data-page-node-id="5pQCb3ZWSQltOdHTald7z3"><b data-page-node-id="8mgGviOZqw37P6FIo5K5pa">第二天 · 看一个真实业务怎么写的（半天）</b><br data-page-node-id="DcAJYBsvO0ekW0BD54tOR2">
+打开 <code data-page-node-id="bwVQmv5SPDKoxnRzGrvyjp">modules\blogging\</code>，沿着 Post 这条垂直切片横着读一遍：<br data-page-node-id="WVGlV18ghpFfBAakiI165P">
+实体 → 仓储接口 → 仓储实现 → DTO → AppService 接口 → AppService 实现 → 控制器。<br data-page-node-id="NKiClfOutDagwMYuSHDR1l">
+<b data-page-node-id="13U1XnQfnQOn3ZYXL4d6K8">这是全仓库最适合初学者的一份材料：真实、完整、没有占位名。</b></li>
+
+<li data-page-node-id="g47cNcPA6wyRHegUpHPNmD"><b data-page-node-id="q3uL2tGOSICWPJSWGRtEnO">第三、四天 · 理解项目骨架（1 天）</b><br data-page-node-id="jLTUo2uqxjLD2Sd8EL0LRM">
+打开 <code data-page-node-id="6lYRv9poTSlzcSIFkllQgZ">templates\app\</code>，对照《ABP 文件路径总索引》把七层目录走一遍。重点看每个 <code data-page-node-id="Hn4ugkmvqI8kgYxuEM0t6G">*Module.cs</code> 里的 <code data-page-node-id="aU6p7ykNCW6B8hKmTDXbjY">[DependsOn]</code>——那才是模块关系的真相。</li>
+
+<li data-page-node-id="Bw5AOZ5qRpAEOXramuMEjA"><b data-page-node-id="X6mVptqEENmaz10eHNrUJH">第五天起 · 动手（持续）</b><br data-page-node-id="SKL6sqK0f7lBkcd4z5d4tG">
+用 <code data-page-node-id="ek3cPcBXJ92JWVP5yiuAOc">abp new</code> 建自己的项目，照着 <code data-page-node-id="Njo3I9hleQl5eM4eLZ5ykM">.agents\skills\abp-development-flow\SKILL.md</code> 走一遍「新增实体」的全流程。<b data-page-node-id="9lDpd3TedZlya1ZZWx3L8t">踩一次坑胜过读十遍文档。</b></li>
+
+<li data-page-node-id="DthjQHwl8786nPktcLvVJm"><b data-page-node-id="bttBBp13Vw3FZ7c6wPDCJW">按需 · 深挖框架内部</b><br data-page-node-id="764dBGRNCYzAc9TAA2dBB5">
+遇到「这个基类到底给我加了什么」时再去 <code data-page-node-id="BDRNHBn7dcV4KtBq416vs9">framework\src\Volo.Abp.XXX\</code>。</li>
+</ol>
+
+<div class="callout tip" data-page-node-id="xI8kHEOHqLYBmHB3FaidTW">
+<p data-page-node-id="OQxiKCdqjpj2LPf8Iih0Pt"><strong data-page-node-id="xsDk6UwciNTtvFcHi8VR7a">一个提效技巧：</strong>那 18 个 AI 技能文件（<code data-page-node-id="FhhzasXDJnzSbmg411S3J1">.agents\skills\</code>）是被设计成给 AI 助手读的。你完全可以让 AI 直接读这些文件再回答你的问题——它比读整个文档站更聚焦，而且代码范式是经过校验的。</p>
+</div>
+
+<div class="foot" data-page-node-id="VpLZ0WPaGAlqOOO9N1cgSP">
+本文基于工作区 <code data-page-node-id="aTJM9RwxwMIdoeWPP2Tk9v">D:\yudao\abp\ABP-Framework-rel-10.6</code> 实际文件系统遍历生成。所有目录清单、文件数量、子目录结构均经实地核验。
+</div>
+
+</div>
+</body>
+</html>

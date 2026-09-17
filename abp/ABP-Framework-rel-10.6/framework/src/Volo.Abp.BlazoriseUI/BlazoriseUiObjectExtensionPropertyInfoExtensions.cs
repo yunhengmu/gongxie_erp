@@ -1,0 +1,286 @@
+﻿using Blazorise;
+using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using Volo.Abp.BlazoriseUI.Components.ObjectExtending;
+using Volo.Abp.ObjectExtending;
+using Volo.Abp.Reflection;
+
+namespace Volo.Abp.BlazoriseUI;
+
+public static class BlazoriseUiObjectExtensionPropertyInfoExtensions
+{
+    private static readonly FrozenSet<Type> NumberTypes = new HashSet<Type>
+        {
+            typeof(int),
+            typeof(long),
+            typeof(byte),
+            typeof(sbyte),
+            typeof(short),
+            typeof(ushort),
+            typeof(uint),
+            typeof(long),
+            typeof(ulong),
+            typeof(float),
+            typeof(double),
+            typeof(decimal),
+            typeof(int?),
+            typeof(long?),
+            typeof(byte?),
+            typeof(sbyte?),
+            typeof(short?),
+            typeof(ushort?),
+            typeof(uint?),
+            typeof(long?),
+            typeof(ulong?),
+            typeof(float?),
+            typeof(double?),
+            typeof(decimal?)
+        }.ToFrozenSet();
+
+    private static readonly FrozenSet<Type> TextEditSupportedAttributeTypes = new HashSet<Type>
+        {
+            typeof(EmailAddressAttribute),
+            typeof(UrlAttribute),
+            typeof(PhoneAttribute)
+        }.ToFrozenSet();
+
+    public static string? GetDateEditInputFormatOrNull(this IBasicObjectExtensionPropertyInfo property)
+    {
+        var dataFormatString = property.GetDataFormatStringOrNull();
+        if (dataFormatString != null)
+        {
+            return dataFormatString;
+        }
+
+        if (property.IsDate())
+        {
+            return "{0:yyyy-MM-dd}";
+        }
+
+        if (property.IsDateTime())
+        {
+            return "{0:yyyy-MM-ddTHH:mm}";
+        }
+
+        return null;
+    }
+
+    public static string? GetDataFormatStringOrNull(this IBasicObjectExtensionPropertyInfo property)
+    {
+        return property
+            .Attributes
+            .OfType<DisplayFormatAttribute>()
+            .FirstOrDefault()?.DataFormatString;
+    }
+
+    public static string? GetTextInputValueOrNull(this IBasicObjectExtensionPropertyInfo property, object? value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        if (TypeHelper.IsFloatingType(property.Type))
+        {
+            return value.ToString()?.Replace(',', '.');
+        }
+
+        return value.ToString();
+    }
+
+    public static T? GetInputValueOrDefault<T>(this IBasicObjectExtensionPropertyInfo property, object? value)
+    {
+        if (value == null)
+        {
+            return default;
+        }
+
+        return (T)value;
+    }
+
+    public static TextInputMode GetTextInputMode(this ObjectExtensionPropertyInfo propertyInfo)
+    {
+        foreach (var attribute in propertyInfo.Attributes)
+        {
+            var textRoleByAttribute = GetTextInputModeFromAttributeOrNull(attribute);
+            if (textRoleByAttribute != null)
+            {
+                return textRoleByAttribute.Value;
+            }
+        }
+
+        return GetTextInputModeFromTypeOrNull(propertyInfo.Type)
+               ?? TextInputMode.None; //default
+    }
+
+    private static TextInputMode? GetTextInputModeFromTypeOrNull(Type type)
+    {
+        if (TypeHelper.IsFloatingType(type))
+        {
+            return TextInputMode.Decimal;
+        }
+
+        if (NumberTypes.Contains(type))
+        {
+            return TextInputMode.Numeric;
+        }
+
+        return null;
+    }
+
+    private static TextInputMode? GetTextInputModeFromAttributeOrNull(Attribute attribute)
+    {
+        if (attribute is EmailAddressAttribute)
+        {
+            return TextInputMode.Email;
+        }
+
+        if (attribute is UrlAttribute)
+        {
+            return TextInputMode.Url;
+        }
+
+
+        if (attribute is PhoneAttribute)
+        {
+            return TextInputMode.Tel;
+        }
+
+        if (attribute is DataTypeAttribute dataTypeAttribute)
+        {
+            switch (dataTypeAttribute.DataType)
+            {
+                case DataType.EmailAddress:
+                    return TextInputMode.Email;
+                case DataType.Url:
+                    return TextInputMode.Url;
+                case DataType.PhoneNumber:
+                    return TextInputMode.Tel;
+            }
+        }
+
+        return null;
+    }
+
+    public static TextRole GetTextRole(this ObjectExtensionPropertyInfo propertyInfo)
+    {
+        foreach (var attribute in propertyInfo.Attributes)
+        {
+            var textRoleByAttribute = GetTextRoleFromAttributeOrNull(attribute);
+            if (textRoleByAttribute != null)
+            {
+                return textRoleByAttribute.Value;
+            }
+        }
+
+        return TextRole.Text; //default
+    }
+
+    private static TextRole? GetTextRoleFromAttributeOrNull(Attribute attribute)
+    {
+        if (attribute is EmailAddressAttribute)
+        {
+            return TextRole.Email;
+        }
+
+        if (attribute is UrlAttribute)
+        {
+            return TextRole.Url;
+        }
+
+        if (attribute is DataTypeAttribute dataTypeAttribute)
+        {
+            switch (dataTypeAttribute.DataType)
+            {
+                case DataType.Password:
+                    return TextRole.Password;
+                case DataType.EmailAddress:
+                    return TextRole.Email;
+                case DataType.Url:
+                    return TextRole.Url;
+            }
+        }
+
+        return null;
+    }
+
+    public static Type GetInputType(this ObjectExtensionPropertyInfo propertyInfo)
+    {
+        foreach (var attribute in propertyInfo.Attributes)
+        {
+            var inputTypeByAttribute = GetInputTypeFromAttributeOrNull(attribute, propertyInfo.Type);
+            if (inputTypeByAttribute != null)
+            {
+                return inputTypeByAttribute;
+            }
+        }
+        return GetInputTypeFromTypeOrNull(propertyInfo.Type)
+               ?? typeof(TextExtensionProperty<,>); //default
+    }
+
+    public static bool IsEnum(this ObjectExtensionPropertyInfo propertyInfo)
+    {
+        return propertyInfo.Type.IsEnum || TypeHelper.IsNullableEnum(propertyInfo.Type);
+    }
+
+    private static Type? GetInputTypeFromAttributeOrNull(Attribute attribute, Type propertyType)
+    {
+        var hasTextEditSupport = TextEditSupportedAttributeTypes.Any(t => t == attribute.GetType());
+
+        if (hasTextEditSupport)
+        {
+            return typeof(TextExtensionProperty<,>);
+        }
+
+        if (attribute is DataTypeAttribute dataTypeAttribute)
+        {
+            switch (dataTypeAttribute.DataType)
+            {
+                case DataType.Password:
+                case DataType.EmailAddress:
+                case DataType.Url:
+                case DataType.PhoneNumber:
+                    return typeof(TextExtensionProperty<,>);
+                case DataType.Date:
+                case DataType.DateTime:
+                    return propertyType == typeof(DateTimeOffset) || propertyType == typeof(DateTimeOffset?)
+                        ? typeof(DateTimeOffsetExtensionProperty<,>)
+                        : typeof(DateTimeExtensionProperty<,>);
+                case DataType.Time:
+                    return typeof(TimeExtensionProperty<,>);
+                case DataType.MultilineText:
+                    return typeof(TextAreaExtensionProperty<,>);
+            }
+        }
+
+        return null;
+    }
+
+    private static Type? GetInputTypeFromTypeOrNull(Type type)
+    {
+        if (type == typeof(bool))
+        {
+            return typeof(CheckExtensionProperty<,>);
+        }
+
+        if (type == typeof(DateTime) || type == typeof(DateTime?))
+        {
+            return typeof(DateTimeExtensionProperty<,>);
+        }
+
+        if (type == typeof(DateTimeOffset) || type == typeof(DateTimeOffset?))
+        {
+            return typeof(DateTimeOffsetExtensionProperty<,>);
+        }
+
+        if (NumberTypes.Contains(type))
+        {
+            return typeof(TextExtensionProperty<,>);
+        }
+
+        return null;
+    }
+}

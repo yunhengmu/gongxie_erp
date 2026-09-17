@@ -1,0 +1,38 @@
+﻿@page
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Mvc.Localization
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@using Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared.Pages.Shared.Components.AbpPageToolbar
+@using Volo.Abp.FeatureManagement
+@using Volo.Abp.TenantManagement
+@using Volo.Abp.TenantManagement.Localization
+@using Volo.Abp.TenantManagement.Web.Navigation
+@using Volo.Abp.TenantManagement.Web.Pages.TenantManagement.Tenants
+@using Volo.Abp.UI.Navigation.Localization.Resource
+@model IndexModel
+@inject IHtmlLocalizer<AbpTenantManagementResource> L
+@inject IHtmlLocalizer<AbpUiNavigationResource> LUiNavigation
+@inject IAuthorizationService Authorization
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = L["Tenants"].Value;
+    PageLayout.Content.BreadCrumb.Add(LUiNavigation["Menu:Administration"].Value);
+    PageLayout.Content.BreadCrumb.Add(L["Menu:TenantManagement"].Value);
+    PageLayout.Content.MenuItemName = TenantManagementMenuNames.Tenants;
+}
+@section scripts {
+    <abp-script-bundle name="@typeof(IndexModel).FullName">
+        <abp-script src="/client-proxies/multi-tenancy-proxy.js" />
+        <abp-script src="/Pages/FeatureManagement/feature-management-modal.js"/>
+        <abp-script src="/Pages/TenantManagement/Tenants/Index.js" />
+        <abp-script src="/Pages/TenantManagement/Tenants/Create.js" />
+    </abp-script-bundle>
+}
+@section content_toolbar {
+    @await Component.InvokeAsync(typeof(AbpPageToolbarViewComponent), new { pageName = typeof(IndexModel).FullName })
+}
+<abp-card id="TenantsWrapper">
+    <abp-card-body>
+        <abp-table  class="nowrap"></abp-table>
+    </abp-card-body>
+</abp-card>

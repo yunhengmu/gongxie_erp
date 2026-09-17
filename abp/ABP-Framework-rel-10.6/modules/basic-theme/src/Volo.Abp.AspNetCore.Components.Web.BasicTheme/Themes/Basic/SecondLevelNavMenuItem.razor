@@ -1,0 +1,48 @@
+@using Volo.Abp.UI.Navigation
+@{
+    var customComponentType = MenuItem.GetComponentTypeOrDefault();
+}
+
+@if (customComponentType != null && typeof(ComponentBase).IsAssignableFrom(customComponentType))
+{
+    <DynamicComponent Type="@customComponentType" />
+}
+else
+{
+    <Dropdown @ref="_dropdown"
+              Class="@(string.IsNullOrEmpty(MenuItem.CssClass) ? string.Empty : MenuItem.CssClass)"
+              ElementId="@(MenuItem.ElementId ?? "MenuItem_" + MenuItem.Name.Replace(".", "_"))"
+              Disabled="MenuItem.IsDisabled">
+        <DropdownToggle Class="me-3">
+            <ChildContent>
+                @if (MenuItem.Icon != null && MenuItem.Icon.StartsWith("fa"))
+                {
+                    <i class="@MenuItem.Icon me-1"></i>
+                }
+                @MenuItem.DisplayName
+            </ChildContent>
+        </DropdownToggle>
+        <DropdownMenu>
+            @foreach (var item in MenuItem.Items)
+            {
+                if (item.Items.Any())
+                {
+                    <SecondLevelNavMenuItem MenuItem="item" ParentDropdown="_dropdown"/>
+                }
+                else
+                {
+                    var itemUrl = item.Url == null ? "#" : item.Url.TrimStart('/', '~');
+                    <a class="text-black text-decoration-none" href="@itemUrl">
+                        @if (item.Icon != null)
+                        {
+                            <i class="@item.Icon me-1"></i>
+                        }
+                        <span>
+                            @item.DisplayName
+                        </span>
+                    </a>
+                }
+            }
+        </DropdownMenu>
+    </Dropdown>
+}

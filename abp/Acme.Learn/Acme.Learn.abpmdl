@@ -1,0 +1,114 @@
+{
+  "template": "app",
+  "imports": {
+    "Volo.Abp.LeptonXLiteTheme": {
+      "version": "5.6.0",
+      "isInstalled": true,
+      "creationTime": "09/11/2026 00:47:49 +00:00"
+    },
+    "Volo.Abp.Account": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "09/11/2026 00:47:49 +00:00"
+    },
+    "Volo.Abp.OpenIddict": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "09/11/2026 00:47:49 +00:00"
+    },
+    "Volo.Abp.Identity": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "09/11/2026 00:47:49 +00:00"
+    },
+    "Volo.Abp.TenantManagement": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "09/11/2026 00:47:49 +00:00"
+    },
+    "Volo.Abp.SettingManagement": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "09/11/2026 00:47:49 +00:00"
+    },
+    "Volo.Abp.PermissionManagement": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "09/11/2026 00:47:49 +00:00"
+    },
+    "Volo.Abp.FeatureManagement": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "09/11/2026 00:47:49 +00:00"
+    },
+    "Volo.Abp.BlobStoring.Database": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "09/11/2026 00:47:49 +00:00"
+    }
+  },
+  "folders": {
+    "items": {
+      "src": {},
+      "test": {}
+    }
+  },
+  "packages": {
+    "Acme.Learn.Application": {
+      "path": "src/Acme.Learn.Application/Acme.Learn.Application.abppkg",
+      "folder": "src"
+    },
+    "Acme.Learn.Application.Tests": {
+      "path": "test/Acme.Learn.Application.Tests/Acme.Learn.Application.Tests.abppkg",
+      "folder": "test"
+    },
+    "Acme.Learn.Domain.Shared": {
+      "path": "src/Acme.Learn.Domain.Shared/Acme.Learn.Domain.Shared.abppkg",
+      "folder": "src"
+    },
+    "Acme.Learn.Application.Contracts": {
+      "path": "src/Acme.Learn.Application.Contracts/Acme.Learn.Application.Contracts.abppkg",
+      "folder": "src"
+    },
+    "Acme.Learn.HttpApi": {
+      "path": "src/Acme.Learn.HttpApi/Acme.Learn.HttpApi.abppkg",
+      "folder": "src"
+    },
+    "Acme.Learn.HttpApi.Client": {
+      "path": "src/Acme.Learn.HttpApi.Client/Acme.Learn.HttpApi.Client.abppkg",
+      "folder": "src"
+    },
+    "Acme.Learn.EntityFrameworkCore.Tests": {
+      "path": "test/Acme.Learn.EntityFrameworkCore.Tests/Acme.Learn.EntityFrameworkCore.Tests.abppkg",
+      "folder": "test"
+    },
+    "Acme.Learn.EntityFrameworkCore": {
+      "path": "src/Acme.Learn.EntityFrameworkCore/Acme.Learn.EntityFrameworkCore.abppkg",
+      "folder": "src"
+    },
+    "Acme.Learn.TestBase": {
+      "path": "test/Acme.Learn.TestBase/Acme.Learn.TestBase.abppkg",
+      "folder": "test"
+    },
+    "Acme.Learn.Domain.Tests": {
+      "path": "test/Acme.Learn.Domain.Tests/Acme.Learn.Domain.Tests.abppkg",
+      "folder": "test"
+    },
+    "Acme.Learn.HttpApi.Client.ConsoleTestApp": {
+      "path": "test/Acme.Learn.HttpApi.Client.ConsoleTestApp/Acme.Learn.HttpApi.Client.ConsoleTestApp.abppkg",
+      "folder": "test"
+    },
+    "Acme.Learn.DbMigrator": {
+      "path": "src/Acme.Learn.DbMigrator/Acme.Learn.DbMigrator.abppkg",
+      "folder": "src"
+    },
+    "Acme.Learn.HttpApi.Host": {
+      "path": "src/Acme.Learn.HttpApi.Host/Acme.Learn.HttpApi.Host.abppkg",
+      "folder": "src"
+    },
+    "Acme.Learn.Domain": {
+      "path": "src/Acme.Learn.Domain/Acme.Learn.Domain.abppkg",
+      "folder": "src"
+    }
+  }
+}

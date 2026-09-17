@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="2OgCIeAXVtYcJcvvtEr2gb">
+<head data-page-node-id="zCH23RHCZsWiANNFqs2gyD">
+<meta charset="UTF-8" data-page-node-id="4FoB5GK3GqioS9IFNFPsUq">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="4Q92ESHDuNLFzML9ez7DAU">
+<title>ABP 前端开发工作流（Angular）</title>
+<style>
+:root{
+  --bg:#ffffff; --bg-sub:#f7f8fa; --bg-code:#f4f6f8; --bg-inline:#eef1f5;
+  --text:#1f2328; --text-sub:#59636e; --text-mute:#8b949e;
+  --border:#d8dee4; --border-soft:#e6e9ed;
+  --blue:#0969da; --blue-bg:#ddf4ff; --green:#1a7f37; --green-bg:#dafbe1;
+  --amber:#9a6700; --amber-bg:#fff8c5; --red:#cf222e; --red-bg:#ffebe9;
+  --purple:#8250df; --purple-bg:#fbefff; --teal:#0f6e56; --teal-bg:#e1f5ee;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117; --bg-sub:#161b22; --bg-code:#161b22; --bg-inline:#21262d;
+    --text:#e6edf3; --text-sub:#9198a1; --text-mute:#6e7681;
+    --border:#30363d; --border-soft:#21262d;
+    --blue:#4493f8; --blue-bg:#0c2d6b; --green:#3fb950; --green-bg:#0f2f1a;
+    --amber:#d29922; --amber-bg:#3a2d00; --red:#f85149; --red-bg:#3d1418;
+    --purple:#ab7df8; --purple-bg:#2b1c4a; --teal:#3fb9a0; --teal-bg:#0c2f28;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1000px;margin:0 auto;padding:48px 28px 100px}
+header.doc{border-bottom:1px solid var(--border);padding-bottom:26px;margin-bottom:32px}
+header.doc .eyebrow{font-size:12.5px;letter-spacing:.12em;color:var(--text-mute);text-transform:uppercase;font-weight:600}
+header.doc h1{font-size:30px;line-height:1.3;margin:12px 0;font-weight:700;letter-spacing:-.01em}
+header.doc p.lead{color:var(--text-sub);font-size:15.5px;margin:0;max-width:780px}
+h2{font-size:21px;font-weight:700;margin:50px 0 6px;padding-top:14px;letter-spacing:-.01em}
+h2 .num{color:var(--blue);font-variant-numeric:tabular-nums;margin-right:9px}
+h3{font-size:16.5px;font-weight:650;margin:30px 0 10px}
+p{margin:12px 0}
+ul,ol{margin:12px 0;padding-left:24px}
+li{margin:6px 0}
+code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  font-size:12.7px;background:var(--bg-inline);padding:2px 6px;border-radius:5px;white-space:nowrap}
+pre{background:var(--bg-code);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:16px 18px;overflow-x:auto;margin:14px 0;line-height:1.62}
+pre code{background:none;padding:0;font-size:12.7px;white-space:pre}
+pre .path{display:block;color:var(--text-mute);font-size:11.5px;margin:-16px -18px 12px;padding:9px 18px;
+  border-bottom:1px solid var(--border-soft);background:var(--bg-sub);border-radius:var(--radius) var(--radius) 0 0;white-space:normal}
+.k{color:var(--purple)}.t{color:var(--blue)}.s{color:var(--green)}.c{color:var(--text-mute);font-style:italic}.n{color:var(--amber)}
+.callout{border-left:3px solid var(--blue);background:var(--blue-bg);padding:13px 18px;
+  border-radius:0 var(--radius) var(--radius) 0;margin:18px 0;font-size:14.3px}
+.callout.warn{border-color:var(--amber);background:var(--amber-bg)}
+.callout.tip{border-color:var(--green);background:var(--green-bg)}
+.callout.danger{border-color:var(--red);background:var(--red-bg)}
+.callout p:first-child{margin-top:0}.callout p:last-child{margin-bottom:0}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.6px}
+th,td{border:1px solid var(--border-soft);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:var(--bg-sub);font-weight:650;white-space:nowrap}
+td code{font-size:12.2px;white-space:normal}
+.pill{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:20px;font-weight:600;vertical-align:middle}
+.pill.ok{background:var(--green-bg);color:var(--green)}
+.pill.fix{background:var(--red-bg);color:var(--red)}
+.pill.new{background:var(--amber-bg);color:var(--amber)}
+.steps{counter-reset:s;list-style:none;padding:0;margin:18px 0}
+.steps>li{counter-increment:s;position:relative;padding:0 0 18px 46px;border-left:2px solid var(--border-soft);margin-left:15px}
+.steps>li:last-child{border-left-color:transparent}
+.steps>li::before{content:counter(s);position:absolute;left:-16px;top:0;width:30px;height:30px;border-radius:50%;
+  background:var(--blue);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.steps>li .st{font-weight:650;font-size:15px}
+.steps>li .sd{color:var(--text-sub);font-size:13.6px}
+.toc{background:var(--bg-sub);border:1px solid var(--border-soft);border-radius:var(--radius);padding:20px 26px;margin:26px 0}
+.toc h3{margin:0 0 12px;font-size:14px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-mute)}
+.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px}
+@media(max-width:680px){.toc ol{columns:1}}
+.toc li{margin:5px 0;font-size:14px}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+hr{border:0;border-top:1px solid var(--border-soft);margin:40px 0}
+.foot{margin-top:60px;padding-top:22px;border-top:1px solid var(--border);color:var(--text-mute);font-size:13px}
+</style>
+</head>
+<body data-page-node-id="4l6VYzar5VrFV0PZqGwpTc">
+<div class="wrap" data-page-node-id="jNaJosD3IpaETcI6gz4Qo0">
+
+<header class="doc" data-page-node-id="THBufJrseDbOdG0HLBxkOC">
+  <div class="eyebrow" data-page-node-id="hScho7NwGjoUA9FcuVJyxU">ABP Framework rel-10.6 · 前端工作流</div>
+  <h1 data-page-node-id="pHgX1sZEbMyK1L8Yujdtp7">ABP 前端到底怎么写（Angular 为主线）</h1>
+  <p class="lead" data-page-node-id="5ibS3rh6pdyxl1h0lf956T">对着你提出的工作流逐环节校准：哪些说对了、哪两处顺序反了、漏了哪三步。所有文件路径与代码均取自本仓库真实源码（<code data-page-node-id="QV2o4nvzAEyi8IqwhHPWA9">npm/ng-packs</code>、<code data-page-node-id="R6kxcFJHmXSl6oDLPA04Ps">templates/module/angular</code>）。</p>
+</header>
+
+<div class="toc" data-page-node-id="P8HKEcVWNIZRJFBjmgffqT">
+  <h3 data-page-node-id="3EaJzJDJddEblDHA8cAnHo">目录</h3>
+  <ol data-page-node-id="TGxzBoGY31CqeyfXNDsmUE">
+    <li data-page-node-id="uSapP1wOABRxwoEGEHTiOy"><a href="#s0" data-page-node-id="Pbi0n3sFnUrbmZzCUKu56W">先校准：你的模型对不对</a></li>
+    <li data-page-node-id="EUghunaCF8d4NIQMOj0aoP"><a href="#s1" data-page-node-id="a0EdBH60cqZatDtM42ns7E">① 确认后端契约</a></li>
+    <li data-page-node-id="RyGduLoshpIthEOy5Wq3qV"><a href="#s2" data-page-node-id="QK7NoVLoF59QZEz0IcGvp7">② 生成请求函数（不是手写）</a></li>
+    <li data-page-node-id="B5ba6UWp5qASE5OcbDzriD"><a href="#s3" data-page-node-id="oKFdQZdDxJ0EnxySfMtkQk">③ 按模块规划目录</a></li>
+    <li data-page-node-id="ST7gl8BF9Da6GD587EQjEO"><a href="#s4" data-page-node-id="kO9oGwE2kMocvVfoRfYJKj">④ 注册路由</a></li>
+    <li data-page-node-id="ZPDPkmdOhAMAOHaskyvaFI"><a href="#s5" data-page-node-id="DwaOQ0hhTUdfKO8VgAAVrq">⑤ 注册菜单 + 权限</a></li>
+    <li data-page-node-id="MNxrY0srAeXRlsLi5343Br"><a href="#s6" data-page-node-id="NkPiRuxSoG2RgVQ8CVsE0U">⑥ 分析业务流 → 页面拆分</a></li>
+    <li data-page-node-id="L4baSBYxSsworD246sFgZW"><a href="#s7" data-page-node-id="AWLPZH4mi0KEyZLpGEoE4T">⑦ 设计组件通信</a></li>
+    <li data-page-node-id="byzN53GUvnzEqhGWZq09dl"><a href="#s8" data-page-node-id="sHcaCRHMzOxrMvDGy92L9a">⑧ 写代码</a></li>
+    <li data-page-node-id="OMrmUIxdA4qDTmJpa3LjfW"><a href="#s9" data-page-node-id="pUx93qwcMXszUl96AthLHe">权限三重绑定与检查清单</a></li>
+  </ol>
+</div>
+
+<!-- ===================== 0 ===================== -->
+<h2 id="s0" data-page-node-id="UEBaXu0JPpd7zOvDERWNtZ"><span class="num" data-page-node-id="AaVJq0t9EzwwmTYoUmzHn5">00</span>先校准：你的模型对不对</h2>
+
+<p data-page-node-id="F9kWtjaSNmEnHKJcN8umdu">你提出的流程是：<em data-page-node-id="IxhTXjuyHTvpQkc5jaAHG4">知道后端接口 → 在某某文件配置请求函数 → 配置页面组件 → 按模块找对应目录 → 分析业务流 → 设计组件通信 → 写代码</em>。</p>
+
+<p data-page-node-id="kBGutRgO6A3CYDylNPcsWh">主线是对的，有 <strong data-page-node-id="MklOMe1sGkPVZPSGgp3diT">1 处认知偏差、1 处顺序颠倒、3 步缺失</strong>：</p>
+
+<table data-page-node-id="n1UMYDTLNuIb9THrL3PWHA">
+<thead data-page-node-id="QlpgKkqW0acbxfOM3p1Qnz"><tr data-page-node-id="JYItFa4VLnIWdp9asPQ4YH"><th data-page-node-id="x8ahOw7G1d46frFKBFrcqn">你的步骤</th><th data-page-node-id="dlIVM6eDOlx8Bv3iXnsR9L">校准结果</th><th data-page-node-id="6ICCemg93OEEaomRIDbe1i">说明</th></tr></thead>
+<tbody data-page-node-id="GSOuuTReYcZCJfIUTLQhdt">
+<tr data-page-node-id="mnqWznbrByXsfYgfTbhH76">
+  <td data-page-node-id="N4TCBfRwedzBkBCDxVw5vr">知道后端接口</td>
+  <td data-page-node-id="vcdrgprCd0GAaXuQ9TCm2L"><span class="pill ok" data-page-node-id="tvrFVfSg8GhZiJ4rxBE2uG">对</span></td>
+  <td data-page-node-id="LUIl8BQbSsTVEZbzXVYmIX">但不只是「知道」，而是后端 <code data-page-node-id="cJI9DFJsqckeW9Ng3CHlqG">Application.Contracts</code> 必须已经就绪——因为下一步是从它<strong data-page-node-id="ew2h6Ez1iTUoDoZ2ZCIePP">自动生成</strong>前端代码</td>
+</tr>
+<tr data-page-node-id="aPNzu5i07Fs4wWnh47GHCO">
+  <td data-page-node-id="2W9RpUFd9orZqErRXYlu5E">在某某文件配置请求函数</td>
+  <td data-page-node-id="6FrOYQD1Hszl2pPD6S8zOl"><span class="pill fix" data-page-node-id="OZCELyLixm1ofWPCpdrriv">需修正</span></td>
+  <td data-page-node-id="QSZKccBxBVNOemCUe84POJ"><strong data-page-node-id="RbOmXgZgB2dJBEOtgXNMAW">不是手写，是生成的。</strong><code data-page-node-id="YicKGEnNQ7zFf7892g2oRy">abp generate-proxy</code> 扫描后端契约，自动产出 <code data-page-node-id="9LGlfAFjmyQGrM5X4TCPEp">src/app/proxy/**/*.service.ts</code>。手写只在极少数场景需要</td>
+</tr>
+<tr data-page-node-id="kCZg4DLBdDGtP2g2IOe5Pn">
+  <td data-page-node-id="jErgR5mXeTOC7PiKJC1vjW">按模块找到对应目录</td>
+  <td data-page-node-id="gGBL9iCIMaqU3JOPiT8GD7"><span class="pill fix" data-page-node-id="8BscBHsjD62ARgVHGnSWVP">顺序要提前</span></td>
+  <td data-page-node-id="zJolBeniYbAKgwg0cfEBWu">应排在「配置页面组件」<strong data-page-node-id="UyGJISuCCOI721lJZcFtzc">之前</strong>。先定好文件落哪儿，再往里填内容</td>
+</tr>
+<tr data-page-node-id="oA0L56lUWCdMv86BiZnfgP">
+  <td data-page-node-id="jfARgqEhPxj5QsFzYYpxgI">分析业务流</td>
+  <td data-page-node-id="jA6pNqjlFegMZCnxPkexLt"><span class="pill ok" data-page-node-id="hXeBc5fyHfCDshwPnADLKM">对</span></td>
+  <td data-page-node-id="T5IQx3RDTZHMHGSD1Hir7P">它的产出是「页面该拆成几个组件」的决策，不只是理解业务</td>
+</tr>
+<tr data-page-node-id="8C8b1qIyP8lUGSGLEW1Da9">
+  <td data-page-node-id="KnAsTIh634HJvyL6WbjoDM">设计组件通信</td>
+  <td data-page-node-id="B6WZjq8SxaG8AujJ07Ruak"><span class="pill ok" data-page-node-id="3PlWrEfz6ZH1cipQE7Jdaf">对</span></td>
+  <td data-page-node-id="aUuuXrVdkmOqFYFawW1BDV">但 ABP 的答案和通用 Angular 不同——主要靠 <code data-page-node-id="Y45pySs1uFR03bq1pQCc3q">ListService</code> 和 <strong data-page-node-id="eUdeqCyRTsTkHNh82VDnTk">modal 内嵌表单</strong>，而不是层层 <code data-page-node-id="vmKuqtiO23vIyokCuQOkZQ">@Input</code></td>
+</tr>
+<tr data-page-node-id="nCeQ2zpzcS5FRvCNmWKgtc">
+  <td data-page-node-id="8Dku18HxkkYYkLK73YbRea">写代码</td>
+  <td data-page-node-id="99vZN3WTrHwXmnCetyIssU"><span class="pill ok" data-page-node-id="hR6XWblqHAnAE9TTdxSn3H">对</span></td>
+  <td data-page-node-id="6pAuYI4njUB2vh1RKJ9E3U">补一个收尾动作：权限绑定 + 本地化</td>
+</tr>
+<tr data-page-node-id="SE7A876Yoi39L3fKGJFreB">
+  <td colspan="2" data-page-node-id="fAfciFEYtdj2ZcjB4ggbUc"><span class="pill new" data-page-node-id="G04GVQyuhCITEz23j0eIDH">遗漏</span> 注册路由</td>
+  <td data-page-node-id="7NxY98a8TXmi9cfvBf9omh">不注册 <code data-page-node-id="CyUKAZA0ZUDDkcl0vaobgT">*.routes.ts</code> 并挂进 <code data-page-node-id="P0NL1g3oNufaGsQ646E2DE">app.routes.ts</code>，页面根本访问不到</td>
+</tr>
+<tr data-page-node-id="bhd7ZUyaTjTvZllHoAnUGn">
+  <td colspan="2" data-page-node-id="eyWlj1pCyE0d86BdUKS2bM"><span class="pill new" data-page-node-id="5tBZ0HCMj43BEI27NdL3kM">遗漏</span> 注册菜单 + 权限</td>
+  <td data-page-node-id="5JFokWCvXRqYBP6n1iCVH1">ABP 的侧边栏菜单不是写 HTML，而是往 <code data-page-node-id="qZML8BMUtt66FIadEFjXot">RoutesService</code> 注册；且必须带 <code data-page-node-id="jGzxZjEDWaMH03PhzUyMFD">requiredPolicy</code>，否则有权限的人看不见入口</td>
+</tr>
+<tr data-page-node-id="ypQLnri2lA9VgOlWi7BuJ4">
+  <td colspan="2" data-page-node-id="e4rCJ4RUwm4Y6ERNDvTfZb"><span class="pill new" data-page-node-id="DTH9QIl2CByDIdBorQfkmD">遗漏</span> 权限与本地化收尾</td>
+  <td data-page-node-id="J3EX98ePvCpRHAOjyjLbej"><code data-page-node-id="SB7wBwHD1lRfKdIOG7kzhj">*abpPermission</code> 控制按钮显隐、<code data-page-node-id="j6ro2FV24K4dY6XWyxTwcY">abpLocalization</code> 处理多语言——这俩不做，功能算没完成</td>
+</tr>
+</tbody>
+</table>
+
+<div class="callout warn" data-page-node-id="67sHutBBfUZAf0dNeh11ZM">
+<p data-page-node-id="uXT202FP8Q9HiAucR4DHv6"><strong data-page-node-id="MF7TGkhH8mxAmEddxsUJvg">一句话总结偏差：</strong>你的模型里「请求函数」是一个需要你配置的东西；而在 ABP 里它是<strong data-page-node-id="lCBtOew4wmD5SGL4V0DEsJ">后端契约的镜像产物</strong>。这意味着前端工作的起点不是「我要调哪个 URL」，而是「后端有哪些 DTO 和 AppService 接口」。</p>
+</div>
+
+<!-- ===================== 1 ===================== -->
+<h2 id="s1" data-page-node-id="yArKxUYG41eH7sThnzeD8e"><span class="num" data-page-node-id="jcHnPrtojWQAQFqUZtOWMF">01</span>① 确认后端契约（前提）</h2>
+
+<p data-page-node-id="tCEW40wHQN8WB75Ie0jthf">打开后端项目，确认这几样东西已存在。它们是前端一切代码的来源：</p>
+
+<table data-page-node-id="otkuo32c7104VSW6ouWJXC">
+<thead data-page-node-id="cXAgKbJGsJSBhsREDeaerA"><tr data-page-node-id="6ektAHTURm5m2VHmzlBuFz"><th data-page-node-id="spGhKOKZAUzkK75RKTizSE">要确认的</th><th data-page-node-id="ULfyvqEzQu7Gy9BrdXDJq4">位置</th><th data-page-node-id="r3rbCN8SI8RojRcNpqOlLb">为什么前端需要</th></tr></thead>
+<tbody data-page-node-id="JDs4L3hRZopmAj1dEtaUoz">
+<tr data-page-node-id="DiIITcESTPgaOimtaaKb5R"><td data-page-node-id="rFDGRUj1DQ8ZXqbzS3uppF">应用服务接口</td><td data-page-node-id="BesG4wER5Ie4GcP9qHarVL"><code data-page-node-id="1LbjUdzMU84madGSCs0Zwp">*.Application.Contracts/Products/IProductAppService.cs</code></td><td data-page-node-id="bEiw9FffF3f3D4hXyXFogB">决定生成哪些请求函数、函数名是什么</td></tr>
+<tr data-page-node-id="6e63C2ITnBcN4KeEgVujwh"><td data-page-node-id="2uxbkfPLGvJ9FG6aqctatz">DTO 定义</td><td data-page-node-id="4WhnC8PeWmGUlxJD4OJMrd">同目录 <code data-page-node-id="tCKThRClO7HdPme5kaoVMA">ProductDto.cs</code>、<code data-page-node-id="3DtRtPoTw928FkSuDUVYlt">CreateProductDto.cs</code>…</td><td data-page-node-id="qYc0z9rSfmM4Yu3n6Pms7b">决定前端拿到什么字段、字段类型</td></tr>
+<tr data-page-node-id="dDh4zzycWYCC0WQJWVWUXf"><td data-page-node-id="xBdjvcvZWKxMdihEmjaGkq">权限常量</td><td data-page-node-id="C7TkCr0MlSU2zp2upoVC3R"><code data-page-node-id="k2EXGCm2LHZGjus7m5jn30">*.Application.Contracts/Permissions/*Permissions.cs</code></td><td data-page-node-id="GzIf2wKrEXV4riaEZcwYu1">决定前端路由与按钮的 <code data-page-node-id="9vyQVLJeHMQnFB95MPO11F">requiredPolicy</code> / <code data-page-node-id="R9vjKvwdVYlb2Juaa5iULp">*abpPermission</code> 该填什么字符串</td></tr>
+<tr data-page-node-id="1E1sWIsHfjLCKu7EflXjjU"><td data-page-node-id="PsI1q19hIFFtTwOBjsYxD8">本地化 key</td><td data-page-node-id="YE7bqp27xDeZEmGsnz8bgC"><code data-page-node-id="cTJCqlgOeoRm8dhBqEFrQF">*.Domain.Shared/Localization/&lt;项目&gt;/*.json</code></td><td data-page-node-id="1qOGBeRJ9Z1ZCTIlButeSv">决定界面文案的 key 名</td></tr>
+</tbody>
+</table>
+
+<div class="callout tip" data-page-node-id="qp2W29ruJayueDCSv3Om0S">
+<p data-page-node-id="C5QiSTmr9Je61c7cFJG2G0"><strong data-page-node-id="hstkXdtEUreFuGRSzCk91g">契约即前端的「设计稿」。</strong>后端接口名 <code data-page-node-id="hyBZk2f76Ht73g4QHcMEUa">GetListAsync</code> → 前端生成 <code data-page-node-id="bBhyaSVAKMMU03Bq27hZk3">getList()</code>；后端 <code data-page-node-id="iUgdRdHUTsqhNE8ExIMdbr">CreateProductDto</code> → 前端生成同名 interface。命名规范（<code data-page-node-id="NpBia4776xB8WfWqO9ufNX">GetAsync</code> / <code data-page-node-id="hwmk2kG0ukjCufGvixJ2Fe">GetListAsync</code> / <code data-page-node-id="Rb1MI6XAyLk4yQOHwhI0jG">CreateAsync</code> / <code data-page-node-id="MyxW50lGmrvkCWmmoaqwn5">UpdateAsync</code> / <code data-page-node-id="s99VAWxoqPUxFBJLvmneDL">DeleteAsync</code>）不只是后端整洁，它直接决定了前端 API 的手感。</p>
+</div>
+
+<!-- ===================== 2 ===================== -->
+<h2 id="s2" data-page-node-id="cqFvO9BQ5wKdNB4ANrM3Am"><span class="num" data-page-node-id="WXEKtyBcQczRFUMO4VUBKX">02</span>② 生成请求函数（这一步是"生成"，不是"配置"）</h2>
+
+<h3 data-page-node-id="GNQG3SWfkNsjavdgTFtR59">命令</h3>
+<pre data-page-node-id="SdHtstAHnC6ECNkZcyWB1h"><code data-page-node-id="RXl3JopE3RnPRKFQnSjctj">abp generate-proxy -t ng -m MyProjectName -u https://localhost:44305</code></pre>
+
+<h3 data-page-node-id="CO2GvdwvWsAxm3osrEu5Al">产出（真实样例，来自框架自带 identity 包）</h3>
+
+<pre data-page-node-id="8QI7O4itOjjUrXrFal7eLv"><span class="path" data-page-node-id="mHaMYWWD82u9aBazygDMkA">npm/ng-packs/packages/identity/proxy/src/lib/proxy/identity/identity-role.service.ts</span><code data-page-node-id="APdEtl80W0TVTNltej9xLd"><span class="k" data-page-node-id="9MreEqB9Z9FZv0Ma1NF6J6">import</span> { <span class="t" data-page-node-id="9BLB7cRnCHHfOl25J9X6S6">GetIdentityRolesInput</span>, <span class="t" data-page-node-id="5zu0MehWBY7DI5sCGeqhhz">IdentityRoleCreateDto</span>, <span class="t" data-page-node-id="XmZbUzwGCnexq586ZxKt7e">IdentityRoleDto</span>, <span class="t" data-page-node-id="UUC56HZrtmMGjcYnU6tNgi">IdentityRoleUpdateDto</span> } <span class="k" data-page-node-id="P1UyIuIdfUR2jAJTMoXm7k">from</span> <span class="s" data-page-node-id="ybAOAdRHDBZ83kvf5vtVS7">'./models'</span>;
+<span class="k" data-page-node-id="hdTUqDG2z4gD0Zsx9CB3Yf">import</span> { <span class="t" data-page-node-id="8G3elvoaRG6yW8zbg540FP">RestService</span> } <span class="k" data-page-node-id="eyTHafYXt9So4do4qGJI6H">from</span> <span class="s" data-page-node-id="QnlUaHsYSQCFHxK0aoZZFZ">'@abp/ng.core'</span>;
+<span class="k" data-page-node-id="e8pPgVvBwbNHHJTa6AIkKo">import</span> { <span class="t" data-page-node-id="090CYPoByxPggEt7s2JrlR">Injectable</span>, <span class="t" data-page-node-id="LzLxEikf5sPVmR2jmyp3uX">inject</span> } <span class="k" data-page-node-id="By6rNBM5gwbCTEv3yKSGFM">from</span> <span class="s" data-page-node-id="riA9snEZWJdjr4d9BVELJ6">'@angular/core'</span>;
+
+<span class="t" data-page-node-id="fVkmWbdi8eJV5QH0VinUPb">@Injectable</span>({ providedIn: <span class="s" data-page-node-id="0qUCPIxyeIqbeuNSXnrALb">'root'</span> })
+<span class="k" data-page-node-id="yxoyxDwDxWkpGFty2eh7ey">export class</span> <span class="t" data-page-node-id="bGRK95SxQZjBA6QxXyWhGw">IdentityRoleService</span> {
+  <span class="k" data-page-node-id="9FjPARhxX0PaGRHijSqmzV">private</span> restService = <span class="t" data-page-node-id="iVXNYtChhs2fwOAgiXkDqO">inject</span>(<span class="t" data-page-node-id="0igKefVG7WXG3Irfi6aDUo">RestService</span>);
+  apiName = <span class="s" data-page-node-id="p9lcwNAd5NXCIpJB7dBe79">'AbpIdentity'</span>;   <span class="c" data-page-node-id="f6Cr4AeywToEiuvU9cH0lr">// 对应 environment.apis 里的键</span>
+
+  <span class="c" data-page-node-id="pYIk5v70YV1vXoPXJTAahP">// 后端 IIdentityRoleAppService.GetListAsync → 这里 getList</span>
+  getList = (input: <span class="t" data-page-node-id="vIQFaOnSDAhfQkTpLo72rA">GetIdentityRolesInput</span>) =&gt;
+    <span class="k" data-page-node-id="5aoDMCnm1bm7bGEfrWSLAr">this</span>.restService.<span class="t" data-page-node-id="BSxRrntKDNjCwbDBuKromA">request</span>&lt;<span class="k" data-page-node-id="Ea0vu4Td2BD00bH4AbP19U">any</span>, <span class="t" data-page-node-id="WbKSJUtHBpZJopssR5RIaP">PagedResultDto</span>&lt;<span class="t" data-page-node-id="znDvsgumXFEsSnNKSWwt5b">IdentityRoleDto</span>&gt;&gt;({
+      method: <span class="s" data-page-node-id="EB6EDJnnIMWqhCz165LGx9">'GET'</span>,
+      url: <span class="s" data-page-node-id="iemOVq9zKF2kTaJ5YMX9E7">'/api/identity/roles'</span>,
+      params: { filter: input.filter, sorting: input.sorting,
+                skipCount: input.skipCount, maxResultCount: input.maxResultCount },
+    }, { apiName: <span class="k" data-page-node-id="0s8eGYJucn9K9TjvtI4J11">this</span>.apiName });
+
+  get = (id: <span class="k" data-page-node-id="4Sz4rcL1ZIipk6vFGpBLGA">string</span>) =&gt; <span class="k" data-page-node-id="hqpQ84ukUF9CBYjkHwpNH0">this</span>.restService.<span class="t" data-page-node-id="KZJTY4jfttfA61dPHsdB0x">request</span>&lt;<span class="k" data-page-node-id="p0hBFChLR3OFFDCfeeEXDd">any</span>, <span class="t" data-page-node-id="6I5A4VwBwn1hPNz8FW1glN">IdentityRoleDto</span>&gt;({ method: <span class="s" data-page-node-id="UweZ6CCvybRdfbFvHjlrZ5">'GET'</span>, url: <span class="s" data-page-node-id="BrWPDhCPildEiIqcrgA3T6">`/api/identity/roles/${id}`</span> }, { apiName: <span class="k" data-page-node-id="XMzgpjG0ZtoICWcQjBEGBM">this</span>.apiName });
+  create = (input: <span class="t" data-page-node-id="dfA9tX8ZC41u3jEO7CwXul">IdentityRoleCreateDto</span>) =&gt; <span class="c" data-page-node-id="qom0Ib3OgX2ZK09duiOHRA">/* POST /api/identity/roles */</span> <span class="k" data-page-node-id="CABaazSbIJNsxeGuKUoziS">null</span>;
+  update = (id: <span class="k" data-page-node-id="12Ei4xxMUktmHFTQRHv37C">string</span>, input: <span class="t" data-page-node-id="eP4uUDVdqoP9YTUsm2h18j">IdentityRoleUpdateDto</span>) =&gt; <span class="c" data-page-node-id="QsmxSKj3oR3q5guNYD4Pu4">/* PUT  /api/identity/roles/${id} */</span> <span class="k" data-page-node-id="ZmzvGQZTN0ZJ9hz1NT7Dzx">null</span>;
+  delete = (id: <span class="k" data-page-node-id="H4e7AZJt4ntUuVCl9FzlDt">string</span>) =&gt; <span class="c" data-page-node-id="wcrdeBNXWPNH4m7w2FQ8qm">/* DELETE /api/identity/roles/${id} */</span> <span class="k" data-page-node-id="oUx6Qv8DdGiCsYhCOYEHsu">null</span>;
+}</code></pre>
+
+<p data-page-node-id="XjPLwRCqgFelt31oGz2ctF">同时生成 <code data-page-node-id="XGXepqfxNlwYapa0gDriBS">models.ts</code>，把后端 DTO 一比一翻译成 TypeScript 接口：</p>
+
+<pre data-page-node-id="ta9fAV4FngRan6NeKOh0G7"><span class="path" data-page-node-id="lbhlOsWc7xacxLVMer7SPN">.../proxy/identity/models.ts（节选）</span><code data-page-node-id="BtKyiSZDqaIMjxUSdOUDZs"><span class="k" data-page-node-id="KUQF687t7gZe05ydErOUPA">export interface</span> <span class="t" data-page-node-id="MvRVxZmZxxl92F6C9gNIms">GetIdentityRolesInput</span> <span class="k" data-page-node-id="wgqXPK0xcOAJJmN0sP9DJ7">extends</span> <span class="t" data-page-node-id="t0KCxHnr2HgjRYnWRCpBxf">PagedAndSortedResultRequestDto</span> {
+  filter?: <span class="k" data-page-node-id="lljiPJoUIyhm81lZa1amNi">string</span>;
+}
+
+<span class="k" data-page-node-id="Kqs8d2srKpVCOoz3UXEwep">export interface</span> <span class="t" data-page-node-id="eDlpgpuCM4d04Khaw4J88d">IdentityRoleDto</span> <span class="k" data-page-node-id="iBhjw7EY4hkmUX4sXRVbyT">extends</span> <span class="t" data-page-node-id="HOdbUwLfEjDgpCE1iGS4OA">ExtensibleEntityDto</span>&lt;<span class="k" data-page-node-id="5GMPVhxGDtuzStZJ2HB82z">string</span>&gt; {
+  name?: <span class="k" data-page-node-id="L73B1n4Kakce7AKIN7YYVz">string</span>;
+  isDefault: <span class="k" data-page-node-id="FXDwh1efS7iRB3Be9CY8vO">boolean</span>;
+  isPublic: <span class="k" data-page-node-id="PAHdTqGGI8A4RKZ7tbVOfm">boolean</span>;
+  concurrencyStamp?: <span class="k" data-page-node-id="AVIIANRMwipwJtn6Hors1Y">string</span>;
+}</code></pre>
+
+<div class="callout" data-page-node-id="APrF7BU01mbzGKRRGqoBZJ">
+<p data-page-node-id="6EV5FqYT7FdfAy6W07NK3Y"><strong data-page-node-id="EIYkqn86oRBuS1xtZYPat7">为什么强烈建议用生成的、而不是手写？</strong>因为 <code data-page-node-id="nI0iyV9JbtWM1PEK6UcEn9">RestService</code> 不只是发 HTTP——它还负责：从 <code data-page-node-id="4wOFxEvBOk0rJ7h9oUZbdN">environment.apis[apiName]</code> 解析 <code data-page-node-id="bmCkfcwiyTu1NTysZEdM94">baseUrl</code>、附加认证 token、把后端返回的错误码翻译成本地化提示、统一处理 loading 状态。<code data-page-node-id="hTwDulV2wRmoL5tN3YxyXt">ApiName</code> 这个字符串就是「这个服务属于哪个后端」的声明，手写极易漏。</p>
+</div>
+
+<h3 data-page-node-id="Bi8wBiqBVttLUWavlaW5YQ">那「手写请求函数」什么时候用？</h3>
+<p data-page-node-id="8KsbEDbbJh6tvkxxohfL9D">确实存在手写形态，出现在<b data-page-node-id="GkbLsMZJIwlVCVdODqnTES">可复用模块</b>里——因为模块不能假设宿主应用一定跑过 <code data-page-node-id="6KOO8OdiVbyh48p47m2xfZ">generate-proxy</code>。模板给了一个标准写法：</p>
+
+<pre data-page-node-id="jzKE3AOgLJdup7oDEPXyyM"><span class="path" data-page-node-id="oHhmjXZsHKThwuu4KGNWOy">templates/module/angular/projects/my-project-name/src/lib/services/my-project-name.service.ts</span><code data-page-node-id="d878qT7IjVjsJPUiCSXmA6"><span class="t" data-page-node-id="V5dMtYEz1japxC9zBCM6i3">@Injectable</span>({ providedIn: <span class="s" data-page-node-id="piQfM8I2VVjQijJmXavStt">'root'</span> })
+<span class="k" data-page-node-id="pKBcIW0NLwpD4oJA6jVGUw">export class</span> <span class="t" data-page-node-id="rUBLJ5yJuF0WXM9D6N03dq">MyProjectNameService</span> {
+  apiName = <span class="s" data-page-node-id="GPD4ZcCGd4C7g50YEIn8UW">'MyProjectName'</span>;
+
+  <span class="k" data-page-node-id="mifuvm4RHbHMZQ6xClrfHl">constructor</span>(<span class="k" data-page-node-id="XsIyxzW5UWXexa7tI1IqvK">private</span> restService: <span class="t" data-page-node-id="Bxf80jPzmj8Y2ji0CXGwGL">RestService</span>) {}
+
+  sample() {
+    <span class="k" data-page-node-id="CqeHMXJy465Iwrw8vxe2CP">return</span> <span class="k" data-page-node-id="8nDmFWaeVJwrpbmSDMZrJ4">this</span>.restService.<span class="t" data-page-node-id="tmJAHCzukZyOrJHAAlDsJr">request</span>&lt;<span class="k" data-page-node-id="3IunzMZCRaMmZHY2LCzDVI">void</span>, <span class="k" data-page-node-id="5TGCN7oysvFT73AIGGbZ8l">any</span>&gt;(
+      { method: <span class="s" data-page-node-id="PUfXsSrF0l4L33BUgtpXKQ">'GET'</span>, url: <span class="s" data-page-node-id="xcfhf1xENqRE8E8t5JEKQ7">'/api/MyProjectName/sample'</span> },
+      { apiName: <span class="k" data-page-node-id="ueMF6CdYhDgkEAbCXqOUzp">this</span>.apiName }
+    );
+  }
+}</code></pre>
+
+<p data-page-node-id="NMN0VKaOSqu91xeLdhT6Az">注意它和生成版的差别：<b data-page-node-id="8z8ULfeiJGD7FjNgB5uoYX">只多了服务类这层壳</b>，内部机制完全一样——都是 <code data-page-node-id="PvyZdlpENDnoDk8zhqDN8L">RestService.request + apiName</code>。所以你的理解「在某个文件里确定请求函数」方向没错，只是这个文件的定位是<b data-page-node-id="weyHpZGME0UfcWBv7QegC6">生成产物所在的 <code data-page-node-id="5BtFyrZzoKh4laYuAVLzFK">proxy/</code> 目录，而不是你新建的文件</b>。</p>
+
+<table data-page-node-id="jHQzYiNB4fWRG8GSB43Rh4">
+<thead data-page-node-id="nn9CI4qfPPsirHMFR9xEPm"><tr data-page-node-id="iiI07FusjVJHIBgGOtFvoF"><th data-page-node-id="ehCuZ0iIIAVzr64qNkP65P">场景</th><th data-page-node-id="3ix5rfNkD3XSUkV3HnPLwy">做法</th><th data-page-node-id="cP4kAt20bLyUYQdot7iCwE">文件</th></tr></thead>
+<tbody data-page-node-id="qRpllAjPAhM66EE2bywusR">
+<tr data-page-node-id="PQFrclGeYLy0oTGaXrycBi"><td data-page-node-id="v7HGvN3F2hDTf8kxkXP9bq">业务应用（`templates/app`）</td><td data-page-node-id="jD6RvGoxZVroWjxE3CLcl2"><strong data-page-node-id="ihZpFX5MTF5PazfFACA0AC">生成</strong></td><td data-page-node-id="zpWHISPMKNCxmJ3DNZmtky"><code data-page-node-id="5tTUZcbqiTInGYngHN9vSV">src/app/proxy/**/*.service.ts</code>（自动，勿手改）</td></tr>
+<tr data-page-node-id="WgTepVa6DMUhzWbvP2zkk3"><td data-page-node-id="zmooLmgWCr6wTxADAqr85Y">可复用模块（`templates/module`）</td><td data-page-node-id="Wb9aZyxExcG2m8qlZAxp51">手写</td><td data-page-node-id="SqfM0Tt3TLkv5vCSno3bFE"><code data-page-node-id="EJqJ4JKzeuPA681XM6lFDP">src/lib/services/xxx.service.ts</code></td></tr>
+</tbody>
+</table>
+
+<!-- ===================== 3 ===================== -->
+<h2 id="s3" data-page-node-id="tLz02h0MvSUMhB3lDDpnFM"><span class="num" data-page-node-id="8WXitY2iNfVWmCtWdqmG2y">03</span>③ 按模块规划目录（必须先做）</h2>
+
+<p data-page-node-id="e0ZNnHou7UO3tfhpKvczWz">你说「按模块找到对应目录」——对，但要<strong data-page-node-id="XGmkEAQ7Y5y6oMK2xAXMb6">先建好目录再写代码</strong>。ABP Angular 的目录是<b data-page-node-id="qXAudpDGDoe59mlTyXHfR9">按业务模块切分</b>的，一个模块一个顶层目录：</p>
+
+<pre data-page-node-id="OWAJTNHy10uopOasQAGGFH"><code data-page-node-id="2Hy4V4WupdaoYHbmZtLaae">angular/src/app/
+├── app.routes.ts          <span class="c" data-page-node-id="WRn785aAQCx53i8fHaUfyd"># 根路由表：每个业务模块挂一条 loadChildren</span>
+├── route.provider.ts      <span class="c" data-page-node-id="sGFZ1YDgSy9doOMutz93OA"># 菜单注册中心</span>
+├── products/              <span class="c" data-page-node-id="CyYunGLO6Hrf546R4Vzlmt"># ← 你的业务模块</span>
+│   ├── products.routes.ts     <span class="c" data-page-node-id="2KBHzAwFswmIthDRFqJImf"># 本模块子路由</span>
+│   ├── product.service.ts     <span class="c" data-page-node-id="7jpJqTHdIrb9q4uOl4rNKF"># （可选）本模块自有的状态/辅助服务</span>
+│   ├── list/
+│   │   ├── list.component.ts
+│   │   ├── list.component.html
+│   │   └── list.component.scss
+│   └── create-edit/
+│       ├── create-edit.component.ts
+│       └── create-edit.component.html
+└── proxy/                 <span class="c" data-page-node-id="e2AsZQbr4ojn25qB3CZXZn"># 生成产物，不手工编辑</span>
+    └── products/
+        ├── product.service.ts
+        └── models.ts</code></pre>
+
+<div class="callout warn" data-page-node-id="ThsLGGh6C9fWXFpvIagFcv">
+<p data-page-node-id="OjLOv3gp9BN0Kk3l4iO0L0"><strong data-page-node-id="RqhH7QWSR4aL9GKtDDFPuT">区分两个同名的 <code data-page-node-id="1XGCDg3b7BUouGw5sGdFjy">product.service.ts</code>：</strong><code data-page-node-id="vTX0SXwxnkOpZsGVATTAFy">proxy/products/</code> 下那个是<b data-page-node-id="wFCTPTm6d1ghxE7voKI2UT">生成的、只做 HTTP 转发</b>；<code data-page-node-id="a0noPiO4A3nc2t3v6FSngF">products/</code> 下那个是你写的<b data-page-node-id="q8TGVA89NxKk8SQk5cYDDf">业务侧服务</b>，用来放跨组件共享的状态。混用会让代码迅速失控——这是新手最常见的坑。</p>
+</div>
+
+<p data-page-node-id="11y0q4oKMciaMzBHdsfosC">补充一点：ABP 对「页面复杂到一定程度」的模块，会给每个组件配一组 <code data-page-node-id="PQJOVY8T5r8HxpyY0WGMBZ">defaults/</code> 配置（列定义、表单定义、工具栏动作），把「表格显示哪些列」变成数据而不是模板代码。identity 包就是这么做的：</p>
+
+<pre data-page-node-id="1x44cIt3lGnsqO2qEutEAQ"><code data-page-node-id="iXaDiPhX4cFTQ1LUwILOYu">npm/ng-packs/packages/identity/src/lib/
+├── components/users/          <span class="c" data-page-node-id="u2rEdLK1ubULtobFRIYenA"># 页面组件</span>
+├── defaults/
+│   ├── default-users-entity-props.ts    <span class="c" data-page-node-id="mTPCmdzS8hDqOaZBHe5oQ0"># 列表显示哪些列</span>
+│   ├── default-users-form-props.ts      <span class="c" data-page-node-id="RFvqS0A67O2C2hqZpEm3a9"># 表单显示哪些字段</span>
+│   ├── default-users-entity-actions.ts  <span class="c" data-page-node-id="Bg603uLVvIeedWa97aMZPI"># 行内操作按钮</span>
+│   └── default-users-toolbar-actions.ts <span class="c" data-page-node-id="jBYKuV5YPulA9lm7tjuGyZ"># 工具栏按钮</span>
+├── enums/components.ts        <span class="c" data-page-node-id="uJmvRDNRdkJpEMs7HMJ3bQ"># 组件标识枚举</span>
+└── tokens/extensions.token.ts <span class="c" data-page-node-id="EIGZsxWDuCRyXVOsEF0oKt"># 扩展点注入令牌</span></code></pre>
+
+<p data-page-node-id="UHrI4W6cX84AFWYpKVYgH7">一般业务从简单的 <code data-page-node-id="DZ8gvjk6pAgZjvcmXNCySZ">list/</code> + <code data-page-node-id="wRO60P2vSDr3sJ8Xj4XNTi">create-edit/</code> 起步就够了，等页面确实膨胀了再引入这套 defaults 机制。</p>
+
+<!-- ===================== 4 ===================== -->
+<h2 id="s4" data-page-node-id="saKTjwDoeP3zr6Q9Mzt3XY"><span class="num" data-page-node-id="jeZPTJOb0XW3PA8Xa8Hy1k">04</span>④ 注册路由（容易漏的第一步）</h2>
+
+<p data-page-node-id="DNdWbUfskEKUFSY87iIFuL">分两处写。先在模块内定义子路由：</p>
+
+<pre data-page-node-id="S4ZL4MwNGHE3q4iHoOrWcH"><span class="path" data-page-node-id="AWHdujOP82DZsy0xt4nk7V">angular/src/app/products/products.routes.ts</span><code data-page-node-id="Dtufk6amiHd6k2DJGC8pcC"><span class="k" data-page-node-id="QnTyutqJLAXorRGvgmIKVF">import</span> { <span class="t" data-page-node-id="0FAKm3KBfFZOlUVCQDY1U0">Routes</span> } <span class="k" data-page-node-id="dLQPKOHj06vdCOKFL0WtVu">from</span> <span class="s" data-page-node-id="BJQCKbX2yEFpj6jvwCmNV7">'@angular/router'</span>;
+
+<span class="k" data-page-node-id="6RL15DfDjSIQV6nFGE4pXD">export const</span> productRoutes: <span class="t" data-page-node-id="1ZAk0xxLyVy1HFrKvfMf3Z">Routes</span> = [
+  {
+    path: <span class="s" data-page-node-id="s9snUwvlDSX68i4BaxVc8B">''</span>,
+    loadComponent: () =&gt;
+      <span class="k" data-page-node-id="PEb77HriFCtaqEU6DyptPf">import</span>(<span class="s" data-page-node-id="xirR7AzGL9Dvi8Gmf86W0y">'./list/list.component'</span>).<span class="t" data-page-node-id="CnTrqQDn9t7rPIAAHR6Ii9">then</span>(m =&gt; m.<span class="t" data-page-node-id="94mX9XkwnMl9vJRUGXHHvJ">ListComponent</span>),
+  },
+];</code></pre>
+
+<p data-page-node-id="FryjO0PEQP5e6v3wo2hb9V">再挂到根路由表（这里是 <code data-page-node-id="p9wYLIdYVG3CJkpcw5kOHW">loadChildren</code> 懒加载，模块级代码分割）：</p>
+
+<pre data-page-node-id="CXadAqXUnFt2bPzUYGLrl9"><span class="path" data-page-node-id="d6GBzzW3wFn1tlmfjP50i3">angular/src/app/app.routes.ts</span><code data-page-node-id="cqoBAACdXiRldEzhsgVGpf"><span class="k" data-page-node-id="hl42cSIyHlwSqYPB1YhT8y">export const</span> appRoutes: <span class="t" data-page-node-id="eviaBxEggsVFvXD0uKbD03">Routes</span> = [
+  { path: <span class="s" data-page-node-id="bmMyriD2GjccSeKAYM8mEI">''</span>, pathMatch: <span class="s" data-page-node-id="0lgpU2PFnO8Ks3aouPQPp1">'full'</span>, loadChildren: () =&gt; <span class="k" data-page-node-id="2BCgDGeWb3Y5yppYFUZyHH">import</span>(<span class="s" data-page-node-id="j4Za8MQbTje5cc7R6MmP6U">'./home/home.routes'</span>).<span class="t" data-page-node-id="QwHCh78iBwDjUS8BOXRxfJ">then</span>(m =&gt; m.homeRoutes) },
+  { path: <span class="s" data-page-node-id="FTUBZJUDclYkoYrZBWE7rn">'account'</span>, loadChildren: () =&gt; <span class="k" data-page-node-id="s5yXvPora8M8P9iwY4D1WS">import</span>(<span class="s" data-page-node-id="1QiEPMWaOmHGJunPKSeBqd">'@abp/ng.account'</span>).<span class="t" data-page-node-id="XeW1ZgCj9H1DloMOJFwUMi">then</span>(m =&gt; m.<span class="t" data-page-node-id="G3w9mnYEMLjPiChxpU6C04">createRoutes</span>()) },
+  { path: <span class="s" data-page-node-id="MCI5Q9v6sCcmKHesWxIRAs">'identity'</span>, loadChildren: () =&gt; <span class="k" data-page-node-id="LpnPNx5DxVTDXnbujnhxd6">import</span>(<span class="s" data-page-node-id="VTa5m3PX6PHmTYZVTr4hUm">'@abp/ng.identity'</span>).<span class="t" data-page-node-id="k6wcLV8svE1OPXTXlEeEnq">then</span>(m =&gt; m.<span class="t" data-page-node-id="HtufqmamJYJpC9RzYeCQAF">createRoutes</span>()) },
+  <span class="c" data-page-node-id="CutV8QbACXBQuUkh7T9c7P">// ↓ 新增这一条</span>
+  { path: <span class="s" data-page-node-id="TWjmmJKdoGvmaRTIJCxaUx">'products'</span>, loadChildren: () =&gt; <span class="k" data-page-node-id="FbhLlQke3G3kVM9pGzqGyd">import</span>(<span class="s" data-page-node-id="cDA1cff3HufS6W6AJEQiuY">'./products/products.routes'</span>).<span class="t" data-page-node-id="4TMej3qGHNjRF7AZbEqkap">then</span>(m =&gt; m.productRoutes) },
+];</code></pre>
+
+<p data-page-node-id="3eiJd8OSz9C37vgjnY4JgA">如果这一页需要权限守卫，可以像框架自带模块那样在路由 <code data-page-node-id="L3kFhdibbKbnrxtYu2b7At">data</code> 上声明（identity 包的真实写法）：</p>
+
+<pre data-page-node-id="J5RyEJ0Ej754p5F3L9CsUC"><span class="path" data-page-node-id="Hd9N7tLe3wYPmFfAwyOS4T">npm/ng-packs/packages/identity/src/lib/identity.routes.ts（节选）</span><code data-page-node-id="LZXxLYGeQXij4DihsC6Rmd">{
+  path: <span class="s" data-page-node-id="JSsobA0wJnzsBxCDN8LxMW">'users'</span>,
+  component: <span class="t" data-page-node-id="LVTPqSvP5tU2BFNFe4UvfC">ReplaceableRouteContainerComponent</span>,
+  data: {
+    requiredPolicy: <span class="s" data-page-node-id="dynzHe0mbwxn8HEuAXXhjp">'AbpIdentity.Users'</span>,   <span class="c" data-page-node-id="flKFjgQwurXM2CF1SvCCf7">// 无此权限则进不来</span>
+    replaceableComponent: { key: <span class="t" data-page-node-id="LFDRRYrjAZ1sm8NdbcBpCH">eIdentityComponents</span>.Users, defaultComponent: <span class="t" data-page-node-id="EbyE1aw3JviYb8M5e33z8u">UsersComponent</span> },
+  },
+  title: <span class="s" data-page-node-id="qW9avwrYD07NgC7ps3E5Fh">'AbpIdentity::Users'</span>,
+}</code></pre>
+
+<p data-page-node-id="YAkwcjIaWnp8yh6mRDh723">顶层还挂了 <code data-page-node-id="Lo6kxqtSJBnBzDIl6WwdoA">canActivate: [authGuard, permissionGuard]</code>——<code data-page-node-id="S5NNdnZCLhETedmys5kRJg">authGuard</code> 管「登录没」，<code data-page-node-id="o2DpLdPkJk2yokzjRdHPvl">permissionGuard</code> 读 <code data-page-node-id="Xe5XVGQHtBLmCQwobrzPpD">requiredPolicy</code> 管「有权限没」。</p>
+
+<!-- ===================== 5 ===================== -->
+<h2 id="s5" data-page-node-id="DjcaKX1fGQcYdKrKRm7CEC"><span class="num" data-page-node-id="VirvgdhIgSvOEFjZezVzZD">05</span>⑤ 注册菜单 + 权限（ABP 特有，最容易漏）</h2>
+
+<p data-page-node-id="GYCYrrDUhJHi1CdXIFUUso"><b data-page-node-id="r0cMUAUsVdukChRNUd2OvX">侧边栏菜单不是 HTML。</b>ABP 的导航是运行时由 <code data-page-node-id="uvg7BqbmtPJiMa28OBX0wC">RoutesService</code> 数据驱动的。不注册，页面即使能访问也不会出现在菜单里。</p>
+
+<pre data-page-node-id="0bFb4QLq0qWiH14Xof6ZsB"><span class="path" data-page-node-id="uGhigBfX0DQhthD5LVDX3E">angular/src/app/route.provider.ts</span><code data-page-node-id="u5WoWc2BM5iKsmw8ML5I2j"><span class="k" data-page-node-id="icdapaCXwKfrNUzuUTP7mu">import</span> { <span class="t" data-page-node-id="j8tGx7lDNTLd1biQffqgL1">eLayoutType</span>, <span class="t" data-page-node-id="nSflENPDmGw1oYNG1oWBUK">RoutesService</span> } <span class="k" data-page-node-id="Hd5qwBYYAHFt9kzAMecj0Q">from</span> <span class="s" data-page-node-id="JuxvqFOWFS7OqSvBGFRWMm">'@abp/ng.core'</span>;
+
+<span class="k" data-page-node-id="qLvRkLTNp7uBrfVyoC1PuY">export const</span> APP_ROUTE_PROVIDER = [
+  { provide: <span class="t" data-page-node-id="G6xVoFK9QpkCtE3UBMTnWY">APP_INITIALIZER</span>, useFactory: configureRoutes, deps: [<span class="t" data-page-node-id="gU8q67iz1mT0hMDc2tN7rK">RoutesService</span>], multi: <span class="k" data-page-node-id="lNGIxkGECHXXJKv36JyGel">true</span> },
+];
+
+<span class="k" data-page-node-id="6VBsoIbPWOtpCkvrwkGiM0">function</span> <span class="t" data-page-node-id="LQiEb22SunpJF2FUK0iLhi">configureRoutes</span>(routesService: <span class="t" data-page-node-id="L96Iw5Ct5NpteD1jfiascf">RoutesService</span>) {
+  <span class="k" data-page-node-id="QpHc6P7sZBoKMKARXcXOnR">return</span> () =&gt; {
+    routesService.<span class="t" data-page-node-id="uc9fQTogxztGO6RnhCTYwj">add</span>([
+      {
+        path: <span class="s" data-page-node-id="S1C8IoLItepNQbhTW5ydjo">'/products'</span>,
+        name: <span class="s" data-page-node-id="FHhG2DI0EgoUjktfZlYcYH">'::Menu:Products'</span>,              <span class="c" data-page-node-id="3rGNl4j29VJXHAMUxLzOjC">// :: 前缀 = 走本地化资源</span>
+        iconClass: <span class="s" data-page-node-id="Nq5dzqsu8LtjOC9Y9I4o1Z">'fas fa-box'</span>,
+        order: <span class="n" data-page-node-id="HhFC4tNS4JZSJjYByw5Bus">10</span>,
+        layout: <span class="t" data-page-node-id="R1xeg7ye7zFSiaOz3iB3fq">eLayoutType</span>.application,
+        requiredPolicy: <span class="s" data-page-node-id="9GMu2t3zGMPAYmczW5xZvp">'MyProjectName.Products'</span>,  <span class="c" data-page-node-id="obxXzXT4et0KV3OalyKds2">// ← 关键：权限</span>
+      },
+    ]);
+  };
+}</code></pre>
+
+<p data-page-node-id="0mdAG0HbTHT0587AVyxyOS">模块模板用的是更现代的写法（<code data-page-node-id="cBmtXF0soditQpqJS4HaTq">provideAppInitializer</code>），效果一致：</p>
+
+<pre data-page-node-id="qhRDAZKPfI3zZ3DHUFpQUh"><span class="path" data-page-node-id="gmY9wMsGQcoX5hKcBZBWFq">templates/module/angular/projects/my-project-name/config/src/providers/route.provider.ts</span><code data-page-node-id="JZww5tapydIxsWY6DKPuHn"><span class="k" data-page-node-id="zMvrdcNiTDvSH5qEwscZ89">export const</span> MY_PROJECT_NAME_ROUTE_PROVIDERS = [
+  <span class="t" data-page-node-id="PMF9iTIiFh2aqBkonLSdUX">provideAppInitializer</span>(() =&gt; { configureRoutes(); }),
+];
+
+<span class="k" data-page-node-id="GqQI2nkncf5dvJvfFWSOv6">export function</span> <span class="t" data-page-node-id="op6awEDHAkmvEbdMGWzadt">configureRoutes</span>() {
+  <span class="k" data-page-node-id="RyzC6TXIvFkvqH7KcYnA24">const</span> routesService = <span class="t" data-page-node-id="l2P4V08nUoBVYOBIbZiSWu">inject</span>(<span class="t" data-page-node-id="dU7G9NlAOfJB5xY5iFRmHK">RoutesService</span>);
+  routesService.<span class="t" data-page-node-id="tRmDb6tNqYwJiv62Gy6LT2">add</span>([
+    {
+      path: <span class="s" data-page-node-id="k4tDrZ0Oyn3vuNKF1cWVyD">'/my-project-name'</span>,
+      name: <span class="t" data-page-node-id="HDDxaMCqV4OxyjlNcVyLMh">eMyProjectNameRouteNames</span>.MyProjectName,
+      iconClass: <span class="s" data-page-node-id="DAeSLRfE3D9LIRsahCiubv">'fas fa-book'</span>,
+      layout: <span class="t" data-page-node-id="zPWDNfeJjxMAWgJSa0sgiY">eLayoutType</span>.application,
+      order: <span class="n" data-page-node-id="SAdhGYDKZT7TgFTg8oRTBT">3</span>,
+    },
+  ]);
+}</code></pre>
+
+<div class="callout danger" data-page-node-id="HGRWfClSG6DA916Ox7wlRU">
+<p data-page-node-id="pXGVDdnC7Es8zKuODsKThq"><strong data-page-node-id="yUvQ3BAbJm64xz8RDtEhK8">权限字符串必须和后台权限常量逐字符一致。</strong>后端 <code data-page-node-id="geuEBqDSbbB9Uwm4wWoXOx">MyProjectNamePermissions.Products.Default</code> 的值是 <code data-page-node-id="QRCufrzzkhSYUoOdM5puTi">"MyProjectName.Products"</code>，前端写错一个大小写就会出现两种典型 bug：菜单不显示（<code data-page-node-id="twU5ijDz7bNgvTqKSdgJrd">requiredPolicy</code> 不匹配），或页面能进但接口 403（<code data-page-node-id="8JHmVhUutRGOoYUVj8s8g3">@Authorize</code> 不通过）。</p>
+</div>
+
+<!-- ===================== 6 ===================== -->
+<h2 id="s6" data-page-node-id="J8noJWWiNt2oGj6VjOilJ5"><span class="num" data-page-node-id="7YKW2uZCnwaRZygv3HUvHI">06</span>⑥ 分析业务流 → 决定页面拆分</h2>
+
+<p data-page-node-id="gR823abP9f1WfFAM0lueFL">这一步的产出不是「我懂了业务」，而是<b data-page-node-id="xbSEalBxIj5oypVLOEAxVc">一张页面结构决策表</b>。三步走：</p>
+
+<ol class="steps" data-page-node-id="AA8nnVWjQpQ2a5Z8EgmqS1">
+<li data-page-node-id="ZORA8GRSakg1WlYHyvNSmr"><div class="st" data-page-node-id="xXgEqDdXIB0BfTj1KKKNBB">列出用户在这个模块里的动作</div><div class="sd" data-page-node-id="wNq9lWvhptPqIb4Pj7ThuI">查列表、筛选、翻页、排序、新建、编辑、删除、批量操作、查看详情、导出……</div></li>
+<li data-page-node-id="LixOObvf1RwKwdwJQQVKnh"><div class="st" data-page-node-id="tO2u2i4kjByyHV4EDqXmRQ">判断每个动作的"重量"</div><div class="sd" data-page-node-id="D2elFk01PbmFJZ18X7Cxug">字段少（≤10 个）且无嵌套子表 → 弹窗足够；字段多、有分步、有子表编辑 → 需要独立页面</div></li>
+<li data-page-node-id="78r1rFfW3xQieaSYTbMBK8"><div class="st" data-page-node-id="AAZmZJ3QyH6aaTO3ohgFN7">决定组件数与路由数</div><div class="sd" data-page-node-id="Dtd32VdTJA3RRfdySwYzGT">大多数 CRUD 的答案是「1 个列表页路由 + 1 个弹窗组件（不占路由）」</div></li>
+</ol>
+
+<table data-page-node-id="a5gTu81meXgbw1zAAQGrrE">
+<thead data-page-node-id="IHQwgsrdE0b8GHvys9hgfD"><tr data-page-node-id="e8kb3G0XFaGRDP3GAY9fiU"><th data-page-node-id="n7H9OUk1ig3Gebb4YA2olJ">业务特征</th><th data-page-node-id="nCVRKOmm0FR8HzeOEUw4mz">页面拆分方案</th><th data-page-node-id="Mv8yjR6FDdAuN6BmVB15y8">路由数</th></tr></thead>
+<tbody data-page-node-id="4PUiNxGBEBg9T8lCXWaXiW">
+<tr data-page-node-id="m3jf1bK72lqxc5LtcECeHB"><td data-page-node-id="NB856QUzPda3NxcJaZsv5A">标准 CRUD，字段少</td><td data-page-node-id="wHs3426fN3CNWl82VXFv5E">列表页 + <strong data-page-node-id="EngfT34eSZcInQ2zoTnpw7">同页 modal 弹窗</strong>做新增/编辑</td><td data-page-node-id="AKLLrcxtOl0v1vuykJUv6t">1</td></tr>
+<tr data-page-node-id="vI1dkfyYSSYeqdAY1xpHy7"><td data-page-node-id="OpO4Cm0UqE7Hw3zNsVRsX0">字段很多 / 有子集合编辑</td><td data-page-node-id="SZVo194RQVFzOyK8Dlsnb1">列表页 + 独立详情页（带 <code data-page-node-id="WRqb0qWM1SCtpJ7q7mBJ3D">:id</code> 路由）</td><td data-page-node-id="CqP6BHTbmMqngkO0DhdUy8">2</td></tr>
+<tr data-page-node-id="zVkqBRETY7KRAh2Pj2Cn9b"><td data-page-node-id="rABMz6F7P8sC6hZtfcHqc0">多步骤流程（如向导）</td><td data-page-node-id="RTGRURGRDoCBMQFXXTxKai">列表页 + 分步路由（<code data-page-node-id="KGBKSr6h8JtDAqNimhh5nS">step/1</code>、<code data-page-node-id="hOaNMrhgyjgtyDeQdHfEKr">step/2</code>）</td><td data-page-node-id="YkBxaueuxAF7hnjpjrEBXc">2+</td></tr>
+<tr data-page-node-id="2Ojlu4DMzDhXR56BpTMu5f"><td data-page-node-id="QYUWVqZBrg4PObotLqJduG">只读报表 / 看板</td><td data-page-node-id="WqVsvPtcXVGKbpy7DRgqt2">单页，多区块</td><td data-page-node-id="JkfqzuoJZPVgDh8CFyHq0W">1</td></tr>
+</tbody>
+</table>
+
+<p data-page-node-id="fNOfwKbQUyDfaBweipyqPH">框架自带模块的答案基本都是第一行。identity 的用户管理就是<b data-page-node-id="gRf4aFB1ZNjHVUGgh8A2ZX">一个列表组件里内嵌 modal 弹窗</b>，连编辑表单都没拆成独立组件——它把「用户信息」「角色」两块做成 modal 里的两个 tab。这个选择很关键，它直接决定了第 7 步的通信设计。</p>
+
+<!-- ===================== 7 ===================== -->
+<h2 id="s7" data-page-node-id="FAIyHaohzh9C76L0BcncNw"><span class="num" data-page-node-id="pnvSFIfuCoPsX3hDlGBner">07</span>⑦ 设计组件通信（ABP 的答案和通用 Angular 不同）</h2>
+
+<p data-page-node-id="R0FAw41bbktP6CtukojYXg">通用 Angular 培训会教你「父传子 <code data-page-node-id="AREoWBVihzEvun0eIhknGA">@Input</code>、子传父 <code data-page-node-id="nLJp28vuwFA7DBKcbXPd5r">@Output</code>、兄弟用 service」。ABP 在标准 CRUD 场景下<b data-page-node-id="WCotqR2hYnABBzZHdXlt1r">刻意减少组件数量</b>，所以通信设计反而更简单。四种模式按优先级：</p>
+
+<table data-page-node-id="m3lBFYZ7lkB4Hwau2Wj3TK">
+<thead data-page-node-id="KHtgpgzPXlzlQyB4p4DHy0"><tr data-page-node-id="4seyx2NoKUyvfGvFVjsCRk"><th data-page-node-id="LOPdTWW3BrdCmhBeOw6rCr">模式</th><th data-page-node-id="R7L3bkPGJgTyeyvvJMXHhT">用途</th><th data-page-node-id="nadWYQg2O3ert2mNvos36e">ABP 的机制</th></tr></thead>
+<tbody data-page-node-id="dNE6vISny2lR9b1ZJAknSa">
+<tr data-page-node-id="K6wN1NCmjoB5EyiCH3w0Wg">
+  <td data-page-node-id="8lRC7EikbD4nt0prjCFNd0"><strong data-page-node-id="uKHa0i4dGk2rU5EzjroX9a">① ListService</strong><br data-page-node-id="idxEi39jYjXbXigcGpb58h">（首选）</td>
+  <td data-page-node-id="AMUvERI77F2AZv7WSx3Eh7">列表状态与查询的唯一真源</td>
+  <td data-page-node-id="bTDGQTzacp7Ig08rGGvEPs"><code data-page-node-id="XYG0Nquw6qe0ivEf6cPwSi">ListService</code> 作为<b data-page-node-id="3GH8lIticVSUqhRxUkKnAX">组件级</b> provider，管 <code data-page-node-id="tYrUq3vS5zGdCmUru8lfWM">filter/page/sortKey/sortOrder</code>，任一变化自动触发 <code data-page-node-id="1K7uDixX8hSEfM9vGKaGhe">query$</code> 重发请求</td>
+</tr>
+<tr data-page-node-id="uURiMnYPOhZL5Ki8ZIeHRX">
+  <td data-page-node-id="CPN35GxCsvvC5SjtCtJdWl"><strong data-page-node-id="SvzFRihMSWGlI81VNULDBB">② Modal 内嵌</strong><br data-page-node-id="dZ2lOp70cSEZd28OpjwFHC">（ABP 惯用）</td>
+  <td data-page-node-id="he7PspvC11SAGm1jl5LElV">新增/编辑表单</td>
+  <td data-page-node-id="3zAlLyvj3sv20zM9fyonDg">不拆子组件，表单直接写在列表组件的 <code data-page-node-id="hjSBwKCoLJUc4mNUWTT3YM">&lt;ng-template #abpBody&gt;</code> 里，用 <code data-page-node-id="iAPuJhKTYV9QFZkGvg7tx9">selected</code> 变量切换「新增 vs 编辑」</td>
+</tr>
+<tr data-page-node-id="WIkFIIyTg3ExcmQ1HL4Oon">
+  <td data-page-node-id="oxrB6jEvX8bE6waatufNHM"><strong data-page-node-id="XE7AKezH1tTGfPbKeEF4sS">③ @Input/@Output</strong></td>
+  <td data-page-node-id="5nNBi8YQ6uxCzTc19ZX7KD">确实拆了子组件时</td>
+  <td data-page-node-id="FYnW4yAVl5YMV1XGAGenfa">ABP 组件普遍采用 <code data-page-node-id="5RDkHxGakS3Pn8P2u26NYC">[visible]</code> + <code data-page-node-id="0G9f3Ixtw69vLWhAqX4OSC">(visibleChange)</code> 双向绑定风格，如 <code data-page-node-id="aVHrtU6f0BsWuO2fSAUUZA">abp-modal</code></td>
+</tr>
+<tr data-page-node-id="VQV2RRX6yWEGzXkGqeDz7s">
+  <td data-page-node-id="EfvZjM0CjVHV9J7vI40eZX"><strong data-page-node-id="ac46yyLkuneo8kdzMitgxm">④ Service + signal</strong></td>
+  <td data-page-node-id="UfQmEb4kZNt7GSqHrM2NGM">跨页面共享状态</td>
+  <td data-page-node-id="ROaOPALEE93hJrnwOiEJIa">放在第 3 步那个业务侧 <code data-page-node-id="1HmTql1jzdBJdwB6iYyAx4">product.service.ts</code> 里，用 <code data-page-node-id="5PUwPKl8G6nUEly35Ejzzb">signal</code> / <code data-page-node-id="tuPCXXP2SBrF6y4NCuoPgr">BehaviorSubject</code></td>
+</tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="hxth8twFU1k0CYcMATDtnn">① ListService 是通信主干</h3>
+<p data-page-node-id="r9N4FkVbE2ERpdjfLctcoV">看它的源码就明白为什么它是核心——<b data-page-node-id="Dq9r2gELAnreXW7nfkK2sF">每个 setter 都会自动触发重新查询</b>：</p>
+
+<pre data-page-node-id="37yTwp5mvJsHRXWsGzC4Zr"><span class="path" data-page-node-id="GAO72kQbQ4tV9TiH2q6nKo">npm/ng-packs/packages/core/src/lib/services/list.service.ts（节选）</span><code data-page-node-id="YTMlihquZSXSyQmC0H3HW2"><span class="t" data-page-node-id="ywaWAT16PfFM7I243wJHW8">@Injectable</span>()   <span class="c" data-page-node-id="sViCWY68HwhVmeXsz8q4iE">// 注意：没有 providedIn:'root'，必须由组件 providers 提供</span>
+<span class="k" data-page-node-id="sG3PziW21nmr60MdARWyK8">export class</span> <span class="t" data-page-node-id="5rhBHJMxrmBhyHeNuyTrDr">ListService</span>&lt;<span class="t" data-page-node-id="jK8sOxCwy7xOS3WN4RXmG9">QueryParamsType</span> = <span class="t" data-page-node-id="v9qRqhu9uY5xfl6C6HHqse">ABP</span>.<span class="t" data-page-node-id="ZCqtLdX5LGTzcvaH7uUmkh">PageQueryParams</span>&gt; {
+  <span class="k" data-page-node-id="1lZF2kGFAKf0PHcb3hnCtI">set</span> filter(value: <span class="k" data-page-node-id="qChIaR1Fjf9nVtYe54eLc3">string</span>)   { <span class="k" data-page-node-id="WGPoFDaE3WmVPY9U6C0soq">this</span>._filter = value;   <span class="k" data-page-node-id="5X8K4ff136uTOYEFS1KhGO">this</span>.<span class="t" data-page-node-id="FQyZfILeMKGYnxLP1D5lzo">get</span>(); }
+  <span class="k" data-page-node-id="NwkVYBt8CprOJjoRGRejc0">set</span> page(value: <span class="k" data-page-node-id="fkSkoyLv1PGMY4Fm7OuliO">number</span>)     { <span class="k" data-page-node-id="jRsr6OS7vGOaGXhBzbOqXc">this</span>._page = value;     <span class="k" data-page-node-id="hpjdh7ZKyozorkP4vjaixx">this</span>.<span class="t" data-page-node-id="03XfNKaJIFfmp8fTHE9Ge2">get</span>(); }
+  <span class="k" data-page-node-id="0D9hw7sBXfK59txYleXLJ1">set</span> sortKey(value)          { <span class="k" data-page-node-id="Eps2TN6eNngh8mWKk6Lm2d">this</span>._sortKey = value;  <span class="k" data-page-node-id="d6gw2mwzhSYpdtLMSbxiuB">this</span>.<span class="t" data-page-node-id="NZxFnPufrWI9Ixx05h1nav">get</span>(); }
+  <span class="k" data-page-node-id="4lqksdFFOrjdVOT1t626Sb">set</span> sortOrder(value)        { <span class="k" data-page-node-id="HSs4pDdyXPZyt7aBuSgbdz">this</span>._sortOrder = value;<span class="k" data-page-node-id="Nc5Fhm8Utb7D5Wan99DnAo">this</span>.<span class="t" data-page-node-id="S7DS5exsD55t6DiWNW3Udk">get</span>(); }
+  <span class="k" data-page-node-id="jTt94gVTkJ8mWcpKvO15yy">set</span> maxResultCount(value)  { <span class="k" data-page-node-id="5U17MCzLelpMoknpuFWuRh">this</span>._maxResultCount = value; <span class="k" data-page-node-id="u7tPrE7hPrSxjkRQ7ip5LK">this</span>.<span class="t" data-page-node-id="yAkZehHBdydnaAdefwCD92">get</span>(); }
+
+  <span class="c" data-page-node-id="onZM6XTOHmMEU8T4eX5jh5">// 关键：把 query$ 流和"调哪个接口"绑定，返回可直接渲染的结果流</span>
+  <span class="t" data-page-node-id="DNIqaIyojFJQOzM2k8kCfp">hookToQuery</span>&lt;<span class="t" data-page-node-id="AqgKLW6WMfZ4CkWYVrPVY7">T</span>&gt;(streamCreatorCallback: <span class="t" data-page-node-id="DTndU4HIFZsGwyBE9pXoRK">QueryStreamCreatorCallback</span>&lt;<span class="t" data-page-node-id="KKyCcF0T88gWXKvB6sVN23">T</span>, <span class="t" data-page-node-id="tsv8iQcRSQxUwjD6KYZJjQ">QueryParamsType</span>&gt;)
+    : <span class="t" data-page-node-id="VBjiQsp7mm8GlR70BS8nhs">Observable</span>&lt;<span class="t" data-page-node-id="Xn5wM746kh6vO9UTZ791ec">PagedResultDto</span>&lt;<span class="t" data-page-node-id="RvtV2HcYG92Vfl0PGqKUSe">T</span>&gt;&gt; {
+    <span class="k" data-page-node-id="ZGXBL54ZXlbtXTTUDJiBvB">return</span> <span class="k" data-page-node-id="zxKDMXNWncdQfJ5L1JHYDv">this</span>.query$.<span class="t" data-page-node-id="dTqJzfHLkzHHuYtDOADS0R">pipe</span>(
+      <span class="t" data-page-node-id="p9ijNXilKIjM0bIpa0dGIz">tap</span>(() =&gt; <span class="k" data-page-node-id="8UhDjttwWESDBfw2ltGUG5">this</span>._requestStatus.<span class="t" data-page-node-id="RADQLFCTyfeCefsKvB9Ka3">next</span>(<span class="s" data-page-node-id="sech2KgdreMEv23uZxGiGf">'loading'</span>)),
+      <span class="t" data-page-node-id="wAXa7KekBAtRvIb74fsVvF">switchMap</span>(query =&gt; <span class="t" data-page-node-id="Eeg2mhLiLULk4bsurAElwQ">defer</span>(() =&gt; streamCreatorCallback(query)).<span class="t" data-page-node-id="zqN8WnTdYBx7LZZFBcQ6vn">pipe</span>(
+        <span class="t" data-page-node-id="vsXPjrmcRRCDcv8Nqm2m8P">catchError</span>(() =&gt; { <span class="k" data-page-node-id="YObDzVCdce7kXViRM7Hosf">this</span>._requestStatus.<span class="t" data-page-node-id="1LVP48eM8rODet2coUd5Ny">next</span>(<span class="s" data-page-node-id="Xg9hBIE8OmCL7nPJFGT8CZ">'error'</span>); <span class="k" data-page-node-id="fzwdmZnFNo8cdkPgUFtFbF">return</span> <span class="t" data-page-node-id="eoDtzgxpGQEmKUxImviERm">EMPTY</span>; }),
+        <span class="t" data-page-node-id="3KsT1CmoxD2Ukv3pWR9quN">tap</span>(() =&gt; <span class="k" data-page-node-id="KDgndUEyQrDJSB14o6bFcC">this</span>._requestStatus.<span class="t" data-page-node-id="hRPiM7NcyYTaaBcXZNDsfM">next</span>(<span class="s" data-page-node-id="Aygj2RczfGbGRreqVIDfol">'success'</span>)),
+      )),
+      <span class="t" data-page-node-id="qPZrGCfhM3TfzXQkRtfMQQ">shareReplay</span>({ bufferSize: <span class="n" data-page-node-id="FV0A9ejwbLY0I6BIKNH9oe">1</span>, refCount: <span class="k" data-page-node-id="APs0F1RjZDIMir9zl7LjOo">true</span> }),
+    );
+  }
+
+  <span class="t" data-page-node-id="GlGiwdT3isoOrwEYJvkPTF">get</span> = () =&gt; { <span class="k" data-page-node-id="eWLxFWBrJA0CjhQDLKTWot">this</span>.<span class="t" data-page-node-id="8HFfZoooBEvWCt7NkoC7F7">resetPageWhenUnchanged</span>(); <span class="k" data-page-node-id="38oUjxIPi9q0Mp007aCHQR">this</span>.<span class="t" data-page-node-id="5W4NGPqtZUHISEyxzfogMD">next</span>(); };  <span class="c" data-page-node-id="STeAnXl3tvAG4shmK2vYCf">// 保存/删除后调它刷新</span>
+  <span class="t" data-page-node-id="vnqNKIOwrN0tLonKZIikz7">next</span>() { <span class="k" data-page-node-id="3g4iG8qkIBFaJSZX4EuQFk">this</span>._query$.<span class="t" data-page-node-id="I1cbLicQ26nvwETLDAMkpX">next</span>({
+      filter: <span class="k" data-page-node-id="gS1MjrxHR8zMzK0OlUKV2z">this</span>._filter || <span class="k" data-page-node-id="MMXb0PKUB8NDvcBgzPaH0H">undefined</span>,
+      maxResultCount: <span class="k" data-page-node-id="kuv4BaFxiDAOpa15Jpm1Ay">this</span>._maxResultCount,
+      skipCount: <span class="k" data-page-node-id="UH05cAZCHDc0lKYgB0sRQC">this</span>._page * <span class="k" data-page-node-id="0fyWXoA6r6vQ8oWT18hDqV">this</span>._maxResultCount,
+      sorting: <span class="k" data-page-node-id="Q2aelBMkq26oM5u3u8ZuKz">this</span>._sortOrder ? <span class="s" data-page-node-id="5cwWxzwdX6SZ7IuLirndMe">`${this._sortKey} ${this._sortOrder}`</span> : <span class="k" data-page-node-id="tWqxAwD2J19ClFhRnnclKB">undefined</span>,
+  } <span class="k" data-page-node-id="1ulbnv1ntdmCkyxLkwcpFj">as any</span>); }
+}</code></pre>
+
+<div class="callout tip" data-page-node-id="HRWnr4mEQS8LdxXFp9b992">
+<p data-page-node-id="qmrBR5KiHu15FWDMR7As54"><strong data-page-node-id="AKFO7wBLJIm5MgCfEffS5X">两个易错点：</strong>① <code data-page-node-id="Nz7LgOe3pO5S2tjh09Rl9v">ListService</code> 没有 <code data-page-node-id="QTyVyzo1AuIj3WT0O6eLmA">providedIn: 'root'</code>，必须在组件的 <code data-page-node-id="nQpJxSmLiFmoXSUcCKjU9o">providers: [ListService]</code> 里提供，否则多个列表页会互相串状态。② 保存/删除成功后<b data-page-node-id="4VpD9scuMGsI0B1K7mbWon">不要手动重新拉数据</b>，调 <code data-page-node-id="K373kXmGqNhtQvbklRx3da">this.list.get()</code> 即可——它会把 query 重新推一遍。</p>
+</div>
+
+<h3 data-page-node-id="SwN3V7i37fMQnRI0ZKmShH">② Modal 内嵌 = 回避父子通信</h3>
+<p data-page-node-id="scwTPGJ4n7mf21YYo2NNPM">identity 的用户页是个好例子：新增和编辑共用同一个 modal，靠 <code data-page-node-id="EAujEMYwzN9O486VMVnMEq">selected</code> 有没有 <code data-page-node-id="K1cMu7SD0cyKhEzVB7ipBT">id</code> 来区分模式。这样<b data-page-node-id="Ndi888gadKCE6DHAMs3dG0">不需要任何父子传参</b>：</p>
+
+<pre data-page-node-id="zoOa3fNbm6BeFJTOucBBaq"><span class="path" data-page-node-id="b1c3dEfhO0FljsWvAJzakq">npm/ng-packs/packages/identity/src/lib/components/users/users.component.ts（节选）</span><code data-page-node-id="mncoicIsupf9RQCHeWLT0j"><span class="t" data-page-node-id="hzmAJhj7O82BsSGkYW6TWG">@Component</span>({
+  selector: <span class="s" data-page-node-id="75edigUhkATc2vKKvIV5JT">'abp-users'</span>,
+  templateUrl: <span class="s" data-page-node-id="63uDN89Bo3MZ4bY9jn80Xk">'./users.component.html'</span>,
+  providers: [<span class="t" data-page-node-id="5BdVx2BkzoLysUcFSvfZCC">ListService</span>],        <span class="c" data-page-node-id="71ctP41n3DneJm79vtZ4p5">// ← 组件级提供，列表状态隔离</span>
+})
+<span class="k" data-page-node-id="pTSKaizv9S3yidaQLyHfsO">export class</span> <span class="t" data-page-node-id="SKbVsvuGaMl8uHfFmxnJLx">UsersComponent</span> {
+  <span class="k" data-page-node-id="yjJnfsEPj2J2CVw9xYD0B8">protected readonly</span> list = <span class="t" data-page-node-id="QLXHmZVYxkhN06ebQL8eYx">inject</span>(<span class="t" data-page-node-id="CvvBLqK1Pkb3RQvhGiPu2q">ListService</span>&lt;<span class="t" data-page-node-id="BbgXRJGFYtsrB0eawvgFCw">GetIdentityUsersInput</span>&gt;);
+  <span class="k" data-page-node-id="wSzFpO16buOng8My9qY8ub">protected readonly</span> service = <span class="t" data-page-node-id="wYFkyPIcFk4KtBDi93csrF">inject</span>(<span class="t" data-page-node-id="XPNW3jmMfaYxG01ygbMXfx">IdentityUserService</span>);   <span class="c" data-page-node-id="PnNEGEG1KvRPm6HdJn506r">// 生成的 proxy 服务</span>
+  <span class="k" data-page-node-id="lDYWSA0WVd63A2vsTnIpaU">protected readonly</span> toasterService = <span class="t" data-page-node-id="ERzcvdrRFpDvLmVNiZzWu2">inject</span>(<span class="t" data-page-node-id="pjeV8xCTufvfo0GPWcdWdh">ToasterService</span>);
+  <span class="k" data-page-node-id="a1GEcjm0oU0lF1FpHnBALx">protected readonly</span> confirmationService = <span class="t" data-page-node-id="tjvhKpmdnDu7Klwq4lEAt5">inject</span>(<span class="t" data-page-node-id="SHdc8gM42ujUSlyhjNvTm4">ConfirmationService</span>);
+
+  <span class="c" data-page-node-id="kvs5op3F8dK80MBCWVvCHw">// 列表数据 = ListService.query$ 流 → 接口调用（switchMap 自动取消旧请求）</span>
+  readonly data = <span class="t" data-page-node-id="6zu2yHXcQR3wggltXU4eOz">toSignal</span>(
+    <span class="k" data-page-node-id="l8taDsz3uOA2SHzxepoFwp">this</span>.list.<span class="t" data-page-node-id="I42FFBaqLED4sBTp48HWBy">hookToQuery</span>(query =&gt; <span class="k" data-page-node-id="R62Qp6yEgFXNQKfkMkQ5vt">this</span>.service.<span class="t" data-page-node-id="E3bHEUFJ6xJS1MtKh3iJJT">getList</span>(query)),
+    { initialValue: { items: [], totalCount: <span class="n" data-page-node-id="0xAH0BgoCJTO8UfDAcItzK">0</span> } <span class="k" data-page-node-id="UwH8jY3lFCCyYGgIKCrGXB">as</span> <span class="t" data-page-node-id="BU1tjlbDU3i7Wr2WqfG4t3">PagedResultDto</span>&lt;<span class="t" data-page-node-id="NvPWBDQZdt5NI29OPG22pe">IdentityUserDto</span>&gt; },
+  );
+
+  <span class="k" data-page-node-id="NF5fVgg5WnF5k4DKNgK71x">readonly</span> isModalVisible = <span class="t" data-page-node-id="n32lJvrC3C0BAK9zjorEv4">signal</span>(<span class="k" data-page-node-id="HFKn0g7N4hbxB2ylhmLuen">false</span>);
+  <span class="k" data-page-node-id="LXPB9NXfqDl4E2a2SjZ8lA">readonly</span> modalBusy = <span class="t" data-page-node-id="gtagTbFgkzpcC7lwD5kqMc">signal</span>(<span class="k" data-page-node-id="CaecINpp0Jc3pt32zYlDvb">false</span>);
+  selected?: <span class="t" data-page-node-id="xoah1oKATD4pFerouqbHV0">IdentityUserDto</span>;
+
+  add()  { <span class="k" data-page-node-id="pi2tZ7fbbE23PrGJWFtlzy">this</span>.selected = {} <span class="k" data-page-node-id="dq4ISmE5woZzTECwD6yuNa">as</span> <span class="t" data-page-node-id="L2tF0PHGL38gDu7LQfMyGO">IdentityUserDto</span>; <span class="k" data-page-node-id="3JQrMUDPy8CAE0uElHCxb4">this</span>.<span class="t" data-page-node-id="B27WyxvEECVuRj0emM1HD9">openModal</span>(); }      <span class="c" data-page-node-id="bIdGdRKVUILrAGFJHzw3Yh">// 空对象 → 新增模式</span>
+  edit(id: <span class="k" data-page-node-id="0gHFulRfGjGXY3m0nAvjle">string</span>) {                                                              <span class="c" data-page-node-id="guDYAvsaEHhAuyWMjKGfoa">// 取到数据 → 编辑模式</span>
+    <span class="k" data-page-node-id="3397MDMrXGQJOkz5ldQ3iZ">this</span>.service.<span class="t" data-page-node-id="rZSlVxZigIyYAt9eqzNTZr">get</span>(id).<span class="t" data-page-node-id="vEzcrh6JomLHpBceAMD1u0">subscribe</span>(user =&gt; { <span class="k" data-page-node-id="26s7yjfieTc6WaEEcF4E0E">this</span>.selected = user; <span class="k" data-page-node-id="lfcwUUgByysODSWsE2lmAb">this</span>.<span class="t" data-page-node-id="An8lrAG8BwXivbo7B2jyqz">openModal</span>(); });
+  }
+
+  save() {
+    <span class="k" data-page-node-id="IDaMAVXCZ5mvlUPUZrLV16">if</span> (!<span class="k" data-page-node-id="7YFjhn6f9YOXenIkhGY3qk">this</span>.form.valid || <span class="k" data-page-node-id="o1WAfO757AC9PDvXhIatVR">this</span>.modalBusy()) <span class="k" data-page-node-id="CZdsccsxfwiUr5rtSwVJp1">return</span>;
+    <span class="k" data-page-node-id="BSC1H1bVUp5zApgxI5HUZt">this</span>.modalBusy.<span class="t" data-page-node-id="BlFGHE7MQN00dGkkHhw4GL">set</span>(<span class="k" data-page-node-id="5T9u6bKKhfEGwbhNUwWGAD">true</span>);
+    <span class="k" data-page-node-id="lXyuCSAkXeNl01808kItUh">const</span> { id } = <span class="k" data-page-node-id="FZNMxetQgLweE1ZvMFHdrE">this</span>.selected || {};
+
+    (id ? <span class="k" data-page-node-id="pI1Mv57vPNykyrECFRebHC">this</span>.service.<span class="t" data-page-node-id="3nFs2wVttcQTYuzCcw5IpF">update</span>(id, { ...<span class="k" data-page-node-id="8xwa5GOnrHJzCMfVmUMvYc">this</span>.selected, ...<span class="k" data-page-node-id="YTjvdURN76w6DWbnY6FHc5">this</span>.form.value })      <span class="c" data-page-node-id="VulDFw6lATRCTBkbPAAWG2">// 有 id → 改</span>
+        : <span class="k" data-page-node-id="5cCExu5BEEwenZdE4HBZlc">this</span>.service.<span class="t" data-page-node-id="Z0DpedgFimBu0BEMXHOF8U">create</span>(<span class="k" data-page-node-id="NaOwneqpoyrYrBanv5EcGa">this</span>.form.value))                                        <span class="c" data-page-node-id="zMQUMMTiLx4X82i2iBHvLx">// 无 id → 增</span>
+      .<span class="t" data-page-node-id="BroMpRiaxgXM6XGZc5fXAL">pipe</span>(<span class="t" data-page-node-id="5PBbhmcehXVf3A616r2auA">finalize</span>(() =&gt; <span class="k" data-page-node-id="EHJE8pwLUXFc8BeAytafW5">this</span>.modalBusy.<span class="t" data-page-node-id="OMyAtXWho3AYAxjSH3IGwu">set</span>(<span class="k" data-page-node-id="0FCLq5yX6wFojr7OroxGV0">false</span>)))
+      .<span class="t" data-page-node-id="Na9XgVhCK37EXeEIGJkdZT">subscribe</span>(() =&gt; {
+        <span class="k" data-page-node-id="sFENNegx8ixJR18A6zSPde">this</span>.isModalVisible.<span class="t" data-page-node-id="bRcMAepwj7HL375hIQ95R4">set</span>(<span class="k" data-page-node-id="xLmGPOJHufwbzvc8ejNcZb">false</span>);
+        <span class="k" data-page-node-id="pgJ7mzMMUsroD8OhWPHJDi">this</span>.toasterService.<span class="t" data-page-node-id="JSSkoRdRQXsxz0h0iipbnV">success</span>(<span class="s" data-page-node-id="FY2sfF8sUlDVrzKbQiHI4S">'AbpUi::SavedSuccessfully'</span>);
+        <span class="k" data-page-node-id="J70AruB1EldiJYpod58JPV">this</span>.list.<span class="t" data-page-node-id="kWy07NCSCIrZ8znjU7qEWv">get</span>();                                    <span class="c" data-page-node-id="9asENzVXjLyqlFCf4QSOmE">// ← 刷新列表，不手动拉数据</span>
+      });
+  }
+
+  delete(id: <span class="k" data-page-node-id="6nleCvFdiy8eWXsk9dsLen">string</span>, userName: <span class="k" data-page-node-id="TkhCPqxNtHFGVP7y7GWSKo">string</span>) {
+    <span class="k" data-page-node-id="3HDVkkhiafLWmHsydmF1py">this</span>.confirmationService
+      .<span class="t" data-page-node-id="39mBOGZsfi3cxBjYp7CW43">warn</span>(<span class="s" data-page-node-id="RnMfbtHFOnXqJvwymRXKW2">'AbpIdentity::UserDeletionConfirmationMessage'</span>, <span class="s" data-page-node-id="xATpxYRhBofehtgNkNe4VO">'AbpIdentity::AreYouSure'</span>,
+            { messageLocalizationParams: [userName] })
+      .<span class="t" data-page-node-id="yGHsWIuDPF04pkXD2pcAbl">subscribe</span>(status =&gt; {
+        <span class="k" data-page-node-id="M37vzpTQ1bj4ELHeqHZACl">if</span> (status === <span class="t" data-page-node-id="hADJH8hhtF707JIgPpns7k">Confirmation</span>.<span class="t" data-page-node-id="8lrnEIrkjEpcKAtBfjfOR6">Status</span>.confirm) {
+          <span class="k" data-page-node-id="3fDG1Y365geLd6w0wXIkhw">this</span>.service.<span class="t" data-page-node-id="HvPZxUOdudjAj2BAEtjKOg">delete</span>(id).<span class="t" data-page-node-id="S6G77JfPhjZzLovxaGmdGL">subscribe</span>(() =&gt; {
+            <span class="k" data-page-node-id="rS0imzgQctgIIfQsDefsNr">this</span>.toasterService.<span class="t" data-page-node-id="nxz4jp57pjuB1CxiouRuK0">success</span>(<span class="s" data-page-node-id="GHYj9NXDgFDjZgsLyziX35">'AbpUi::DeletedSuccessfully'</span>);
+            <span class="k" data-page-node-id="lIiFobp5CBvDL9aPpj2Lav">this</span>.list.<span class="t" data-page-node-id="1dPZzZb8RNkThR8z25vwqn">get</span>();
+          });
+        }
+      });
+  }
+
+  sort(data: <span class="k" data-page-node-id="QDFByidznL7yFID5DXR9KR">any</span>) {                                    <span class="c" data-page-node-id="TwmtGH2SD7XFRYuIOzVlC0">// 表格排序 → 写回 ListService</span>
+    <span class="k" data-page-node-id="U19E1gkGY08YNIlmeVE6mA">const</span> { prop, dir } = data.sorts[<span class="n" data-page-node-id="NJdSth0TVXrBbB0kpUya53">0</span>];
+    <span class="k" data-page-node-id="iOxF8p7PsiQMbnuDHgST90">this</span>.list.sortKey = prop;
+    <span class="k" data-page-node-id="Zo3thz0farN5IxfktAQpB8">this</span>.list.sortOrder = dir;
+  }
+}</code></pre>
+
+<p data-page-node-id="bax9yVOxshoGGCmSC1hIHh">对应的模板——注意 <code data-page-node-id="oME2dimolUpGuW9sceWeX9">abp-page</code>、<code data-page-node-id="EPdItlOAXiagfdbl5ObGrn">abp-extensible-table</code>、<code data-page-node-id="WfB5wFcJ75wbTVcWdVQUxi">abp-modal</code> 这些现成组件承担了大部分通信工作：</p>
+
+<pre data-page-node-id="NdH4BXWDVe967xNKioXErz"><span class="path" data-page-node-id="VRz7NIC5XHBgJKyaxWSc6G">npm/ng-packs/packages/identity/src/lib/components/users/users.component.html（节选）</span><code data-page-node-id="TNuZhEo2FREDdreyZmGAZW">&lt;<span class="t" data-page-node-id="fzPMMkjbF14A2KuXVNp9Ad">abp-page</span> [title]=<span class="s" data-page-node-id="4wC82mlGbo50WKutIISsXa">"'AbpIdentity::Users' | abpLocalization"</span>&gt;
+  <span class="c" data-page-node-id="rI16mLQa9kEsYswgJHSYnD">&lt;!-- 搜索框直接双向绑定 ListService.filter，改动即触发查询 --&gt;</span>
+  &lt;<span class="t" data-page-node-id="jBMYZrWs7sprCvu6DGHr4X">input</span> type=<span class="s" data-page-node-id="sPO2BKzHYHliXYyz0SIFCP">"search"</span> [(ngModel)]=<span class="s" data-page-node-id="ifxnT3jdRPrttZtbvgUEea">"list.filter"</span> /&gt;
+
+  <span class="c" data-page-node-id="mSdi422mADjVAWeQg6jMpy">&lt;!-- 表格把 ListService 和 data 一起接过去，分页/排序/列渲染全自动 --&gt;</span>
+  &lt;<span class="t" data-page-node-id="hkx4hIavVGjGLSZuT9VmM3">abp-extensible-table</span> [data]=<span class="s" data-page-node-id="PIpc9945goTVB0YRbKhXlI">"data().items"</span> [recordsTotal]=<span class="s" data-page-node-id="r2jAPLme7IQjrcvnL4Cq6Z">"data().totalCount"</span> [list]=<span class="s" data-page-node-id="4whnSDDgb9wWVfgbT1waGO">"list"</span> /&gt;
+
+  <span class="c" data-page-node-id="c06xKJNhi6zQMCs15jab8M">&lt;!-- 编辑弹窗内嵌在同组件，通过 signal 控制显隐 --&gt;</span>
+  &lt;<span class="t" data-page-node-id="AKg7EYvdaifxQsziMFRDn4">abp-modal</span> [visible]=<span class="s" data-page-node-id="JlH4OxzSEhwCwbQxYVwylj">"isModalVisible()"</span> (visibleChange)=<span class="s" data-page-node-id="ODBPDN5kGnwyrPcCJ8As8I">"isModalVisible.set($event)"</span> [busy]=<span class="s" data-page-node-id="ySPpl36oQ5h7f4E3JhpU2V">"modalBusy()"</span>&gt;
+    &lt;<span class="k" data-page-node-id="ifqSCxuBGIMRp9zqcGzXkt">ng-template</span> #abpHeader&gt;
+      &lt;<span class="t" data-page-node-id="K75R6i4yaze5GKaDqpCmGf">h3</span>&gt;{{ (selected?.id ? <span class="s" data-page-node-id="BOFvfY0MuPWAYa8I6knGn2">'AbpIdentity::Edit'</span> : <span class="s" data-page-node-id="gNkdui4pBt9Hm2l07fWPrP">'AbpIdentity::NewUser'</span>) | <span class="t" data-page-node-id="NvOolWXPhitnybYCCIsnEl">abpLocalization</span> }}&lt;/<span class="t" data-page-node-id="1J3qZkiTHiD2vHBQMFtDoA">h3</span>&gt;
+    &lt;/<span class="k" data-page-node-id="MlvOtooaQyDqrkRpDLYWBy">ng-template</span>&gt;
+    &lt;<span class="k" data-page-node-id="5bRoCJ0KGOXLhKH9cb68Gu">ng-template</span> #abpBody&gt;
+      &lt;<span class="t" data-page-node-id="MNpn5qfyIHHQtBLw39RtGt">form</span> [formGroup]=<span class="s" data-page-node-id="1r8qsepE4PVaDeUD6EWAI2">"form"</span> (ngSubmit)=<span class="s" data-page-node-id="HhST8ng87SJAsAzZXdwsiW">"save()"</span>&gt; ... &lt;/<span class="t" data-page-node-id="OLgWzzyRoxqGLpa691WQ0b">form</span>&gt;
+    &lt;/<span class="k" data-page-node-id="nEm6MN2ypY4WlcnE0FldTL">ng-template</span>&gt;
+    &lt;<span class="k" data-page-node-id="JyjEmWrIRHvAB6iflFejWd">ng-template</span> #abpFooter&gt;
+      &lt;<span class="t" data-page-node-id="cXtnpLmtFz5CbcFkEndwgh">button</span> abpClose&gt;取消&lt;/<span class="t" data-page-node-id="eeVYoMI7lU4k0FyT5ibMxl">button</span>&gt;
+      &lt;<span class="t" data-page-node-id="KiGJn6IdPuBhU8PzdR7jfg">abp-button</span> [disabled]=<span class="s" data-page-node-id="k0bQzvEysphWmSukacUFMb">"form?.invalid"</span> (click)=<span class="s" data-page-node-id="r8AYOrHD9HUblcviYLEKcV">"save()"</span>&gt;保存&lt;/<span class="t" data-page-node-id="RHsGe404qQPRbzmZgjZezQ">abp-button</span>&gt;
+    &lt;/<span class="k" data-page-node-id="TiHUuTy0MoyEy6ZCajoopy">ng-template</span>&gt;
+  &lt;/<span class="t" data-page-node-id="Bw4V17LDACFBYQvtGbEnFb">abp-modal</span>&gt;
+&lt;/<span class="t" data-page-node-id="27FK7ONez3eziB00uEzGwD">abp-page</span>&gt;</code></pre>
+
+<div class="callout" data-page-node-id="TzgjAioTeiAhM4oMxnbnmu">
+<p data-page-node-id="EMkP7T7P62ix6QdjQOAIYk"><strong data-page-node-id="aLqm4av9AUJGBYye2BvAwc">看出规律了吗？</strong>ABP 用「现成组件 + 数据流」替代了手工的组件通信：<b data-page-node-id="QlYRkaGFVbYf7vBzsSRo0o">搜索框 → ListService.filter → query$ → 接口 → data()</b> 是一条单向数据流；<b data-page-node-id="mRiaFDeubsSWiCG3MG8IIL">弹窗显隐</b>用 signal 局部控制。所以「设计组件通信」在 ABP 里的实际工作量，往往只是「决定用不用 ListService、弹窗放哪」。</p>
+</div>
+
+<h3 data-page-node-id="TucICEKik8KBPgszlCaQIl">④ 跨组件共享才需要自建 service</h3>
+<pre data-page-node-id="A1ZTphbRU0ZC3TveeFxzT3"><span class="path" data-page-node-id="4la6V5UeV7lE7NIevIckh9">angular/src/app/products/product.service.ts（业务侧服务，非 proxy）</span><code data-page-node-id="9HDQHmgE66MczGuKAJV6Ig"><span class="t" data-page-node-id="148oRFELnrqdlE6wrIKyDh">@Injectable</span>({ providedIn: <span class="s" data-page-node-id="yCKqX8VWxLefA9bXTidisx">'root'</span> })
+<span class="k" data-page-node-id="DoZPxHvaYLi8TCyribmRqB">export class</span> <span class="t" data-page-node-id="uFctwGl6NCJIQrwBtmSJ1Q">ProductStateService</span> {
+  <span class="c" data-page-node-id="NjhdtboaCw1GSWd0VcpaPJ">// Angular 17+ 用 signal，比 BehaviorSubject 更简洁</span>
+  <span class="k" data-page-node-id="UU2pJA2KGEPYtp2x7CDVMM">private readonly</span> _selectedIds = <span class="t" data-page-node-id="9SWZPIcTScZIS3k1kd8uGF">signal</span>&lt;<span class="k" data-page-node-id="YR8ffZrXQHJAXy2xQrqGko">string</span>[]&gt;([]);
+  <span class="k" data-page-node-id="hH7aSxq1nqnocjJAGyAIHT">readonly</span> selectedIds = <span class="k" data-page-node-id="lyK9vDpW0IfJ1VaZURtuZ3">this</span>._selectedIds.<span class="t" data-page-node-id="JADlcufQotcNDBotjcG91w">asReadonly</span>();
+
+  <span class="t" data-page-node-id="q7AWfgG8RqFeMepP21Bf4W">toggle</span>(id: <span class="k" data-page-node-id="tzx7rvRexrAMWyUgpgtFvS">string</span>) {
+    <span class="k" data-page-node-id="2oF2rXicb2xysiH8NJ9DR2">this</span>._selectedIds.<span class="t" data-page-node-id="QsC2jbxVTunLxTDOJIsxnj">update</span>(ids =&gt;
+      ids.<span class="t" data-page-node-id="1nFcnMEhQAeEtyyt4zFuFH">includes</span>(id) ? ids.<span class="t" data-page-node-id="AHVhhnv0Xslle3ebHjKqU3">filter</span>(x =&gt; x !== id) : [...ids, id]);
+  }
+  <span class="t" data-page-node-id="ok4lwWkG3oEiJx9WYSnItk">clear</span>() { <span class="k" data-page-node-id="qNkYlhiYQv2JHW7j07jYtM">this</span>._selectedIds.<span class="t" data-page-node-id="XMi6fmJqVVwiAs76UFWw6v">set</span>([]); }
+}</code></pre>
+
+<!-- ===================== 8 ===================== -->
+<h2 id="s8" data-page-node-id="ujInmBhqMT0JoHiCUv6iFD"><span class="num" data-page-node-id="yxoE5oGmzFcbwrVkM3U8cy">08</span>⑧ 写代码（两个文件一对）</h2>
+
+<p data-page-node-id="wYxvqACathEP0n7aNDhYZL">Angular 组件永远是 <code data-page-node-id="ADRnEQfQKOjwgl8t3Jjeip">.ts</code>（逻辑）+ <code data-page-node-id="HwfXCnSEETYwTdD7bBlCHP">.html</code>（模板）一对。用第 3 步的目录复用上面的模式，一个最小可用的列表页长这样：</p>
+
+<pre data-page-node-id="SlgyVDtOohCwObsBtmKZyM"><span class="path" data-page-node-id="tST7QnZdLyMtO7e5O4udf6">angular/src/app/products/list/list.component.ts</span><code data-page-node-id="zFkwIN2zyxG9Mm7CPFLaHp"><span class="k" data-page-node-id="t9jK4JpGrRapOo6XQqHnUc">import</span> { <span class="t" data-page-node-id="lkRHk30oRMgSmsjITFSDBz">Component</span>, <span class="t" data-page-node-id="wILWDtQB0dlWK744Ai655d">inject</span>, <span class="t" data-page-node-id="xJO2kHtIrcl8xjygas2cIB">signal</span> } <span class="k" data-page-node-id="E0D7VR7W1lDRxfNTuxE7Nq">from</span> <span class="s" data-page-node-id="o4Iaz93r3MCoCEG2lT6O5j">'@angular/core'</span>;
+<span class="k" data-page-node-id="Rxj3B7yu4kaeJsTiSJ6EFe">import</span> { <span class="t" data-page-node-id="dVPOxwIEuSwvw3cxCPcnQt">toSignal</span> } <span class="k" data-page-node-id="n9Q1srso1HKWFTfdUGFPG1">from</span> <span class="s" data-page-node-id="ld9AR2eC7WvbEWeiBmA6tX">'@angular/core/rxjs-interop'</span>;
+<span class="k" data-page-node-id="YTJWhhC4IHjTXCD4t6SVi8">import</span> { <span class="t" data-page-node-id="Q7FMnbbzeJfmJVXKDsWNVU">ListService</span>, <span class="t" data-page-node-id="o7bqmruNEIPB6k1xYujkSI">LocalizationPipe</span>, <span class="t" data-page-node-id="BXsnoaF711jrPvBSDhBqQt">PagedResultDto</span> } <span class="k" data-page-node-id="hUCp5ZscAmkxZOvC3IhMxu">from</span> <span class="s" data-page-node-id="ZE0DrZI56AaOkSzxxTb2L5">'@abp/ng.core'</span>;
+<span class="k" data-page-node-id="MBNArI2ax0ddsqAQpKq40v">import</span> { <span class="t" data-page-node-id="XH3lWDoNsPchIKAo72WWIA">ConfirmationService</span>, <span class="t" data-page-node-id="TYXdPv12DpjrDXEwsyTyME">ToasterService</span> } <span class="k" data-page-node-id="9E5KA4pHXXUQYNni5CIexQ">from</span> <span class="s" data-page-node-id="HUehpk7V8XvyDErh32Lcgi">'@abp/ng.theme.shared'</span>;
+<span class="k" data-page-node-id="C4DDpAjYGkhFkVSTqYcHKf">import</span> { <span class="t" data-page-node-id="qptVjaVAHEFd4PrzcFpybW">ProductService</span> } <span class="k" data-page-node-id="EH2KiHDCvZyP4M5gV9r90L">from</span> <span class="s" data-page-node-id="zGTWwXIzwWs1g5vKOQGWXX">'../../proxy/products/product.service'</span>;
+<span class="k" data-page-node-id="eu1yYAksTG6CJf76N4qAvF">import</span> { <span class="t" data-page-node-id="n2LCFvWorFVBBDkL1dGHlD">GetProductListDto</span>, <span class="t" data-page-node-id="8ojECxFkllOEs6aYj46tlz">ProductDto</span> } <span class="k" data-page-node-id="lNdnPlTBrdHC5Nk9zwkmes">from</span> <span class="s" data-page-node-id="D3jXEP3qPiPP4rr2tMTHQZ">'../../proxy/products/models'</span>;
+
+<span class="t" data-page-node-id="OjAVnLPYA6Jh5csYyxFKjC">@Component</span>({
+  selector: <span class="s" data-page-node-id="4YNKbmvicRferpoAPFKS0n">'app-product-list'</span>,
+  templateUrl: <span class="s" data-page-node-id="wHjDkACsF0bLt6mYCzs8hD">'./list.component.html'</span>,
+  providers: [<span class="t" data-page-node-id="2qVPBxKK0eIJF5FEEmN09r">ListService</span>],     <span class="c" data-page-node-id="9Aj3ovNCUcxhAPWQN7kNbF">// ← 别忘了这一行</span>
+  imports: [<span class="t" data-page-node-id="38fRb3GzM7lnIiT2OkqeZ4">LocalizationPipe</span>],
+})
+<span class="k" data-page-node-id="1rWu9IG2mDQFPGEFtlWqOr">export class</span> <span class="t" data-page-node-id="yGS657TeHFpMNxxV6gMeKH">ListComponent</span> {
+  <span class="k" data-page-node-id="2mXmBSCdOApDubU0GG5AEa">protected readonly</span> list = <span class="t" data-page-node-id="dGQNoSirtG93vla6W1SSnL">inject</span>(<span class="t" data-page-node-id="NhhiHfecIl782VYnRqfCuK">ListService</span>&lt;<span class="t" data-page-node-id="othYUMgLhIHADfgiEINBFl">GetProductListDto</span>&gt;);
+  <span class="k" data-page-node-id="g6S49Z6XYEhlHIwyxD89ct">protected readonly</span> service = <span class="t" data-page-node-id="zb1dDnsmSsmZUFYIx71ts8">inject</span>(<span class="t" data-page-node-id="OwH3k8O1Y3HmI6JtYAFB08">ProductService</span>);
+  <span class="k" data-page-node-id="oPt8LI6nDM0EYLHjggVHxz">private readonly</span> toaster = <span class="t" data-page-node-id="VDfPGBujqw2QPq3dmkgUnZ">inject</span>(<span class="t" data-page-node-id="pJLY9rq2qtqMOzWWxSrk00">ToasterService</span>);
+  <span class="k" data-page-node-id="T7CFb7YgTphX4hzafWKgPg">private readonly</span> confirmation = <span class="t" data-page-node-id="rF7CuIxoDV8t4gXxRljvFi">inject</span>(<span class="t" data-page-node-id="Y0QI52dPw4ZsawKDhzpbkQ">ConfirmationService</span>);
+
+  <span class="k" data-page-node-id="WrPk3dURYQJzqdV9wfGrw2">readonly</span> data = <span class="t" data-page-node-id="5DQKt2FntByG3u6GLtloSY">toSignal</span>(
+    <span class="k" data-page-node-id="ggArAcxHgC58fCYSC3IEXW">this</span>.list.<span class="t" data-page-node-id="9qf5xP4CEvZeweCBe7AHyc">hookToQuery</span>(query =&gt; <span class="k" data-page-node-id="QSGEFXEvtbCd88hQhBNKhu">this</span>.service.<span class="t" data-page-node-id="kEE4IyDKxQxEXmSPk0B0u1">getList</span>(query)),
+    { initialValue: { items: [], totalCount: <span class="n" data-page-node-id="sJ6TPZpZ8Ep4NpO0iHrelV">0</span> } <span class="k" data-page-node-id="2TTy2DRgKtsLlZ714WHniv">as</span> <span class="t" data-page-node-id="UAqAsL96oZByzQ5bLCi5os">PagedResultDto</span>&lt;<span class="t" data-page-node-id="YeTeyHvwGr593pTYRxvrtB">ProductDto</span>&gt; },
+  );
+
+  <span class="k" data-page-node-id="Qr5frnPsXjoyTACxbJSZZ7">readonly</span> isModalVisible = <span class="t" data-page-node-id="DEL7Y5WuPYTThGp4YusCLb">signal</span>(<span class="k" data-page-node-id="Ezmr6C46ttmrLoQaeY7Znn">false</span>);
+  selected?: <span class="t" data-page-node-id="isj8vPf4UQnKNj3cKm712T">ProductDto</span>;
+
+  <span class="t" data-page-node-id="1HTGIlWysIabqFK1PTKEpg">add</span>()  { <span class="k" data-page-node-id="CRq6rxDQoiNgu1Wk0w1gTk">this</span>.selected = {} <span class="k" data-page-node-id="hEHH8PYPmoc623Vs9AJaan">as</span> <span class="t" data-page-node-id="dxPx0Z8UTCQs6Tx9yoEfJF">ProductDto</span>; <span class="k" data-page-node-id="Ok9RFLf7O8YdfdODfwJrmk">this</span>.isModalVisible.<span class="t" data-page-node-id="armEjuXUFx5Fq457zhpqtH">set</span>(<span class="k" data-page-node-id="KNFmgaC3GrjS34AjE2SJ1B">true</span>); }
+  <span class="t" data-page-node-id="lH8IFzDQHoWlg4H0ukFlyo">edit</span>(id: <span class="k" data-page-node-id="77JyZg4PXvydmzaX1DJQYM">string</span>) { <span class="k" data-page-node-id="KAwBjQZuQk5xN7Nq9iSYr0">this</span>.service.<span class="t" data-page-node-id="yGWxEMHoeVR1rfL1LEkGTl">get</span>(id).<span class="t" data-page-node-id="nxx14GkEZRf1daeM9G0gmr">subscribe</span>(r =&gt; { <span class="k" data-page-node-id="Fpz03yRLTZz9garMAbN2XH">this</span>.selected = r; <span class="k" data-page-node-id="vcjUoZ9zh88yTQ9YwygHTx">this</span>.isModalVisible.<span class="t" data-page-node-id="L8GuUi7MMFLhX5A1XCPKTE">set</span>(<span class="k" data-page-node-id="GazrJPKKWGQyG2Y4pxIHjT">true</span>); }); }
+
+  <span class="t" data-page-node-id="taDUbDTOV1hO6s1VDH12tp">delete</span>(id: <span class="k" data-page-node-id="8EcBDzUBClwtRvW6nd0HDT">string</span>) {
+    <span class="k" data-page-node-id="fpDOf6PfK3Kwwp5ww1JrkD">this</span>.confirmation.<span class="t" data-page-node-id="DDF04hv1oeCeiyH1Am6eVF">warn</span>(<span class="s" data-page-node-id="swwzKA3Icra4dloay2HICM">'::AreYouSureToDelete'</span>, <span class="s" data-page-node-id="j07wFKyZN7f9eJB2K0R1dh">'::AreYouSure'</span>).<span class="t" data-page-node-id="NIEM5BieRQIWmsQ98TgBeN">subscribe</span>(status =&gt; {
+      <span class="k" data-page-node-id="A78rGkzPvtPjQV6DWxyJB9">if</span> (status === <span class="s" data-page-node-id="aZBl1wnco0TgNXw3DGnsmQ">'confirm'</span>) {
+        <span class="k" data-page-node-id="fKdvKBbuOf0ZaPDiWKA8vJ">this</span>.service.<span class="t" data-page-node-id="Xjk6mWVcsd28XnpzFyQYSQ">delete</span>(id).<span class="t" data-page-node-id="Z3ARD5FoTIF6C2STtDG0A8">subscribe</span>(() =&gt; {
+          <span class="k" data-page-node-id="zOA38UHJI2g9Cbv03sAYOH">this</span>.toaster.<span class="t" data-page-node-id="qfWN4ARDRz1g5gOEleHfA8">success</span>(<span class="s" data-page-node-id="hU2KWWoaQXKLQbBn8ipkVb">'::DeletedSuccessfully'</span>);
+          <span class="k" data-page-node-id="dLUhILHxoqG1o7aNHGEZgs">this</span>.list.<span class="t" data-page-node-id="cZENTxFe8DhH6G6yFWJgXS">get</span>();
+        });
+      }
+    });
+  }
+}</code></pre>
+
+<pre data-page-node-id="NgP1VL79HrkR2JZB8YQmOw"><span class="path" data-page-node-id="uhKzcudBvgsaqSWJWsGIj6">angular/src/app/products/list/list.component.html</span><code data-page-node-id="FrHJHBF7RkBxr0pGfcv3MD">&lt;<span class="t" data-page-node-id="195r4WTCJKtmMnVKXbwbm1">abp-page</span> [title]=<span class="s" data-page-node-id="MFuUxJKYIJss0Zy0xXJQtw">"'::Products' | abpLocalization"</span>&gt;
+  &lt;<span class="t" data-page-node-id="RtFUxP7EfjHeCJIK3NCrS4">input</span> class=<span class="s" data-page-node-id="gPdKjmE7YVnVDNgCZb3gnA">"form-control"</span> [(ngModel)]=<span class="s" data-page-node-id="JNX46OyS3ozIQDlEoYnWnN">"list.filter"</span>
+         [placeholder]=<span class="s" data-page-node-id="wDPSLD2scrCd7o4xMKCvlO">"'AbpUi::PagerSearch' | abpLocalization"</span> /&gt;
+
+  &lt;<span class="t" data-page-node-id="EyW9GTvpKbJF3TknkWN3Wf">table</span> <span class="k" data-page-node-id="cbURTwyAfmF72uHubDMnQ3">class</span>=<span class="s" data-page-node-id="qhNeYmEDOTCBexLRjqcvXF">"table"</span>&gt;
+    &lt;<span class="t" data-page-node-id="vZtVoaR1LZQvjCMfnTzwJe">tbody</span>&gt;
+      <span class="t" data-page-node-id="1JCErr0fP3NduPiDsCZH8x">@for</span> (item <span class="k" data-page-node-id="M9kezcjhF1z5HTohLx8nUB">of</span> data().items; track item.id) {
+        &lt;<span class="t" data-page-node-id="VWOIIIdyfiWgFdzuqc4TgI">tr</span>&gt;
+          &lt;<span class="t" data-page-node-id="ufkffgbbpdMG8tM0TlO1P7">td</span>&gt;{{ item.code }}&lt;/<span class="t" data-page-node-id="a2k5D7R0KtNRSgOOCjLS73">td</span>&gt;
+          &lt;<span class="t" data-page-node-id="AwTSDWUJpHN00znLtd0TnL">td</span>&gt;{{ item.name }}&lt;/<span class="t" data-page-node-id="rCCwl67CwYWJDXrY9EKOXx">td</span>&gt;
+          &lt;<span class="t" data-page-node-id="4Bz8swbZqyrwdkO1tzfAIb">td</span>&gt;
+            <span class="c" data-page-node-id="5wxVMqOM5IqEu7XJxzmuN9">&lt;!-- 无权限时按钮自动不渲染 --&gt;</span>
+            &lt;<span class="t" data-page-node-id="rS9rl1wOkre1ZfQpRfgKpq">button</span> *<span class="t" data-page-node-id="CyzuHJRX95iJ2Er0IcT9IL">abpPermission</span>=<span class="s" data-page-node-id="v2Oox2yuVq2m6iKv6AgNCA">"'MyProjectName.Products.Update'"</span>
+                    (click)=<span class="s" data-page-node-id="EqwgsFjWX65WR9esS0UCtF">"edit(item.id)"</span>&gt;编辑&lt;/<span class="t" data-page-node-id="bmmuqm3voSHUERiK3zffd5">button</span>&gt;
+            &lt;<span class="t" data-page-node-id="DUT6lao6q14EkZhOtIigFL">button</span> *<span class="t" data-page-node-id="NW7ZGiI8PrExXBQsIdSm2n">abpPermission</span>=<span class="s" data-page-node-id="IqBbW5cm82nLcJx1I9XyMv">"'MyProjectName.Products.Delete'"</span>
+                    (click)=<span class="s" data-page-node-id="lLrk3u4aSloNo2N93OMs86">"delete(item.id)"</span>&gt;删除&lt;/<span class="t" data-page-node-id="15SgsZ2ga4xYR0aIUJXgjS">button</span>&gt;
+          &lt;/<span class="t" data-page-node-id="blyt0HGu22r5yBX0Fe9GEs">td</span>&gt;
+        &lt;/<span class="t" data-page-node-id="2HzNhWpHTGTI64APeNrbcG">tr</span>&gt;
+      }
+    &lt;/<span class="t" data-page-node-id="Ryg1jpzo4HEHW9b0GakMDn">tbody</span>&gt;
+  &lt;/<span class="t" data-page-node-id="jxhs0Fw3k98IMJmNBL8V11">table</span>&gt;
+
+  &lt;<span class="t" data-page-node-id="U9TTbqxZcHFAC1EvcvGyMb">abp-pagination</span> [totalCount]=<span class="s" data-page-node-id="uO6yE2s88l8mqLQQ6lvsPk">"data().totalCount"</span> [list]=<span class="s" data-page-node-id="6QllIwFd58H5whjkDtBN8g">"list"</span> /&gt;
+&lt;/<span class="t" data-page-node-id="2WULXRNpSH51QboWrpzCpV">abp-page</span>&gt;</code></pre>
+
+<!-- ===================== 9 ===================== -->
+<h2 id="s9" data-page-node-id="pABF7dqAOmF7vICYclcYNN"><span class="num" data-page-node-id="rAnd22JrKlVG2lH4bijUBV">09</span>权限三重绑定与检查清单</h2>
+
+<h3 data-page-node-id="ANsS4yaHsg2dMDHycl0QjE">同一个权限字符串，出现在三个地方</h3>
+<p data-page-node-id="a2Ae6h8wF5Drru6cs2nnVa">这是 ABP 权限体系最需要建立直觉的一点。后端只定义一次，前端要绑三处：</p>
+
+<table data-page-node-id="pI4e9gOEKtRz5o2Kzocef4">
+<thead data-page-node-id="j62eHLFcK4ltNLAEwKAwZr"><tr data-page-node-id="JsNYEuRG6xgALHScU07PjT"><th data-page-node-id="J0nBO0yHnjYeF2ZAPnnqvX">#</th><th data-page-node-id="oOC3JGYTNUagSaVjthELND">位置</th><th data-page-node-id="pw9O5ZBbdbWNAeWp5Tn8je">写法</th><th data-page-node-id="gOIUYCYAxrapJ6PjGc43mX">作用</th></tr></thead>
+<tbody data-page-node-id="sjmcQQv9BKbhXL6jYyb4RV">
+<tr data-page-node-id="fpMneabDsA4Pbdomonvj0G"><td data-page-node-id="L7akvahJLyWMijJ4U70zfs">1</td><td data-page-node-id="HkMonIghWweXBCcRdgkmgX">路由 <code data-page-node-id="TYEU6JTAtSYRDASddkKKFh">data.requiredPolicy</code></td><td data-page-node-id="OqSnN12plHLOOQTZ3qk35J"><code data-page-node-id="m31PBYNgX0E6rY24XsPvD3">requiredPolicy: 'MyProjectName.Products'</code></td><td data-page-node-id="vBq0315k6vrA9JnuiMu1Dz">没权限直接进不了页面（<code data-page-node-id="ztiAvQShGnkLQamVls0HrZ">permissionGuard</code> 拦截）</td></tr>
+<tr data-page-node-id="vCxy5tBdoSG399HG4gSaYa"><td data-page-node-id="gINY970xmXifszMZlr8bsq">2</td><td data-page-node-id="Y6o3xnLzQS8H5TejI8UTfD"><code data-page-node-id="Bze2TRf7UFtxGiB0EKKytR">RoutesService.add</code> 菜单项</td><td data-page-node-id="3Oq3vCLi1OvR9NFEDG1920"><code data-page-node-id="IvOfqF6GrBdm6bZ6RojBK0">requiredPolicy: 'MyProjectName.Products'</code></td><td data-page-node-id="IkPy7ny3lb2gPjhTuMpeiF">没权限侧边栏不显示入口</td></tr>
+<tr data-page-node-id="w8NLeQsMsvsgf0D6b0aUlY"><td data-page-node-id="VffLoe3naLpy8dpzUlpDfN">3</td><td data-page-node-id="tLL5yUE6QBk24lYn46xF49">模板按钮</td><td data-page-node-id="sXs90Sb3FzwIunnaePOaCF"><code data-page-node-id="KT99xUY5Eafz2G1goPlNti">*abpPermission="'MyProjectName.Products.Create'"</code></td><td data-page-node-id="9RtdlVcn2KxAuTi0l175MV">没权限按钮不渲染（结构性指令，会移除 DOM）</td></tr>
+</tbody>
+</table>
+
+<p data-page-node-id="sgf8CSNMXzxnGqROzYuGXJ"><code data-page-node-id="DIPK3w7hBZ2TC6b2mm3EcT">*abpPermission</code> 的实现是订阅 <code data-page-node-id="R6cXa4Qlcwnq1dnjTru3ox">PermissionService.getGrantedPolicy$()</code>，返回 false 时就把视图清空——所以它是「不渲染」而非「禁用」，这对安全更友好：</p>
+
+<pre data-page-node-id="e5LK8n7xn6J1hdByKoNlwI"><span class="path" data-page-node-id="Nwn4X2RxuPLCvHpFE8yZ1D">npm/ng-packs/packages/core/src/lib/directives/permission.directive.ts（节选）</span><code data-page-node-id="VBEm8iCnoVHIRYPMUIskNt"><span class="t" data-page-node-id="ebcrWP1biWO9YSIsbOPqdB">@Directive</span>({ selector: <span class="s" data-page-node-id="Bu05OMfVpvQUZfbQCSxiiw">'[abpPermission]'</span> })
+<span class="k" data-page-node-id="1T5i9gHNa9qORyNv2Qb2if">export class</span> <span class="t" data-page-node-id="ldDZvO4kUveSx2SWWmP0Tq">PermissionDirective</span> {
+  <span class="k" data-page-node-id="sGnRHzV07E5NE8lUCGJQii">readonly</span> condition = <span class="t" data-page-node-id="bY2z3TH9v0l4zPfplyLXCJ">input</span>&lt;<span class="k" data-page-node-id="uKODoaYM9Dys1HC2pTGPzt">string</span> | <span class="k" data-page-node-id="Je6qX8idXBRDoY9bpb8W1n">undefined</span>&gt;(<span class="k" data-page-node-id="Ca5GDYXkwExqkJvvdrY0nE">undefined</span>, { alias: <span class="s" data-page-node-id="m58csCyvU5ZcQXPbqXEnEn">"abpPermission"</span> });
+
+  <span class="k" data-page-node-id="aCHKLObmTJliRvcAuuj4pj">private</span> <span class="t" data-page-node-id="BnjyTTowhkxTItKPOvIi8z">check</span>() {
+    <span class="k" data-page-node-id="6tEyBqD8uqTef17Vq5aKWl">this</span>.subscription = <span class="k" data-page-node-id="ti8EOyoUMAIz0aFm4NLFUO">this</span>.permissionService
+      .<span class="t" data-page-node-id="Hs4KrKKbukgQeKfDp1npVy">getGrantedPolicy$</span>(<span class="k" data-page-node-id="cZs05vzIus0HnqNIjEjS3C">this</span>.condition() || <span class="s" data-page-node-id="OIhW3K9ISZzR9QoH5Vum5T">''</span>)
+      .<span class="t" data-page-node-id="gnrj0tLpJtXgXXZseHexwi">pipe</span>(<span class="t" data-page-node-id="HAI872MU3pTb9204fNKvE7">distinctUntilChanged</span>())
+      .<span class="t" data-page-node-id="NOvX8K38ayr3yAxgUak2np">subscribe</span>(isGranted =&gt; {
+        <span class="k" data-page-node-id="AJuLxKVegK4plfYe4FhiKl">this</span>.vcRef.<span class="t" data-page-node-id="M3nG6i0E5CtYQdDybUQWqm">clear</span>();                          <span class="c" data-page-node-id="6JqScMZaUWikHxRXGffXx5">// 先清空</span>
+        <span class="k" data-page-node-id="TRvcXq0Z5BcKRh65Hmc1LU">if</span> (isGranted &amp;&amp; <span class="k" data-page-node-id="Grf2ydefJ4kZfZB2dB4PlW">this</span>.templateRef) {
+          <span class="k" data-page-node-id="AnOd5XxmDY68Wx4nTZXy72">this</span>.vcRef.<span class="t" data-page-node-id="IEdFHMIAjC5VRUAAbmjqxF">createEmbeddedView</span>(<span class="k" data-page-node-id="nNFm8wVrtHzbWhRFWaeTA2">this</span>.templateRef);  <span class="c" data-page-node-id="soSMGz10A7lAAxl3ljSJiC">// 有权限才渲染</span>
+        }
+      });
+  }
+}</code></pre>
+
+<h3 data-page-node-id="SbVDzLSIvLdIx99XUKT2CG">本地化 key 的两种写法</h3>
+<ul data-page-node-id="H14s7tZkZ6RAdNdHSfzUMh">
+<li data-page-node-id="EN2fDnj0KlK4VbcxYKu6K1"><code data-page-node-id="l4o36Y3XMgBzFfmA7mg5OU">'::Menu:Products'</code> —— 双冒号前缀表示「用默认资源」，key 是 <code data-page-node-id="fBO7Lk8eT5Zj7NHrke6AvO">Menu:Products</code></li>
+<li data-page-node-id="cZtMYjWzBQyI1PRxT9T8uO"><code data-page-node-id="4XSYTPgtb00tYw8fGokUan">'AbpIdentity::Users'</code> —— 明确指定资源名是 <code data-page-node-id="YpuwUiEGpmRljBB8CdAaMD">AbpIdentity</code>，key 是 <code data-page-node-id="LS5LP78ZYkNN7Z5prSf29L">Users</code></li>
+</ul>
+<p data-page-node-id="TmoFlEQdIa6VpUsb7463ho">两者都通过 <code data-page-node-id="2F0UfLrDVgMug6Dwioo8ec">| abpLocalization</code> 管道渲染。文案本体在后端 <code data-page-node-id="qPNyQ60V1vYTY0mz5rtwfw">Localization/&lt;项目&gt;/zh-Hans.json</code> 或前端 <code data-page-node-id="NtzG9t8KDcalJEinL1AiIP">src/assets/i18n/*.json</code> 里。</p>
+
+<h3 data-page-node-id="O3MAJ9O1N0kEBBfst1gR76">收尾检查清单</h3>
+<ol class="steps" data-page-node-id="A3ofEa1WNjlglC3qsgtjXw">
+<li data-page-node-id="tc91TVUWxuizSLYkT3RPh2"><div class="st" data-page-node-id="pMPHBwr9pE9XYAcopdMWgy">proxy 是最新的吗</div><div class="sd" data-page-node-id="kyH7SIbbUSHeesEBvQtOws">后端改过 Contracts 后，重跑 <code data-page-node-id="fE8sMXIqx1EjlMI1SGphcQ">abp generate-proxy</code>，否则前端类型和接口对不上</div></li>
+<li data-page-node-id="MEHQQhKgLZcpgWa2FvIK1c"><div class="st" data-page-node-id="SFLvj4STBn4uN2FgNmJg1O">路由注册了吗</div><div class="sd" data-page-node-id="3JkrIJ1W8gj2inoIfML7Vt">模块 <code data-page-node-id="tokQpxBx9ENXE5kyaL02DB">*.routes.ts</code> 写好，并挂进 <code data-page-node-id="yv68to2rZuEboryEN1VwWx">app.routes.ts</code></div></li>
+<li data-page-node-id="eRvrYZuEyj0cM8XROr4Tgh"><div class="st" data-page-node-id="L80V9GKvGZsgRCRCayH9dT">菜单注册了吗</div><div class="sd" data-page-node-id="keP8VnFkrTZcdSooih9OlB"><code data-page-node-id="0zsvREy35DDB8p6hPNWhb3">route.provider.ts</code> 里 <code data-page-node-id="lAtz2TNSQ6T63bGVpHhOho">RoutesService.add</code> 有这一条，且 <code data-page-node-id="owo5e1zj9NjiN61rWFrAQs">order</code> 没和别人打架</div></li>
+<li data-page-node-id="6ooKtuy5yB6PwlF6PznB9E"><div class="st" data-page-node-id="xEMtXONpFjfl85pAWhD6Bf">权限三处一致吗</div><div class="sd" data-page-node-id="S5acA9EcqTGyBwEPZw5vMf">路由 requiredPolicy / 菜单 requiredPolicy / 按钮 *abpPermission，字符串与后端常量逐字符一致</div></li>
+<li data-page-node-id="dDAKmbJAjbRapiXjWyKqR8"><div class="st" data-page-node-id="ZNaZqQHCm9uEEqs67i2fep">ListService 是组件级提供吗</div><div class="sd" data-page-node-id="qfq9ayGKD9olocFMtA6fMq"><code data-page-node-id="MAFlmTfLldvyWy1nc62ZzE">providers: [ListService]</code> 写在组件装饰器里</div></li>
+<li data-page-node-id="A7naYGxHzCF7FrbIHrfH1o"><div class="st" data-page-node-id="xrDJvVLKnjX1rUejJ2xPeI">写完操作有刷新列表吗</div><div class="sd" data-page-node-id="oolsep2Q5Bkrx0g24HH150">保存/删除的成功回调里调 <code data-page-node-id="eDdxVByYzJXzBTcI0nez7B">this.list.get()</code></div></li>
+<li data-page-node-id="HgAsgMN4w4zafieGOfmTXN"><div class="st" data-page-node-id="tHWhwNhWohoSUaIn4bztUf">文案本地化了吗</div><div class="sd" data-page-node-id="6QmIIACrb1z3UeipBX0GuS">没有裸英文/裸中文硬编码在模板里</div></li>
+<li data-page-node-id="r1NiOvMqdxXcAwptsGCzDO"><div class="st" data-page-node-id="avRjkYZhKlmpKYBVsAzDj0">代理与业务服务没混用吗</div><div class="sd" data-page-node-id="uQjOX0H5OeY8zA2JZorbHa"><code data-page-node-id="7F1W7lS3AiNoyOPmNzlovC">proxy/</code> 只做 HTTP 转发；业务状态放自己写的 service</div></li>
+</ol>
+
+<div class="foot" data-page-node-id="isjeFSuNBpqGNHBzYdx26V">
+本文所有文件路径与代码片段均取自本仓库 <code data-page-node-id="iOY2RuvVqkMy0bjkJCHPDo">ABP-Framework-rel-10.6</code> 实际源码：<code data-page-node-id="vl1KT59zRCuqq0D4mGldKh">npm/ng-packs/packages/core</code>、<code data-page-node-id="nLc76kRO9trFiRLYiz5kqU">npm/ng-packs/packages/identity</code>、<code data-page-node-id="eR46GbNZV7R3IFNBEZvqyP">templates/app/angular</code>、<code data-page-node-id="DQR5ZydLv7ZEGgf9iDvVab">templates/module/angular</code>。
+</div>
+
+</div>
+</body>
+</html>

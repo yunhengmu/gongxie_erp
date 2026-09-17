@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\..\..\common.props" />
+  <Import Project="..\..\..\..\configureawait.props" />
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;netstandard2.1;net8.0;net9.0;net10.0</TargetFrameworks>
+    <RootNamespace />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Slugify.Core" />
+    <PackageReference Include="Unidecode.NET" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\framework\src\Volo.Abp.Ddd.Domain\Volo.Abp.Ddd.Domain.csproj" />
+    <ProjectReference Include="..\Volo.CmsKit.Domain.Shared\Volo.CmsKit.Domain.Shared.csproj" />
+    <ProjectReference Include="..\..\..\..\modules\users\src\Volo.Abp.Users.Domain\Volo.Abp.Users.Domain.csproj" />
+    <ProjectReference Include="..\..\..\..\framework\src\Volo.Abp.BlobStoring\Volo.Abp.BlobStoring.csproj" />
+    <ProjectReference Include="..\..\..\..\modules\setting-management\src\Volo.Abp.SettingManagement.Domain/Volo.Abp.SettingManagement.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

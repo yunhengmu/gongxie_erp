@@ -1,0 +1,123 @@
+```json
+//[doc-seo]
+{
+    "Description": "Learn how to use ABP's JSON abstraction for flexible, library-independent serialization with predefined converters for seamless integration."
+}
+```
+
+# JSON
+The ABP provides an abstraction to work with JSON. Having such an abstraction has some benefits;
+
+* You can write library independent code. Therefore, you can change the underlying library with the minimum effort and code change.
+* You can use the predefined converters defined in the ABP without worrying about the underlying library's internal details.
+
+> The JSON serialization system is implemented with the [Volo.Abp.Json](https://www.nuget.org/packages/Volo.Abp.Json) NuGet package([Volo.Abp.Json.SystemTextJson](https://www.nuget.org/packages/Volo.Abp.Json.SystemTextJson) is the default implementation). Most of the time, you don't need to manually [install it](https://abp.io/package-detail/Volo.Abp.Json) since it comes pre-installed with the [application startup template](../../solution-templates/layered-web-application).
+
+## IJsonSerializer
+
+You can inject `IJsonSerializer` and use it for JSON operations. Here is the available operations in the `IJsonSerializer` interface.
+
+```csharp
+public interface IJsonSerializer
+{
+    string Serialize(object obj, bool camelCase = true, bool indented = false);
+    T Deserialize<T>(string jsonString, bool camelCase = true);
+    object Deserialize(Type type, string jsonString, bool camelCase = true);
+}
+```
+Usage Example:
+
+```csharp
+public class ProductManager
+{
+    public IJsonSerializer JsonSerializer { get; }
+
+    public ProductManager(IJsonSerializer jsonSerializer)
+    {
+        JsonSerializer = jsonSerializer;
+    }
+
+    public void SendRequest(Product product)
+    {
+        var json=  JsonSerializer.Serialize(product);
+        // Left blank intentionally for demo purposes...
+    }
+}
+```
+
+## IObjectSerializer
+
+`IObjectSerializer` (defined in the `Volo.Abp.Serialization` package, independently of the JSON system) serializes objects to and from `byte[]`. The default implementation uses UTF-8 JSON bytes from `System.Text.Json`:
+
+```csharp
+public interface IObjectSerializer
+{
+    byte[]? Serialize<T>(T? obj);
+    T? Deserialize<T>(byte[] bytes);
+}
+```
+
+Inject `IObjectSerializer` when a storage or transport API works with bytes instead of strings. To customize serialization for a specific type, implement `IObjectSerializer<T>`. ABP automatically exposes conventionally registered implementations through the corresponding closed generic interface, and the default serializer uses that implementation for `T`:
+
+```csharp
+public class ProductSerializer : IObjectSerializer<Product>, ITransientDependency
+{
+    public byte[]? Serialize(Product? obj)
+    {
+        return obj is null ? null : JsonSerializer.SerializeToUtf8Bytes(obj);
+    }
+
+    public Product? Deserialize(byte[]? bytes)
+    {
+        return bytes is null ? null : JsonSerializer.Deserialize<Product>(bytes);
+    }
+}
+```
+
+## Configuration
+
+### AbpJsonOptions
+
+`AbpJsonOptions` type provides options for the JSON operations in the ABP.
+
+Properties:
+* **InputDateTimeFormats(`List<string>`)**: Formats of input JSON date, Empty string means default format. You can provide multiple formats to parse the date.
+* **OutputDateTimeFormat(`string`)**: Format of output json date, Null or empty string means default format.
+
+## System Text Json
+
+### AbpSystemTextJsonSerializerOptions
+
+- **JsonSerializerOptions(`System.Text.Json.JsonSerializerOptions`)**: Global options for System.Text.Json library operations. See [here](https://docs.microsoft.com/en-us/dotnet/api/system.text.json.jsonserializeroptions) for reference.
+
+### AbpSystemTextJsonSerializerModifiersOptions
+
+- **Modifiers(`List<Action<JsonTypeInfo>>`)**: Configure `Modifiers` of `DefaultJsonTypeInfoResolver`. See [here](https://devblogs.microsoft.com/dotnet/announcing-dotnet-7-preview-6/#json-contract-customization) for reference.
+
+
+## Newtonsoft
+
+Add [Volo.Abp.Json.Newtonsoft](https://www.nuget.org/packages/Volo.Abp.Json.Newtonsoft) package and depends on `AbpJsonNewtonsoftModule` to replace the `System Text Json`.
+
+### AbpNewtonsoftJsonSerializerOptions
+
+- **JsonSerializerSettings(`Newtonsoft.Json.JsonSerializerSettings`)**: Global options for Newtonsoft library operations. See [here](https://www.newtonsoft.com/json/help/html/T_Newtonsoft_Json_JsonSerializerSettings.htm) for reference.
+
+## Configuring JSON options in ASP.NET Core
+
+Configuring JSON options in ABP does not affect ASP.NET Core's JSON settings. To modify ASP.NET Core JSON behavior, configure [JsonOptions](https://docs.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.mvc.jsonoptions) or [MvcNewtonsoftJsonOptions](https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.mvc.mvcnewtonsoftjsonoptions) (if you're using `Newtonsoft.Json`) separately.
+
+Example:
+
+```csharp
+Configure<JsonOptions>(options =>
+{
+    //options.SerializerOptions
+});
+
+// If you use Newtonsoft.Json
+Configure<MvcNewtonsoftJsonOptions>(options =>
+{
+    //options.SerializerSettings
+});
+```

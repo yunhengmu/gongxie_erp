@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="roqfr9BkcsvhzEdijS7FZZ">
+<head data-page-node-id="NeMYcuR6kA5I1MrrbOxTGe">
+<meta charset="UTF-8" data-page-node-id="21EMr5Hk5FPuOONnf4LFxv">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="9K1rmx1WEDivE5j4aTTzcv">
+<title>ABP 仓库文件路径总索引</title>
+<style>
+:root{
+  --bg:#ffffff; --bg-sub:#f7f8fa; --bg-code:#f4f6f8; --bg-inline:#eef1f5;
+  --text:#1f2328; --text-sub:#59636e; --text-mute:#8b949e;
+  --border:#d8dee4; --border-soft:#e6e9ed;
+  --blue:#0969da; --blue-bg:#ddf4ff; --green:#1a7f37; --green-bg:#dafbe1;
+  --amber:#9a6700; --amber-bg:#fff8c5; --red:#cf222e; --red-bg:#ffebe9;
+  --purple:#8250df; --purple-bg:#fbefff; --teal:#0f6e56; --teal-bg:#e1f5ee;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117; --bg-sub:#161b22; --bg-code:#161b22; --bg-inline:#21262d;
+    --text:#e6edf3; --text-sub:#9198a1; --text-mute:#6e7681;
+    --border:#30363d; --border-soft:#21262d;
+    --blue:#4493f8; --blue-bg:#0c2d6b; --green:#3fb950; --green-bg:#0f2f1a;
+    --amber:#d29922; --amber-bg:#3a2d00; --red:#f85149; --red-bg:#3d1418;
+    --purple:#ab7df8; --purple-bg:#2b1c4a; --teal:#3fb9a0; --teal-bg:#0c2f28;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding:44px 26px 100px}
+header.doc{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:30px}
+header.doc .eyebrow{font-size:12.5px;letter-spacing:.12em;color:var(--text-mute);text-transform:uppercase;font-weight:600}
+header.doc h1{font-size:29px;line-height:1.3;margin:12px 0;font-weight:700;letter-spacing:-.01em}
+header.doc p.lead{color:var(--text-sub);font-size:15.5px;margin:0;max-width:820px}
+h2{font-size:21px;font-weight:700;margin:48px 0 6px;padding-top:14px;letter-spacing:-.01em}
+h2 .num{color:var(--blue);font-variant-numeric:tabular-nums;margin-right:9px}
+h3{font-size:16px;font-weight:650;margin:28px 0 8px}
+p{margin:12px 0}
+ul,ol{margin:12px 0;padding-left:24px}
+li{margin:5px 0}
+code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  font-size:12.5px;background:var(--bg-inline);padding:2px 6px;border-radius:5px;
+  word-break:break-all;white-space:normal}
+pre{background:var(--bg-code);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:16px 18px;overflow-x:auto;margin:14px 0;line-height:1.6}
+pre code{background:none;padding:0;font-size:12.6px;white-space:pre;word-break:normal}
+.callout{border-left:3px solid var(--blue);background:var(--blue-bg);padding:13px 18px;
+  border-radius:0 var(--radius) var(--radius) 0;margin:18px 0;font-size:14.3px}
+.callout.warn{border-color:var(--amber);background:var(--amber-bg)}
+.callout.tip{border-color:var(--green);background:var(--green-bg)}
+.callout.danger{border-color:var(--red);background:var(--red-bg)}
+.callout p:first-child{margin-top:0}.callout p:last-child{margin-bottom:0}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.3px;table-layout:fixed}
+th,td{border:1px solid var(--border-soft);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--bg-sub);font-weight:650}
+th:first-child{width:30%}
+td code{font-size:12.1px}
+.pt{font-family:"SFMono-Regular",Consolas,Menlo,monospace;font-size:12.1px;word-break:break-all;color:var(--text)}
+.pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:20px;font-weight:600;vertical-align:middle}
+.pill.ph{background:var(--red-bg);color:var(--red)}
+.pill.real{background:var(--green-bg);color:var(--green)}
+.pill.fw{background:var(--purple-bg);color:var(--purple)}
+.pill.be{background:var(--blue-bg);color:var(--blue)}
+.pill.fe{background:var(--amber-bg);color:var(--amber)}
+.toc{background:var(--bg-sub);border:1px solid var(--border-soft);border-radius:var(--radius);padding:18px 24px;margin:24px 0}
+.toc h3{margin:0 0 10px;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-mute)}
+.toc ol{margin:0;padding-left:20px;columns:2;column-gap:30px}
+@media(max-width:760px){.toc ol{columns:1}}
+.toc li{margin:4px 0;font-size:13.8px}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.foot{margin-top:56px;padding-top:20px;border-top:1px solid var(--border);color:var(--text-mute);font-size:13px}
+</style>
+</head>
+<body data-page-node-id="1JEEAS2Mc9GMfTcgqfhXXm">
+<div class="wrap" data-page-node-id="NIazxz3FYFGEuLwWjlb5Dp">
+
+<header class="doc" data-page-node-id="TxqIdJyUFFpRSIoWYZdH4k">
+  <div class="eyebrow" data-page-node-id="WSFFeeJCoEHuY1zkyRbZfZ">ABP Framework rel-10.6 · 路径索引</div>
+  <h1 data-page-node-id="tgFBwCeHkvzXly2pEAsGar">找文件不再迷路：ABP 仓库完整路径索引</h1>
+  <p class="lead" data-page-node-id="EFobAUZc4gL9ukAfuHNdhW">工作区根目录：<code data-page-node-id="MKcaeOvfBlPQOXauxwvgDe">D:\yudao\abp\ABP-Framework-rel-10.6</code>。本文所有路径均为可直接复制粘贴的完整路径，按「我要找什么 → 去哪」组织，所有条目均已实地核验存在。</p>
+</header>
+
+<div class="callout danger" data-page-node-id="XtMGNmHP25lWhlAnTiy2xu">
+<p data-page-node-id="sksIo8TAxsHTGTeRRJ0fAo"><strong data-page-node-id="soEYw9YCRUkleaECiZeKLs">先看这一条，否则你永远找不到文件：模板里的路径全是「占位名」。</strong></p>
+<p data-page-node-id="kTdxAhsKHZ1bW6M9XXMbS7">ABP 官方模板为了能生成任意项目，把公司名和项目名做成了占位符：<code data-page-node-id="mtZXDYpDYD52siTRDHk8QW">MyCompanyName.MyProjectName</code>（C# 侧）和 <code data-page-node-id="XSjwOBW90nnyNlkW7TD2hY">my-project-name</code>（Angular 侧）。<strong data-page-node-id="3beFNpDDZHRuMmky5UNCvn">你在仓库里看到的 <code data-page-node-id="8VpEqkNAiqglCb3pwrWPbW">MyCompanyName.MyProjectName.Domain</code> 不是某个真实项目</strong>，它是「假设你叫 MyCompanyName、项目叫 MyProjectName」时的样子。</p>
+<p data-page-node-id="q1xJ08hiFmAUh7CL8Sqdf3">当你真正执行 <code data-page-node-id="Ha9fAhpeVbtv51vy8XdbhC">abp new Acme.BookStore</code> 生成自己的项目后：</p>
+<ul data-page-node-id="mMzHeLUvDGO9kzqZdPHaEo">
+<li data-page-node-id="RUjR95qFo2eyzaDela2inV"><code data-page-node-id="pCTICNu04yaYByBiDxUnOI">MyCompanyName.MyProjectName.Domain</code> → <code data-page-node-id="ZlwGWYmqjAPHLS3cEsIBYD">Acme.BookStore.Domain</code></li>
+<li data-page-node-id="BOmIN4W8qE85F5AzVtdB19"><code data-page-node-id="lbmFs39cK5y1US1ULiLoLy">MyProjectNameDomainModule.cs</code> → <code data-page-node-id="KQHrjeKUc83jEt70Xa4C42">BookStoreDomainModule.cs</code></li>
+<li data-page-node-id="GLp6soaA9KNQnmdusqPV30"><code data-page-node-id="Y8duXTovdhyagkm9yV8i3a">my-project-name/</code> → <code data-page-node-id="eE17FB1Ni7A6786SKBsp08">book-store/</code></li>
+</ul>
+<p data-page-node-id="yb0WEc98HClbDS2JKEyqiF">所以读模板时请<b data-page-node-id="X1cKc5CRUbsIoHr7IOeAw2">把占位名当变量看</b>；本索引里凡出现占位名的路径，我都会标注 <span class="pill ph" data-page-node-id="JJythPB0VuAuXEptTWD5oy">占位名</span>。</p>
+</div>
+
+<div class="toc" data-page-node-id="mJQ2RoLOPlQPfbBS6J3HLS">
+  <h3 data-page-node-id="48VorCP6WY7v6v6wMkCVLV">索引目录</h3>
+  <ol data-page-node-id="KOY2NOkIRgJtQ6zDTLF4Wp">
+    <li data-page-node-id="T6mQrHAAzAdr1xu9QA82gD"><a href="#s0" data-page-node-id="VAMRseEwhePs08zEFWRz3T">速查：我想找 X</a></li>
+    <li data-page-node-id="AFCWlTs9Pw5QkT6M6BQ14x"><a href="#s1" data-page-node-id="IuWicVs4Xx2Vi7u2B9JSd9">仓库根目录全景</a></li>
+    <li data-page-node-id="HUQGxbRoGM4vrnyGDCqcEN"><a href="#s2" data-page-node-id="wSUnSOKSzMTpkpDNPdo5Bm">后端 · app 模板（七层）</a></li>
+    <li data-page-node-id="4g1glU1MvJc0ZOOVETNqJN"><a href="#s3" data-page-node-id="eDaer6qxGzdbg51DzI7C0F">后端 · module 模板</a></li>
+    <li data-page-node-id="SCeiRciB0aOVN8iDQHJjvc"><a href="#s4" data-page-node-id="0SkQHPRDwL45spUFdVRJnq">后端 · blogging 真实业务模块</a></li>
+    <li data-page-node-id="MNBMAHTI3RBzZYOUhRy1cY"><a href="#s5" data-page-node-id="jD6ia9BAJItvDPG2nY1PrW">前端 · Angular 应用侧</a></li>
+    <li data-page-node-id="xJyY0ZekkCWKLyhSIJlquT"><a href="#s6" data-page-node-id="BsJKZ6GEmiFo4J2aMMKfgi">前端 · 框架组件库 ng-packs</a></li>
+    <li data-page-node-id="IjxsarojvvzHrSZMSGec2r"><a href="#s7" data-page-node-id="c0PBjaYThLK2ZTgeoahfOK">框架内核 framework/src</a></li>
+    <li data-page-node-id="VRSohN5yT9g3jMPbx98ILe"><a href="#s8" data-page-node-id="NOHYDCbM8NhpqdLYtKOBDm">项目级配置与约定文件</a></li>
+  </ol>
+</div>
+
+<!-- ============ 0 ============ -->
+<h2 id="s0" data-page-node-id="bhpInrnMFIhqb0W3ypUkVs"><span class="num" data-page-node-id="CRrYTZvOLaWlFJOew1KoPf">00</span>速查：我想找 X</h2>
+
+<p data-page-node-id="7no9fxeltCom54DAir73et">先从这张表入手。它按「你要找的东西」倒查路径，是最高频的用法。</p>
+
+<h3 data-page-node-id="dpANWPZm6y750JsBLkqJMq">后端（以 app 模板为例，<span class="pill ph" data-page-node-id="SETNeRl1A1AuQvkkVnaGAr">占位名</span> 部分替换成你的项目名）</h3>
+
+<table data-page-node-id="jXfdErSh9nqD3mPpLIMHfN">
+<thead data-page-node-id="NdvsHCwP6OEOi4jOPwiFLU"><tr data-page-node-id="Fd6CHimKscrsrFTXFURqi9"><th data-page-node-id="tvBcDQCdjIFjmjrRBUt2DI">我要找什么</th><th data-page-node-id="dRFpc5jh24vabcy7nBDc6j">完整路径</th></tr></thead>
+<tbody data-page-node-id="NVpkOIt6CvAsZnpuhSydIw">
+<tr data-page-node-id="5zbobrK0HsHU4rKd6dH9SE"><td data-page-node-id="D3G2O3zJ5s53zrROhqBatD">实体 / 聚合根</td><td class="pt" data-page-node-id="pAmEfIYkQPO0328oDXjpxl">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Domain\&lt;业务名&gt;\Xxx.cs</td></tr>
+<tr data-page-node-id="km1BK1eAEuhn3HL77lrgxq"><td data-page-node-id="xoADvjlp4iTI8PYhlAmVDB">仓储接口</td><td class="pt" data-page-node-id="CEB5KVfbEfPZGaso2ivnCe">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Domain\&lt;业务名&gt;\IXxxRepository.cs</td></tr>
+<tr data-page-node-id="nhAsrrLDbNRAC1JI9qFoRn"><td data-page-node-id="tMGfuWPO7Ck0RJ5x9XLra3">领域服务</td><td class="pt" data-page-node-id="SBBcJlxW9SdMDzZRuUeDFU">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Domain\&lt;业务名&gt;\XxxManager.cs</td></tr>
+<tr data-page-node-id="8eTCBDGONJW738DnrNGVBY"><td data-page-node-id="GtgMuibxlVBtTSefmk5Pb9">常量 / 表前缀</td><td class="pt" data-page-node-id="cQGrcBoDLBfc7VxfG7zcL8">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Domain\MyProjectNameConsts.cs</td></tr>
+<tr data-page-node-id="6kzEF5qOvVuXx8UqopkMBZ"><td data-page-node-id="Q15rkw6ixbVILCfcOKqFhe">错误码</td><td class="pt" data-page-node-id="RiViopnxYlLrenB2jLRmJQ">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Domain.Shared\MyProjectNameDomainErrorCodes.cs</td></tr>
+<tr data-page-node-id="5UjIQY3WttFRKJHnLhYGWS"><td data-page-node-id="kHmote0XJlefm4d4qpve6I">多语言文案</td><td class="pt" data-page-node-id="aVBnPr6AiWCGZjWE1KFhye">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Domain.Shared\Localization\MyProjectName\zh-Hans.json</td></tr>
+<tr data-page-node-id="WxzVGgDpxotQg71RvgfbEz"><td data-page-node-id="RCFRGVBCSYtCNkSX68vWMF">多租户开关</td><td class="pt" data-page-node-id="UrvKRJBQ9XZCoP4MMQCtx5">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Domain.Shared\MultiTenancy\MultiTenancyConsts.cs</td></tr>
+<tr data-page-node-id="FNT9l7cTI4hjlwmdCoHraF"><td data-page-node-id="boibCTg0jx3leAmzigtlBQ">DTO</td><td class="pt" data-page-node-id="kBF1DQLFkCKwaqtJ5BUcFX">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Application.Contracts\&lt;业务名&gt;\XxxDto.cs</td></tr>
+<tr data-page-node-id="Hq1HA6AaJd3sGbtV9fduf3"><td data-page-node-id="TjexvvEqSP7vbqYgL5X2ku">应用服务接口</td><td class="pt" data-page-node-id="GuI5JUhZEZSXSerAGAqBcF">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Application.Contracts\&lt;业务名&gt;\IXxxAppService.cs</td></tr>
+<tr data-page-node-id="e5fq45tJblZZkjG82R09FV"><td data-page-node-id="032DnN9N2ThNzaHhi5FWPE">权限常量</td><td class="pt" data-page-node-id="i3wFmooanNwFcwt8WNtcrt">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Application.Contracts\Permissions\MyProjectNamePermissions.cs</td></tr>
+<tr data-page-node-id="YOgmo9GNyIdrkYzOfdekyj"><td data-page-node-id="nMVvxDfUDqsETH1BuDtWNz">权限定义（注册）</td><td class="pt" data-page-node-id="BfCQhpjpqBDo785rIE6Iyx">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Application.Contracts\Permissions\MyProjectNamePermissionDefinitionProvider.cs</td></tr>
+<tr data-page-node-id="mACDrvIoIewBKOlbokELu2"><td data-page-node-id="PugrNW8Qy64Ah6vXnjjCdJ">应用服务实现</td><td class="pt" data-page-node-id="CtU7bKeEag7SpBrzkLEWHJ">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Application\&lt;业务名&gt;\XxxAppService.cs</td></tr>
+<tr data-page-node-id="O5jQvv0TAypyYdRRnYgnjq"><td data-page-node-id="Vxr63j0RRVEjlkcOodeOzo">对象映射配置</td><td class="pt" data-page-node-id="vJg9JFKJYZUHQj73uzHV3R">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Application\MyProjectNameApplicationMappers.cs</td></tr>
+<tr data-page-node-id="mCw5ktGxzv612HZ1AcdKgl"><td data-page-node-id="fnuI5qE8ELRIRWhIrAI3xQ">应用服务基类</td><td class="pt" data-page-node-id="Me3WRHLgF20EvCDFcXplkN">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Application\MyProjectNameAppService.cs</td></tr>
+<tr data-page-node-id="GXaz9fmJDz6LSdcPvqUQ5R"><td data-page-node-id="JlhigWuoifMwp7SdRJQC8x">DbContext</td><td class="pt" data-page-node-id="JHNZ5h0kudNEENb0qRmBRb">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.EntityFrameworkCore\EntityFrameworkCore\MyProjectNameDbContext.cs</td></tr>
+<tr data-page-node-id="oGjgIw7JHkyG7Hf5MGkpHh"><td data-page-node-id="YtWKdQYy7omiOhw1rUCSbI">实体→表 映射</td><td class="pt" data-page-node-id="gxe2awY0NcXC3cU1IhMlJp">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.EntityFrameworkCore\EntityFrameworkCore\MyProjectNameDbContext.cs<br data-page-node-id="UDjwpACMe4Wq8yRGKMDche"><span style="color:var(--text-mute)" data-page-node-id="HFDpmK61YIut3xPSFhYQdA">★ app 模板<b data-page-node-id="bY0quEOVvd45GfrT6qx2i4">没有</b>独立的 ModelCreatingExtensions 文件，实体映射直接写在 DbContext 的 OnModelCreating 里（文件内已留注释模板）。而 module 模板<b data-page-node-id="5A2X2g8Yo40AMZHdFlQwCM">有</b>独立文件，见第 03 节。</span></td></tr>
+<tr data-page-node-id="n0uWuGO2BBZeyt6e8UYEla"><td data-page-node-id="lfWVYaZ8fwkgizs4ezC5Oj">数据库迁移</td><td class="pt" data-page-node-id="m0cRVFGBNPfmzncADX6Fut">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.EntityFrameworkCore\Migrations\</td></tr>
+<tr data-page-node-id="pOsbyU6pSbIDKTohxyTcBA"><td data-page-node-id="CdHBsIGQXhU6Cj2KEXw4ZN">仓储实现</td><td class="pt" data-page-node-id="LeP7LQmXpcbOfpc6WZj7kC">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.EntityFrameworkCore\&lt;业务名&gt;\EfCoreXxxRepository.cs</td></tr>
+<tr data-page-node-id="89xXE0unc6PoP4tbeXlY2l"><td data-page-node-id="CeH0mskFjp2HCX7VHe8IRK">REST 控制器</td><td class="pt" data-page-node-id="UeN89wSQkDEbe1C6KTMIH0">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.HttpApi\&lt;业务名&gt;\XxxController.cs</td></tr>
+<tr data-page-node-id="vKFZQG4o75NNPuQrPqOw1A"><td data-page-node-id="VYUW2IV2dGWMHXmeVQ8k16">控制器基类</td><td class="pt" data-page-node-id="99L8IrpZcICp2fBmQysHtR">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.HttpApi\Controllers\MyProjectNameController.cs</td></tr>
+<tr data-page-node-id="GgLBC7OMcGvBtwtjTsy6Va"><td data-page-node-id="DpqhHkYD1k0ECj2g9JUzes">启动入口</td><td class="pt" data-page-node-id="FhZhP10ERIiRD6OorrRpVD">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.HttpApi.Host\Program.cs</td></tr>
+<tr data-page-node-id="kGO2Cwz2KTjeV7bDx9sbUt"><td data-page-node-id="ND4BLAqj2gsJ7ZJwJx0bKP">宿主模块配置</td><td class="pt" data-page-node-id="lSyLv8dU945MTEyIj1NJSG">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.HttpApi.Host\MyProjectNameHttpApiHostModule.cs</td></tr>
+<tr data-page-node-id="vnPCGKREOtTBU2tsx1oVpn"><td data-page-node-id="QH0BCWvCFH3nmHh7SNWCKk">连接串 / 应用配置</td><td class="pt" data-page-node-id="L6ZEd9BlPDIqlOfM9p3wiS">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.HttpApi.Host\appsettings.json</td></tr>
+<tr data-page-node-id="ZeySnqBSHieKfyGLHqNyZt"><td data-page-node-id="clgnugQkKTfAHBMimcpt8k">各层模块类</td><td class="pt" data-page-node-id="k1uV1xjMWnS6AHHcIpdavW">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\&lt;层目录&gt;\MyProjectName&lt;层名&gt;Module.cs</td></tr>
+<tr data-page-node-id="whsoaNZRy7vcDGGJ6ObJi1"><td data-page-node-id="RTYnTl2G85cHduK6Sh9AvB">MVC 菜单注册</td><td class="pt" data-page-node-id="VtL7nGrZenkCRIK3UFCGMA">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Web\Menus\MyProjectNameMenuContributor.cs</td></tr>
+<tr data-page-node-id="a13DvMIPtPMv8T5iuS46AA"><td data-page-node-id="a5fdtSZ448qAn6m0lbBYnG">MVC 页面</td><td class="pt" data-page-node-id="Y333SX0E9MGutprp7S5rhm">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Web\Pages\Index.cshtml</td></tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="yQ3HiwuAmU5OocbmGm0dF5">前端（Angular）</h3>
+
+<table data-page-node-id="hKzNud3EPUdcYcfFsLC58S">
+<thead data-page-node-id="CEbkOAUcnpo1UW2NxAbVh2"><tr data-page-node-id="0V3obYWHYeQJ7uWqL2gPrV"><th data-page-node-id="OwW6V2UJmlegqGLBD3CHhk">我要找什么</th><th data-page-node-id="9h7siMCPX4RLH8kE7URyRN">完整路径</th></tr></thead>
+<tbody data-page-node-id="awHNWzD6zcEWKuX33xqmlJ">
+<tr data-page-node-id="qsnFbO4zFrG6QvrGXcaVGy"><td data-page-node-id="TCxjip7FfNxRAj2srJ7MoI">根路由表</td><td class="pt" data-page-node-id="byNXO7j36AyCjGBn9TphcN">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\angular\src\app\app.routes.ts</td></tr>
+<tr data-page-node-id="fWjFyghJbVsAG1JmUzDZd2"><td data-page-node-id="wASuDBmztztGRpJ2ShE6wH">菜单注册</td><td class="pt" data-page-node-id="PJABTO2qV1om9EDxTbG4om">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\angular\src\app\route.provider.ts</td></tr>
+<tr data-page-node-id="6wj3cfvOYUcUAZy1hWk0vL"><td data-page-node-id="m2tVDBu6ZbzBSZdcEZCPKC">应用配置（provider 汇总）</td><td class="pt" data-page-node-id="HoV6S20aJmDvr1UEcsfwYZ">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\angular\src\app\app.config.ts</td></tr>
+<tr data-page-node-id="enoRw980d4iPTXGzBJe9wd"><td data-page-node-id="0j8Lb3Ob0sYviMB7QrCJBV">API 地址 / OAuth 配置</td><td class="pt" data-page-node-id="RQZPs4DLqtDUOujifP8Hga">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\angular\src\environments\environment.ts</td></tr>
+<tr data-page-node-id="Zz2xFBCyjE8LBpbdhLBGXZ"><td data-page-node-id="WQWyRDZEYFWX7cK9QG6RVC">页面示例（首页）</td><td class="pt" data-page-node-id="yuVhFN2QfXKkNsJbTTlnKi">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\angular\src\app\home\home.component.ts</td></tr>
+<tr data-page-node-id="eHFrBeoSNupVy7ZHSkY7aH"><td data-page-node-id="WW2rmjLsCKBvzAVOZkrgFh">ListService（列表状态核心）</td><td class="pt" data-page-node-id="4oUdtjpsB8T4gZU8Cn5vYw">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\services\list.service.ts</td></tr>
+<tr data-page-node-id="V2e1QXTRErmi3iDF33kiYQ"><td data-page-node-id="1qsiVFv5FxmhaeSlSd1t15">权限指令 *abpPermission</td><td class="pt" data-page-node-id="48RbPXyDOkv1cOPEW0ID4z">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\directives\permission.directive.ts</td></tr>
+<tr data-page-node-id="csD52HMXFd0YpKAk3KvO4V"><td data-page-node-id="cYRTUdooBl7WV6GnOiQ5Mh">权限守卫 permissionGuard</td><td class="pt" data-page-node-id="pz85BhsFfOzgEuNfenPGQs">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\guards\permission.guard.ts</td></tr>
+<tr data-page-node-id="iUB3OjUjAy2G3dweZga5NK"><td data-page-node-id="GNONWyCTTthVknIIMSqoWd">权限服务</td><td class="pt" data-page-node-id="w8R5lTwAviPj1qdCi37gR0">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\services\permission.service.ts</td></tr>
+<tr data-page-node-id="tLMJEEZ2GiMBGepX9VNdlY"><td data-page-node-id="X212bWWJntuzyPYjGjlRHW">真实 CRUD 页面范例（用户管理）</td><td class="pt" data-page-node-id="cvdGle0ixVk65jN4DHyEsI">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\src\lib\components\users\users.component.ts</td></tr>
+<tr data-page-node-id="q0bJ3As3V7VEDAwDqo5GPQ"><td data-page-node-id="blAtdGHnpdz9GY7L91K7q3">对应模板</td><td class="pt" data-page-node-id="E0XuozoXE0BkdWBoK2Hutl">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\src\lib\components\users\users.component.html</td></tr>
+<tr data-page-node-id="gNGzgWCDe4Ohd4oFkfMFLm"><td data-page-node-id="sz7D3YdeSR44IuXxtY1aUv">生成的 proxy 范例</td><td class="pt" data-page-node-id="QN329tjAx0Bjp83upBV8Oy">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\proxy\src\lib\proxy\identity\identity-role.service.ts</td></tr>
+<tr data-page-node-id="0KDHipcQirQAhu97A0OsL2"><td data-page-node-id="LnS0QG2agz9yVCoFHxlF3U">生成的 DTO 类型范例</td><td class="pt" data-page-node-id="gY1hrBWpaYJ5HJ77SGmvBT">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\proxy\src\lib\proxy\identity\models.ts</td></tr>
+<tr data-page-node-id="VwdmhWCfDsGVls4l9zjMuL"><td data-page-node-id="ZkXZJY8YlFjnquB10qadId">模块（可复用）的 Angular 结构</td><td class="pt" data-page-node-id="FSEMHkTSFTruhF3F0uglHi">D:\yudao\abp\ABP-Framework-rel-10.6\templates\module\angular\projects\my-project-name\</td></tr>
+</tbody>
+</table>
+
+<div class="callout tip" data-page-node-id="tONZrCWR9QgHGo0mZCLEWM">
+<p data-page-node-id="uOiggpHu2t4wVTMRmFKYRL"><strong data-page-node-id="5KLWDF0FHYbIdj7WESgE7X">在 IDE 里怎么快速定位：</strong>直接在 VS Code 里按 <code data-page-node-id="fwfqoq3a77q3Vo0FrQQmOb">Ctrl+P</code> 输入文件名（如 <code data-page-node-id="bHoq7h57nCaJVotc4GlD8q">ListService</code>）比翻目录快得多。或者在项目根 <code data-page-node-id="0Y8rS3lQO6y06rk3webAsh">D:\yudao\abp\ABP-Framework-rel-10.6</code> 下用 <code data-page-node-id="GQ0HcP1CfOv3AdImSfNRA8">Ctrl+Shift+F</code> 全局搜类名。文件名在这个框架里是有强规律的（见下文各层命名规则），记住规律比记路径更省力。</p>
+</div>
+
+<!-- ============ 1 ============ -->
+<h2 id="s1" data-page-node-id="8Dqq5lfRqWnCfUwNzVDUtw"><span class="num" data-page-node-id="4SknIJU0zQ81YnWC61s3i6">01</span>仓库根目录全景</h2>
+
+<p data-page-node-id="gQvjTitYspgMY6GKxmaQ2B">根目录：<code data-page-node-id="PvB6CkS7Yzinj0rCV9HHjN">D:\yudao\abp\ABP-Framework-rel-10.6</code></p>
+
+<table data-page-node-id="42PTubWegXlWyoWNJ0PMMS">
+<thead data-page-node-id="DFZ2gXOafG4Fdj9wwQ5RTI"><tr data-page-node-id="3BVVKYaHDJIJBiH4vLGLAN"><th data-page-node-id="UaU8i70AoDMJrGfNrarw6t">目录</th><th data-page-node-id="EmV6D3B31bXRjvJACpvuth">是什么 / 什么时候来这</th></tr></thead>
+<tbody data-page-node-id="EfEe6ArDmraaIkN2lqY3Pm">
+<tr data-page-node-id="pgSsL14y7wmBhQPlp3qQGQ"><td class="pt" data-page-node-id="f5VAEJRjqytqy5dX4kH2xK">D:\yudao\abp\ABP-Framework-rel-10.6\framework\src\</td><td data-page-node-id="LiNNupdWZJ6t2lNjocXtgR">框架内核，数百个 <code data-page-node-id="ZQCgwVjONdbCKPJ9AO17HP">Volo.Abp.*</code> 包。想搞清「某个能力框架是怎么实现的」来这</td></tr>
+<tr data-page-node-id="EqyR86jKBX6nTLeEfyLSCX"><td class="pt" data-page-node-id="OO3dHPP1B4IkPhisPmpDpZ">D:\yudao\abp\ABP-Framework-rel-10.6\modules\</td><td data-page-node-id="fEQKmCRANAcf59dqdwd9O5">官方预置应用模块。<strong data-page-node-id="Fda4wsVzQtPJxo5iv0Nzyq">学业务代码怎么写的最佳范本</strong></td></tr>
+<tr data-page-node-id="dIzV0DkbBCYVuacTnsSlDe"><td class="pt" data-page-node-id="P1FKFYQec5vAUPamkxpi8C">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\</td><td data-page-node-id="yuEF7dnUBpB4OcIYg8VmwQ">「单应用」启动模板（前后端完整脚手架）</td></tr>
+<tr data-page-node-id="OgPLjKHWoqHGQI0hwXseai"><td class="pt" data-page-node-id="QMH58ZLeNZfCPo1JtAzuNw">D:\yudao\abp\ABP-Framework-rel-10.6\templates\module\</td><td data-page-node-id="F2itmugzFygYd3GAN9ntad">「可复用模块」模板，内含官方最小范例 <code data-page-node-id="A7gSGm4JlanjEEx8kaZvis">Samples/</code></td></tr>
+<tr data-page-node-id="y26SMAEbCY20Fmywo6w0Pa"><td class="pt" data-page-node-id="r56Xqfqc3AVeSCSq9suVLP">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app-nolayers\</td><td data-page-node-id="yR946FCsL9sXdDakwwJeNH">单层极简模板（不分层）</td></tr>
+<tr data-page-node-id="IYwko2RWbAMOl3a889nF7G"><td class="pt" data-page-node-id="yVnLfRKNkRrNrLkuOgL8FS">D:\yudao\abp\ABP-Framework-rel-10.6\templates\console\</td><td data-page-node-id="msr0YsK3uwY8MKymePa0F7">控制台应用模板</td></tr>
+<tr data-page-node-id="1KTmmffXGqBx1nhXDvKe16"><td class="pt" data-page-node-id="6McjngFQTLM9nghUW8BL8W">D:\yudao\abp\ABP-Framework-rel-10.6\templates\maui\</td><td data-page-node-id="qlELFlI70XXNB0DfxJQI7I">MAUI 桌面/移动模板</td></tr>
+<tr data-page-node-id="6vDaDB23XKmOqebMs4mJxH"><td class="pt" data-page-node-id="KjoTuIPXLLxxMcKjALWerW">D:\yudao\abp\ABP-Framework-rel-10.6\templates\wpf\</td><td data-page-node-id="HXPVtNkhhkMOxYqnbbTc7W">WPF 桌面模板</td></tr>
+<tr data-page-node-id="CURdHq2wLhKQrNv3Ab1Uch"><td class="pt" data-page-node-id="WNP1mej6QHJLuYTLjCAKUN">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\</td><td data-page-node-id="PO5vPQKcrSFnCNsHEhItWT"><strong data-page-node-id="4yDpiY78OS8CyjvrLsIlHb">Angular 侧全部 <code data-page-node-id="vFmmFBGNlUMLd6dmE3yKWj">@abp/ng.*</code> 包源码</strong>（identity、theme-shared、core…）</td></tr>
+<tr data-page-node-id="BhSpWUx5olBlBdcHbkfFrW"><td class="pt" data-page-node-id="ppbCTxS9ZCv1yKAnfF0efQ">D:\yudao\abp\ABP-Framework-rel-10.6\docs\</td><td data-page-node-id="budtjkNVRLXR6xpCB3jbCI">官方文档源码（含 <code data-page-node-id="RG9aJEhxuBXcN9HpETsOrg">en\</code> 等语言目录）</td></tr>
+<tr data-page-node-id="GpvPdqxUhEeqTGxBD7O6Im"><td class="pt" data-page-node-id="pfGBNK2KtAlHIEixBU7XCy">D:\yudao\abp\ABP-Framework-rel-10.6\studio\</td><td data-page-node-id="wMig7vbtLNkSiJ9fB3BbJ7">ABP Studio 桌面端</td></tr>
+<tr data-page-node-id="Hk68QA11v6LYuiM4EECURp"><td class="pt" data-page-node-id="IaqMLBIIR8zHoXZsoWUVsx">D:\yudao\abp\ABP-Framework-rel-10.6\schemas\</td><td data-page-node-id="JDRgsVOWD8Hv1fj7fJF6NZ">JSON schema</td></tr>
+<tr data-page-node-id="WfYlqkxMJjcPcHzsc2BBb2"><td class="pt" data-page-node-id="thWHb7SOd1jxXDbtxL7mmw">D:\yudao\abp\ABP-Framework-rel-10.6\abp_io\</td><td data-page-node-id="aQeAgwi6e4SKPPrDw8EK31">官网相关资源</td></tr>
+<tr data-page-node-id="KBqeMmr3hLT8TXxyAGFmlq"><td class="pt" data-page-node-id="l4egIUqZPcGJq9SzMCDot7">D:\yudao\abp\ABP-Framework-rel-10.6\.cursorrules</td><td data-page-node-id="lj62AG98Qvx4w6Z6CAs9gL"><strong data-page-node-id="FcUu4FQ9OCjJYrhUrQyWuG">框架官方编码规范</strong>（分层、命名、实体、仓储、DTO 全部约定）</td></tr>
+<tr data-page-node-id="NAkScsAAHBmjVeMX9DZMQs"><td class="pt" data-page-node-id="s1bjZWzThGH8mHDJMkUgQB">D:\yudao\abp\ABP-Framework-rel-10.6\Directory.Packages.props</td><td data-page-node-id="SSsgWB1wATXHbrrPOD9OfS">全仓库统一的 NuGet 包版本</td></tr>
+</tbody>
+</table>
+
+<!-- ============ 2 ============ -->
+<h2 id="s2" data-page-node-id="pQxzmF3s6Sx1SwkCBJ3qw0"><span class="num" data-page-node-id="lNsuBv4MFeSr1z9GqJim5R">02</span>后端 · app 模板（七层）</h2>
+
+<p data-page-node-id="1nOaAKtUDXIfCw6NOKUt6z">基准目录：<code data-page-node-id="D7J7wIMTIr2VsKDGqCkZCU">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core</code></p>
+
+<div class="callout warn" data-page-node-id="X3WFEpw1yB3p5CwrWeDbhJ">
+<p data-page-node-id="yKbxeC39j7G1PUshXfJdmO">下面的 <code data-page-node-id="uhyrGeyMap1bBFRxE02VzM">MyCompanyName.MyProjectName</code> 请当作 <span class="pill ph" data-page-node-id="5peEODWs0261biR5RqojBC">占位名</span> 读；<code data-page-node-id="mzOB40tAIKayhdYOD3ekmK">MyProjectName</code> 单独出现时同理（去掉了公司名前缀）。</p>
+</div>
+
+<h3 data-page-node-id="vSJjJKitgMCFiXvT8CKkBs">① Domain（领域层）</h3>
+<pre data-page-node-id="xc86Miww8ezEm5EzRGBlQU"><code data-page-node-id="qjA4D4gMGRCEHLoTotikhL">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Domain\
+├── MyProjectNameDomainModule.cs              模块类：声明 [DependsOn] 依赖
+├── MyProjectNameConsts.cs                    全局常量（DbTablePrefix = "App"）
+├── Data\
+│   ├── IMyProjectNameDbSchemaMigrator.cs
+│   ├── MyProjectNameDbMigrationService.cs    迁移服务
+│   └── NullMyProjectNameDbSchemaMigrator.cs
+├── OpenIddict\
+│   └── OpenIddictDataSeedContributor.cs
+├── Settings\
+│   ├── MyProjectNameSettingDefinitionProvider.cs
+│   └── MyProjectNameSettings.cs
+├── Properties\AssemblyInfo.cs
+└── MyCompanyName.MyProjectName.Domain.csproj</code></pre>
+<p data-page-node-id="ftyNZ1xi8TCXH6Nvz6iSYZ"><b data-page-node-id="u2gLlA64dmfLAAmB4Eg8le">你将来往哪加：</b>业务实体、仓储接口、领域服务，都建子目录放这里，例：<code data-page-node-id="FymjqHXFnlU6mehhRAQ2mf">...\Domain\Products\Product.cs</code>、<code data-page-node-id="mHwecl624EZDYYB4HaHrEZ">...\Domain\Products\IProductRepository.cs</code>。</p>
+
+<h3 data-page-node-id="xkEg3Ph1OOmsxmICZkWCQ9">② Domain.Shared（领域共享层）</h3>
+<pre data-page-node-id="4bIEZAX9CbFhvwEKK5RAWQ"><code data-page-node-id="nmr1iuLg4xE4PZMBmaNevX">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Domain.Shared\
+├── MyProjectNameDomainSharedModule.cs
+├── MyProjectNameDomainErrorCodes.cs          业务错误码常量
+├── MyProjectNameGlobalFeatureConfigurator.cs
+├── MyProjectNameModuleExtensionConfigurator.cs
+├── Localization\
+│   ├── MyProjectNameResource.cs              本地化资源类
+│   └── MyProjectName\                        多语言 JSON（24 种语言）
+│       ├── zh-Hans.json                      简体中文 ← 你主要改这个
+│       ├── zh-Hant.json
+│       ├── en.json
+│       └── ...（ar/cs/de/es/fr/ru/tr/vi 等）
+└── MultiTenancy\
+    └── MultiTenancyConsts.cs                 多租户总开关</code></pre>
+
+<h3 data-page-node-id="hsGajNDPWxKKSkvFNPFPQh">③ Application.Contracts（应用契约层）</h3>
+<pre data-page-node-id="VLEqdhhBREm7MofENBkzlg"><code data-page-node-id="xwiFlfAx4jCc1Y139Z1KOB">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Application.Contracts\
+├── MyProjectNameApplicationContractsModule.cs
+├── MyProjectNameDtoExtensions.cs
+├── Permissions\
+│   ├── MyProjectNamePermissions.cs                    权限名常量
+│   └── MyProjectNamePermissionDefinitionProvider.cs   权限注册到框架
+└── MyCompanyName.MyProjectName.Application.Contracts.csproj</code></pre>
+<p data-page-node-id="6DLfkwwpiOZuIaukHsD4rC"><b data-page-node-id="kKkTGoCKDeXJ5w0yCi8HIK">你将来往哪加：</b><code data-page-node-id="hIrs4L8OR4CehKwKYcRcJy">...\Application.Contracts\Products\</code> 放 <code data-page-node-id="OhmhhgsRpFrV4BtPoF9vCF">IProductAppService.cs</code>、<code data-page-node-id="MpwoT4eKqybUCznXiB4SOt">ProductDto.cs</code>、<code data-page-node-id="pJhUcf8qW1VqgADPUhMeUv">CreateProductDto.cs</code>、<code data-page-node-id="HZvqgsS3Jy1y7pBKl6IkQd">UpdateProductDto.cs</code>、<code data-page-node-id="WSbKRibc4ZMAeGMfU6Eiac">GetProductListDto.cs</code>。</p>
+
+<h3 data-page-node-id="5s2qUxxsHCI8wXP96VFWQy">④ Application（应用实现层）</h3>
+<pre data-page-node-id="hcpPRvnDi7UgkBQVGGF4PV"><code data-page-node-id="lb6fWMeqXeN8601CWwvJ9l">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Application\
+├── MyProjectNameApplicationModule.cs
+├── MyProjectNameAppService.cs              所有 AppService 的基类（注入在 LocalizationResource）
+├── MyProjectNameApplicationMappers.cs      Mapperly 对象映射配置
+├── Properties\AssemblyInfo.cs
+└── MyCompanyName.MyProjectName.Application.csproj</code></pre>
+
+<h3 data-page-node-id="B3LUPiaKuJn7pF4hO6gRYH">⑤ EntityFrameworkCore（ORM 集成层）</h3>
+<pre data-page-node-id="gF6DZslrZj0tpdSASKacAV"><code data-page-node-id="aeVNCRoU7fXL9Ga6LJ9LAB">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.EntityFrameworkCore\
+├── EntityFrameworkCore\
+│   ├── MyProjectNameDbContext.cs                          ← 加 DbSet 在这
+│   ├── MyProjectNameDbContextFactory.cs                   设计时工厂（给 dotnet ef 用）
+│   ├── MyProjectNameEntityFrameworkCoreModule.cs
+│   ├── MyProjectNameEfCoreEntityExtensionMappings.cs
+│   └── EntityFrameworkCoreMyProjectNameDbSchemaMigrator.cs
+├── Migrations\
+│   ├── 20260220031648_Initial.cs                          迁移脚本（自动生成）
+│   ├── 20260220031648_Initial.Designer.cs
+│   └── MyProjectNameDbContextModelSnapshot.cs
+└── MyCompanyName.MyProjectName.EntityFrameworkCore.csproj</code></pre>
+<div class="callout warn" data-page-node-id="1F9pe4TlTCKmQ7wKZItxfm">
+<p data-page-node-id="0zyCYUkp2tF00I6Fhr6Nb8"><strong data-page-node-id="vLvbbqjYSfEiDGEgivJXz5">app 模板与 module 模板在 EF Core 层有一处实质差异，别找错文件：</strong></p>
+<ul data-page-node-id="XRTfSpqIBrMU2E7HUIulkA">
+<li data-page-node-id="5Mboo6Ak4HQFE9e0VJQEM3"><b data-page-node-id="WGUR8E5kWfetE6S5RUpDxo">app 模板</b>：<b data-page-node-id="mg9zhO6ST1kCxTKXkI1ISA">没有</b> <code data-page-node-id="vt35YYUagIRI0oRmgQeQog">MyProjectNameDbContextModelCreatingExtensions.cs</code>。实体映射直接写在 <code data-page-node-id="C1bGZZaE22dv7iOiBNRGWm">MyProjectNameDbContext.cs</code> 的 <code data-page-node-id="iy6ZVTB9qIAWoXt6qQYRz5">OnModelCreating()</code> 里（该文件内已留好注释掉的 <code data-page-node-id="Xs9niI6DCA4kCqLpljBfo0">builder.Entity&lt;YourEntity&gt;(...)</code> 模板）。</li>
+<li data-page-node-id="lz8zLCLGKEuwHFE33ULHYo"><b data-page-node-id="H6xWq7JPrHzNua5fU4RZVR">module 模板</b>：<b data-page-node-id="2VBQZ49PU6FZuQFbqAn02Q">有</b>独立文件 <code data-page-node-id="OliRV31xqwBHP1tWDBVf99">MyProjectNameDbContextModelCreatingExtensions.cs</code>，并且还有独立的 <code data-page-node-id="MZhBA2dMGGaSCyhd3N4aBj">IMyProjectNameDbContext.cs</code> 接口。这是官方推荐写法（见 <code data-page-node-id="yTG9DA9SR0uJUxIj035Cjd">.cursorrules</code>：<em data-page-node-id="8WEDGII9wA0YTwS1ieH4wV">Do NOT configure entities directly inside OnModelCreating</em>）。</li>
+</ul>
+<p data-page-node-id="ClUv98X7DOPjkv5irqwCAg">所以如果你照着 module 模板的规范写，但项目是基于 app 模板建的，可以自己把映射抽到独立的扩展方法里。</p>
+</div>
+
+<p data-page-node-id="3IbGwxXy1VCyMd4DMTkJq9">另有平行的 MongoDB 版本：<code data-page-node-id="x6qPHjGQIkjkHL9yCi3Bis">...\src\MyCompanyName.MyProjectName.MongoDB\</code>。</p>
+
+<h3 data-page-node-id="VzGZrlHXiYNtDnqY7NOOXk">⑥ HttpApi（REST 层）</h3>
+<pre data-page-node-id="6Y9eoJAAae5ZDA8fZM9Rko"><code data-page-node-id="Ul7JXf3iukI9SmCHw7DWSI">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.HttpApi\
+├── Controllers\
+│   └── MyProjectNameController.cs          控制器基类
+├── Models\Test\
+│   └── TestModel.cs
+├── MyProjectNameHttpApiModule.cs
+└── MyCompanyName.MyProjectName.HttpApi.csproj</code></pre>
+<p data-page-node-id="PRQAdUhMWA2Exnw2c9VVWh">客户端代理层：<code data-page-node-id="RPn4g5zZfyxuLD6gStu9z5">...\src\MyCompanyName.MyProjectName.HttpApi.Client\MyProjectNameHttpApiClientModule.cs</code></p>
+
+<h3 data-page-node-id="LU3unpggZpKlAiTlv8O6J4">⑦ 宿主与前端宿主</h3>
+<pre data-page-node-id="1pQFC3pFly5TvC2BPtLXJ2"><code data-page-node-id="3YKEPiyhDVXwBAapggL6kD">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.HttpApi.Host\
+├── Program.cs                              启动入口
+├── MyProjectNameHttpApiHostModule.cs       ← 中间件/认证/CORS 配置在这
+├── Controllers\HomeController.cs
+├── appsettings.json                        连接串等
+├── appsettings.Development.json
+├── Properties\launchSettings.json          端口配置
+└── web.config</code></pre>
+
+<p data-page-node-id="hvw6v0lOC73djCibAqWjHB">同级的其它宿主（按你选的 UI 形态，只会生成对应的那些）：</p>
+<pre data-page-node-id="AM2r3k7DiP3znekHpoA5v6"><code data-page-node-id="ieVj8UfewjUZRtPTDy4IB6">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\
+├── MyCompanyName.MyProjectName.HttpApi.HostWithIds\
+├── MyCompanyName.MyProjectName.AuthServer\
+├── MyCompanyName.MyProjectName.Web\                MVC / Razor Pages
+├── MyCompanyName.MyProjectName.Web.Host\
+├── MyCompanyName.MyProjectName.Blazor\
+├── MyCompanyName.MyProjectName.Blazor.Client\
+├── MyCompanyName.MyProjectName.Blazor.Server\
+├── MyCompanyName.MyProjectName.Blazor.Server.Tiered\
+├── MyCompanyName.MyProjectName.Blazor.WebApp\
+├── MyCompanyName.MyProjectName.Blazor.WebApp.Client\
+├── MyCompanyName.MyProjectName.Blazor.WebApp.Tiered\
+├── MyCompanyName.MyProjectName.Blazor.WebApp.Tiered.Client\
+└── MyCompanyName.MyProjectName.DbMigrator\         数据库迁移控制台</code></pre>
+
+<h3 data-page-node-id="bVT2YPT6ArNtUyEmSlLZnd">Web（MVC）关键文件</h3>
+<pre data-page-node-id="yfQ6TqCxYmQ8fRBrKhBbao"><code data-page-node-id="NzdVikqFssME37O5aRfnuJ">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\src\MyCompanyName.MyProjectName.Web\
+├── Program.cs
+├── MyProjectNameWebModule.cs
+├── Menus\
+│   ├── MyProjectNameMenuContributor.cs     ← 菜单注册
+│   └── MyProjectNameMenus.cs               菜单名常量
+├── Pages\
+│   ├── Index.cshtml / Index.cshtml.cs      页面示例
+│   ├── MyProjectNamePageModel.cs            PageModel 基类
+│   └── _ViewImports.cshtml
+├── Components\_ViewImports.cshtml
+├── Views\_ViewImports.cshtml
+├── MyProjectNameBrandingProvider.cs
+├── MyProjectNameWebMappers.cs
+├── abp.resourcemapping.js
+├── package.json
+├── appsettings.json
+└── wwwroot\
+    ├── global-styles.css
+    └── images\logo\leptonx\</code></pre>
+
+<h3 data-page-node-id="MR1R0m6Weqj619C7npF0xr">测试工程</h3>
+<pre data-page-node-id="fZvxsCPTGo9ffsUFR9xFaC"><code data-page-node-id="kd38zf1FsT5poRH7GYvAb8">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\aspnet-core\test\
+├── MyCompanyName.MyProjectName.TestBase\                     测试基类
+├── MyCompanyName.MyProjectName.Domain.Tests\
+├── MyCompanyName.MyProjectName.Application.Tests\
+├── MyCompanyName.MyProjectName.EntityFrameworkCore.Tests\
+├── MyCompanyName.MyProjectName.MongoDB.Tests\
+├── MyCompanyName.MyProjectName.Web.Tests\
+└── MyCompanyName.MyProjectName.HttpApi.Client.ConsoleTestApp\</code></pre>
+
+<!-- ============ 3 ============ -->
+<h2 id="s3" data-page-node-id="OYaZtHFC3SbnpgJMs77zou"><span class="num" data-page-node-id="B2FQai3GMcteLs6rvBVMtm">03</span>后端 · module 模板</h2>
+
+<p data-page-node-id="MlmqNFolTm1REcgwOI3Bm1">基准目录：<code data-page-node-id="fGTUAzADgCFKKSHilZRC6P">D:\yudao\abp\ABP-Framework-rel-10.6\templates\module\aspnet-core</code></p>
+
+<p data-page-node-id="ZJGhEL3lHBWVvdhiXJMIcx">与 app 模板最大的差别：<b data-page-node-id="GwHL40YlAQJM1FSJOww2Xq">它多了一个 <code data-page-node-id="tGhxevRCnLyJxWHmF1SnFu">Samples/</code> 目录</b>，是官方给的「新增一个功能」最小范例，非常适合照着抄。</p>
+
+<pre data-page-node-id="CWIf9HpB9k1qE7w4DE8mYG"><code data-page-node-id="W6rWw7wrUEwRDnVkz35SOx">D:\yudao\abp\ABP-Framework-rel-10.6\templates\module\aspnet-core\src\
+├── MyCompanyName.MyProjectName.Domain\
+│   ├── MyProjectNameDomainModule.cs
+│   ├── MyProjectNameDbProperties.cs           表前缀/库 schema
+│   └── Settings\MyProjectNameSettingDefinitionProvider.cs
+├── MyCompanyName.MyProjectName.Domain.Shared\
+│   ├── MyProjectNameDomainSharedModule.cs
+│   └── MyProjectNameErrorCodes.cs
+├── MyCompanyName.MyProjectName.Application.Contracts\
+│   ├── MyProjectNameApplicationContractsModule.cs
+│   ├── MyProjectNameRemoteServiceConsts.cs          远程服务名常量
+│   ├── Permissions\MyProjectNamePermissions.cs
+│   ├── Permissions\MyProjectNamePermissionDefinitionProvider.cs
+│   └── Samples\
+│       ├── ISampleAppService.cs                     ★ 范例：接口
+│       └── SampleDto.cs                             ★ 范例：DTO
+├── MyCompanyName.MyProjectName.Application\
+│   ├── MyProjectNameAppService.cs
+│   ├── MyProjectNameApplicationMappers.cs
+│   └── Samples\SampleAppService.cs                  ★ 范例：实现
+├── MyCompanyName.MyProjectName.EntityFrameworkCore\EntityFrameworkCore\
+│   ├── IMyProjectNameDbContext.cs                   ★ 注意：module 版有独立 DbContext 接口
+│   ├── MyProjectNameDbContext.cs
+│   ├── MyProjectNameDbContextModelCreatingExtensions.cs   ★ 实体映射写在这
+│   └── MyProjectNameEntityFrameworkCoreModule.cs
+├── MyCompanyName.MyProjectName.HttpApi\
+│   ├── MyProjectNameController.cs                   控制器基类
+│   └── Samples\SampleController.cs                  ★ 范例：控制器
+├── MyCompanyName.MyProjectName.HttpApi.Client\
+│   └── MyProjectNameHttpApiClientModule.cs
+├── MyCompanyName.MyProjectName.MongoDB\
+├── MyCompanyName.MyProjectName.Blazor\ 系列
+├── MyCompanyName.MyProjectName.Web\
+└── MyCompanyName.MyProjectName.Installer\</code></pre>
+
+<p data-page-node-id="BADCGAZXJ2ErSBWswSwfYD">宿主目录（一个模块模板会生成多套宿主，方便本地调试）：</p>
+<pre data-page-node-id="J6FkWlZObZSA4mF1JA9NFw"><code data-page-node-id="2JchIsvqn3spQENsYsskGi">D:\yudao\abp\ABP-Framework-rel-10.6\templates\module\aspnet-core\host\
+├── MyCompanyName.MyProjectName.AuthServer\          认证服务
+├── MyCompanyName.MyProjectName.HttpApi.Host\        API 宿主
+├── MyCompanyName.MyProjectName.Web.Host\
+├── MyCompanyName.MyProjectName.Web.Unified\         一体化宿主
+├── MyCompanyName.MyProjectName.Blazor.Host\
+├── MyCompanyName.MyProjectName.Blazor.Host.Client\
+├── MyCompanyName.MyProjectName.Blazor.Server.Host\
+└── MyCompanyName.MyProjectName.Host.Shared\</code></pre>
+
+<!-- ============ 4 ============ -->
+<h2 id="s4" data-page-node-id="L6tKWHvvfMmxxSMs1zsfWo"><span class="num" data-page-node-id="8DcSbqtNvbUkbMj1iWfJAd">04</span>后端 · blogging 真实业务模块（最推荐对照）</h2>
+
+<p data-page-node-id="yctGIPNH3V2zvZZtNk8OaF">这是<b data-page-node-id="q9SFbh1hel3MgGTb0AqOKM">真实存在、可编译的完整业务模块</b>，没有占位名干扰。<strong data-page-node-id="uA55cfaNF6bS4cBti68Oyi">想学业务代码怎么写，直接读这个。</strong></p>
+
+<p data-page-node-id="SnApo9gbH7lBLdvopCn0ES">基准目录：<code data-page-node-id="RUMinU05maBQwC1ksxkLjI">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src</code></p>
+
+<h3 data-page-node-id="ATllUewP5RXhsOEqHhhNGa">以「Post（文章）」为例的一条完整垂直切片</h3>
+
+<table data-page-node-id="DDWsCIDovlYLGuHCC1uGtX">
+<thead data-page-node-id="1XYZJ49sjaZFOUYpQuGcIg"><tr data-page-node-id="vDSwWakPO8dBZ532Zo6d9o"><th data-page-node-id="YEGRDzoFyttqV6C3r2oK0I">环节</th><th data-page-node-id="tLTTgZtcKcficLRUsMHy3k">完整路径</th></tr></thead>
+<tbody data-page-node-id="6j0D9UuE2298fTI2FNnK66">
+<tr data-page-node-id="FpEcUUHirljboRq0hpXF7f"><td data-page-node-id="Lyfhxs0HH2GYxEEsN5D4mn">① 实体</td><td class="pt" data-page-node-id="td7Y2QVT5AbVMSlBAtSUQR">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Domain\Volo\Blogging\Posts\Post.cs</td></tr>
+<tr data-page-node-id="If3DuOqatTupXAmW1DzuuB"><td data-page-node-id="omqHkm5s7rylEQB3BkPyEF">② 仓储接口</td><td class="pt" data-page-node-id="4KDyxHXK1whXB2qRfwE8Cf">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Domain\Volo\Blogging\Posts\IPostRepository.cs</td></tr>
+<tr data-page-node-id="jmuwBV72LNFenjr1r225xl"><td data-page-node-id="UsBQC6MlSr09wCeYa996nO">③ 领域事件</td><td class="pt" data-page-node-id="cYlPCDZwE6ysFkBJlXLSXy">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Domain\Volo\Blogging\Posts\PostChangedEvent.cs</td></tr>
+<tr data-page-node-id="79J4aISTbACek7x4E4YIjw"><td data-page-node-id="2Vmx1DJqKUZ7Fx7HdN98H0">④ 缓存项</td><td class="pt" data-page-node-id="SeNGyyF2S61Mn7pjzH1zK4">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Domain\Volo\Blogging\Posts\PostCacheItem.cs</td></tr>
+<tr data-page-node-id="C55UbhBuNLKXUAzieKDraC"><td data-page-node-id="6jeGxLUl5GHU0jTVCYrA4D">⑤ 缓存失效器</td><td class="pt" data-page-node-id="MrCDtC09PFG5yETum1wjqr">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Domain\Volo\Blogging\Posts\PostCacheInvalidator.cs</td></tr>
+<tr data-page-node-id="LstP30jguJquVFqRo15klB"><td data-page-node-id="embyzuawVCgWG7C0jRNxSP">⑥ 关联表实体</td><td class="pt" data-page-node-id="OCgQH4O8j8tueYFWBHl2oj">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Domain\Volo\Blogging\Posts\PostTag.cs</td></tr>
+<tr data-page-node-id="Jgf1iKzvB0AttOTtKLbZbe"><td data-page-node-id="pAAEFgkj6VWrBo7CvZWRJc">⑦ AppService 接口</td><td class="pt" data-page-node-id="pEv5LqJXstCMCbFGH52Y3E">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Application.Contracts\Volo\Blogging\Posts\IPostAppService.cs</td></tr>
+<tr data-page-node-id="mVc9We1VG8Q9xKaKoi51ef"><td data-page-node-id="cFuOvz1RB3EDx9l0VUPCuR">⑧ 输出 DTO</td><td class="pt" data-page-node-id="bKqb0VWvYtIL6xKHQc3Z43">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Application.Contracts\Volo\Blogging\Posts\PostWithDetailsDto.cs</td></tr>
+<tr data-page-node-id="RgAKPNqlov9YByoRUy1kHV"><td data-page-node-id="IiRAUTInrJwK5UIygOVvT5">⑨ 创建 DTO</td><td class="pt" data-page-node-id="T2vzJktoRmAeoOECUur9Vd">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Application.Contracts\Volo\Blogging\Posts\CreatePostDto.cs</td></tr>
+<tr data-page-node-id="Ihu6859bIzp6STxh0NMtvC"><td data-page-node-id="3meCee1lRRqodnjHJXacZP">⑩ 更新 DTO</td><td class="pt" data-page-node-id="gY1Wkb7mCUY3RbYHVviH0R">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Application.Contracts\Volo\Blogging\Posts\UpdatePostDto.cs</td></tr>
+<tr data-page-node-id="bL2Waf6IkkV316lefrUECX"><td data-page-node-id="h2aDH5CwuksN93k4qIXK4D">⑪ AppService 实现</td><td class="pt" data-page-node-id="ZL8LNqxBI9jWvOSHnFRcoX">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Application\Volo\Blogging\Posts\PostAppService.cs</td></tr>
+<tr data-page-node-id="YKRxudZUfWLyXBJKdJpdVt"><td data-page-node-id="Xr11R2jZFdLFvIZsFlvN5Q">⑫ 授权处理器</td><td class="pt" data-page-node-id="aOciu4jAwN3AyirxtYTRCH">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Application\Volo\Blogging\Posts\PostAuthorizationHandler.cs</td></tr>
+<tr data-page-node-id="Xj6uRNVwDTYhS5HqMf5ShE"><td data-page-node-id="ZbceLobKVwTRGw3ScwRHC5">⑬ 仓储实现</td><td class="pt" data-page-node-id="abBTdN9gXHj0t9QpQH7pFg">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.EntityFrameworkCore\Volo\Blogging\Posts\EfCorePostRepository.cs</td></tr>
+<tr data-page-node-id="JiQZkDrYw5U9At0VYbfNgX"><td data-page-node-id="oRlMOEquz0o4D8L6jvC4HN">⑭ DbContext</td><td class="pt" data-page-node-id="o6bdXC8OVZOsmzy5OxyXmJ">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.EntityFrameworkCore\Volo\Blogging\EntityFrameworkCore\BloggingDbContext.cs</td></tr>
+<tr data-page-node-id="Yj23w36eV2jibsYgqncwRB"><td data-page-node-id="3VQFU5XFLMvzBxEmPzDFdZ">⑮ 实体映射</td><td class="pt" data-page-node-id="ARqFin78h96MrUHeNiMHjX">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.EntityFrameworkCore\Volo\Blogging\EntityFrameworkCore\BloggingDbContextModelBuilderExtensions.cs</td></tr>
+<tr data-page-node-id="AS8V8k9owrPyrCXK6giBkq"><td data-page-node-id="pyV9pInG741Xo9422Rirrt">⑯ REST 控制器</td><td class="pt" data-page-node-id="JAipLmqaqAxVJre7Ek3alW">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.HttpApi\Volo\Blogging\PostsController.cs</td></tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="ZO1bM5e99wIcsa5xdkOwct">blogging 其它业务（同样结构）</h3>
+<pre data-page-node-id="LNo6sFi70aoOokf6Wurwm6"><code data-page-node-id="3AqPTrAYUxN6PcdWAHTxok">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\
+├── Volo.Blogging.Domain\Volo\Blogging\
+│   ├── Blogs\Blog.cs / IBlogRepository.cs / BloggingDomainMappers.cs
+│   ├── Comments\Comment.cs / ICommentRepository.cs
+│   ├── Tagging\Tag.cs / ITagRepository.cs
+│   ├── Users\BlogUser.cs / IBlogUserLookupService.cs
+│   └── BloggingDomainModule.cs
+├── Volo.Blogging.Domain.Shared\Volo\Blogging\
+│   ├── Blogs\BlogConsts.cs / BlogEto.cs
+│   ├── Posts\PostConsts.cs / PostEto.cs
+│   ├── Localization\BloggingResource.cs
+│   └── Localization\Resources\zh-Hans.json
+├── Volo.Blogging.Application\Volo\Blogging\
+│   ├── Blogs\BlogAppService.cs
+│   ├── Comments\CommentAppService.cs
+│   ├── Tagging\TagAppService.cs
+│   ├── BloggingAppServiceBase.cs
+│   └── BloggingApplicationMappers.cs
+├── Volo.Blogging.HttpApi\Volo\Blogging\
+│   ├── BlogsController.cs / CommentsController.cs
+│   ├── TagsController.cs / BlogFilesController.cs
+│   └── BloggingHttpApiModule.cs
+└── Volo.Blogging.EntityFrameworkCore\Volo\Blogging\...（各实体仓储实现）</code></pre>
+
+<p data-page-node-id="KJGB4A3hSAN3cegPTxAKpd">另外还有一套后台管理版：<code data-page-node-id="vJ3BKDy7uxaUnkuidGU2Dj">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\src\Volo.Blogging.Admin.*</code>（Admin.Application / Admin.Application.Contracts / Admin.HttpApi / Admin.HttpApi.Client / Admin.Web），展示了「同一实体、前台后台两套接口」的分层法。</p>
+
+<!-- ============ 5 ============ -->
+<h2 id="s5" data-page-node-id="4Nv2Jp5bzTrOpjK0f7oz3Y"><span class="num" data-page-node-id="1IKgGiAHTokqIDuMl4RiHK">05</span>前端 · Angular 应用侧</h2>
+
+<h3 data-page-node-id="bs2etsQVk4e3chlQrh3vCR">app 模板的 Angular</h3>
+<p data-page-node-id="0GbMWQ863z8Rc4pbo9Kkfi">基准目录：<code data-page-node-id="GFsM8KbtgO9nfHDCAfqmsC">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\angular</code></p>
+
+<pre data-page-node-id="bAk5zkqp461le4aSCiZGr9"><code data-page-node-id="KVHBkNk9NCpqa26LR0pLYI">D:\yudao\abp\ABP-Framework-rel-10.6\templates\app\angular\
+├── angular.json                    构建配置
+├── package.json                    依赖（@abp/ng.* 等）
+├── tsconfig.json / tsconfig.app.json / tsconfig.spec.json
+├── .eslintrc.json / .prettierrc / .editorconfig
+├── start.ps1                       启动脚本
+└── src\
+    ├── main.ts                     Angular 入口
+    ├── index.html
+    ├── polyfills.ts
+    ├── styles.scss                 全局样式
+    ├── favicon.ico
+    ├── environments\
+    │   ├── environment.ts          ← API 地址 / OAuth 配置在这改
+    │   └── environment.prod.ts
+    ├── assets\
+    │   ├── images\getting-started\
+    │   └── images\logo\
+    └── app\
+        ├── app.component.ts
+        ├── app.config.ts           ← provider 汇总（路由/主题/OAuth 等）
+        ├── app.routes.ts           ← 根路由表
+        ├── route.provider.ts       ← 侧边栏菜单注册
+        ├── home\
+        │   ├── home.component.ts / .html / .scss / .spec.ts
+        │   └── home.routes.ts
+        └── shared\shared.module.ts</code></pre>
+
+<div class="callout warn" data-page-node-id="NGBitRp1JfFHsb4VhQvoFw">
+<p data-page-node-id="8PbmkPss94bvpIMXnkamUx"><strong data-page-node-id="ULVJBCakq2X4bwECx2qQdT">注意：模板里没有 <code data-page-node-id="mj1RmrvGpVz2a3UZzXuj5q">proxy\</code> 目录。</strong>它要等你跑过 <code data-page-node-id="qP0mYn1sWR6TCOd5Bjk4Q5">abp generate-proxy</code> 之后才会在 <code data-page-node-id="HuQ7dvJU7MANbpei573cVU">...\angular\src\app\proxy\</code> 下生成。这就是为什么你在模板里找不到「请求函数」——它默认不存在，是生成物。</p>
+</div>
+
+<h3 data-page-node-id="uFHjuDXcF1FjnOiHmm9b0f">module 模板的 Angular（含可复用模块的完整结构）</h3>
+<p data-page-node-id="xIeO5Qfg3UUtndXRCmRWzz">基准目录：<code data-page-node-id="3nZyQ2DViilgHVOzwZg9re">D:\yudao\abp\ABP-Framework-rel-10.6\templates\module\angular\projects</code></p>
+
+<pre data-page-node-id="4TqzxTYAi23rw8lhhWP57g"><code data-page-node-id="vmZ5960iWgpw3AHESq8vKA">my-project-name\                         ← 模块本体（打包成 npm 包）
+├── ng-package.json / package.json
+├── config\                              ← 「配置」子入口：路由/枚举
+│   └── src\
+│       ├── enums\route-names.ts              路由名枚举
+│       ├── providers\route.provider.ts       ← 菜单注册
+│       ├── my-project-name-config.module.ts
+│       └── public-api.ts
+└── src\
+    ├── lib\
+    │   ├── my-project-name.routes.ts         ← 模块子路由
+    │   ├── components\my-project-name.component.ts   ← 页面组件
+    │   └── services\my-project-name.service.ts       ← 手写请求函数（RestService）
+    └── public-api.ts                       模块对外导出
+
+dev-app\                                 ← 本地调试用的壳应用
+└── src\
+    ├── app\
+    │   ├── app.config.ts / app.routes.ts / route.provider.ts
+    │   ├── home\home.component.ts
+    │   └── shared\shared.module.ts
+    ├── environments\environment.ts
+    └── main.ts / index.html / styles.scss</code></pre>
+
+<p data-page-node-id="mbHpRpQCKp4SAyowPkTWfU">完整路径示例：
+<br data-page-node-id="bMrotjgXeE6bZYQxj2lq8f"><span class="pt" data-page-node-id="jwLIbOZU26Y8gMYHriytYn">D:\yudao\abp\ABP-Framework-rel-10.6\templates\module\angular\projects\my-project-name\src\lib\services\my-project-name.service.ts</span>
+<br data-page-node-id="4Dn3MpEAoFbrynGpSm80Tp"><span class="pt" data-page-node-id="tgqfwl9yc7kILehfDCUwNp">D:\yudao\abp\ABP-Framework-rel-10.6\templates\module\angular\projects\my-project-name\config\src\providers\route.provider.ts</span></p>
+
+<!-- ============ 6 ============ -->
+<h2 id="s6" data-page-node-id="0aFgVB8THZIB02qxVZjIDH"><span class="num" data-page-node-id="kxyk0iVaIB9iDk5zkpwFgS">06</span>前端 · 框架组件库 ng-packs</h2>
+
+<p data-page-node-id="hSSDHCQdS7TDvL2HYfWURD">这是 Angular 侧所有可复用组件的源码所在。<code data-page-node-id="DPWnlcbpvlVYg3h79FlSfz">@abp/ng.xxx</code> 这些包就来自这里。</p>
+
+<p data-page-node-id="fAWk72KRYBFrbz4p10Ftcy">基准目录：<code data-page-node-id="4IWVwGpAh0OPs5V0UbEnAu">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages</code></p>
+
+<pre data-page-node-id="L82HNUZ5DxXMNVJkMb0wP9"><code data-page-node-id="HEXn06Iv4YduyQu5Yqk713">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\
+├── core\              核心服务（ListService、RoutesService、PermissionService、RestService…）
+├── components\        UI 组件（dynamic-form、extensible、page 等）
+├── theme-shared\      共享主题组件（abp-modal、abp-button、Toast、Confirm…）
+├── theme-basic\       基础主题
+├── identity\          身份管理（用户/角色页面）
+├── tenant-management\ 租户管理
+├── setting-management\设置管理
+├── permission-management\ 权限管理
+├── feature-management\    功能管理
+├── account\ / account-core\  账户模块
+├── oauth\             认证
+├── cms-kit\           CMS 模块
+├── generators\        代码生成器
+└── schematics\        Angular schematics（含 proxy 模板）</code></pre>
+
+<h3 data-page-node-id="PCleNB7BeF5s9QCxumsjqR">你最该看的几个文件</h3>
+
+<table data-page-node-id="O0yuYGBcRb3i7XWYMC6f6H">
+<thead data-page-node-id="Q64K8lmnG3Dr0b2QqjflDX"><tr data-page-node-id="olewUzPk4Rd2uUB6d2Q122"><th data-page-node-id="ZDzDLoLCfBnIt9pwgd4BJd">用途</th><th data-page-node-id="A9MmsV8HsD4SLAWiTZ5Rq2">完整路径</th></tr></thead>
+<tbody data-page-node-id="11USGccRKjueGW7A3NSGXq">
+<tr data-page-node-id="Vr6R1ZYdVEP2JRRpNh1xuJ"><td data-page-node-id="0r9jJvmW8zlCP4ZHJ8DATD">列表状态核心</td><td class="pt" data-page-node-id="ZIh2n5OBdTdChCu3GJ8PCl">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\services\list.service.ts</td></tr>
+<tr data-page-node-id="ZvMVxaLe1b5U7eqbNUQhmy"><td data-page-node-id="NxiPSCyNLOaICkzP8YJDQS">路由/菜单服务</td><td class="pt" data-page-node-id="6YaxBMs6hRRsH55Eo8BEg6">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\services\routes.service.ts</td></tr>
+<tr data-page-node-id="feG6jZkQbkmtymRBiIFmMz"><td data-page-node-id="Ej4htSQqPCwnCdweoST3K1">权限服务</td><td class="pt" data-page-node-id="i4xapT1fkCPoHizCchkRTS">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\services\permission.service.ts</td></tr>
+<tr data-page-node-id="Cj4mwDwd7RzQqVAOoClzl1"><td data-page-node-id="em0udTTnpq4xBxR86kF22B">*abpPermission 指令</td><td class="pt" data-page-node-id="4dhaVfzVOL2AY0aBtBrv9g">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\directives\permission.directive.ts</td></tr>
+<tr data-page-node-id="otFQHTkVVEG3pBCLyORcPA"><td data-page-node-id="i5D8MUENCbfY8rcSI7rwHw">permissionGuard</td><td class="pt" data-page-node-id="dQRj3sNR12aq3yLuAAtHR4">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\guards\permission.guard.ts</td></tr>
+<tr data-page-node-id="d9J93zp6AxAXRKavTyN9T6"><td data-page-node-id="xPMJ4DGNEQHb9OF8vImwDr"><strong data-page-node-id="TRNfVgsumKcBocGBrsiKQw">真实 CRUD 页面范例</strong></td><td class="pt" data-page-node-id="ckz3BM7ZQh25uTJFBFgtHA">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\src\lib\components\users\users.component.ts</td></tr>
+<tr data-page-node-id="GX1VVtUzEJ49D5dKsnh6p0"><td data-page-node-id="kRTSfbwzMZL2BCgvApqy8o">同页模板</td><td class="pt" data-page-node-id="V6KBhsgaGpBBKzlVIA8QiU">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\src\lib\components\users\users.component.html</td></tr>
+<tr data-page-node-id="lwGyuEgtYsQcQYyX2hKB9k"><td data-page-node-id="A42Q3QVgEYeLUwD0G9XOKZ">角色页（更简单）</td><td class="pt" data-page-node-id="CzINiFWQDqsd2t5MmkacxF">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\src\lib\components\roles\roles.component.ts</td></tr>
+<tr data-page-node-id="HtIb9UezsGVylCOu1WOwxb"><td data-page-node-id="zoHRhVhFhXTdEVnb66bBs1">列表列定义（进阶）</td><td class="pt" data-page-node-id="A3aH3gGMrDTGLCJyvHnMqL">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\src\lib\defaults\default-users-entity-props.ts</td></tr>
+<tr data-page-node-id="Xgo3PMAYgQqYTdHItHkooo"><td data-page-node-id="zcw23PS2uGCj7yT624YQvG">表单字段定义（进阶）</td><td class="pt" data-page-node-id="KlfE1j7uKS4Vs7noWAeOZ6">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\src\lib\defaults\default-users-form-props.ts</td></tr>
+<tr data-page-node-id="4EaSsrLFIaoPdDg1nfbAvP"><td data-page-node-id="1HMJ3Ds24Dx1Esxmi0NhJk">路由定义范例</td><td class="pt" data-page-node-id="Jr6LpuvC2WdvVA64YzgMgG">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\src\lib\identity.routes.ts</td></tr>
+<tr data-page-node-id="T10korMnYYSMOmivcAzDel"><td data-page-node-id="4X219rE9tN2EGO9sYWxPz3">生成的 proxy 范例</td><td class="pt" data-page-node-id="0jZHqRDdyEnz5mTMku4O1E">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\proxy\src\lib\proxy\identity\identity-role.service.ts</td></tr>
+<tr data-page-node-id="ozi0v17dZ1lsFdGrAxsHYq"><td data-page-node-id="GhmUvwNNvBrclL3eb3qGk7">生成的类型范例</td><td class="pt" data-page-node-id="p4Yewv0rJBmBuXvTEuUYIY">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\identity\proxy\src\lib\proxy\identity\models.ts</td></tr>
+<tr data-page-node-id="aHfSAmKFjYYPi4uo6aqeKu"><td data-page-node-id="I4TyeqXGTjMWTYWrHABYPl">proxy 生成模板（想看生成规则）</td><td class="pt" data-page-node-id="W3caY95lVRapMai09v37F0">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\schematics\src\commands\api\files-service\proxy\__name@kebab__.service.ts.template</td></tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="HEFLPzmh3IRcp9EObkj2gH">core 包的完整子目录</h3>
+<pre data-page-node-id="qHUY438VL8leaRyRLXXeWv"><code data-page-node-id="fQlaDwVbv3hQwQmEHwSQ35">D:\yudao\abp\ABP-Framework-rel-10.6\npm\ng-packs\packages\core\src\lib\
+├── abstracts\     抽象基类
+├── clients\       客户端
+├── components\    通用组件
+├── constants\     常量
+├── directives\    ← 指令（permission.directive.ts）
+├── enums\         枚举
+├── guards\        ← 路由守卫（permission.guard.ts、auth.guard.ts）
+├── handlers\      错误处理器
+├── interceptors\  HTTP 拦截器
+├── models\        类型定义
+├── pipes\         管道（localization.pipe.ts）
+├── providers\     provider 工厂
+├── proxy\         框架自带的服务端 proxy
+├── services\      ← 服务（list/routes/permission/rest.service.ts）
+├── strategies\    策略
+├── tokens\        注入令牌
+├── utils\         工具
+├── validators\    校验器
+├── core.module.ts
+└── localization.module.ts</code></pre>
+
+<!-- ============ 7 ============ -->
+<h2 id="s7" data-page-node-id="DqriHQLvJRDKh2M4Iu9zA0"><span class="num" data-page-node-id="fqUMWePtkt0RzBlTEEwh6k">07</span>框架内核 framework/src</h2>
+
+<p data-page-node-id="V0TNbN7oA6Nsq2yA4BED3i">想知道「某个能力框架内部怎么实现的」时来这。基准目录：<code data-page-node-id="8UNuKm2Cc3Mtd4UES94XEe">D:\yudao\abp\ABP-Framework-rel-10.6\framework\src</code></p>
+
+<p data-page-node-id="PvEUpZijJrXshFqUkSoagl">包非常多（数百个），按前缀能快速判断用途：</p>
+
+<table data-page-node-id="FpAHjqO44DhwaQzqeQuQa5">
+<thead data-page-node-id="hNV7BEkICSCvvDaHLYmhMR"><tr data-page-node-id="RWNL4l3Dk5lE9redWBpkdt"><th data-page-node-id="8Pc22P16tW6UPEX1brrGBY">前缀 / 名字</th><th data-page-node-id="4asafx4LqoTwm7lCNPgtJX">管什么</th></tr></thead>
+<tbody data-page-node-id="4hproGnxavKvdAq0VtevXX">
+<tr data-page-node-id="fWbnIAg3p0eNw2sq8SboZJ"><td class="pt" data-page-node-id="UljE3ZQPrI7DEZzhWjfUGp">framework\src\Volo.Abp.Core\</td><td data-page-node-id="fg53MmLoEC8tWY81dsk710">内核：模块系统、DI 约定、AOP 拦截器</td></tr>
+<tr data-page-node-id="y7jEJlaOxbyS27oP82D1Pv"><td class="pt" data-page-node-id="RwHT7zFVEK10Ijsh0alqfz">framework\src\Volo.Abp.Ddd.Domain\</td><td data-page-node-id="k0fmHcFIE1vQEc2jvESzqM">实体基类、仓储基类、领域服务</td></tr>
+<tr data-page-node-id="vCgy5eHHIVq0eUS0hNDTh1"><td class="pt" data-page-node-id="c7UIBHhuqWxCzKWGmSJE25">framework\src\Volo.Abp.Ddd.Application\</td><td data-page-node-id="7Aw1SYfDMZlm9rCEbqkPyF">ApplicationService 基类</td></tr>
+<tr data-page-node-id="tWjmFprLFYNUL9M8Oog5D6"><td class="pt" data-page-node-id="3UBdegBj32xo2KyEEWPeyW">framework\src\Volo.Abp.AspNetCore.Mvc\</td><td data-page-node-id="Gd0MgAxoifHPGrmKW5Dq45">动态 API、AbpControllerBase</td></tr>
+<tr data-page-node-id="wUt1ACk8HrHS5LUCp7f2Jh"><td class="pt" data-page-node-id="4K8plX5Hdw8gcVAs0BOUqz">framework\src\Volo.Abp.EntityFrameworkCore\</td><td data-page-node-id="F6kDV6vfoUImial21z72jl">AbpDbContext、EfCoreRepository</td></tr>
+<tr data-page-node-id="RxoVTTE8oLWToW5VSeLL6Q"><td class="pt" data-page-node-id="bUKXN68vVIsO6ZS75HPLNp">framework\src\Volo.Abp.MongoDB\</td><td data-page-node-id="1lgOweqKSOGxBvkcl9e1ek">MongoDB 集成</td></tr>
+<tr data-page-node-id="Durhtatm2Z6JVnvaxhW8LZ"><td class="pt" data-page-node-id="933IFY67q9MVonxE5xcTZk">framework\src\Volo.Abp.Authorization\</td><td data-page-node-id="s6n9cvSPDU7CAIwkYFKM0o">授权、权限</td></tr>
+<tr data-page-node-id="pL5ijJF5vAaBE8tkc6fnzD"><td class="pt" data-page-node-id="7B4MgTNRKDA5tWNpbVA1tt">framework\src\Volo.Abp.Localization\</td><td data-page-node-id="mNStPtidhF1gCJkTCl53uU">本地化</td></tr>
+<tr data-page-node-id="hx9eEhOVmIdxjOP2RP8z8Z"><td class="pt" data-page-node-id="pRUOJM0Zwnu7KESYn2cOU2">framework\src\Volo.Abp.Auditing\</td><td data-page-node-id="ZEmAG1DqUOn0GuaVN4okBB">审计日志</td></tr>
+<tr data-page-node-id="Cd6CqHeWrRQxetsIxQnJyJ"><td class="pt" data-page-node-id="EofjBeGdKO92nOHW4DlcZv">framework\src\Volo.Abp.EventBus\</td><td data-page-node-id="9iOkjt2MKSFiPKGQsUZTUf">事件总线</td></tr>
+<tr data-page-node-id="EWbWA1pfGrGoAStKohdROE"><td class="pt" data-page-node-id="DCnYJR9SvqBrvZRZXyyyCZ">framework\src\Volo.Abp.BackgroundJobs\</td><td data-page-node-id="nF0BhfE1JUP8GwFuocL6mU">后台任务</td></tr>
+<tr data-page-node-id="kJeJgXqHggoUwasBXg0hxy"><td class="pt" data-page-node-id="IRzLz66SanS0WAqaoyR1qm">framework\src\Volo.Abp.MultiTenancy\</td><td data-page-node-id="FHQoTzQN6bse6oi1rdPPWa">多租户</td></tr>
+<tr data-page-node-id="52iCie4KNm0lYF50nz2mLd"><td class="pt" data-page-node-id="XHSdxyGv1NHDNVasVcnguK">framework\src\Volo.Abp.Uow\</td><td data-page-node-id="3iWPK7W8Ys2bcmcEf8cw66">工作单元</td></tr>
+<tr data-page-node-id="l2BhYumG3Y1YoHnknFXgiR"><td class="pt" data-page-node-id="rY5XF6AQMunsopif7vgkyC">framework\src\Volo.Abp.BlobStoring\</td><td data-page-node-id="yXMgEXsrCcdwmUHk1kKBVa">文件存储抽象</td></tr>
+<tr data-page-node-id="Xg5FfuLxBHtV96HDsf8vwf"><td class="pt" data-page-node-id="SYv0r0VZxD8CwUyKdMhZoo">framework\src\Volo.Abp.Caching\</td><td data-page-node-id="DFgqpi54C4acegtNMKJ8fH">缓存</td></tr>
+<tr data-page-node-id="iPESPOHvnPBkb0J5s3iefw"><td class="pt" data-page-node-id="79Vbhlch5jD1zNn3ECtaq6">framework\src\Volo.Abp.Http\ / <code data-page-node-id="D0LDTvhK2bUzTMs1sc72H8">Volo.Abp.Http.Client</code>\</td><td data-page-node-id="qVb7z1NyosDAD1usBB0FeF">HTTP 抽象与远程调用代理</td></tr>
+<tr data-page-node-id="1WoDADccF0E9g03A2gy4G0"><td class="pt" data-page-node-id="KzRXj90Kp3mePQqvmCHl4D">framework\src\Volo.Abp.AspNetCore.*\</td><td data-page-node-id="Fzh031yccGYLS0D7UTF0pQ">各类 ASP.NET Core 集成（认证、Serilog、SignalR、UI…）</td></tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="YWszS9U46ta4wYAmljw52s">两个目录的差异要知道</h3>
+<table data-page-node-id="1Ygk5Tw9TSTJOtVOZWDKHA">
+<thead data-page-node-id="2w6WNyjs0wCDmbTTaoHeh3"><tr data-page-node-id="wdMQaDNFwfyjatoNc4easZ"><th data-page-node-id="L1DyFkZbsDzAy5zqeysGHy">目录</th><th data-page-node-id="5JLcCDPcKquRkmygVl56Sx">对应什么</th></tr></thead>
+<tbody data-page-node-id="WiPaXIrwzIoBhajIcJVXQ4">
+<tr data-page-node-id="X5zEPgzLpAD8F4YehCBugg"><td class="pt" data-page-node-id="jQHMkEtIhIHhYMG9VSylPN">D:\yudao\abp\ABP-Framework-rel-10.6\framework\src\</td><td data-page-node-id="2dXbDWgzidbdEolBaX4kQa">框架源码，直接可读可改</td></tr>
+<tr data-page-node-id="tUFtNoRCL1xCAeq04G4LUG"><td class="pt" data-page-node-id="xire7g58vEeLRFY5duxAfy">D:\yudao\abp\ABP-Framework-rel-10.6\source-code\</td><td data-page-node-id="8pdeVKof0yoBNt1avi5lXT">框架包对应的 <code data-page-node-id="jb4OUlyxNq0HOTl2rjmO9X">.zip</code> / <code data-page-node-id="NAChccWmRD7eVy2dkMVwDh">.xml</code> / <code data-page-node-id="1mavOHJZS7e100qwaluFFp">.nuspec</code> 打包产物，不是源码</td></tr>
+<tr data-page-node-id="whtO2c41oRbXPSRgdquKVZ"><td class="pt" data-page-node-id="uHoErEREVjK5lIsubecHQ0">D:\yudao\abp\ABP-Framework-rel-10.6\nupkg\</td><td data-page-node-id="dDGZGIi7aHqlLF4myI8Fet">NuGet 打包脚本</td></tr>
+</tbody>
+</table>
+
+<!-- ============ 8 ============ -->
+<h2 id="s8" data-page-node-id="4kDO9srZzRS5uSxMa2cyRk"><span class="num" data-page-node-id="2ncH870wb5Om1uXrxqjZg6">08</span>项目级配置与约定文件</h2>
+
+<table data-page-node-id="MVje4UmkioIPLbwrqpePVw">
+<thead data-page-node-id="PVSxZkP1wJY4c8Ow3g71Ip"><tr data-page-node-id="4BCvvVW5PCivjQzFrDNfF7"><th data-page-node-id="0BxC3mPe8DfsC0VfkTXOLL">作用</th><th data-page-node-id="IaSX3pwf9ulWa5i8KGRlYp">完整路径</th></tr></thead>
+<tbody data-page-node-id="QBaWdFJFQYb0GN4LAunHWP">
+<tr data-page-node-id="CmFLXFNRTP55NNCcf6toLa"><td data-page-node-id="83Wbh4WHjHWSVTHGAdALue"><strong data-page-node-id="4W1L09gtUbBBQs0WOMAYRU">框架官方编码规范</strong>（必读）</td><td class="pt" data-page-node-id="sptXB5zqr7PRsYv3bDeU6J">D:\yudao\abp\ABP-Framework-rel-10.6\.cursorrules</td></tr>
+<tr data-page-node-id="IIvHZpVvlnTA2Q3aNwNvQl"><td data-page-node-id="wcmQfCSUax0FM8vVVGO3n3">全仓库 NuGet 版本锁</td><td class="pt" data-page-node-id="UNJAaqaiCrHCmSQHlApjl9">D:\yudao\abp\ABP-Framework-rel-10.6\Directory.Packages.props</td></tr>
+<tr data-page-node-id="kOlMw3rs3JqC0lWbPWseIs"><td data-page-node-id="qbIufWacpMRlLRxiLJHfPh">全局编译属性</td><td class="pt" data-page-node-id="3G9ukA4Q3d7sq16fYEMCKU">D:\yudao\abp\ABP-Framework-rel-10.6\Directory.Build.props</td></tr>
+<tr data-page-node-id="BzEOXaqAGxVZRkS6gDr1ie"><td data-page-node-id="UOG9eaxD4EdykbQCdTYIh3">SDK 版本锁定</td><td class="pt" data-page-node-id="nyhOcnFPKDtoKm2W1GVDsu">D:\yudao\abp\ABP-Framework-rel-10.6\global.json</td></tr>
+<tr data-page-node-id="93NqpBk79knsa8bhQvZ4HQ"><td data-page-node-id="ljbO5gzTJlpRKIL8tsZB0l">NuGet 源配置</td><td class="pt" data-page-node-id="oez7Lw7VPRuTUJENekNtIG">D:\yudao\abp\ABP-Framework-rel-10.6\NuGet.Config</td></tr>
+<tr data-page-node-id="UwoMvcGvsMlpkOoCBe1A8B"><td data-page-node-id="7dXFwaFBu4N4ncymRKMGpy">版本清单</td><td class="pt" data-page-node-id="3918k316Hsm9bLjzTjvxlf">D:\yudao\abp\ABP-Framework-rel-10.6\latest-versions.json</td></tr>
+<tr data-page-node-id="puIZbQSm50sYHW1rMbcnyi"><td data-page-node-id="DTCnRHopxplSM1K8OzLW8x">编辑器代码风格</td><td class="pt" data-page-node-id="jsrvBx3pfUVDCaASlOHP8R">D:\yudao\abp\ABP-Framework-rel-10.6\.editorconfig</td></tr>
+<tr data-page-node-id="6zCQvNKguHQ94SaeoZXMgo"><td data-page-node-id="e1k8VwWl1NO87yJOkHNaL0">README</td><td class="pt" data-page-node-id="lAPXrEdrYaVyEkLDYjKHFy">D:\yudao\abp\ABP-Framework-rel-10.6\README.md</td></tr>
+<tr data-page-node-id="InytzV3Cb0aisFDGQtMXta"><td data-page-node-id="TBQOhA8KafoTfHWE1m7i4S">官方文档（英文源）</td><td class="pt" data-page-node-id="sUyzwKkYfykHGgDyKFioHt">D:\yudao\abp\ABP-Framework-rel-10.6\docs\en\</td></tr>
+</tbody>
+</table>
+
+<div class="callout tip" data-page-node-id="8TepspQQLVWcB3wNYzYcqT">
+<p data-page-node-id="RGuFc6p9x5saGxzaGAedHj"><strong data-page-node-id="qqAKVbQwsIGabnmNyJTQJf">命名规律速记（比背路径更管用）：</strong></p>
+<ul data-page-node-id="HCm5zeKd97LJukTX3CSp9R">
+<li data-page-node-id="dCsGIelFRyzSOEDyZyRBP2">每层都有且仅有一个模块类：<code data-page-node-id="hjMSLACTvRCJBRhVMwQkvL">MyProjectName&lt;层名&gt;Module.cs</code></li>
+<li data-page-node-id="HpCl2s9J4IbaSnM7FC4KXt">每个聚合根一对：<code data-page-node-id="N7QC0IHZzuk7bl0TGdTtv5">Xxx.cs</code>（Domain）+ <code data-page-node-id="vgao81uYpMigOWcpMDF91B">IXxxRepository.cs</code>（Domain）+ <code data-page-node-id="SNhdDcOyPSW9D13TBHCyfz">EfCoreXxxRepository.cs</code>（EFCore）</li>
+<li data-page-node-id="Elq5Z5k82odDN0ssFWsUNx">契约三件套：<code data-page-node-id="rJzamwlrr7eLrS2jTp78kl">IXxxAppService.cs</code>（Contracts）+ <code data-page-node-id="ipSteUH60PmDYCXBwKjRjo">XxxAppService.cs</code>（Application）+ <code data-page-node-id="S4Xkx9OQD2rNkizBpzG3pp">XxxController.cs</code>（HttpApi）</li>
+<li data-page-node-id="vcMlfD4K6l6voyGlIMTUCX">DTO 四件套：<code data-page-node-id="dRo8VyBf6l3FPH4AKJpso4">XxxDto.cs</code>（详情）+ <code data-page-node-id="TVpetnBtpEiUlxP4gsos3q">CreateXxxDto.cs</code> + <code data-page-node-id="dh3TBkC6i9R66v4qbiQ9v8">UpdateXxxDto.cs</code> + <code data-page-node-id="X7XBndHx6YNgSiwgYqjCXo">GetXxxListDto.cs</code></li>
+<li data-page-node-id="s3TZAAM20L1kvQOIl9IEnW">业务目录名在七层里<b data-page-node-id="s5lKeghhp4xcktT2vCSHrQ">保持一致</b>（都叫 <code data-page-node-id="Cr47scW0fiPPtLsiWCaDCJ">Products\</code>），所以顺着目录名横着走就能穿完整个链路</li>
+</ul>
+<p data-page-node-id="wW8qLHzHNM8WigWqekTz1o">掌握这五条，你在 IDE 里搜一个业务名，七层的文件会一起出现。</p>
+</div>
+
+<div class="foot" data-page-node-id="GVH12FyAEFQp0fHhGCFmGK">
+本索引基于工作区 <code data-page-node-id="c6ROeNVjw21vmgkEHSZvo4">D:\yudao\abp\ABP-Framework-rel-10.6</code> 实际文件系统生成，所有路径均已核验。标注 <span class="pill ph" data-page-node-id="VqJ84gHu2DxX1Im4TwQ3iv">占位名</span> 的路径需要按你的真实项目名替换后再使用。
+</div>
+
+</div>
+</body>
+</html>

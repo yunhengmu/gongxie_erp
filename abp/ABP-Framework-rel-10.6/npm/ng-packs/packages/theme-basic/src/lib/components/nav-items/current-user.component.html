@@ -1,0 +1,57 @@
+@if (currentUser()?.isAuthenticated) {
+  <div ngbDropdown class="dropdown" #currentUserDropdown="ngbDropdown" display="static">
+    <a
+      ngbDropdownToggle
+      class="nav-link"
+      href="javascript:void(0)"
+      role="button"
+      id="dropdownMenuLink"
+      data-toggle="dropdown"
+      aria-haspopup="true"
+      aria-expanded="false"
+    >
+      @if (selectedTenant()?.name; as tenantName) {
+        <small
+          ><i>{{ tenantName }}</i
+          >\</small
+        >
+      }
+      <strong>{{ currentUser()?.userName }}</strong>
+    </a>
+    <div
+      class="dropdown-menu dropdown-menu-end border-0 shadow-sm"
+      aria-labelledby="dropdownMenuLink"
+      [class.d-block]="smallScreen && currentUserDropdown.isOpen()"
+    >
+      @for (item of userMenuItems(); track $index) {
+        <ng-container *abpVisible="!item.visible || item.visible(item)">
+          <li class="nav-item d-flex align-items-center" *abpPermission="item.requiredPolicy">
+            @if (item.component) {
+              <ng-container
+                [ngComponentOutlet]="item.component"
+                [ngComponentOutletInjector]="item | toInjector"
+              />
+            } @else {
+              @if (item.html) {
+                <div [innerHTML]="item.html" (click)="item.action ? item.action() : null"></div>
+              } @else {
+                @if (item.textTemplate) {
+                  <a (click)="item.action ? item.action() : null" class="dropdown-item pointer">
+                    @if (item.textTemplate.icon) {
+                      <i class="me-1 {{ item.textTemplate.icon }}"></i>
+                    }
+                    {{ item.textTemplate.text | abpLocalization }}</a
+                  >
+                }
+              }
+            }
+          </li>
+        </ng-container>
+      }
+    </div>
+  </div>
+} @else {
+  <a role="button" class="nav-link pointer" (click)="navigateToLogin()">
+    {{ 'AbpAccount::Login' | abpLocalization }}
+  </a>
+}

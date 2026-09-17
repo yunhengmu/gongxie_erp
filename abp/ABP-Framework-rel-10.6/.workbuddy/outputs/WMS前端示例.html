@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WMS 前端示例 · 入库单管理页 · Acme.Learn</title>
+<style>
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2128;--bg4:#21262d;
+  --bd:#30363d;--bd2:#3d444d;
+  --tx:#e6edf3;--tx2:#9da7b3;--tx3:#6e7681;
+  --blue:#58a6ff;--blue-bg:rgba(56,139,253,.14);
+  --green:#3fb950;--green-bg:rgba(63,185,80,.13);
+  --red:#f85149;--red-bg:rgba(248,81,73,.13);
+  --amber:#d29922;--amber-bg:rgba(210,153,34,.14);
+  --purple:#bc8cff;--purple-bg:rgba(188,140,255,.13);
+  --cyan:#39c5cf;--cyan-bg:rgba(57,197,207,.13);
+  --pink:#f778ba;
+  --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--tx);
+  font:15px/1.75 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px 120px}
+header{border-bottom:1px solid var(--bd);background:linear-gradient(180deg,rgba(56,139,253,.07),transparent);margin-bottom:44px}
+.hd{max-width:1180px;margin:0 auto;padding:52px 28px 40px}
+.tag{display:inline-block;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--blue);background:var(--blue-bg);border:1px solid rgba(56,139,253,.3);padding:6px 11px;border-radius:5px;margin-bottom:18px;text-transform:uppercase}
+h1{font-size:30px;font-weight:700;letter-spacing:-.5px;margin-bottom:12px}
+h1 span{color:var(--tx3);font-weight:400}
+.sub{color:var(--tx2);font-size:14.5px;max-width:800px}
+.meta{margin-top:22px;display:flex;gap:26px;flex-wrap:wrap;font:13px var(--mono);color:var(--tx3)}
+.meta b{color:var(--cyan);font-weight:600}
+nav.toc{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:20px 24px;margin-bottom:48px}
+nav.toc h4{font:600 11px var(--mono);letter-spacing:.13em;color:var(--tx3);text-transform:uppercase;margin-bottom:14px}
+nav.toc ol{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px 26px}
+nav.toc a{color:var(--tx2);text-decoration:none;font-size:13.5px;display:flex;gap:9px;padding:4px 0;transition:color .15s}
+nav.toc a:hover{color:var(--blue)}
+nav.toc a i{font:600 12px var(--mono);color:var(--tx3);font-style:normal;min-width:19px}
+nav.toc a:hover i{color:var(--blue)}
+section{margin-bottom:56px;scroll-margin-top:20px}
+h2{font-size:22px;font-weight:650;letter-spacing:-.25px;padding-bottom:13px;margin-bottom:26px;border-bottom:1px solid var(--bd);display:flex;align-items:baseline;gap:13px}
+h2 i{font:700 12px var(--mono);font-style:normal;color:var(--blue);background:var(--blue-bg);border-radius:5px;padding:4px 8px;position:relative;top:-1px}
+h3{font-size:16.5px;font-weight:650;margin:32px 0 14px;color:var(--tx)}
+h3::before{content:'▍';color:var(--blue);margin-right:7px;font-size:13px}
+h4{font-size:14.5px;font-weight:650;margin:22px 0 10px;color:var(--cyan)}
+p{color:var(--tx2);margin-bottom:14px}
+p strong,li strong{color:var(--tx);font-weight:600}
+a{color:var(--blue)}
+pre{background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:17px 20px;overflow-x:auto;margin:14px 0 20px;font:12.5px/1.66 var(--mono);color:#c9d1d9}
+pre::-webkit-scrollbar{height:9px}
+pre::-webkit-scrollbar-track{background:var(--bg3)}
+pre::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg3);border:1px solid var(--bd);border-radius:4px;padding:1.5px 6px;color:var(--pink)}
+pre code{background:none;border:none;padding:0;color:inherit;font-size:1em}
+.path{display:block;background:var(--bg3);border:1px solid var(--bd);border-left:3px solid var(--purple);border-radius:6px;padding:9px 14px;margin:0 0 14px;font:12.5px var(--mono);color:var(--purple);word-break:break-all}
+.k{color:#ff7b72}.s{color:#a5d6ff}.c{color:#8b949e;font-style:italic}.f{color:#d2a8ff}.t{color:#7ee787}.n{color:#79c0ff}.p{color:#ffa657}.u{color:#79c0ff}
+table{width:100%;border-collapse:collapse;margin:16px 0 24px;font-size:13.5px}
+th{background:var(--bg3);color:var(--tx);font-weight:600;text-align:left;padding:11px 15px;border:1px solid var(--bd);font-size:12.5px;letter-spacing:.03em;white-space:nowrap}
+td{padding:11px 15px;border:1px solid var(--bd);color:var(--tx2);vertical-align:top}
+tbody tr:nth-child(even){background:rgba(255,255,255,.017)}
+tbody tr:hover{background:rgba(56,139,253,.05)}
+td code,th code{font-size:12px}
+.note{border-radius:9px;padding:15px 19px;margin:18px 0;border:1px solid var(--bd);border-left:3px solid;font-size:14px;line-height:1.72}
+.note .lbl{display:block;font:700 11px var(--mono);letter-spacing:.11em;text-transform:uppercase;margin-bottom:7px}
+.note p:last-child{margin-bottom:0}
+.note ul{margin:6px 0 0 0}
+.note-blue{background:var(--blue-bg);border-left-color:var(--blue)}.note-blue .lbl{color:var(--blue)}
+.note-green{background:var(--green-bg);border-left-color:var(--green)}.note-green .lbl{color:var(--green)}
+.note-red{background:var(--red-bg);border-left-color:var(--red)}.note-red .lbl{color:var(--red)}
+.note-amber{background:var(--amber-bg);border-left-color:var(--amber)}.note-amber .lbl{color:var(--amber)}
+ul,ol{margin:10px 0 16px 22px;color:var(--tx2)}
+li{margin-bottom:7px}
+li::marker{color:var(--blue)}
+.bd{display:inline-block;font:600 11px var(--mono);padding:2.5px 8px;border-radius:4px;border:1px solid;white-space:nowrap;line-height:1.5}
+.bd-ok{color:var(--green);border-color:rgba(63,185,80,.38);background:var(--green-bg)}
+.bd-no{color:var(--red);border-color:rgba(248,81,73,.38);background:var(--red-bg)}
+.bd-warn{color:var(--amber);border-color:rgba(210,153,34,.38);background:var(--amber-bg)}
+.bd-info{color:var(--blue);border-color:rgba(56,139,253,.38);background:var(--blue-bg)}
+.bd-p{color:var(--purple);border-color:rgba(188,140,255,.38);background:var(--purple-bg)}
+.flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:22px;margin:18px 0;justify-content:center}
+.stp{border-radius:7px;padding:10px 15px;font:600 12.5px var(--mono);border:1.5px solid;text-align:center;min-width:104px}
+.stp small{display:block;font-size:10px;font-weight:400;opacity:.72;margin-top:3px}
+.st1{color:var(--tx2);border-color:var(--bd2);background:var(--bg4)}
+.st2{color:var(--blue);border-color:rgba(56,139,253,.45);background:var(--blue-bg)}
+.st3{color:var(--amber);border-color:rgba(210,153,34,.45);background:var(--amber-bg)}
+.st4{color:var(--green);border-color:rgba(63,185,80,.45);background:var(--green-bg)}
+.st5{color:var(--red);border-color:rgba(248,81,73,.45);background:var(--red-bg)}
+.arw{color:var(--tx3);padding:0 10px;font-size:15px;flex-shrink:0;align-self:center}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0 24px}
+.cmp>div{background:var(--bg2);border:1px solid var(--bd);border-radius:9px;overflow:hidden}
+.cmp .ch{padding:10px 16px;font:600 12.5px var(--mono);border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px}
+.cmp .ch.bad{color:var(--red);background:var(--red-bg)}
+.cmp .ch.good{color:var(--green);background:var(--green-bg)}
+.cmp pre{margin:0;border:none;border-radius:0;background:transparent;padding:16px}
+@media(max-width:760px){.cmp{grid-template-columns:1fr}}
+.qa{border:1px solid var(--bd);border-radius:9px;margin-bottom:14px;overflow:hidden;background:var(--bg2)}
+.qa .q{padding:13px 18px;background:var(--bg3);font-weight:600;font-size:14px;color:var(--tx);display:flex;gap:11px;align-items:baseline;border-bottom:1px solid var(--bd)}
+.qa .q span{color:var(--blue);font-family:var(--mono);font-size:12.5px;flex-shrink:0}
+.qa .a{padding:15px 18px;font-size:13.8px;color:var(--tx2);line-height:1.75}
+.qa .a p:last-child{margin-bottom:0}
+footer{border-top:1px solid var(--bd);padding-top:26px;margin-top:64px;color:var(--tx3);font-size:12.5px;font-family:var(--mono);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd">
+    <div class="tag">ABP · Angular · 应用开发示例</div>
+    <h1>WMS 前端示例 <span>— 入库单管理页</span></h1>
+    <p class="sub">在 <code>Acme.Learn</code>（ABP 10.6 + Angular 22，独立组件模式）里，从「接口到页面」写一个完整可用的入库单管理页。代码与已安装的 <code>@abp/ng.*</code> 包逐一核对，可直接落地。</p>
+    <div class="meta">
+      <span>后端 <b>ABP 10.6 / .NET 10</b></span>
+      <span>前端 <b>Angular 22 / 独立组件</b></span>
+      <span>主题 <b>LeptonX</b></span>
+      <span>API 名 <b>Default</b></span>
+      <span>演示实体 <b>InboundOrder</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h4>目录</h4>
+  <ol>
+    <li><a href="#s0"><i>00</i>一个页面由哪些文件拼成</a></li>
+    <li><a href="#s1"><i>01</i>前置：生成 proxy，接口层从哪来</a></li>
+    <li><a href="#s2"><i>02</i>新目录：Wms 模块落在哪</a></li>
+    <li><a href="#s3"><i>03</i>请求函数：自写业务 service（状态机动作）</a></li>
+    <li><a href="#s4"><i>04</i>页面组件：列表 + abp-modal 内联表单</a></li>
+    <li><a href="#s5"><i>05</i>组件模板：状态机按钮怎么显隐</a></li>
+    <li><a href="#s6"><i>06</i>注册路由 + 菜单 + 权限</a></li>
+    <li><a href="#s7"><i>07</i>本地化：文字从哪来</a></li>
+    <li><a href="#s8"><i>08</i>核心机制复盘（ListService 单向数据流）</a></li>
+    <li><a href="#s9"><i>09</i>对比：只读库存页（轻量变体）</a></li>
+    <li><a href="#s10"><i>10</i>清单与高频坑</a></li>
+  </ol>
+</nav>
+
+<!-- ══════════ 00 ══════════ -->
+<section id="s0">
+  <h2><i>00</i>一个页面由哪些文件拼成</h2>
+
+  <p>先给结论：<strong>一个 ABP Angular 页面最后会被拆成 6 类文件，分布在 3 个目录层。</strong> 你的心智模型「知道接口 → 配请求函数 → 配页面组件 → 按模块找目录 → 分析业务流 → 设计组件通信 → 写代码」里的每一步，都对应下面具体的一份文件。</p>
+
+  <table>
+    <thead><tr><th>你的步骤</th><th>对应文件</th><th>目录层</th><th>手写 or 生成</th></tr></thead>
+    <tbody>
+      <tr><td>知道接口（DTO / URL）</td><td><code>proxy/wms/inbound-orders/models.ts</code> + <code>inbound-order.service.ts</code></td><td><code>app/proxy/</code></td><td><span class="bd bd-info">generate-proxy 生成</span></td></tr>
+      <tr><td>按模块找目录</td><td><code>app/wms/inbound-orders/</code>（你自己的业务目录，与后端 Domain 的 <code>Wms/InboundOrders/</code> 同名对齐）</td><td><code>app/wms/</code></td><td><span class="bd bd-ok">手写</span></td></tr>
+      <tr><td>配请求函数</td><td><code>inbound-order.service.ts</code>（封装状态机动作的「页面业务服务」）</td><td><code>app/wms/inbound-orders/</code></td><td><span class="bd bd-ok">手写</span></td></tr>
+      <tr><td>配页面组件</td><td><code>inbound-order.component.{ts,html,scss}</code></td><td><code>app/wms/inbound-orders/</code></td><td><span class="bd bd-ok">手写</span></td></tr>
+      <tr><td>注册路由</td><td><code>inbound-order.routes.ts</code> + 改 <code>app.routes.ts</code></td><td><code>app/wms/</code> + <code>app/</code></td><td><span class="bd bd-ok">手写</span></td></tr>
+      <tr><td>菜单 + 权限 + 本地化</td><td><code>route.provider.ts</code> + 后端 <code>Localization/zh-Hans.json</code></td><td><code>app/</code> + <code>Domain.Shared</code></td><td><span class="bd bd-ok">手写</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note note-green">
+    <span class="lbl">前提：proxy 必须先存在，否则后面全编译不过</span>
+    <p>本项目的 <code>app/proxy/</code> 目录<strong>现在还不存在</strong>（模板生成时没有它）。所以第一步永远是先跑 <code>abp generate-proxy</code>，把后端 <code>Application.Contracts</code> 里的 DTO 和 AppService 接口扫成 TS 文件。这一步不做，下面所有 <code>import 'proxy/...'</code> 都会报「找不到模块」。</p>
+  </div>
+</section>
+
+<!-- ══════════ 01 ══════════ -->
+<section id="s1">
+  <h2><i>01</i>前置：生成 proxy，接口层从哪来</h2>
+
+  <p>请求函数<strong>不是手写的</strong>，是命令生成的。它扫描后端 <code>Acme.Learn.Application.Contracts</code> 的 DTO 与 AppService 接口，一比一翻译成 TS。</p>
+
+  <div class="note note-amber">
+    <span class="lbl">命令</span>
+    <p><code>abp generate-proxy -t ng -m Wms -u https://localhost:44362</code>　<small>（<code>-m Wms</code> 只生成 Wms 这个模块，<code>-u</code> 指后端地址）</small></p>
+  </div>
+
+  <h3>生成出来的模型（proxy/wms/inbound-orders/models.ts）</h3>
+  <span class="path">d:\yudao\abp\Acme.Learn\angular\src\app\proxy\wms\inbound-orders\models.ts</span>
+<pre><code><span class="c">// 枚举：与后端 Domain 的 InboundOrderStatus 一一对应（同数值）</span>
+<span class="k">export enum</span> InboundOrderStatus {
+  Draft     = <span class="n">0</span>,
+  Confirmed = <span class="n">1</span>,
+  Receiving = <span class="n">2</span>,
+  Completed = <span class="n">3</span>,
+  Cancelled = <span class="n">9</span>,
+}
+
+<span class="k">export enum</span> InboundType { Purchase = <span class="n">1</span>, Return = <span class="n">2</span>, Transfer = <span class="n">3</span>, Other = <span class="n">9</span> }
+
+<span class="k">export interface</span> InboundOrderLineDto {
+  id: <span class="t">string</span>;
+  materialId: <span class="t">string</span>;
+  locationId?: <span class="t">string</span>;
+  expectedQuantity: <span class="t">number</span>;   <span class="c">// decimal → number</span>
+  receivedQuantity: <span class="t">number</span>;
+}
+
+<span class="k">export interface</span> InboundOrderDto {
+  id: <span class="t">string</span>;
+  orderNo: <span class="t">string</span>;
+  warehouseId: <span class="t">string</span>;
+  type: InboundType;
+  sourceOrderNo?: <span class="t">string</span>;
+  status: InboundOrderStatus;
+  lines: InboundOrderLineDto[];
+  creationTime: <span class="t">string</span>;
+  creatorId?: <span class="t">string</span>;
+}
+
+<span class="k">export interface</span> CreateInboundOrderDto {
+  warehouseId?: <span class="t">string</span>;
+  type: InboundType;
+  sourceOrderNo?: <span class="t">string</span>;
+  lines: CreateInboundOrderLineDto[];
+}
+
+<span class="c">// 列表入参：继承分页 + 排序 + 过滤</span>
+<span class="k">export interface</span> GetInboundOrdersInput <span class="k">extends</span> PagedAndSortedResultRequestDto {
+  warehouseId?: <span class="t">string</span>;
+  status?: InboundOrderStatus;
+  filter?: <span class="t">string</span>;
+}</code></pre>
+
+  <div class="note note-blue">
+    <span class="lbl">关键事实</span>
+    <p>每一个后端方法都会在生成的 service 里变成一个<strong>箭头函数属性</strong>，内部统一走 <code>restService.request(...)</code>。<code>{ apiName: 'Default' }</code> 对应 <code>environment.apis.default</code> —— <code>RestService</code> 靠它解析 baseUrl（<code>https://localhost:44362</code>）、附上 OAuth token、把后端 <code>BusinessException</code> 翻译成前端错误提示、并管理 loading。</p>
+  </div>
+</section>
+
+<!-- ══════════ 02 ══════════ -->
+<section id="s2">
+  <h2><i>02</i>新目录：Wms 模块落在哪</h2>
+
+  <p>对应你「按模块找目录」这一步。<strong>关键规律：前端业务目录名与后端 Domain 目录名保持一致</strong>（都叫 <code>inbound-orders</code>）。后端是 <code>src\Acme.Learn.Domain\Wms\InboundOrders\</code>，前端就建 <code>angular\src\app\wms\inbound-orders\</code>。名字对齐后，你在前端写接口文件时，照着后端目录横向一搜就能定位。</p>
+
+  <div class="note note-amber">
+    <span class="lbl">注意一个容易踩的坑</span>
+    <p><code>app/proxy/wms/</code> 与 <code>app/wms/</code> 是两个不同的地方。<code>proxy</code> 下面是<strong>生成的纯 HTTP 层</strong>（不改），<code>wms</code> 下面是你<strong>自写的业务状态层</strong>（复杂页面才需要）。混用是高频错误 —— 业务方法写进 proxy 文件，下次 regenerate 就被覆盖了。</p>
+  </div>
+
+  <pre><code>angular\src\app\
+├── proxy\                         <span class="c">← 生成，勿手改</span>
+│   └── wms\inbound-orders\
+│       ├── models.ts
+│       └── inbound-order.service.ts
+├── wms\                           <span class="c">← 手写</span>
+│   └── inbound-orders\
+│       ├── inbound-order.service.ts      <span class="c">业务服务（状态机动作）</span>
+│       ├── inbound-order.component.ts
+│       ├── inbound-order.component.html
+│       ├── inbound-order.component.scss
+│       └── inbound-order.routes.ts
+├── app.routes.ts                  <span class="c">← 改：加懒加载路由</span>
+└── route.provider.ts              <span class="c">← 改：加菜单 + requiredPolicy</span></code></pre>
+</section>
+
+<!-- ══════════ 03 ══════════ -->
+<section id="s3">
+  <h2><i>03</i>请求函数：自写业务 service（状态机动作）</h2>
+
+  <p>对应你「配请求函数」一步。因为入库单有<strong>状态机</strong>，页面要做的不只是一般的增删改查，还有「确认 / 开始收货 / 取消」这类<strong>业务动作</strong>。这些动作在 proxy 里各是一个 POST 接口。我们把它们集中到一个「页面业务服务」里，组件就不直接摸 proxy，职责更清楚。</p>
+
+  <span class="path">d:\yudao\abp\Acme.Learn\angular\src\app\wms\inbound-orders\inbound-order.service.ts</span>
+<pre><code><span class="k">import</span> { Injectable } <span class="k">from</span> <span class="s">'@angular/core'</span>;
+<span class="k">import</span> { InboundOrderService <span class="k">as</span> ProxyInboundOrderService } <span class="k">from</span> <span class="s">'../../proxy/wms/inbound-orders/inbound-order.service'</span>;
+<span class="k">import</span> { CreateInboundOrderDto, ReceiveInputDto } <span class="k">from</span> <span class="s">'../../proxy/wms/inbound-orders/models'</span>;
+
+<span class="c">// 这个 service 区别于 proxy 下的同名 service：它承载「页面业务语义」，不是纯 HTTP</span>
+@Injectable({ providedIn: <span class="s">'root'</span> })
+<span class="k">export class</span> InboundOrderBusinessService {
+  <span class="k">constructor</span>(<span class="k">private readonly</span> proxy: ProxyInboundOrderService) {}
+
+  <span class="c">// ── 状态机动作：每个动作背后是一个带状态守卫的后端接口 ──</span>
+  confirm(id: <span class="t">string</span>)            { <span class="k">return</span> <span class="k">this</span>.proxy.confirm(id); }
+  startReceiving(id: <span class="t">string</span>)       { <span class="k">return</span> <span class="k">this</span>.proxy.startReceiving(id); }
+  receive(id: <span class="t">string</span>, input: ReceiveInputDto) { <span class="k">return</span> <span class="k">this</span>.proxy.receive(id, input); }
+  cancel(id: <span class="t">string</span>)              { <span class="k">return</span> <span class="k">this</span>.proxy.cancel(id); }
+
+  <span class="c">// ── CRUD 透传 ──</span>
+  getList = <span class="p">(input: any)</span> =&gt; <span class="k">this</span>.proxy.getList(input);
+  getById = <span class="p">(id: string)</span> =&gt; <span class="k">this</span>.proxy.getById(id);
+  create = <span class="p">(input: CreateInboundOrderDto)</span> =&gt; <span class="k">this</span>.proxy.create(input);
+  delete = <span class="p">(id: string)</span> =&gt; <span class="k">this</span>.proxy.delete(id);
+}</code></pre>
+
+  <div class="note note-green">
+    <span class="lbl">为什么这里用 <code>providedIn: 'root'</code>，而列表状态用组件级 provider</span>
+    <p>业务 service 是<strong>无状态</strong>的（只是转发），全局单例没问题。而 <code>ListService</code> 是<strong>有状态</strong>的（保存当前页/排序/过滤），<strong>绝不能</strong>全局单例，否则切换页面状态会串 —— 所以它必须在组件里 <code>providers: [ListService]</code>。（对照口语记忆：业务方法 <code>root</code> 全局，列表状态 <code>provider</code> 局部。）</p>
+  </div>
+</section>
+
+<!-- ══════════ 04 ══════════ -->
+<section id="s4">
+  <h2><i>04</i>页面组件：列表 + abp-modal 内联表单</h2>
+
+  <span class="path">d:\yudao\abp\Acme.Learn\angular\src\app\wms\inbound-orders\inbound-order.component.ts</span>
+<pre><code><span class="k">import</span> { Component, OnInit, inject } <span class="k">from</span> <span class="s">'@angular/core'</span>;
+<span class="k">import</span> { CommonModule } <span class="k">from</span> <span class="s">'@angular/common'</span>;
+<span class="k">import</span> { FormsModule } <span class="k">from</span> <span class="s">'@angular/forms'</span>;
+<span class="k">import</span> { ListService, PermissionDirective, LocalizationPipe } <span class="k">from</span> <span class="s">'@abp/ng.core'</span>;
+<span class="k">import</span> { ModalComponent, ButtonComponent } <span class="k">from</span> <span class="s">'@abp/ng.theme.shared'</span>;
+<span class="k">import</span> {
+  InboundOrderDto, CreateInboundOrderDto,
+  InboundOrderStatus, InboundType,
+} <span class="k">from</span> <span class="s">'../../proxy/wms/inbound-orders/models'</span>;
+<span class="k">import</span> { InboundOrderBusinessService } <span class="k">from</span> <span class="s">'./inbound-order.service'</span>;
+
+@Component({
+  selector: <span class="s">'app-inbound-order'</span>,
+  templateUrl: <span class="s">'./inbound-order.component.html'</span>,
+  standalone: <span class="k">true</span>,
+  imports: [CommonModule, FormsModule, PermissionDirective, LocalizationPipe, ModalComponent, ButtonComponent],
+  providers: [ListService],          <span class="c">// ★ 组件级 provider：列表状态唯一的「真源」</span>
+})
+<span class="k">export class</span> InboundOrderComponent <span class="k">implements</span> OnInit {
+  readonly list = inject(ListService);
+  <span class="k">private readonly</span> service = inject(InboundOrderBusinessService);
+
+  orders: InboundOrderDto[] = [];
+  isModalVisible = <span class="k">false</span>;
+  isSaveBusy = <span class="k">false</span>;
+  selected: CreateInboundOrderDto = <span class="k">this</span>.emptyForm();
+
+  readonly InboundType = InboundType;          <span class="c">// 暴露给模板用</span>
+  readonly InboundOrderStatus = InboundOrderStatus;
+
+  ngOnInit() {
+    <span class="c">// hookToQuery：把 ListService 的查询状态（页/排序/过滤）喂给后端接口，</span>
+    <span class="c">// 返回的 Observable 可以直接渲染。任何 setter 变化都会自动重新拉数据。</span>
+    <span class="k">this</span>.list.hookToQuery(<span class="p">query =&gt;</span> <span class="k">this</span>.service.getList(<span class="k">this</span>.toInput(query)))
+      .subscribe(<span class="p">result =&gt;</span> { <span class="k">this</span>.orders = result.items; });
+  }
+
+  <span class="c">// ListService 的 query 字段 → 后端 DTO 字段名（大小写映射在这做）</span>
+  <span class="k">private</span> toInput(q: <span class="t">any</span>) {
+    <span class="k">return</span> {
+      filter: q.search,                                  <span class="c">// 搜索框</span>
+      skipCount: (q.page - <span class="n">1</span>) * q.maxResultCount,
+      maxResultCount: q.maxResultCount,
+      sorting: q.sortKey ? `${q.sortKey} ${q.sortOrder}` : <span class="s">'creationTime desc'</span>,
+    };
+  }
+
+  openCreate() {
+    <span class="k">this</span>.selected = <span class="k">this</span>.emptyForm();
+    <span class="k">this</span>.isModalVisible = <span class="k">true</span>;
+  }
+
+  edit(id: <span class="t">string</span>) {
+    <span class="k">this</span>.service.getById(id).subscribe(dto =&gt; { <span class="k">this</span>.selected = dto; <span class="k">this</span>.isModalVisible = <span class="k">true</span>; });
+  }
+
+  save() {
+    <span class="k">this</span>.isSaveBusy = <span class="k">true</span>;
+    <span class="p">(</span><span class="k">this</span>.selected.id
+      ? <span class="k">this</span>.service.update(<span class="k">this</span>.selected.id, <span class="k">this</span>.selected)
+      : <span class="k">this</span>.service.create(<span class="k">this</span>.selected))
+      .subscribe({ next: () =&gt; { <span class="k">this</span>.isModalVisible = <span class="k">false</span>; <span class="k">this</span>.list.get(); },
+                   error: () =&gt; { <span class="k">this</span>.isSaveBusy = <span class="k">false</span>; } });
+  }
+
+  <span class="c">// ── 状态机动作：Draft 才能确认；动作成功后调 list.get() 刷新，不要手动重拉 ──</span>
+  confirm(id: <span class="t">string</span>) { <span class="k">this</span>.service.confirm(id).subscribe(<span class="p">() =&gt;</span> <span class="k">this</span>.list.get()); }
+  cancel(id: <span class="t">string</span>)   { <span class="k">this</span>.service.cancel(id).subscribe(<span class="p">() =&gt;</span> <span class="k">this</span>.list.get()); }
+
+  <span class="c">// 状态标签（真实项目里用 abpLocalization + 本地化 key，见 07 节）</span>
+  statusText(s: InboundOrderStatus) { <span class="k">return</span> InboundOrderStatus[s]; }
+
+  <span class="k">private</span> emptyForm(): CreateInboundOrderDto {
+    <span class="k">return</span> { type: InboundType.Purchase, lines: [] };
+  }
+}</code></pre>
+
+  <div class="note note-amber">
+    <span class="lbl">三个易错点（对照记忆里的「组件通信四模式」）</span>
+    <ul>
+      <li><strong>ListService 必须 <code>providers</code> 在组件里</strong>，漏了它会回退为全局实例，列表状态在页面间串。</li>
+      <li><strong>保存/删除后调 <code>this.list.get()</code> 刷新</strong>，不要自己重新绑数据 —— <code>get()</code> 会用当前页/排序/过滤重新请求，这才是单一数据源。</li>
+      <li>新增与编辑共用<strong>同一个 <code>abp-modal</code></strong>，靠 <code>selected.id</code> 是否存在区分，<strong>不拆子组件、不用 <code>@Input/@Output</code> 传参</strong>（ABP 惯用，回避父子耦合）。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════ 05 ══════════ -->
+<section id="s5">
+  <h2><i>05</i>组件模板：状态机按钮怎么显隐</h2>
+
+  <span class="path">d:\yudao\abp\Acme.Learn\angular\src\app\wms\inbound-orders\inbound-order.component.html</span>
+<pre><code><span class="c">&lt;!-- 工具栏：新增按钮 —— 权限用结构性指令 *abpPermission 控制（无权限会整个移除 DOM）--&gt;</span>
+&lt;<span class="t">div</span> <span class="k">class</span>=<span class="s">"page-toolbar"</span>&gt;
+  &lt;<span class="t">abp-button</span>
+    iconClass=<span class="s">"fa fa-plus"</span>
+    buttonClass=<span class="s">"btn btn-primary"</span>
+    [text]="'::NewInboundOrder' | abpLocalization"
+    (click)=<span class="s">"openCreate()"</span>
+    *abpPermission=<span class="s">"'Wms.InboundOrders.Create'"</span> /&gt;
+&lt;/<span class="t">div</span>&gt;
+
+<span class="c">&lt;!-- 列表：读 orders 数组 --&gt;</span>
+&lt;<span class="t">table</span> <span class="k">class</span>=<span class="s">"table table-hover"</span>&gt;
+  &lt;<span class="t">thead</span>&gt;
+    &lt;<span class="t">tr</span>&gt;
+      &lt;<span class="t">th</span>&gt;{{ <span class="s">'::OrderNo'</span> | abpLocalization }}&lt;/<span class="t">th</span>&gt;
+      &lt;<span class="t">th</span>&gt;{{ <span class="s">'::Type'</span> | abpLocalization }}&lt;/<span class="t">th</span>&gt;
+      &lt;<span class="t">th</span>&gt;{{ <span class="s">'::Status'</span> | abpLocalization }}&lt;/<span class="t">th</span>&gt;
+      &lt;<span class="t">th</span>&gt;{{ <span class="s">'::Actions'</span> | abpLocalization }}&lt;/<span class="t">th</span>&gt;
+    &lt;/<span class="t">tr</span>&gt;
+  &lt;/<span class="t">thead</span>&gt;
+  &lt;<span class="t">tbody</span>&gt;
+    &lt;<span class="t">tr</span> *ngFor=<span class="s">"let o of orders"</span>&gt;
+      &lt;<span class="t">td</span>&gt;{{ o.orderNo }}&lt;/<span class="t">td</span>&gt;
+      &lt;<span class="t">td</span>&gt;{{ o.type }}&lt;/<span class="t">td</span>&gt;
+      &lt;<span class="t">td</span>&gt;&lt;<span class="t">span</span> <span class="k">class</span>=<span class="s">"badge"</span>&gt;{{ statusText(o.status) }}&lt;/<span class="t">span</span>&gt;&lt;/<span class="t">td</span>&gt;
+      &lt;<span class="t">td</span>&gt;
+        <span class="c">&lt;!-- 状态机按钮：按当前状态决定显示哪一个 --&gt;</span>
+        &lt;<span class="t">button</span> *ngIf=<span class="s">"o.status === InboundOrderStatus.Draft"</span>
+                (click)=<span class="s">"confirm(o.id)"</span> <span class="k">class</span>=<span class="s">"btn btn-sm btn-primary"</span>&gt;确认&lt;/<span class="t">button</span>&gt;
+        &lt;<span class="t">button</span> *ngIf=<span class="s">"o.status === InboundOrderStatus.Draft"</span>
+                (click)=<span class="s">"cancel(o.id)"</span> <span class="k">class</span>=<span class="s">"btn btn-sm btn-secondary"</span>&gt;取消&lt;/<span class="t">button</span>&gt;
+        &lt;<span class="t">button</span> *ngIf=<span class="s">"o.status === InboundOrderStatus.Confirmed"</span>
+                (click)=<span class="s">"startReceiving(o.id)"</span> <span class="k">class</span>=<span class="s">"btn btn-sm btn-info"</span>&gt;开始收货&lt;/<span class="t">button</span>&gt;
+      &lt;/<span class="t">td</span>&gt;
+    &lt;/<span class="t">tr</span>&gt;
+  &lt;/<span class="t">tbody</span>&gt;
+&lt;/<span class="t">table</span>&gt;
+
+<span class="c">&lt;!-- 内联表单弹窗：新增/编辑复用同一个 modal --&gt;</span>
+&lt;<span class="t">abp-modal</span> [visible]=<span class="s">"isModalVisible"</span> (visibleChange)=<span class="s">"isModalVisible = $event"</span>&gt;
+  &lt;<span class="t">ng-template</span> #abpHeader&gt;
+    &lt;<span class="t">h5</span>&gt;{{ selected?.id ? (<span class="s">'::EditInboundOrder'</span> | abpLocalization) : (<span class="s">'::NewInboundOrder'</span> | abpLocalization) }}&lt;/<span class="t">h5</span>&gt;
+  &lt;/<span class="t">ng-template</span>&gt;
+
+  &lt;<span class="t">ng-template</span> #abpBody&gt;
+    &lt;<span class="t">form</span> *ngIf=<span class="s">"selected"</span>&gt;
+      &lt;<span class="t">div</span> <span class="k">class</span>=<span class="s">"mb-3"</span>&gt;
+        &lt;<span class="t">label</span> <span class="k">class</span>=<span class="s">"form-label"</span>&gt;{{ <span class="s">'::Type'</span> | abpLocalization }}&lt;/<span class="t">label</span>&gt;
+        &lt;<span class="t">select</span> <span class="k">class</span>=<span class="s">"form-select"</span> [(ngModel)]=<span class="s">"selected.type"</span> name=<span class="s">"type"</span>&gt;
+          &lt;<span class="t">option</span> *ngFor=<span class="s">"let t of types"</span> [ngValue]=<span class="s">"t.value"</span>&gt;{{ t.label }}&lt;/<span class="t">option</span>&gt;
+        &lt;/<span class="t">select</span>&gt;
+      &lt;/<span class="t">div</span>&gt;
+      &lt;<span class="t">div</span> <span class="k">class</span>=<span class="s">"mb-3"</span>&gt;
+        &lt;<span class="t">label</span> <span class="k">class</span>=<span class="s">"form-label"</span>&gt;{{ <span class="s">'::SourceOrderNo'</span> | abpLocalization }}&lt;/<span class="t">label</span>&gt;
+        &lt;<span class="t">input</span> <span class="k">class</span>=<span class="s">"form-control"</span> [(ngModel)]=<span class="s">"selected.sourceOrderNo"</span> name=<span class="s">"sourceOrderNo"</span> /&gt;
+      &lt;/<span class="t">div</span>&gt;
+      <span class="c">&lt;!-- 仓库下拉、单据行子表编辑省略（重点是 4 个自由槽：abpHeader/abpBody/abpFooter/abpSubmit）--&gt;</span>
+    &lt;/<span class="t">form</span>&gt;
+  &lt;/<span class="t">ng-template</span>&gt;
+
+  &lt;<span class="t">ng-template</span> #abpFooter&gt;
+    &lt;<span class="t">abp-button</span>
+      iconClass=<span class="s">"fa fa-check"</span>
+      [text]="'::Save' | abpLocalization"
+      buttonType=<span class="s">"submit"</span>
+      [loading]=<span class="s">"isSaveBusy"</span>
+      (click)=<span class="s">"save()"</span> /&gt;
+  &lt;/<span class="t">ng-template</span>&gt;
+&lt;/<span class="t">abp-modal</span>&gt;</code></pre>
+
+  <div class="note note-amber">
+    <span class="lbl">模板浓缩了「组件通信四模式」里的前两条</span>
+    <p><code>*abpPermission</code> 是<strong>结构性指令</strong>，它内部订阅 <code>PermissionService.getGrantedPolicy$()</code>，没有权限时用 <code>vcRef.clear()</code> <strong>移除 DOM</strong> 而不是禁用。因此「按钮能不能点」靠权限指令决定，「在哪个状态下显示哪个动作」靠 <code>*ngIf</code> 按 <code>status</code> 决定 —— 权限管「能不能」，状态机管「显示啥」，两者正交。</p>
+    <p style="margin-top:8px"><code>abp-modal</code> 打开/关闭是标准的 <code>[visible]</code> + <code>(visibleChange)</code> 双向风格，内容用 <code>#abpHeader / #abpBody / #abpFooter</code> 四个自由槽投影，表单就内联在 body 里，不拆子组件。</p>
+  </div>
+</section>
+
+<!-- ══════════ 06 ══════════ -->
+<section id="s6">
+  <h2><i>06</i>注册路由 + 菜单 + 权限</h2>
+
+  <p>对应你「注册路由 → 初始菜单 → 权限」两步，也是文档里反复强调的「缺失三步」。一共有 <strong>3 处</strong>要改，且同一权限字符串会在其中 2 处出现。</p>
+
+  <h3>第 1 处：模块自己的路由文件</h3>
+  <span class="path">d:\yudao\abp\Acme.Learn\angular\src\app\wms\inbound-orders\inbound-order.routes.ts</span>
+<pre><code><span class="k">import</span> { authGuard, permissionGuard } <span class="k">from</span> <span class="s">'@abp/ng.core'</span>;
+<span class="k">import</span> { Routes } <span class="k">from</span> <span class="s">'@angular/router'</span>;
+
+<span class="k">export const</span> INBOUND_ORDER_ROUTES: Routes = [
+  {
+    path: <span class="s">'inbound-orders'</span>,
+    <span class="k">data</span>: { requiredPolicy: <span class="s">'Wms.InboundOrders'</span> },   <span class="c">// permissionGuard 拦截用</span>
+    loadComponent: () =&gt; import(<span class="s">'./inbound-order.component'</span>).then(c =&gt; c.InboundOrderComponent),
+  },
+];</code></pre>
+
+  <h3>第 2 处：挂进 app.routes.ts（懒加载）</h3>
+  <span class="path">d:\yudao\abp\Acme.Learn\angular\src\app\app.routes.ts</span>
+<pre><code><span class="c">// 在 APP_ROUTES 数组里追加一个子路由（新增一行）：</span>
+{
+  path: <span class="s">'wms'</span>,
+  loadChildren: () =&gt; import(<span class="s">'./wms/inbound-orders/inbound-order.routes'</span>).then(r =&gt; r.INBOUND_ORDER_ROUTES),
+}</code></pre>
+
+  <h3>第 3 处：route.provider.ts 注册菜单 + 权限</h3>
+  <span class="path">d:\yudao\abp\Acme.Learn\angular\src\app\route.provider.ts</span>
+<pre><code><span class="k">import</span> { RoutesService, eLayoutType } <span class="k">from</span> <span class="s">'@abp/ng.core'</span>;
+<span class="k">import</span> { inject, provideAppInitializer } <span class="k">from</span> <span class="s">'@angular/core'</span>;
+
+<span class="k">export const</span> APP_ROUTE_PROVIDER = [
+  provideAppInitializer(<span class="p">()</span> =&gt; { configureRoutes(); }),
+];
+
+<span class="k">function</span> configureRoutes() {
+  <span class="k">const</span> routes = inject(RoutesService);
+  routes.add([
+    { path: <span class="s">'/'</span>, name: <span class="s">'::Menu:Home'</span>, iconClass: <span class="s">'fas fa-home'</span>, order: <span class="n">1</span>, layout: eLayoutType.application },
+    <span class="c">// 新增菜单项：requiredPolicy 保证没有权限的人看不到这个菜单</span>
+    {
+      path: <span class="s">'/wms/inbound-orders'</span>,
+      name: <span class="s">'::Menu:InboundOrders'</span>,
+      parentName: <span class="s">'::Menu:Wms'</span>,
+      requiredPolicy: <span class="s">'Wms.InboundOrders'</span>,   <span class="c">// ← 同一个权限字符串</span>
+      iconClass: <span class="s">'fas fa-cart-flatbed'</span>,
+      order: <span class="n">10</span>,
+      layout: eLayoutType.application,
+    },
+  ]);
+}</code></pre>
+
+  <div class="note note-red">
+    <span class="lbl">权限三重绑定（同一字符串出现 3 处，少一处都漏）</span>
+    <table style="margin:10px 0 4px">
+      <thead><tr><th>#</th><th>位置</th><th>作用</th></tr></thead>
+      <tbody>
+        <tr><td>①</td><td><code>inbound-order.routes.ts</code> 的 <code>data.requiredPolicy</code></td><td><code>permissionGuard</code> 路由守卫，没权限直接拦不上页</td></tr>
+        <tr><td>②</td><td><code>route.provider.ts</code> 菜单项的 <code>requiredPolicy</code></td><td>没权限菜单不显示</td></tr>
+        <tr><td>③</td><td>模板 <code>*abpPermission="'Wms.InboundOrders.Create'"</code></td><td>没权限按钮移除 DOM</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:8px">权限字符串在<strong>后端</strong> <code>InboundOrderPermissions.cs</code> 里定义（<code>public const string InboundOrders = GroupName + ".InboundOrders"</code>）。前端只需写死同一个常量，权限由后端下发 —— 这也是 ABP 相对 Spring 的便利处：实体实现 <code>IMultiTenant</code> + 权限自动下发，前端零逻辑。</p>
+  </div>
+</section>
+
+<!-- ══════════ 07 ══════════ -->
+<section id="s7">
+  <h2><i>07</i>本地化：文字从哪来</h2>
+
+  <p>模板里 <code>{{ '::OrderNo' | abpLocalization }}</code> 的英文 key，实际文案来自<strong>后端</strong>的本地化资源（不是前端写死）。两种 key 写法：</p>
+
+  <table>
+    <thead><tr><th>写法</th><th>含义</th><th>例子</th></tr></thead>
+    <tbody>
+      <tr><td><code>'::Xxx'</code></td><td><strong>默认资源</strong>（本项目的 <code>Learn</code> 资源）</td><td><code>'::OrderNo'</code></td></tr>
+      <tr><td><code>'AbpIdentity::Users'</code></td><td><strong>指定资源名</strong>（跨模块）</td><td><code>'AbpIdentity::Users'</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>所以要在后端加文案。本项目资源目录：</p>
+  <span class="path">d:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain.Shared\Localization\Learn\zh-Hans.json</span>
+<pre><code>{
+  <span class="u">"culture"</span>: <span class="s">"zh-Hans"</span>,
+  <span class="u">"texts"</span>: {
+    <span class="s">"Menu:Wms"</span>:              <span class="s">"仓储管理"</span>,
+    <span class="s">"Menu:InboundOrders"</span>:    <span class="s">"入库单"</span>,
+    <span class="s">"OrderNo"</span>:               <span class="s">"单号"</span>,
+    <span class="s">"Type"</span>:                  <span class="s">"类型"</span>,
+    <span class="s">"Status"</span>:                <span class="s">"状态"</span>,
+    <span class="s">"Actions"</span>:               <span class="s">"操作"</span>,
+    <span class="s">"NewInboundOrder"</span>:       <span class="s">"新建入库单"</span>,
+    <span class="s">"EditInboundOrder"</span>:      <span class="s">"编辑入库单"</span>,
+    <span class="s">"Save"</span>:                  <span class="s">"保存"</span>
+  }
+}</code></pre>
+
+  <div class="note note-blue">
+    <span class="lbl">English 资源记得同步加</span>
+    <p>同一个目录下的 <code>Learn.json</code>（en）也要加这些 key，否则切英文界面会回退显示 key 本身。工程化一点可用仓库自带的 <code>tools/localization-key-synchronizer</code> 校验多语言是否缺 key。</p>
+  </div>
+</section>
+
+<!-- ══════════ 08 ══════════ -->
+<section id="s8">
+  <h2><i>08</i>核心机制复盘：ListService 单向数据流</h2>
+
+  <div class="flow">
+    <div class="stp st2">ListService<small>组件级 provider</small></div>
+    <div class="arw">→</div>
+    <div class="stp st4">get()<small>query 变化自动触发</small></div>
+    <div class="arw">→</div>
+    <div class="stp st3">Service.getList(input)<small>proxy → HTTP</small></div>
+    <div class="arw">→</div>
+    <div class="stp st4">PagedResultDto<small>items + totalCount</small></div>
+    <div class="arw">→</div>
+    <div class="stp st1">模板渲染</div>
+  </div>
+
+  <p style="margin-top:10px">这张图是把「ABP-前端工作流」记忆里那版画在这里，因为它是理解整个页面的钥匙：</p>
+
+  <ul>
+    <li><strong>方向永远是单向的</strong>：查询状态 → 请求 → 结果 → 渲染。你不手动改列表数据。</li>
+    <li><strong>回路的唯一写法是 <code>list.get()</code></strong>：保存成功、删除成功、状态机动作成功之后，一律 <code>this.list.get()</code> 让它用当前状态重新请求。不要又去赋值 <code>this.orders = ...</code>，那会破坏单向流。</li>
+    <li><strong>分页/排序/搜索框</strong>：这些控件绑定的是 ListService 的字段（<code>page / maxResultCount / sortKey / sortOrder / search</code>），它们每一个的 setter 都会自动触发一次 <code>get()</code>。你在 <code>hookToQuery</code> 里做的只是「把那个 query 翻译成后端 DTO 字段名」。</li>
+    <li><strong>Loading 也不必自己管</strong>：<code>ListService.requestStatus$</code> 直接给模板里用（<code>*ngIf</code> 显示骨架屏），RestService 负责 HTTP 层 loading。</li>
+  </ul>
+</section>
+
+<!-- ══════════ 09 ══════════ -->
+<section id="s9">
+  <h2><i>09</i>对比：只读库存页（轻量变体）</h2>
+
+  <p>入库单因为带状态机，页面动作多。如果只是一个<strong>只读的实时库存页</strong>（对应 WMS 的 <code>Inventory</code> 聚合根，核心是计算属性 <code>AvailableQuantity</code>），代码会大幅缩短。关键差异：<strong>没有 modal、没有业务动作，组件更薄</strong>。</p>
+
+  <div class="comparison" style="display:none"></div>
+  <h4>只读库存组件（去掉增删改，只做查询 + 展示）</h4>
+<pre><code><span class="k">import</span> { Component, inject } <span class="k">from</span> <span class="s">'@angular/core'</span>;
+<span class="k">import</span> { ListService } <span class="k">from</span> <span class="s">'@abp/ng.core'</span>;
+<span class="k">import</span> { InventoryService } <span class="k">from</span> <span class="s">'../../proxy/wms/inventories/inventory.service'</span>;
+
+@Component({
+  selector: <span class="s">'app-inventory'</span>,
+  template: <span class="s">`
+    &lt;table class="table table-hover"&gt;
+      &lt;thead&gt;&lt;tr&gt;&lt;th&gt;仓库&lt;/th&gt;&lt;th&gt;库位&lt;/th&gt;&lt;th&gt;物料&lt;/th&gt;&lt;th&gt;在库量&lt;/th&gt;&lt;th&gt;已分配&lt;/th&gt;&lt;th&gt;可用量&lt;/th&gt;
+      &lt;tbody&gt;
+        &lt;tr *ngFor="let it of items"&gt;
+          &lt;td&gt;{{ it.warehouseId }}&lt;/td&gt;&lt;td&gt;{{ it.locationId }}&lt;/td&gt;&lt;td&gt;{{ it.materialId }}&lt;/td&gt;
+          &lt;td&gt;{{ it.quantity }}&lt;/td&gt;&lt;td&gt;{{ it.allocatedQuantity }}&lt;/td&gt;
+          &lt;td&gt;&lt;strong&gt;{{ it.availableQuantity }}&lt;/strong&gt;&lt;/td&gt;   &lt;!-- 后端计算属性 --&gt;
+        &lt;/tr&gt;
+      &lt;/tbody&gt;
+    &lt;/table&gt;`</span>,
+  standalone: <span class="k">true</span>,
+  providers: [ListService],
+})
+<span class="k">export class</span> InventoryComponent {
+  readonly list = inject(ListService);
+  items: <span class="t">any</span>[] = [];
+  <span class="k">constructor</span>(<span class="k">private readonly</span> service: InventoryService) {
+    <span class="k">this</span>.list.hookToQuery(<span class="p">q =&gt;</span> <span class="k">this</span>.service.getList(<span class="k">this</span>.toInput(q)))
+      .subscribe(<span class="p">r =&gt;</span> { <span class="k">this</span>.items = r.items; });
+  }
+  <span class="k">private</span> toInput(q: <span class="t">any</span>) { <span class="k">return</span> { skipCount: (q.page - <span class="n">1</span>) * q.maxResultCount, maxResultCount: q.maxResultCount }; }
+}</code></pre>
+
+  <div class="note note-green">
+    <span class="lbl">结论：页面复杂度与「业务动作数量」正相关，而不是与「实体复杂度」正相关</span>
+    <p>库存页比入库单页简单得多，不是因为 <code>Inventory</code> 实体简单，而是因为它<strong>只有查询、没有状态机动作</strong>。这也印证了记忆里的判断框架：主数据（Warehouse/Material）贫血化、页面就是列表+modal；出入库单+库存这种有状态机/有一致性的，页面才会出现「按状态显隐的动作按钮 + 刷新回路」。</p>
+  </div>
+</section>
+
+<!-- ══════════ 10 ══════════ -->
+<section id="s10">
+  <h2><i>10</i>清单与高频坑</h2>
+
+  <h3>落地清单（按顺序勾）</h3>
+  <table>
+    <thead><tr><th>#</th><th>动作</th><th>文件</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>跑 proxy 生成</td><td><code>abp generate-proxy -t ng -m Wms</code> → 生成 <code>app/proxy/wms/</code></td></tr>
+      <tr><td>2</td><td>建业务目录 + service</td><td><code>app/wms/inbound-orders/inbound-order.service.ts</code></td></tr>
+      <tr><td>3</td><td>写组件三件套</td><td><code>*.component.ts / .html / .scss</code></td></tr>
+      <tr><td>4</td><td>建路由文件</td><td><code>inbound-order.routes.ts</code></td></tr>
+      <tr><td>5</td><td>挂懒加载路由</td><td><code>app.routes.ts</code> 加 <code>wms</code> 子路由</td></tr>
+      <tr><td>6</td><td>注册菜单 + 权限</td><td><code>route.provider.ts</code> 的 <code>RoutesService.add</code></td></tr>
+      <tr><td>7</td><td>补本地化</td><td>后端 <code>Localization/Learn.json</code> + <code>zh-Hans.json</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>高频坑（对照记忆逐条核对过）</h3>
+  <div class="qa"><div class="q"><span>坑1</span>ListService 忘了 component providers，列表状态串页</div><div class="a"><p>ListService 默认不是全局单例，但一旦你在某处 <code>providedIn:'root'</code> 或漏了组件 providers，它就会变成共享实例。排查方式：切换分页后 <code>get()</code> 带着上一页的页码请求 → 就是它。</p></div></div>
+
+  <div class="qa"><div class="q"><span>坑2</span>把业务方法写进了 proxy 文件，regenerate 后被覆盖</div><div class="a"><p><code>proxy/</code> 是生成目录，别在里面加自己的逻辑。需要页面级业务状态（状态机动作、派生状态）就在 <code>wms/inbound-orders/</code> 自写 service，内部再注入 proxy。</p></div></div>
+
+  <div class="qa"><div class="q"><span>坑3</span>权限字符串只改了菜单处，路由守卫和第 3 处按钮漏了</div><div class="a"><p>一个权限字符串有 3 个出现位置（路由 <code>data.requiredPolicy</code>、菜单 <code>requiredPolicy</code>、模板 <code>*abpPermission</code>）。前端记得三角对齐，而<strong>枚举值本身</strong>以后端 <code>InboundOrderPermissions.cs</code> 为准，那才是真源。</p></div></div>
+
+  <div class="qa"><div class="q"><span>坑4</span>找不到 proxy，或 proxy 里没有想要的方法</div><div class="a"><p>最常见原因是<strong>还没跑 generate-proxy</strong>，或后端 AppService 接口没在 <code>Application.Contracts</code> 里声明（ABP 动态 API 只暴露接口上声明的方法）。先确认后端 Swagger 里 <code>/api/app/inbound-order</code> 存在，再生成。</p></div></div>
+
+  <div class="qa"><div class="q"><span>坑5</span>保存后界面不刷新，或手动重新绑数据导致重复请求</div><div class="a"><p>统一用 <code>this.list.get()</code>。它带当前查询状态刷新，且只发一次请求。手动再赋值 <code>this.orders = ...</code> 会打破单向数据流，还会和自动请求打架。</p></div></div>
+</section>
+
+<footer>
+  <span>WMS 前端示例 · Acme.Learn · ABP 10.6 + Angular 22</span>
+  <span>基于 .workbuddy 记忆 · WMS领域设计-ABP-DDD · ABP-前端开发工作流</span>
+</footer>
+
+</div>
+</body>
+</html>

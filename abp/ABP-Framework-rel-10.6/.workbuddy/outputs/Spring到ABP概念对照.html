@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="i3qkOv2ruGpCrA1GiZSTAP">
+<head data-page-node-id="uDXvM0PqeMYsMt64UHmB6A">
+<meta charset="UTF-8" data-page-node-id="hF7Z8oOinAPADmb4AULAJH">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="3mIqLx8nDmP0BGTZUfkVaI">
+<title>Spring → ABP 概念对照表</title>
+<style>
+:root{
+  --bg:#ffffff; --bg-sub:#f7f8fa; --bg-code:#f4f6f8; --bg-inline:#eef1f5;
+  --text:#1f2328; --text-sub:#59636e; --text-mute:#8b949e;
+  --border:#d8dee4; --border-soft:#e6e9ed;
+  --blue:#0969da; --blue-bg:#ddf4ff; --green:#1a7f37; --green-bg:#dafbe1;
+  --amber:#9a6700; --amber-bg:#fff8c5; --red:#cf222e; --red-bg:#ffebe9;
+  --purple:#8250df; --purple-bg:#fbefff; --teal:#0f6e56; --teal-bg:#e1f5ee;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117; --bg-sub:#161b22; --bg-code:#161b22; --bg-inline:#21262d;
+    --text:#e6edf3; --text-sub:#9198a1; --text-mute:#6e7681;
+    --border:#30363d; --border-soft:#21262d;
+    --blue:#4493f8; --blue-bg:#0c2d6b; --green:#3fb950; --green-bg:#0f2f1a;
+    --amber:#d29922; --amber-bg:#3a2d00; --red:#f85149; --red-bg:#3d1418;
+    --purple:#ab7df8; --purple-bg:#2b1c4a; --teal:#3fb9a0; --teal-bg:#0c2f28;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.72;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:46px 26px 100px}
+header.doc{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:28px}
+header.doc .eyebrow{font-size:12.5px;letter-spacing:.12em;color:var(--text-mute);text-transform:uppercase;font-weight:600}
+header.doc h1{font-size:29px;line-height:1.3;margin:12px 0;font-weight:700;letter-spacing:-.01em}
+header.doc p.lead{color:var(--text-sub);font-size:15.5px;margin:0;max-width:840px}
+h2{font-size:20px;font-weight:700;margin:44px 0 8px;padding-top:12px;letter-spacing:-.01em}
+h2 .num{color:var(--blue);font-variant-numeric:tabular-nums;margin-right:8px}
+h3{font-size:15.5px;font-weight:650;margin:24px 0 6px}
+p{margin:12px 0}
+code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  font-size:12.4px;background:var(--bg-inline);padding:2px 6px;border-radius:5px;
+  word-break:break-all;white-space:normal}
+pre{background:var(--bg-code);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:15px 17px;overflow-x:auto;margin:14px 0;line-height:1.58}
+pre code{background:none;padding:0;font-size:12.4px;white-space:pre;word-break:normal}
+.callout{border-left:3px solid var(--blue);background:var(--blue-bg);padding:13px 18px;
+  border-radius:0 var(--radius) var(--radius) 0;margin:18px 0;font-size:14.3px}
+.callout.warn{border-color:var(--amber);background:var(--amber-bg)}
+.callout.tip{border-color:var(--green);background:var(--green-bg)}
+.callout p:first-child{margin-top:0}.callout p:last-child{margin-bottom:0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.3px;table-layout:fixed}
+th,td{border:1px solid var(--border-soft);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--bg-sub);font-weight:650}
+th:first-child{width:44%}
+td code{font-size:12px;background:transparent;padding:0}
+.same{color:var(--green);font-weight:600}
+.diff{color:var(--amber);font-weight:600}
+.toc{background:var(--bg-sub);border:1px solid var(--border-soft);border-radius:var(--radius);padding:18px 24px;margin:24px 0}
+.toc h3{margin:0 0 10px;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-mute)}
+.toc ol{margin:0;padding-left:20px;columns:2;column-gap:30px}
+@media(max-width:760px){.toc ol{columns:1}}
+.toc li{margin:4px 0;font-size:13.8px}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.foot{margin-top:56px;padding-top:20px;border-top:1px solid var(--border);color:var(--text-mute);font-size:13px}
+</style>
+</head>
+<body data-page-node-id="qdkXPNNhBGXOi5Pbhl5BGG">
+<div class="wrap" data-page-node-id="SVLAJFnwiEa3NuqOv8X7Zj">
+
+<header class="doc" data-page-node-id="Z0PnyDeZJhWEm8vHepUH1i">
+  <div class="eyebrow" data-page-node-id="U5MC1klMtN2Wj5ZgQLztCj">Spring → ABP · 概念对照</div>
+  <h1 data-page-node-id="IFrza3y6sTxEMemhDd104i">从 Spring 视角看 ABP：一一对照</h1>
+  <p class="lead" data-page-node-id="O80CG46ifmSitrQQwlwTKg">按 Spring 生态的既有概念映射 ABP 的对应物。<span class="same" data-page-node-id="nIt4sytGGaeYVXBKaLFdNc">绿色</span> = 概念一致、只是换名字；<span class="diff" data-page-node-id="UEc5NNVNJ1HgoVbdnfvBBx">橙色</span> = ABP 有额外约定或做得不一样的地方，需要特别留意。</p>
+</header>
+
+<div class="toc" data-page-node-id="fy4Rur78NJAjMROZ3mlogA">
+  <h3 data-page-node-id="ZBSYnsLfWL8sTjAxMQSXSC">目录</h3>
+  <ol data-page-node-id="GfUpdOpOyD4tZdUvHTUk5A">
+    <li data-page-node-id="Ze4Mz7OEssygcuHaXLqkiG"><a href="#s1" data-page-node-id="rqkINeijhY35YsJPgKyfcl">整体架构对位</a></li>
+    <li data-page-node-id="mc4auaWS4yf7yI6m48DcG9"><a href="#s2" data-page-node-id="R6hPeSfMh7gMIeP9U2Lfoj">启动与装配</a></li>
+    <li data-page-node-id="sZ7MwAHSnFM2nc9pFfg9Fa"><a href="#s3" data-page-node-id="XdKjQkatAmGHKZ3PNO3fwD">依赖注入</a></li>
+    <li data-page-node-id="1pGbATxYxYgrnyEehCRixk"><a href="#s4" data-page-node-id="4SRu8EVwraQMKjbrz3Bozk">Web 层</a></li>
+    <li data-page-node-id="txFzSmMoyChwBG7wZ1y6jy"><a href="#s5" data-page-node-id="aTZdNJRH1i3SI7ywxGmZ0N">业务层</a></li>
+    <li data-page-node-id="tuuBIv0GgL0RferG1LwYb5"><a href="#s6" data-page-node-id="o88DPyEE7tTMcdx8iC2YWG">领域与持久化</a></li>
+    <li data-page-node-id="qNBkMmoDM23YCuR3dQzOcp"><a href="#s7" data-page-node-id="RLA7lpRsdTTfL2ZGrLeVtH">安全与多租户</a></li>
+    <li data-page-node-id="LxfmsMDdtExm1BjmE95k20"><a href="#s8" data-page-node-id="rrn2gQGy1wAIqfj94SIddm">基础设施</a></li>
+    <li data-page-node-id="xwbijyAbGUNjbSJdzCcWX8"><a href="#s9" data-page-node-id="YRp7PitMgxHfuizNPDqlsK">几个「差异较大」的点</a></li>
+  </ol>
+</div>
+
+<!-- ============ 1 ============ -->
+<h2 id="s1" data-page-node-id="cdj6Knlzq0ZrCh1slhcUPw"><span class="num" data-page-node-id="hdDvORgzu2o3KwPwjWdzBX">01</span>整体架构对位</h2>
+
+<table data-page-node-id="6fnSGsZRwJPtQb5cW2TebI">
+<thead data-page-node-id="fu4cKmO7IDGIWL2BGywDdj"><tr data-page-node-id="kUGDZSzcfCGZmfnRXp5xvj"><th data-page-node-id="BtYYR0QzMFM6T69MXUFUOo">Spring 世界</th><th data-page-node-id="1siZKHy5GqO1z3pwEp5BhU">ABP 世界</th></tr></thead>
+<tbody data-page-node-id="H9ubFUYRMF8RxCBHIyB9po">
+<tr data-page-node-id="AeOnGiEgTcVGVNyfDclPFY"><td data-page-node-id="11MlNh1BVeFaw6yZ2TxN0p">Spring Boot 单体应用</td><td data-page-node-id="hX5lpy5hWjdOvn1Ebk7tD3"><code data-page-node-id="fAB1FXuu3w45QN56Wg1wdS">-t app</code> 分层模板 / <code data-page-node-id="8lHUZP7FmKVqcKiKkbu7a4">-t app-nolayers</code> 单层模板</td></tr>
+<tr data-page-node-id="OxtjqDFcJEccIKokjCR0TD"><td data-page-node-id="R8Ee32Lz3UX8wfjvSI3raB">Spring Modulith（模块化单体）</td><td data-page-node-id="pocBcaP30nvLiuH1M39lWj"><code data-page-node-id="oCzvxZCDGOV54YMZcTAaHG">modules/</code> 机制 + <code data-page-node-id="wcPKJNHmzMxjBURw75tRtN">abp new-module</code></td></tr>
+<tr data-page-node-id="ZH9GNEvFTkc7XZTUDYQhzn"><td data-page-node-id="g44A4dJ1jt5Ndvc7CGDXjL">Spring Cloud（微服务全家桶）</td><td data-page-node-id="XGs77Ofao3VTEDujLs197B"><code data-page-node-id="atiF2CEuJf0JTkGiLC7nGj">-t microservice</code> 模板 + API Gateway + 服务发现</td></tr>
+<tr data-page-node-id="mMjoD5WGP1LoUibabshxYw"><td data-page-node-id="feqNLV5EUKmTznq0eOGRNS">Maven <code data-page-node-id="KGQFBayTMf9xADsy8Be3fH">&lt;modules&gt;</code> / Gradle 多项目</td><td data-page-node-id="SwiBki39AUJDQBJ0H9yEaA"><code data-page-node-id="E7AG4oZCPE7hDwZ6ebXWzH">.slnx</code> 解决方案 + 项目引用</td></tr>
+<tr data-page-node-id="09zR4WAoK4HUjHLrWpxzUi"><td data-page-node-id="ZrBwrx8GaGmJKEaSDrHm4l">父 POM 统一版本管理</td><td data-page-node-id="UwAMiyUIlmfv6XjW3Ap1IQ"><code data-page-node-id="MEwjctqRWUnboTSr3nZCgC">Directory.Packages.props</code>（Central Package Management）</td></tr>
+<tr data-page-node-id="3cZAVcq2jDowRMDhDDAsSQ"><td data-page-node-id="omxkeCIeZan4FkQFB1kWmm"><code data-page-node-id="ksyzicnXzEET5lDHM0pmda">application.yml</code> / <code data-page-node-id="8uUcfiFIcVQRHe2sMeykzd">application.properties</code></td><td data-page-node-id="6LED2KZYqR4VUdz8NFEani"><code data-page-node-id="mZ6jwg1XnLGugW1ZsNdP8X">appsettings.json</code> / <code data-page-node-id="sZwn7Jzp7a48QC8EQpGJBQ">appsettings.Development.json</code></td></tr>
+<tr data-page-node-id="PcRR3qxhOw4nRQyetnPUaf"><td data-page-node-id="UR4sMBMsKArDEpx1XuxzX4">Lombok（@Data / @Builder）</td><td data-page-node-id="KNGIv7YuHRGoBvWDBbkqWx">C# 语言原生 <code data-page-node-id="tJrsmSZcmN6ocNhD16AaUx">record</code> / 属性语法（不需要 Lombok）</td></tr>
+<tr data-page-node-id="ql6d4HrmE6oKFTqNylvsQE"><td data-page-node-id="BMgq28GC1BJ6f00Ay9W9C5">MapStruct（DTO 映射）</td><td data-page-node-id="sPhFZB7XnKmCe3FUglx3x1"><strong data-page-node-id="chyYIDhtXw1sybZ6RN5Avx">Mapperly</strong>（编译期生成，ABP 10.x 已从 AutoMapper 迁移过来）</td></tr>
+</tbody>
+</table>
+
+<div class="callout tip" data-page-node-id="fIHIehLFA7j0CI9kCXdYR4">
+<p data-page-node-id="oDUb2g9KktVNZfuhq6jGW3"><strong data-page-node-id="Cck7zHechzeJ8NfXun2Dzq">心智切换：</strong>ABP 的分层和 Spring 项目的 <code data-page-node-id="FT42XZHtFLakZ63D6JFKpG">controller / service / repository / entity</code> 分层<b data-page-node-id="F4cTb9lrWPYxd1sQPPc3Uh">本质相同</b>，只是切得更细——把「service」拆成了 <code data-page-node-id="cNbHA60JhkPkbd1zRzUg4h">Application.Contracts</code>（接口+DTO）和 <code data-page-node-id="O1i0iEycrkS4X15ehvHNOR">Application</code>（实现），把「repository」拆成了 <code data-page-node-id="9A6ZlsqwIbN3bS0RJp2Ci8">Domain</code>（接口）和 <code data-page-node-id="pAMwttCSAiBDmJa9C8risI">EntityFrameworkCore</code>（实现）。</p>
+</div>
+
+<!-- ============ 2 ============ -->
+<h2 id="s2" data-page-node-id="8viTLqMgJGlIFx8vSvG35K"><span class="num" data-page-node-id="Yakp0zgcJQEcJhGvLMF5Ao">02</span>启动与装配</h2>
+
+<table data-page-node-id="RZkkUhc0msK3cXUb17SYdf">
+<thead data-page-node-id="rB72KY8DWcWDVmvE3mWh9f"><tr data-page-node-id="Xgg8aUseE0R7ZA8lOBK35k"><th data-page-node-id="faNZxyhr4BpgXfQBHXADJf">Spring</th><th data-page-node-id="1q2Dzj9SNDVKUomRlqi2uc">ABP</th></tr></thead>
+<tbody data-page-node-id="Bq0W4qIX3enlPSLxyY1HLb">
+<tr data-page-node-id="yquZXzdIgEmtsOJyAurJ5k"><td data-page-node-id="vOTJ1iEn0DVIfIEE8U1qwe"><code data-page-node-id="uu5H2AEJL6gTZQj5fZvUw9">@SpringBootApplication</code></td><td data-page-node-id="ZHL8gOqPf1hzKbpIUpGTFJ"><code data-page-node-id="D7OTIYS63TXQYY6m3DZ0bT">Program.cs</code>（宿主入口）+ 各层 <code data-page-node-id="twBBlaxp1QEtKUSJpDJioC">*Module.cs</code></td></tr>
+<tr data-page-node-id="ABAvhfEghvvaYpjAVxymFq"><td data-page-node-id="hJwY3Qza6PiAqhc2YFB08M"><code data-page-node-id="N9xhFrH0llyMgWUNU4tmiO">@Configuration</code> + <code data-page-node-id="qzup7k6KZhXIyrLkAZnF2e">@Bean</code></td><td data-page-node-id="mfieF9eEQ3EE9P2EmEHrXW"><code data-page-node-id="SpzXoHIGiY0ESBxjmPVNGj">AbpModule.ConfigureServices(context)</code></td></tr>
+<tr data-page-node-id="Ja4NC8oBVS1QG2PORzj3Oe"><td data-page-node-id="MFEXbsD1hirX3197TXWnEb"><code data-page-node-id="8ZItJDeajYIsoqsmtUuTXT">@Import(XxxConfig.class)</code></td><td data-page-node-id="0IHNOWHFpclftAzIepDYLE"><code data-page-node-id="cEmFkytzpPoUtwwtDckrFv">[DependsOn(typeof(XxxModule))]</code></td></tr>
+<tr data-page-node-id="i6ShA2UYfxGvt0FRmkgAPq"><td data-page-node-id="OYsjappb49bAS4oZTXCcEO"><code data-page-node-id="ljeEV2y9m9mamlWl3DnqHC">spring.factories</code> / <code data-page-node-id="XsAz6AdgXLi20TC4Ixx0Ed">@AutoConfiguration</code></td><td data-page-node-id="UwWHgwPXYvD9eBYoZBQeHA">模块的 <code data-page-node-id="6MD4HysH2oodwOBmvwYVKc">[DependsOn]</code> 链（递归收集 + 拓扑排序）</td></tr>
+<tr data-page-node-id="u8Ks7FbFc7Kb5XF8n3VjEK"><td data-page-node-id="9Mp0K6Mj8U9dsy6U7zj30W"><code data-page-node-id="PY3zAgDKHpoTJyYoLcGDsU">@ConditionalOnProperty</code> / <code data-page-node-id="PTO2zRDvDfeCvX43yJ0IHk">@Profile</code></td><td data-page-node-id="caq8UYxBQKiO3Q2ubiEgr0"><code data-page-node-id="CU7TWNdltuQ8nJlqS5F3U9">Configure&lt;XxxOptions&gt;(opt =&gt; ...)</code></td></tr>
+<tr data-page-node-id="Hx1NZmhEkoKwxiwF7x0D4c"><td data-page-node-id="Xa7HNTyRmB0hfSHLhUNC6g">Spring Boot 自动配置类</td><td data-page-node-id="aWcBUdM5GsN7QFPVhj31iQ">ABP 各模块的 <code data-page-node-id="5SL350KSaUd5ktk8aSAFUx">ConfigureServices</code>（同一套思路）</td></tr>
+<tr data-page-node-id="gsEhGzfGvlYujbxGy91pH1"><td data-page-node-id="klKH35qL89SPWyiED9SqcA"><code data-page-node-id="3ohNqgtXBeSjrlGqSyHOsU">@Value("${app.xxx}")</code></td><td data-page-node-id="zab0pD5O18CNAfNXhPck7B"><code data-page-node-id="AkVhTEfQHdby1a9d6EHc18">IConfiguration</code> / Options 模式</td></tr>
+</tbody>
+</table>
+
+<p data-page-node-id="L9ALcG3SGy9fIDDgYMGV43"><b data-page-node-id="jZjDWmdK5cD7HK90gFs1I2">模块类对应关系最直观：</b></p>
+<pre data-page-node-id="0XnpjNhjIO7rlvIPSHVnau"><code data-page-node-id="88jVVeBAP81DuqDTwHRmWM"><span class="c" data-page-node-id="9CALv22XT0XRU9tsWFBLm2">// Spring</span>
+@Configuration
+@Import({DomainConfig.class, ContractsConfig.class})
+public class ApplicationConfig {
+    @Bean public BookAppService bookAppService(BookRepository r) { ... }
+}
+
+<span class="c" data-page-node-id="g4YKZz3gbb4oiDryEW0yH9">// ABP</span>
+[DependsOn(
+    typeof(BookStoreDomainModule),
+    typeof(BookStoreApplicationContractsModule))]
+public class BookStoreApplicationModule : AbpModule
+{
+    public override void ConfigureServices(ServiceConfigurationContext context) { ... }
+}</code></pre>
+
+<div class="callout warn" data-page-node-id="7cSH9hYF3l5CVBwXMeUqyv">
+<p data-page-node-id="KoBtpK0H69KHLrFPiTl5F2"><strong data-page-node-id="HNfcf1Ag0sqQkACXQtq4Uy">差异点：</strong>ABP 模块的生命周期有 <b data-page-node-id="FmE0nvdHMrgLAgi6IbMzrt">三个</b> 阶段而不是一个——<code data-page-node-id="rhVKxBJQY5OBikP7gRoHnR">PreConfigureServices</code> → <code data-page-node-id="EWjeuiOooG5co2gySB3FsJ">ConfigureServices</code> → <code data-page-node-id="VEPKL8Z5own4fTsiufQPjZ">PostConfigureServices</code>。顺序很重要：Pre 用于「声明参与」（如把当前程序集注册为 MVC ApplicationPart），Post 用于「等所有模块就绪后收尾」（如应用扩展配置）。</p>
+</div>
+
+<!-- ============ 3 ============ -->
+<h2 id="s3" data-page-node-id="IOMZurjrSiOCYSdEDXQXEI"><span class="num" data-page-node-id="FdeePAZtPmRDUWG62BgXz5">03</span>依赖注入</h2>
+
+<table data-page-node-id="0nweiZFYbA2fujIJGV3O1o">
+<thead data-page-node-id="nc7oJO3Exf73pa3KZdjjMn"><tr data-page-node-id="fvCceJH8AjC994ajxs2fWh"><th data-page-node-id="EUrhzRXpqJRCsHUouWiWQk">Spring</th><th data-page-node-id="hcF6YlcpfK0nBwGhtJr6Vd">ABP</th></tr></thead>
+<tbody data-page-node-id="cDvgjeGPzIXCM5RHNDKoIS">
+<tr data-page-node-id="XB5WeTYVhhJEcpODDKcnbn"><td data-page-node-id="0M8qOUL20NO8MlA53H05LX"><code data-page-node-id="eUuZMsGPiXNVrKDoBZGh9a">@ComponentScan</code> 自动扫描</td><td data-page-node-id="0QiONsKcAg3YrvuV72AU7T"><span class="same" data-page-node-id="n2JvCp2Yr7KGKjx2QN0tPc">概念一致</span>：约定式自动注册，无需扫描配置</td></tr>
+<tr data-page-node-id="4VY3cSjMuZFBtFD37THDzA"><td data-page-node-id="5dxKr1iEzIQH1dcVaAcX8P"><code data-page-node-id="82Ujewu9lUOEHVxym10xpR">@Component</code> / <code data-page-node-id="scktPIgYeYEQfCeyCJxLss">@Service</code> / <code data-page-node-id="dwda36UR00kvxZZqDj6aXw">@Repository</code></td><td data-page-node-id="rZCFsHtq9WMSA8xhDtMReR">实现 <code data-page-node-id="Mf3kcFNwjFv5hWEAELuFUk">ITransientDependency</code> / <code data-page-node-id="cF4YTmOy681g6JNqXQK7iq">IScopedDependency</code> / <code data-page-node-id="HORbjhqjy4NBJVNpbThqmD">ISingletonDependency</code></td></tr>
+<tr data-page-node-id="UHJnW8klPcrBJB6kE2cFsq"><td data-page-node-id="e3dK5xwTrutNhYOsmGCrvl"><code data-page-node-id="JM2oh4smNG2P3qXHAE3yvF">@Scope("prototype")</code></td><td data-page-node-id="g57DXEmccv1W4rT6WJsMN8"><code data-page-node-id="7OMvASL99vflWhqE6GpUHD">ITransientDependency</code>（Transient）</td></tr>
+<tr data-page-node-id="ee91zDdKJ2AGD6GwIdbzHo"><td data-page-node-id="jGVCZuQkGB1BSZgQHA4hwl"><code data-page-node-id="wJ3Wv7yqpRjbP4mAve70rY">@Scope("request")</code> / <code data-page-node-id="gThsoSSfuj6dpaZYB5zB3Q">@RequestScope</code></td><td data-page-node-id="yBxEykJyKLhPIByykzBpbW"><code data-page-node-id="liF9WKef1JAPTyAdODCpFQ">IScopedDependency</code>（Scoped）</td></tr>
+<tr data-page-node-id="THQvWBoSGZo9W87XhV0PgG"><td data-page-node-id="brQhDF81zMltTGjFo5pSJL">构造器注入（推荐）</td><td data-page-node-id="oImElLsO5DuEZgE34ww8Jy">构造器注入（同样推荐，写法一致）</td></tr>
+<tr data-page-node-id="7CJszToIbLzEa8x7SJm2vq"><td data-page-node-id="4vAAVNYKUYDU9EGJS18b4L"><code data-page-node-id="oHkOP3RDroUp1NvklQs4S3">@Qualifier</code></td><td data-page-node-id="YRDWTIbka5SDZFdD0ChFrO"><code data-page-node-id="NqHMbzHvOF63SpsG8fzIAW">[FromKeyedServices]</code> 或命名注册</td></tr>
+<tr data-page-node-id="7WIbVdgvgcD82pCC3zStVW"><td data-page-node-id="yV2FltzQyRigOdi1amUOGj"><code data-page-node-id="lOLGI0BlXeIl4ySeRD2OOV">@Primary</code></td><td data-page-node-id="vLTNGPRgHfAdqDeFkcbmtl"><code data-page-node-id="7wF2Ukq7fBsj0r3GVNh5En">[Dependency(ReplaceServices = true)]</code></td></tr>
+<tr data-page-node-id="YYMCAapHAZAvEZCHOC2tdw"><td data-page-node-id="9yTBAxhi5A9l5ppKDhBNZJ"><code data-page-node-id="Lcv7I9DQmBRferQo0noIul">@Lazy</code></td><td data-page-node-id="wRKR2GhYGYCx4CQMmxm5D8"><code data-page-node-id="FiEZE0CWCTqSupGsTdCUAQ">IServiceProvider</code> / <code data-page-node-id="hPhJqppHz2gsuHxVCj6iwU">Lazy&lt;T&gt;</code></td></tr>
+</tbody>
+</table>
+
+<div class="callout tip" data-page-node-id="R0pK5roovV5H66tyH5rh0Q">
+<p data-page-node-id="A1Ej6oilqrWOzv0S9OsvbA"><strong data-page-node-id="hEcU7LqNd2UyfoWDI9CC03">关键便利：</strong>ABP 里 <code data-page-node-id="ePVIvRvOE15Rt6ulHVPd39">IBookAppService</code> → <code data-page-node-id="XqN4ngcMy0aptzt6Oc0gG4">BookAppService</code>、<code data-page-node-id="7YxJKVCZ78krgKAOho6Rmf">IBookRepository</code> → <code data-page-node-id="uIThOEh214cnsNH6JfrGp8">EfCoreBookRepository</code> 这类约定会自动建立接口与实现的绑定，你不用写任何注册代码——**相当于 Spring 里省掉了每个 <code data-page-node-id="TFJQdYQZB28qNyrIHU9A0y">@Service</code> 类的 @Bean 方法**。</p>
+</div>
+
+<!-- ============ 4 ============ -->
+<h2 id="s4" data-page-node-id="I6iltes7kFQaSS0rPiXnD3"><span class="num" data-page-node-id="F01vciDgqxzSUNl8khiBJ7">04</span>Web 层</h2>
+
+<table data-page-node-id="pzEXDL9T1MEGKMtvwNpsOJ">
+<thead data-page-node-id="DmGMgax0glBIDsKKqApdMY"><tr data-page-node-id="Bm8l7ywCChf0DiMTegBqWa"><th data-page-node-id="ACKcD3cDUlMvDqfDWSMGIF">Spring</th><th data-page-node-id="ODEsRiWbye0jGkHWO2929U">ABP</th></tr></thead>
+<tbody data-page-node-id="AmvDg2fWiaBUPESmpH1YgX">
+<tr data-page-node-id="4ewcAhkUHpLhwXasZx0Fg0"><td data-page-node-id="UQfeQgflw6ZZc2VrcWxqvo"><code data-page-node-id="HuhSMgOGmP7aMFioEN8BZg">@RestController</code></td><td data-page-node-id="LmKAZbjiEJnxqlKqG7rMyE"><code data-page-node-id="BNHDebmEhXLrdpKAzH028a">HttpApi</code> 层的 <code data-page-node-id="vvcQCclxZJ7w1OoFyQNtXz">*Controller</code></td></tr>
+<tr data-page-node-id="kFwozvJQn9mnDeGuHiefJ1"><td data-page-node-id="9yQYftFe1oHhN8ygZ18s3N"><code data-page-node-id="zn2Ire5CBQ037tmUwArooQ">@RequestMapping("/api/books")</code></td><td data-page-node-id="uuQXELjAZI7n1hxnhjsPUK"><code data-page-node-id="4WqmqJUxV0VvzwfgVhD1IV">[Route("api/books")]</code></td></tr>
+<tr data-page-node-id="FRUjlYX0xaIqmI1kT8NH6f"><td data-page-node-id="lq2zcHZ9XciXO1N9TXFVwV"><code data-page-node-id="SVD0a0OzIlVsoAa1Z3kxyr">@GetMapping</code> / <code data-page-node-id="6FRJLSdf0EeLKvWh9eeHnV">@PostMapping</code></td><td data-page-node-id="DSBcq2wgiZOuAdfdCTVpoB"><code data-page-node-id="sWNl6WtBtnVk5odt0C7p5d">[HttpGet]</code> / <code data-page-node-id="00c6CGHOVGrV3TYOEPFTSp">[HttpPost]</code></td></tr>
+<tr data-page-node-id="0VMt2yV4WEvTDhRsNQafhv"><td data-page-node-id="6ImFfYSPGkBkvCjysEbEMF"><code data-page-node-id="6Q0qSltNEIYV3v8cyQnEfx">@RequestBody</code> / <code data-page-node-id="X4iFh3PuwQhNlllwePRyqK">@ResponseBody</code></td><td data-page-node-id="1FlL2rDqGPeMCmYX4NuESr">DTO 参数自动绑定 + 自动序列化</td></tr>
+<tr data-page-node-id="3NFbTcmfeXZLZxK2Vh9FP9"><td data-page-node-id="yYlQkSFAoDkNciwxio9aZf"><strong data-page-node-id="jgtcG0QdEMhVfhGzsXndah">Spring Data REST</strong>（自动暴露 Repository 为 REST）</td><td data-page-node-id="DC03iJyALa9X0cFDPSwszt"><span class="same" data-page-node-id="LpGjpiM9n3Y3Vn7l4xtJX2">动态 API</span>：<code data-page-node-id="CLXEkvTc9dl1UmlwyNVx8B">AbpServiceConvention</code> 自动把 AppService 暴露成 REST 端点</td></tr>
+<tr data-page-node-id="M9ApHggwdgL8wUgsQ1Btl5"><td data-page-node-id="cWWzEiHM1ab28CSIfj8AWH"><code data-page-node-id="96RUBLuHgDBpCfFI3f13Nj">@Valid</code> + <code data-page-node-id="FsLYPHr5k6KkwxGCJeltHP">BindingResult</code></td><td data-page-node-id="Ok8PeTcnTZIeAoDEXlmd5B">DTO 上的 DataAnnotations，失败自动抛标准异常</td></tr>
+<tr data-page-node-id="xLKJckxUgJGcCpq4b0C6mx"><td data-page-node-id="346v6bgU68ZsRVucCw19HG"><code data-page-node-id="QPdHcIHmL9Tc49TsEfK1og">@ControllerAdvice</code> + <code data-page-node-id="VFxPBa7XMBev0OkkX7KrTs">@ExceptionHandler</code></td><td data-page-node-id="euwhTmAKfThPFq5nO3oRvK">内置异常过滤器（<code data-page-node-id="FCkwMFQ6BGgX2U6qKMp5Xa">BusinessException</code> → 标准 JSON + 本地化消息）</td></tr>
+<tr data-page-node-id="Dv6qKJHdwSzwEVUmN2ICz0"><td data-page-node-id="xPSOm41X85m45dEZBvbXSk"><code data-page-node-id="LxenCGSlvrUBDI4D52Hby8">ResponseEntity&lt;T&gt;</code></td><td data-page-node-id="kPu6znXNMmugyYojhuJ8O1">直接返回 DTO，框架包装响应体</td></tr>
+</tbody>
+</table>
+
+<div class="callout" data-page-node-id="D4XLipe0tCGWKwaGh5NYf9">
+<p data-page-node-id="26pT7Jv9xdY4OuK7QAzBjn"><strong data-page-node-id="yuc2Tv7ej4HbSZEozz5sae">重要简化：</strong>ABP 里<b data-page-node-id="DARR6njkR8aeaIj1EjM5hf">多数情况你不需要写 Controller</b>——只要你的 AppService 实现了 <code data-page-node-id="esKS27HaMBuQU1b4rSoPV4">IApplicationService</code>，动态 API 会按约定自动生成 <code data-page-node-id="nw2aaqXfpsjK3PyQ1hrQkQ">/api/app/book</code> 这类端点。<code data-page-node-id="F0HxnxGyKLvYwObFNchoVq">HttpApi</code> 层的 Controller 只在需要自定义路由/特殊绑定时才写。</p>
+<p data-page-node-id="iJuErqSmkhS73pupOWoIxX">这在 Spring 里最接近 <b data-page-node-id="jX3WuTJq1SibW3CetvTvVp">Spring Data REST</b>，但 ABP 暴露的是 Service 而不是 Repository，粒度更合适。</p>
+</div>
+
+<!-- ============ 5 ============ -->
+<h2 id="s5" data-page-node-id="6CFhEtKDvrE9zt8jU2Gyw1"><span class="num" data-page-node-id="TzuWJSylJZH9K3nYPbIFBr">05</span>业务层</h2>
+
+<table data-page-node-id="Vv9qpyzoYQ5RfZ2ujlqd0J">
+<thead data-page-node-id="Vxktgk9MLaVAACj516hBk0"><tr data-page-node-id="W825oxhVdluXUQlr3ixrPN"><th data-page-node-id="Nl1KxlAQMRoBZFkQNyUN9s">Spring</th><th data-page-node-id="Jsvz4ETkw5SVZC7pc7tvZG">ABP</th></tr></thead>
+<tbody data-page-node-id="DHFtJXIiKiZubA4nqGHfXi">
+<tr data-page-node-id="9GqCB1LBfIEpZ15xythRIn"><td data-page-node-id="4HwhemjyOsdq7xlwyWtnEY"><code data-page-node-id="Bzq6rFX31Sp4IMsFDHiDjZ">@Service</code></td><td data-page-node-id="DsyClyBoH9WwyVeQ4cAFs4"><code data-page-node-id="jnQxYRneXsMoDLYJUFZhsk">Application</code> 层的 <code data-page-node-id="3cwrGjwhABCR72WEsN0uBx">*AppService</code></td></tr>
+<tr data-page-node-id="IsoJbdaTkByTYD9ickHYPw"><td data-page-node-id="Kos7zu3wLschmtDnWJy6Mh">接口 + 实现（同包或分模块）</td><td data-page-node-id="JbWhvDdHEOmntMY9vu7Jzj"><code data-page-node-id="wMYbzxuCB5bVy999YRuFXf">Application.Contracts</code>（接口+DTO）/ <code data-page-node-id="AMJAZACpencR5lTcVvtkFP">Application</code>（实现）<span class="diff" data-page-node-id="y0lIHTW2rD4ArizdY0BNVg">强制分项目</span></td></tr>
+<tr data-page-node-id="HYkWVD0FwzUrTJsLJGmzab"><td data-page-node-id="oI4ZmyavatkA0J7RItLkQP">DTO + MapStruct</td><td data-page-node-id="gnVWcB2JahinAqsJiIzzKn">DTO + Mapperly</td></tr>
+<tr data-page-node-id="CyiitaFzr2RL8bcD5l4SAB"><td data-page-node-id="OqhHRhK9DWWoMWPzx2m6nD">Feign Client 接口</td><td data-page-node-id="R0eafknm6E2w7XyKNeTlAH"><code data-page-node-id="dlGoYGCrQhVP096X4yEMWO">HttpApi.Client</code> 层的 <code data-page-node-id="zVwdWjAPmRQt2QE7x5a4V6">*ClientProxy</code></td></tr>
+<tr data-page-node-id="2vs9WqNnMHTNujl411SGCY"><td data-page-node-id="i1KYIpicxwyGJW8bPYInjz"><code data-page-node-id="qbPI3CbCOzJm5n4qG2zjPN">@Transactional</code>（手动标注）</td><td data-page-node-id="mchuOeC1Ll8eGhay3kKFjE"><span class="diff" data-page-node-id="hxIbARtIVOiABWzkvuAKt8">Unit of Work 自动生效</span>，多数情况不用标；需要精细控制时用 <code data-page-node-id="NKzqmisE13eaTkPZwvrXsI">[UnitOfWork]</code></td></tr>
+<tr data-page-node-id="sNW1YWAq35lOEacJcQ3mMZ"><td data-page-node-id="ugmcG6AVjEH6Oao3lnzGLW">Service 之间互相注入调用</td><td data-page-node-id="m9fqNZm5AnZ3GGHnyk2G9i"><span class="diff" data-page-node-id="bLgRXTa1N7fNn5ZrsIaqKl">同模块内禁止 AppService 互调</span>（架构约束，见下方说明）</td></tr>
+</tbody>
+</table>
+
+<div class="callout warn" data-page-node-id="C3SDEmeArjdp0mXejQWHEF">
+<p data-page-node-id="Rgh60GxPhnRa328NKTfW24"><strong data-page-node-id="nErwqfgs9CbbShfWy1jgpT">这条约束和 Spring 习惯冲突，容易踩：</strong>ABP 规定<b data-page-node-id="4oXpWcNBQAdPDTzOi2z7qH">同一模块内不要把逻辑写成 AppService 调 AppService</b>。需要复用的逻辑要下沉到 Domain 层（领域服务）或提取成独立方法。跨模块调用则只允许通过对方模块的 <code data-page-node-id="dkxaHEl91dc9ra3ZflPB4p">Application.Contracts</code>。</p>
+<p data-page-node-id="EkZH7p1rZeZ0RCOTz3Mo8j">Spring 项目里 <code data-page-node-id="FCTnOFvqL9pnmlrtwCMzbH">OrderService</code> 直接注入 <code data-page-node-id="GQq8icZx4vwqLNzE2QQMCA">UserService</code> 很常见，在 ABP 里这是被明确反对的。</p>
+</div>
+
+<!-- ============ 6 ============ -->
+<h2 id="s6" data-page-node-id="tyotq8CiPGJF7nRy13X2te"><span class="num" data-page-node-id="sHB7YI3zP2i9DnNuIKIptE">06</span>领域与持久化</h2>
+
+<table data-page-node-id="joXlRfd0zNrXFiiNia8AE5">
+<thead data-page-node-id="3jAdixpXybQxuFsLXD1xW0"><tr data-page-node-id="kzVr1RXPlfT0twe90H8OA0"><th data-page-node-id="WNs9lEYIlLDHHv1hNC3W3e">Spring / JPA</th><th data-page-node-id="EW1UjmP7abe4r8suHJ4JMI">ABP</th></tr></thead>
+<tbody data-page-node-id="ls4RmYtUQbdr3ev7LfYGES">
+<tr data-page-node-id="Gtd0xK3ZBWLBbFg0WGhqs5"><td data-page-node-id="JOv61mo8QmjulZSEAydkvY"><code data-page-node-id="G3dknO5ZWQ0JbXSanSaTvi">@Entity</code> (JPA)</td><td data-page-node-id="Jr1sk9G1XEc6RVoPG4EGSA"><code data-page-node-id="el00C5xYNNssxjdNXvEp90">Domain</code> 层的实体类</td></tr>
+<tr data-page-node-id="ewt3FYX0Pk0mTnUXxGGxzI"><td data-page-node-id="sxOZjK6d0oV00bPNkqnfuq">聚合根（DDD 手工实现）</td><td data-page-node-id="5wI3rvoAwf0KimewjzEqme"><code data-page-node-id="oGxPmPPCHR9yyBQM3anTqA">AggregateRoot&lt;Guid&gt;</code> / <code data-page-node-id="JvbBgY2lXIF7N4MxM5lBEA">FullAuditedAggregateRoot&lt;Guid&gt;</code></td></tr>
+<tr data-page-node-id="1RKeNCq0TDGEzUA1vbHPqZ"><td data-page-node-id="Ce5pCZpmQOVlH3lBA380ww"><code data-page-node-id="UmqTg8J5bzGqa2dAAnqRiB">@Embeddable</code> / 值对象</td><td data-page-node-id="PCyWkE7AvuhjhPFp26BYkK"><code data-page-node-id="hvDSbxDrwkgk54sEDjCBfi">ValueObject</code></td></tr>
+<tr data-page-node-id="uw1Zev1CeG1pKPa6GTToNT"><td data-page-node-id="zNCEs7QF6yNpde8Hyip5c5"><code data-page-node-id="ypzFZptulDGPt5W8GT9Zcn">JpaRepository&lt;T, ID&gt;</code></td><td data-page-node-id="BrRlrzNGBqIpKstarfuTom"><code data-page-node-id="cq29iRKzvOjV4cRKexdL7u">IRepository&lt;T, TKey&gt;</code> / <code data-page-node-id="pw6HBMB97vsEFaaWN3b7If">IBasicRepository&lt;T, TKey&gt;</code></td></tr>
+<tr data-page-node-id="hGG9aRF7cVjqOtMof2yV9F"><td data-page-node-id="IB7RoBCOMSgpoC2IMJCdCB"><code data-page-node-id="vE4vj2eV9ZnE72d2hr1CVz">@Repository</code> + <code data-page-node-id="5i975nHErNzhwyXRdfqQMW">@Query</code></td><td data-page-node-id="fSQKoBKEx36vigBEni9Gwj"><code data-page-node-id="TdoCehUUdkRH87k23Q832b">Domain</code> 层 <code data-page-node-id="GlpN9EHl2XZuLec6czbHKx">IBookRepository</code> + <code data-page-node-id="S5ZTaGUWPLiaZtD39HANXz">EntityFrameworkCore</code> 层 <code data-page-node-id="aHD3j4plUVkBlbCdT41t2b">EfCoreBookRepository</code></td></tr>
+<tr data-page-node-id="ylByBqnLG3EzZv4VuiLBrE"><td data-page-node-id="ktjxTte1pJYCXm8WIF0uXi">JPQL / Criteria API / EntityManager</td><td data-page-node-id="ZiTQD6GAfBujNOOP958J1O">LINQ / <code data-page-node-id="GbUqekbTbZnD3ryEQ4wpln">IQueryable</code></td></tr>
+<tr data-page-node-id="fXE9IagHFFG03DxLrWWZm8"><td data-page-node-id="ogK61GSlCngeoY30yrf2Lq"><code data-page-node-id="teCRBor2SvTx3bTGOi1suw">@CreatedDate</code> / <code data-page-node-id="q2A6mOigpnhfGZWH6VrU3y">@LastModifiedDate</code> / <code data-page-node-id="2eK989lVJHi4GthedF2hqP">@CreatedBy</code></td><td data-page-node-id="NmIlKW1XImFPt5GP1xTIGu"><strong data-page-node-id="AvDcPiCByIfxUlAY21xMBD">审计字段内置于 <code data-page-node-id="qT0tCgTRmF7UM0gByKpgxB">FullAuditedAggregateRoot</code></strong>，继承即有</td></tr>
+<tr data-page-node-id="mYsS8qDVaRUIAu6I3UQHXN"><td data-page-node-id="gI6CaXKdTlWlPo0iFiCoiH"><code data-page-node-id="iOEcnEWGBf2rdbjAjbtwcM">@SoftDelete</code>（Hibernate 6.4+）</td><td data-page-node-id="IzCoH95RD8Mk3yfOGU68kO"><code data-page-node-id="JUmfSzEnCtHssF2c20n7jV">ISoftDelete</code> —— 内置，且查询自动过滤已删数据</td></tr>
+<tr data-page-node-id="dIXj8EoBi3dYRKNDRPOMmQ"><td data-page-node-id="EOTEjWBacnEC1puMDgFBqv">Flyway / Liquibase</td><td data-page-node-id="ckDU6N0HgCaIAq2a8JQuhw">EF Core Migrations（<code data-page-node-id="9zebbPdFiS5weJmTcaAUO3">dotnet ef migrations add</code>）</td></tr>
+<tr data-page-node-id="S2nD2tngfAnkwayDQcoRVv"><td data-page-node-id="Kbpty6CSTI9BktDyEK3Xnq">Hibernate 懒加载</td><td data-page-node-id="VRC9zDcE2Isk2Xly4W696N"><span class="diff" data-page-node-id="DM9OHXxlFRful6OwPH4fbh">ABP 明确禁用懒加载</span>，用 <code data-page-node-id="kZpNfZhzvjmsdohMTKQW66">includeDetails</code> 显式控制</td></tr>
+<tr data-page-node-id="L6CFV5DhjgEybETCOaL7mH"><td data-page-node-id="HFZG76mv4rZvCbJnCwibMb"><code data-page-node-id="nrQfVIuR2ktEJImPgc2bky">@Version</code>（乐观锁）</td><td data-page-node-id="3oN9oKaJ0qXef6HMYFvGMP"><code data-page-node-id="WbWfGCubgHW9RCPfTd0qRT">IHasConcurrencyStamp</code> + <code data-page-node-id="psUvzmhTbL6oXmBMTaD81G">ConcurrencyStamp</code></td></tr>
+</tbody>
+</table>
+
+<div class="callout warn" data-page-node-id="4bpaCdpDG6NEfrR6IijIOD">
+<p data-page-node-id="Ch7lHHp19rFxkgsFxr4pJP"><strong data-page-node-id="JoqE8QOqdt4wExaHKSOOH4">两个和 JPA 习惯明显不同的点：</strong></p>
+<p data-page-node-id="lV9IRXF1WzJnlCnYvO7nL8">① <strong data-page-node-id="fMdcI5JEmxSe9SqCHuZ4kn">禁用懒加载。</strong>JPA 里靠 <code data-page-node-id="xGiCKmtvSK2AadIPdOXpE5">@OneToMany(fetch=LAZY)</code> + Session 自动加载很常见；ABP 要求显式指定——仓储方法带 <code data-page-node-id="kB2j4ZFFYI2m5OqfzFiUBf">includeDetails</code> 参数，实现里 <code data-page-node-id="2XJUTcfHPeTg78WmOJbkk3">Include()</code> 出来。这避免了 N+1 和 Session 边界问题，但写法不同。</p>
+<p data-page-node-id="PJmTECJ3yt4vDn1BalOTIR">② <strong data-page-node-id="6be6BFo27F6YCnfJgsT365">实体不生成 Id。</strong><code data-page-node-id="zLHuSsSVVTATHmMI54JmWl">@GeneratedValue</code> 在 ABP 里对应的是「调用方用 <code data-page-node-id="cRcbnjCoU3FyXad4XXagMl">IGuidGenerator</code> 生成后传给构造器」。实体构造器里 <code data-page-node-id="jbxlv86AJkHnZwGm6lRF0v">new Guid()</code> 是被明确禁止的。</p>
+</div>
+
+<!-- ============ 7 ============ -->
+<h2 id="s7" data-page-node-id="VHVKc3s4SIDZB9l0ULXX3h"><span class="num" data-page-node-id="uwFGOFIezHuEYNMCU5BVh6">07</span>安全与多租户</h2>
+
+<table data-page-node-id="KdgUSeCph8xPcwkbKFnbnw">
+<thead data-page-node-id="bAgq54BkYR8wlZtC0jpeRg"><tr data-page-node-id="7rFdrZwENi73XLgXVrLinE"><th data-page-node-id="vA55w1orY6B4AkNpYoVfZ6">Spring</th><th data-page-node-id="Ji2lDMXLBmbtR21kmVhFmY">ABP</th></tr></thead>
+<tbody data-page-node-id="Dh2iMymDfT1cFrH8GQKAlO">
+<tr data-page-node-id="NGxR2meAPTFBc0H1YCJY5I"><td data-page-node-id="1Dr77SIvHp8sGqiYPoJ1Pc">Spring Security</td><td data-page-node-id="aEH50yDls1N4bGOlCDLr43"><code data-page-node-id="rEvONvts2jFHaOBy6z22MJ">Volo.Abp.Authorization</code> + Identity 模块</td></tr>
+<tr data-page-node-id="AiUmdQx8imemT05vDDRS1F"><td data-page-node-id="Wda3rNy7IiL66dD6oUPvqy"><code data-page-node-id="oSKlrisfCSHsLYTw6OfeZQ">@PreAuthorize("hasAuthority('book.create')")</code></td><td data-page-node-id="MpzNBflwiXCGFKBihf65lD"><code data-page-node-id="X9IZpbC0YRjpZx14hn8F2H">[Authorize("BookStore.Books.Create")]</code></td></tr>
+<tr data-page-node-id="raDHhJALGIeQOjS1hJA8az"><td data-page-node-id="IDPqWXGlmPCzD6YIwC3biB"><code data-page-node-id="jpjUGXO4s5iuF2FCQ0nQB3">GrantedAuthority</code> / Role</td><td data-page-node-id="vMEWC9p9Q8TSo7Wmz63AMe">Permission 定义（<code data-page-node-id="RaAL0624812ZbLBo5wnkQ8">*PermissionDefinitionProvider</code>）</td></tr>
+<tr data-page-node-id="f5WqCOEAq9psskh8ptR1cX"><td data-page-node-id="TCTGl2sj5JC4Efpd6rjqVP"><code data-page-node-id="FxkM3Kk4FpAYRgEOBKXLuh">UserDetailsService</code></td><td data-page-node-id="QEjTiTql3I4LNmzwm7XYaJ"><code data-page-node-id="r1LdF5yNpJ3vBcica6pr5J">ICurrentUser</code> / <code data-page-node-id="OZAc7O6qXRO9XI7z2RA8js">ICurrentPrincipalAccessor</code></td></tr>
+<tr data-page-node-id="EUhbvJ4P8BptX97mgs8hSu"><td data-page-node-id="oH1k6FlOXnDDYgDICugfrM"><code data-page-node-id="4HulQZ6DZBWpWgKS7Cp9xE">SecurityContextHolder</code> + ThreadLocal</td><td data-page-node-id="ykSI0dhoM1bGseXf4iIzkQ"><code data-page-node-id="HO1vMP54m7an1tLWBc3xGw">ICurrentUser</code>（内部基于 <code data-page-node-id="hJdxPQxnG6OugFsYwMtLaf">AsyncLocal</code>，支持异步流）</td></tr>
+<tr data-page-node-id="ohT6JMGjUkzFwgkRmhVmzg"><td data-page-node-id="Q7Tkh3C58LospljaUfVN7y">OpenID Connect / Keycloak / 自研 JWT</td><td data-page-node-id="KquSD9erG4CnYvCBHKictT">模板内置 OpenIddict 模块（也可换 IdentityServer）</td></tr>
+<tr data-page-node-id="P3x8Mujw3xWGiQbW6sJbQ7"><td data-page-node-id="6R9JrchneSNh6ncv3CjykD"><strong data-page-node-id="zXfXfrG3N6fWClck0r2wE4">多租户</strong>：自己写 MyBatis/JPA 拦截器拼 <code data-page-node-id="Q0AdEIRSzMBuvHa7qVHDb0">tenant_id</code> 条件</td><td data-page-node-id="pzyHQw3gyzSH24BkV2uFYn"><span class="diff" data-page-node-id="ighbEpFTLZ1L0OTkCW1to6">内置</span>：实体实现 <code data-page-node-id="T8B7TQPCyZFYY55jVc1QeV">IMultiTenant</code>，数据过滤器<b data-page-node-id="GhnlcOHkNSjtauOgKMiKHU">自动</b>追加租户条件</td></tr>
+<tr data-page-node-id="cER51ZS1jCm49JhU5mgWCu"><td data-page-node-id="NpjVVoNGDUQeLgYLPxk47p">租户上下文手工传递（ThreadLocal）</td><td data-page-node-id="x9NfZov94XJBbaxSbjOujd"><code data-page-node-id="n59yPCQ481P9BSDIIDX3ij">ICurrentTenant</code>（同样 AsyncLocal 机制）</td></tr>
+</tbody>
+</table>
+
+<div class="callout tip" data-page-node-id="8dLkgC19ayJcBBDh63sRoU">
+<p data-page-node-id="d6PIfSQ2oIZ3bwftd37rvo"><strong data-page-node-id="k8PlJbbobcT7TxNzTIKJXM">多租户是 ABP 相对 Spring 生态最省事的地方。</strong>Spring 里你要自己实现 <code data-page-node-id="GusGDQoPWPlmrsv3fZvw3R">TenantContext</code> + 拦截器 + 所有 SQL 手动加租户条件，还要小心异步丢失上下文。ABP 里这些都内建好了：实体打个 <code data-page-node-id="cAeZxLbHovA8342U6DADeD">IMultiTenant</code> 标记，之后所有查询自动隔离，异步也不会丢上下文。</p>
+</div>
+
+<!-- ============ 8 ============ -->
+<h2 id="s8" data-page-node-id="CeD70uRlaKR8GQe1oK2dd6"><span class="num" data-page-node-id="9L7Aj6Q5p0MRzPJmW1Q9pO">08</span>基础设施</h2>
+
+<table data-page-node-id="jQhEGU7n8H7ZDS7JyQ4Gff">
+<thead data-page-node-id="yUaYq2w80GHIPr644iDvua"><tr data-page-node-id="N0jjCPsqJu8ZnR9C0RVH7S"><th data-page-node-id="zwP4dDUTGf5agp2dhpL39a">Spring</th><th data-page-node-id="WRBobHbijiy74fxjl8B6nL">ABP</th></tr></thead>
+<tbody data-page-node-id="AcxXxvtfAfB31bKyxVuBOg">
+<tr data-page-node-id="oF61ZgWj3YoDcU5SLlxOvC"><td data-page-node-id="GuEVzB5f3IhiAiw6EV5GgH"><code data-page-node-id="ibUX8aBJspNSkNQ6bOgDrS">@Async</code> / <code data-page-node-id="hS7KCmq9efOxWkBHsRDGZF">@Scheduled</code> / Quartz</td><td data-page-node-id="SmB0zu1YDaGh99PIjFzi5I"><code data-page-node-id="E7wKEZ0e7f2JgKkEgYYY9B">IBackgroundJobManager</code> / <code data-page-node-id="ouGKQ1NPmBcKkLzIqDeI8o">BackgroundWorker</code></td></tr>
+<tr data-page-node-id="nBUQjYt3nDsqgiEkZYw9HH"><td data-page-node-id="VZ1wCGCH45rM2SBPZXXFJj"><code data-page-node-id="OtB3X7oUE0KB1QQxJQR38S">ApplicationEventPublisher</code> + <code data-page-node-id="RT49G4JI0052jJwobFM7ff">@EventListener</code></td><td data-page-node-id="SuYvV2gCCLqM4DYLaC3vFm"><code data-page-node-id="g0eMtP5WN3au48Q5UQrQAz">ILocalEventBus</code>（同进程）/ <code data-page-node-id="wEC5WSF6s5Z73RnAT7yx1b">IDistributedEventBus</code>（跨服务）</td></tr>
+<tr data-page-node-id="62GBuj0mnZI8MYzALES1J7"><td data-page-node-id="5RNMkIYN8jl7VEcjpxMa3U">RabbitMQ / Kafka + <code data-page-node-id="C6XAWBpf2jnlKLtkAWlNhS">@RabbitListener</code></td><td data-page-node-id="97apijaRLtcOdT50iXhBM1"><code data-page-node-id="o7wtRP2ExbI3pkRIAWFhIf">IDistributedEventBus</code> 的分布式事件（可挂 RabbitMQ / Kafka 传输）</td></tr>
+<tr data-page-node-id="07lN12x11m9OiDdAp3ssmm"><td data-page-node-id="G8r17Sm2Uxbq2lxrIWAskD"><code data-page-node-id="150yqXAa2iTHMHveKCxtxT">@Cacheable</code> / <code data-page-node-id="q0DKMgL7vAil3CIA98QF7s">RedisTemplate</code></td><td data-page-node-id="7PApHHlXv8BTLuzCMvqFmK"><code data-page-node-id="GKZyuw76H9BYojefDtl8H9">IDistributedCache&lt;T&gt;</code> / Caching 模块</td></tr>
+<tr data-page-node-id="ADKPaIHGxiv3SygTlUrVux"><td data-page-node-id="ULMy8BEZYHjrJ1Gam9KJgb"><code data-page-node-id="zwFRXWYL0qJ0zHzaITXlMD">MultipartFile</code></td><td data-page-node-id="3r4P8c1uQSbnP0TsaudBHi">BlobStoring 模块（可切本地/数据库/云存储）</td></tr>
+<tr data-page-node-id="oGqH0kKnqFBnQkMAL7XEuK"><td data-page-node-id="rKOI7m9wQnWDk9s0feDPZj"><code data-page-node-id="YroJoqsPqLiNueGhDnrgcr">MessageSource</code> + <code data-page-node-id="fsZw980EzGYaBJXNLuJhBQ">messages_zh_CN.properties</code></td><td data-page-node-id="8JJbOhSaomuLXgE8YQBuip">本地化 JSON 资源 <code data-page-node-id="DwbCa0poXuCCUdnicfDnIg">Localization/&lt;模块&gt;/zh-Hans.json</code></td></tr>
+<tr data-page-node-id="0Ot2khCRYvQmcM19YIJRer"><td data-page-node-id="pfmzx2ekypM6AcDVUFdc5z">Actuator</td><td data-page-node-id="N0pBesCUA0KenOPVBq7Rn9">HealthCheck 模块</td></tr>
+<tr data-page-node-id="m5lRo64PNSUzNLPw5qjEwg"><td data-page-node-id="AwAqEgETak66zMTGCIGwDk">Logback + MDC</td><td data-page-node-id="wPGr92qeaGoST5oHIctLaY">Serilog（模板已集成）</td></tr>
+<tr data-page-node-id="X4iMQeSFBuHrEBz1o2Zpms"><td data-page-node-id="kjrGYhCFJdIcD4lu2EYxjs"><code data-page-node-id="EHLF2wj7SEuQK0bTvdk2A3">@ConfigurationProperties</code></td><td data-page-node-id="nVOuiblVPjnOPtUfDWNB5S">设置管理模块（Settings，可运行时改、可按租户覆盖）</td></tr>
+<tr data-page-node-id="9WEUD9g7VFvVZ1A5MrPIho"><td data-page-node-id="kEcnUosrROWiI6bJA5nK9y">Feature Flag（Togglz / Unleash）</td><td data-page-node-id="s3uxHVN6Z452Q2HXs2NQmI"><span class="diff" data-page-node-id="PeQMEIqbpwjYwDQIrdO4hO">Feature Management 内置模块</span></td></tr>
+</tbody>
+</table>
+
+<!-- ============ 9 ============ -->
+<h2 id="s9" data-page-node-id="R97SEapjBWp4Xsj9eirhFd"><span class="num" data-page-node-id="a6ZxxOllwwDnC5ECY7rxCB">09</span>几个「差异较大」的点</h2>
+
+<p data-page-node-id="5fErRBmAiuksRkeFTk5uNL">这些不是换名字的问题，是设计哲学不同，建议重点记。</p>
+
+<h3 data-page-node-id="Rtu3haUPFc50pPU3PuBStH">① 契约层是硬性拆分，不是可选项</h3>
+<p data-page-node-id="uelBWahnVBpGgJjbULlgun">Spring 里接口和实现放同一个包很常见。ABP 强制分成 <code data-page-node-id="6w0YpzANHq07nh8mt0GGvy">.Application.Contracts</code> 和 <code data-page-node-id="UJe2I3eHZ3GLTwvODC3wl2">.Application</code> 两个项目，原因是<b data-page-node-id="t6VuLuOoPQ0a5RkYVO66uf">契约要能独立分发给客户端</b>。所有消费者（HttpApi / Web / Blazor / HttpApi.Client）只依赖 Contracts，不依赖实现。</p>
+
+<h3 data-page-node-id="9K4GnHtgqC2yqDSdJEJee7">② Unit of Work 是自动的</h3>
+<p data-page-node-id="rHME4NUGUVQkTR807nAo1G">Spring 里不加 <code data-page-node-id="8MLPa4I1xiQPwgoQ1fk9fF">@Transactional</code> 就没有事务。ABP 的 UoW 中间件在请求进入时自动开启、退出时自动提交——你甚至不需要知道它存在。反过来，如果你的逻辑依赖「没事务」的行为，要显式关闭。</p>
+
+<h3 data-page-node-id="fJHAz4VXXitTW1yTaEIVcx">③ 约定优于配置的力度更大</h3>
+<table data-page-node-id="4X90MX703d8IwX0XDmHNSb">
+<thead data-page-node-id="GXlIraAgMvlE1nMkRHI0oN"><tr data-page-node-id="WXIzfAYEJ1JEe3IirOaXRs"><th data-page-node-id="NlvyTR1xSSkFsRNZP8WC82">事情</th><th data-page-node-id="1BMq9bHK3oEFPX825ZJWEI">Spring 你要做</th><th data-page-node-id="nD0CWUF3PPRgM7HVgMbgPH">ABP</th></tr></thead>
+<tbody data-page-node-id="xeH13JG6B1y4tcwZ3smttt">
+<tr data-page-node-id="HsveFpUBadlzVFCFHwXYtc"><td data-page-node-id="Hqv48CWlZVqKZtVx2vusGh">注册 Bean</td><td data-page-node-id="LrPA9j5xL5nOXA8WqThsqd">加 <code data-page-node-id="2eonNV0nQAPk3wGrIKL8m2">@Service</code></td><td data-page-node-id="VVOUBqv6mrooXuuymnVFVI">加接口标记（如 <code data-page-node-id="l1dZViG5IBuVkqrGAbJBXW">ITransientDependency</code>），或什么也不加（约定匹配）</td></tr>
+<tr data-page-node-id="gAlPfyHkprHO1OBDBgv5YI"><td data-page-node-id="b2cvXgkBHg6mGgfpUuzt2B">暴露 REST</td><td data-page-node-id="oGn5SgLG49xdalVasIbAyz">写 <code data-page-node-id="DIIpvnGH79CysqS5siUXCk">@RestController</code></td><td data-page-node-id="1j9Np50nCQtAAMu6LKrGcl">什么都不用做（动态 API 自动生成）</td></tr>
+<tr data-page-node-id="vDpRWGXD6PnTQjX3AlxitS"><td data-page-node-id="VcoQylmzIP2BxoCzBjAxvF">实体审计字段</td><td data-page-node-id="fBtZewJMBAjw4bnYHiaGwo">加 <code data-page-node-id="twr20kcxkL4e33DIVenmgK">@EntityListeners(AuditingEntityListener.class)</code> + 4 个注解</td><td data-page-node-id="YQgjRL5PjtT3apkPxwrWFS">继承 <code data-page-node-id="cORmAWWHiS2EUfx8ZO2YD3">FullAuditedAggregateRoot</code></td></tr>
+<tr data-page-node-id="KJCTFXojvUgACjbwhmBinY"><td data-page-node-id="TYMjrcsXWSft5szGNSefVB">软删除过滤</td><td data-page-node-id="LcS47omU7kCV47NqeLFzoJ">手写 <code data-page-node-id="QBFZbIXBJk5SBZEERnpu8a">@Where</code> 或 Hibernate 配置</td><td data-page-node-id="KiWhSvDnPgkxBYQg8s6UVo">实现 <code data-page-node-id="dzi1WNLbDskLx2EgRX6BzW">ISoftDelete</code> 即可，自动过滤</td></tr>
+<tr data-page-node-id="Azjrc7B64mFuChgvilJgST"><td data-page-node-id="6GOjOqGHf4gZbipMCezb0T">多租户隔离</td><td data-page-node-id="mUvSOhITZ3GKNwsAG1z0Dq">全部自己实现</td><td data-page-node-id="Qn4gJf52DYs2qtqYdWsul5">实现 <code data-page-node-id="VEw2zCgLymqSCAoExVDq92">IMultiTenant</code> 即可</td></tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="JG7B029RfO43DFBILn2Eac">④ 模块既是包，也是部署单元</h3>
+<p data-page-node-id="FzVAlyZsbdP6QWC8qTv0Nz">Spring Modulith 的模块是<b data-page-node-id="XtRFkFzDzmowK7qvCV4zBM">同一个构建产物内部</b>的包边界。ABP 的模块是<b data-page-node-id="dFVASaT3EnajzWId28H5LB">独立打包、独立版本、可独立发布到 NuGet 的组件</b>——一个模块对应多个 NuGet 包（每层一个）。所以 ABP 的模块边界比 Spring Modulith 更"硬"，也更容易跨项目复用。</p>
+
+<h3 data-page-node-id="cakQnzDRLnAAEZqneOSnLR">⑤ 动态 API 取代手写 Controller</h3>
+<p data-page-node-id="wQUxEzj6uP9Q2lte8KCTIZ">这是从 Spring 过来最容易「找不到 Controller 在哪」的原因。<b data-page-node-id="hcXZADoS1pinUZFVxH8IUL">不是没有 Controller，是运行时生成的。</b>想看实际路由，启动后看 Swagger，而不是去翻代码。</p>
+
+<div class="callout tip" data-page-node-id="wf2v73rkCU4T6nfKXlsAsV">
+<p data-page-node-id="MBI4VvHqePgL7xQtkBfxny"><strong data-page-node-id="PngidgyXEYII48x8FuhDhX">建议的切入方式：</strong>拿一个你熟悉的 Spring 项目结构，在脑子里做一次映射——<code data-page-node-id="jOAOf7cDRhbD2yNtI0VOOl">controller</code> 对应 <code data-page-node-id="WA166tTG4FFgx7jqVYTA2E">HttpApi</code>、<code data-page-node-id="PUIN7DByNK7ucuM7buqk3c">service</code> 对半拆成 <code data-page-node-id="rNX6IUNa7EP9ApH9JRa3An">Contracts</code> + <code data-page-node-id="7bGQFShJXByNX6TkvnVHNS">Application</code>、<code data-page-node-id="YoeZxU9Ra1khAQtJckTnPk">repository</code> 对半拆成 <code data-page-node-id="ggEiZmOe79RBSlmq4IwzZi">Domain</code> 接口 + <code data-page-node-id="KlD7euhsfsDhHEzqepTIdr">EFCore</code> 实现、<code data-page-node-id="Bo64qbNKLUqKVAsDqZWKYB">entity</code> 对应 <code data-page-node-id="rBjrUN3WKNPTDjR3b4aUeY">Domain</code>。<b data-page-node-id="wQC6QVExiEFj95F155F3tq">七层里你能一眼认出来的至少四层</b>，剩下三层（Domain.Shared、HttpApi.Client、DbMigrator）是 ABP 特有的补充。</p>
+</div>
+
+<div class="foot" data-page-node-id="qjWrsW9e4AavgCqu8a9dIY">
+本文对照关系基于 ABP 10.6 的官方文档与源码（<code data-page-node-id="9MhkkLIzXx0DpD6lvQwBZE">docs/en/framework</code>、<code data-page-node-id="FTFyvQAvhA8At7bRLuaJus">docs/en/solution-templates</code>、<code data-page-node-id="WwBg8rUEL7ljUtf1JHiFIW">.cursorrules</code>、<code data-page-node-id="0r5OmdyHcZKySltiuzQexo">ai-rules</code>）整理。
+</div>
+
+</div>
+</body>
+</html>

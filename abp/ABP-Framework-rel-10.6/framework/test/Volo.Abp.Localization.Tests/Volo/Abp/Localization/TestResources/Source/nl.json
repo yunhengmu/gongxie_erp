@@ -1,0 +1,16 @@
+{
+  "culture": "nl",
+  "texts": {
+    "Hello <b>{0}</b>.": "Hallo <b>{0}</b>.",
+    "Car": "Auto",
+    "CarPlural": "Auto's",
+    "MaxLenghtErrorMessage": "De lengte van dit veld mag maximaal '{0}' tekens zijn",
+    "Universe": "Universum",
+    "FortyTwo": "Tweeënveertig",
+    "Enum:BookType.Undefined": "Ongedefinieerd",
+    "Enum:BookType.0": "Ongedefinieerd met waarde 0",
+    "BookType.Adventure": "Avontuur",
+    "BookType.1": "Avontuur met waarde 1",
+    "Biography": "Biografie"
+  }
+}

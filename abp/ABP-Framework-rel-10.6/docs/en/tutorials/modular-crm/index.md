@@ -1,0 +1,50 @@
+```json
+//[doc-seo]
+{
+    "Description": "Learn to build modular web applications with ABP Framework in this tutorial, focusing on creating and communicating application modules."
+}
+```
+
+# Modular Monolith Application Development Tutorial
+
+````json
+//[doc-params]
+{
+    "UI": ["MVC", "BlazorWebApp", "NG"]
+}
+````
+
+````json
+//[doc-nav]
+{
+  "Next": {
+    "Name": "Creating the initial solution",
+    "Path": "tutorials/modular-crm/part-01"
+  }
+}
+````
+
+ABP provides great infrastructure and tooling to build modular software solutions. In this tutorial, you will learn how to create application modules, compose and communicate them to build a modular monolith web application with the {{UI_Value}} UI.
+
+> **This tutorial focuses on modularity.** The sample application's UI is intentionally kept simple so you can focus on module design and integration. For a real-world, full-featured application walkthrough with ABP, follow the [Book Store tutorial](../book-store/index.md).
+
+## Tutorial Outline
+
+This tutorial is organized as the following parts:
+
+* [Part 01: Creating the initial solution](part-01.md)
+* [Part 02: Setting Up the Catalog Module](part-02.md)
+* [Part 03: Building the Catalog Module](part-03.md)
+* [Part 04: Creating the initial Ordering Module](part-04.md)
+* [Part 05: Building the Ordering Module](part-05.md)
+* [Part 06: Integrating the modules: Implementing Integration Services](part-06.md)
+* [Part 07: Integrating the modules: Communication via Messages (Events)](part-07.md)
+* [Part 08: Integrating the modules: Joining the Products and Orders Data](part-08.md)
+
+## Download the Source Code
+
+You can download the completed sample solution [here](https://github.com/abpframework/abp-samples/tree/master/ModularCRM).
+
+## See Also
+
+* [Book Store: Web Application Development Tutorial](../book-store/index.md)

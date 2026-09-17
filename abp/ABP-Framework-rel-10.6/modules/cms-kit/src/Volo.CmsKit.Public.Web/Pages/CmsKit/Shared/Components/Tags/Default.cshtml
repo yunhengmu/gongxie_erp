@@ -1,0 +1,27 @@
+﻿@using Volo.CmsKit.Public.Web.Pages.CmsKit.Shared.Components.Tags
+
+@model TagViewComponent.TagViewModel
+
+<div class="my-3">
+	<div class="cms-tags-area">
+		@if (Model.Tags != null)
+		{
+			<div class="d-flex flex-wrap gap-2">
+				@foreach (var tag in Model.Tags)
+				{
+					if (Model.UrlFormat.IsNullOrWhiteSpace())
+					{
+							<span class="badge rounded-pill bg-secondary cmskit-tag fw-normal">
+								@tag.Name
+							</span>
+					}
+					else
+					{
+						var formattedUrl = Model.UrlFormat.Replace("{TagId}", tag.Id.ToString()).Replace("{TagName}", tag.Name);
+							<a class="badge rounded-pill bg-secondary cmskit-tag fw-normal text-decoration-none" href="@formattedUrl">@tag.Name</a>
+					}
+				}
+			</div>
+		}
+	</div>
+</div> 

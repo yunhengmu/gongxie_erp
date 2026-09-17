@@ -1,0 +1,31 @@
+{
+  "culture": "ar",
+  "texts": {
+    "InternalServerErrorMessage": "حدث خطأ داخلي أثناء تنفيذ طلبك.",
+    "ValidationErrorMessage": "البيانات المُدخلة غير صحيحة.",
+    "ValidationNarrativeErrorMessageTitle": "تم العثور على الأخطاء التالية أثناء التحقق:",
+    "DefaultErrorMessage": "حدث خطأ.",
+    "DefaultErrorMessageDetail": "لم يتم إرسال تفاصيل الخطأ من الخادم.",
+    "DefaultErrorMessage401": "لم يتم تسجيل الدخول.",
+    "DefaultErrorMessage401Detail": "يجب تسجيل الدخول لإتمام هذه العملية.",
+    "DefaultErrorMessage403": "ليس لديك صلاحية.",
+    "DefaultErrorMessage403Detail": "غير مسموح لك بتنفيذ هذه العملية.",
+    "DefaultErrorMessage404": "المورد غير موجود.",
+    "DefaultErrorMessage404Detail": "تعذر العثور على المورد المطلوب.",
+    "EntityNotFoundErrorMessage": "لا يوجد {0} بالمعرف = {1}.",
+    "EntityNotFoundErrorMessageWithoutId": "العنصر {0} غير موجود.",
+    "AbpDbConcurrencyErrorMessage": "تم تغيير البيانات التي أرسلتها بواسطة مستخدم آخر. يرجى تجاهل التغييرات التي أجريتها والمحاولة مرة أخرى.",
+    "Error": "خطأ",
+    "UnhandledException": "حدث استثناء غير متوقع.",
+    "Authorizing": "جارٍ التحقق من الصلاحيات…",
+    "401Message": "غير مصرح",
+    "403Message": "ممنوع",
+    "404Message": "الصفحة غير موجودة",
+    "500Message": "خطأ داخلي في الخادم",
+    "403MessageDetail": "ليس لديك صلاحية لتنفيذ هذه العملية.",
+    "404MessageDetail": "عذرًا، الصفحة المطلوبة غير موجودة.",
+    "Unauthorized": "غير مصرح",
+    "invalid_token": "الرمز المميز غير صالح",
+    "SessionExpired": "انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى للمتابعة."
+  }
+}

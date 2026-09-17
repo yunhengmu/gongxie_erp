@@ -1,0 +1,2307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WMS 领域设计 · ABP / DDD 视角</title>
+<style>
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2128;--bg4:#21262d;
+  --bd:#30363d;--bd2:#3d444d;
+  --tx:#e6edf3;--tx2:#9da7b3;--tx3:#6e7681;
+  --blue:#58a6ff;--blue-bg:rgba(56,139,253,.14);
+  --green:#3fb950;--green-bg:rgba(63,185,80,.13);
+  --red:#f85149;--red-bg:rgba(248,81,73,.13);
+  --amber:#d29922;--amber-bg:rgba(210,153,34,.14);
+  --purple:#bc8cff;--purple-bg:rgba(188,140,255,.13);
+  --cyan:#39c5cf;--cyan-bg:rgba(57,197,207,.13);
+  --pink:#f778ba;
+  --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--tx);
+  font:15px/1.75 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px 120px}
+
+/* ── Header ── */
+header{
+  border-bottom:1px solid var(--bd);
+  background:linear-gradient(180deg,rgba(56,139,253,.07),transparent);
+  margin-bottom:44px;
+}
+.hd{max-width:1180px;margin:0 auto;padding:52px 28px 40px}
+.tag{
+  display:inline-block;font:600 11px/1 var(--mono);letter-spacing:.14em;
+  color:var(--blue);background:var(--blue-bg);border:1px solid rgba(56,139,253,.3);
+  padding:6px 11px;border-radius:5px;margin-bottom:18px;text-transform:uppercase;
+}
+h1{font-size:31px;font-weight:700;letter-spacing:-.5px;margin-bottom:12px}
+h1 span{color:var(--tx3);font-weight:400}
+.sub{color:var(--tx2);font-size:14.5px;max-width:760px}
+.meta{margin-top:22px;display:flex;gap:26px;flex-wrap:wrap;font:13px var(--mono);color:var(--tx3)}
+.meta b{color:var(--cyan);font-weight:600}
+
+/* ── Nav ── */
+nav.toc{
+  background:var(--bg2);border:1px solid var(--bd);border-radius:10px;
+  padding:20px 24px;margin-bottom:48px;
+}
+nav.toc h4{
+  font:600 11px var(--mono);letter-spacing:.13em;color:var(--tx3);
+  text-transform:uppercase;margin-bottom:14px;
+}
+nav.toc ol{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:8px 26px}
+nav.toc a{
+  color:var(--tx2);text-decoration:none;font-size:13.5px;
+  display:flex;gap:9px;padding:4px 0;transition:color .15s;
+}
+nav.toc a:hover{color:var(--blue)}
+nav.toc a i{font:600 12px var(--mono);color:var(--tx3);font-style:normal;min-width:19px}
+nav.toc a:hover i{color:var(--blue)}
+
+/* ── Section ── */
+section{margin-bottom:58px;scroll-margin-top:20px}
+h2{
+  font-size:22px;font-weight:650;letter-spacing:-.25px;
+  padding-bottom:13px;margin-bottom:26px;border-bottom:1px solid var(--bd);
+  display:flex;align-items:baseline;gap:13px;
+}
+h2 i{
+  font:700 12px var(--mono);font-style:normal;color:var(--blue);
+  background:var(--blue-bg);border-radius:5px;padding:4px 8px;
+  position:relative;top:-1px;
+}
+h3{font-size:16.5px;font-weight:650;margin:32px 0 14px;color:var(--tx)}
+h3::before{content:'▍';color:var(--blue);margin-right:7px;font-size:13px}
+h4{font-size:14.5px;font-weight:650;margin:22px 0 10px;color:var(--cyan)}
+p{color:var(--tx2);margin-bottom:14px}
+p strong,li strong{color:var(--tx);font-weight:600}
+a{color:var(--blue)}
+
+/* ── Code ── */
+pre{
+  background:var(--bg2);border:1px solid var(--bd);border-radius:9px;
+  padding:17px 20px;overflow-x:auto;margin:14px 0 20px;
+  font:13px/1.68 var(--mono);color:#c9d1d9;
+}
+pre::-webkit-scrollbar{height:9px}
+pre::-webkit-scrollbar-track{background:var(--bg3)}
+pre::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+code{font-family:var(--mono);font-size:.9em;background:var(--bg3);
+  border:1px solid var(--bd);border-radius:4px;padding:1.5px 6px;color:var(--pink)}
+pre code{background:none;border:none;padding:0;color:inherit;font-size:1em}
+.path{
+  display:block;background:var(--bg3);border:1px solid var(--bd);border-left:3px solid var(--purple);
+  border-radius:6px;padding:9px 14px;margin:0 0 14px;
+  font:12.5px var(--mono);color:var(--purple);word-break:break-all;
+}
+.k{color:#ff7b72}.s{color:#a5d6ff}.c{color:#8b949e;font-style:italic}
+.f{color:#d2a8ff}.t{color:#7ee787}.n{color:#79c0ff}.p{color:#ffa657}
+
+/* ── Table ── */
+table{width:100%;border-collapse:collapse;margin:16px 0 24px;font-size:13.5px}
+th{
+  background:var(--bg3);color:var(--tx);font-weight:600;text-align:left;
+  padding:11px 15px;border:1px solid var(--bd);font-size:12.5px;
+  letter-spacing:.03em;white-space:nowrap;
+}
+td{padding:11px 15px;border:1px solid var(--bd);color:var(--tx2);vertical-align:top}
+tbody tr:nth-child(even){background:rgba(255,255,255,.017)}
+tbody tr:hover{background:rgba(56,139,253,.05)}
+td code{font-size:12px}
+
+/* ── Callouts ── */
+.note{
+  border-radius:9px;padding:15px 19px;margin:18px 0;
+  border:1px solid var(--bd);border-left:3px solid;
+  font-size:14px;line-height:1.72;
+}
+.note .lbl{
+  display:block;font:700 11px var(--mono);letter-spacing:.11em;
+  text-transform:uppercase;margin-bottom:7px;
+}
+.note p:last-child{margin-bottom:0}
+.note ul{margin:6px 0 0 0}
+.note-blue{background:var(--blue-bg);border-left-color:var(--blue)}
+.note-blue .lbl{color:var(--blue)}
+.note-green{background:var(--green-bg);border-left-color:var(--green)}
+.note-green .lbl{color:var(--green)}
+.note-red{background:var(--red-bg);border-left-color:var(--red)}
+.note-red .lbl{color:var(--red)}
+.note-amber{background:var(--amber-bg);border-left-color:var(--amber)}
+.note-amber .lbl{color:var(--amber)}
+.note-purple{background:var(--purple-bg);border-left-color:var(--purple)}
+.note-purple .lbl{color:var(--purple)}
+
+ul,ol{margin:10px 0 16px 22px;color:var(--tx2)}
+li{margin-bottom:7px}
+li::marker{color:var(--blue)}
+
+/* ── Badge ── */
+.bd{
+  display:inline-block;font:600 11px var(--mono);padding:2.5px 8px;
+  border-radius:4px;border:1px solid;white-space:nowrap;line-height:1.5;
+}
+.bd-ok{color:var(--green);border-color:rgba(63,185,80,.38);background:var(--green-bg)}
+.bd-no{color:var(--red);border-color:rgba(248,81,73,.38);background:var(--red-bg)}
+.bd-warn{color:var(--amber);border-color:rgba(210,153,34,.38);background:var(--amber-bg)}
+.bd-info{color:var(--blue);border-color:rgba(56,139,253,.38);background:var(--blue-bg)}
+.bd-p{color:var(--purple);border-color:rgba(188,140,255,.38);background:var(--purple-bg)}
+
+/* ── Diagram ── */
+.diagram{
+  background:var(--bg2);border:1px solid var(--bd);border-radius:10px;
+  padding:26px;margin:22px 0;overflow-x:auto;
+}
+.diagram::-webkit-scrollbar{height:9px}
+.diagram::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+.diagram svg{display:block;margin:0 auto;min-width:700px}
+
+/* ── State machine ── */
+.fsm{
+  display:flex;align-items:center;gap:0;flex-wrap:wrap;
+  background:var(--bg2);border:1px solid var(--bd);border-radius:10px;
+  padding:24px 22px;margin:20px 0;justify-content:center;
+}
+.st{
+  border-radius:7px;padding:9px 15px;font:600 12.5px var(--mono);
+  border:1.5px solid;text-align:center;white-space:nowrap;
+}
+.st small{display:block;font-size:10px;font-weight:400;opacity:.72;margin-top:3px}
+.st-draft{color:var(--tx2);border-color:var(--bd2);background:var(--bg4)}
+.st-run{color:var(--blue);border-color:rgba(56,139,253,.45);background:var(--blue-bg)}
+.st-mid{color:var(--amber);border-color:rgba(210,153,34,.45);background:var(--amber-bg)}
+.st-end{color:var(--green);border-color:rgba(63,185,80,.45);background:var(--green-bg)}
+.st-cancel{color:var(--red);border-color:rgba(248,81,73,.45);background:var(--red-bg)}
+.arw{color:var(--tx3);padding:0 11px;font-size:15px;flex-shrink:0}
+
+/* ── Tree ── */
+.tree{
+  background:var(--bg2);border:1px solid var(--bd);border-radius:9px;
+  padding:18px 22px;font:13px/1.85 var(--mono);color:var(--tx2);
+  overflow-x:auto;margin:16px 0 22px;white-space:pre;
+}
+.tree .dir{color:var(--blue);font-weight:600}
+.tree .file{color:var(--tx2)}
+.tree .key{color:var(--amber);font-weight:600}
+.tree .cm{color:var(--tx3);font-style:italic}
+
+/* ── Compare ── */
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0 24px}
+.cmp>div{background:var(--bg2);border:1px solid var(--bd);border-radius:9px;overflow:hidden}
+.cmp .ch{
+  padding:10px 16px;font:600 12.5px var(--mono);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;gap:8px;
+}
+.cmp .ch.bad{color:var(--red);background:var(--red-bg)}
+.cmp .ch.good{color:var(--green);background:var(--green-bg)}
+.cmp pre{margin:0;border:none;border-radius:0;background:transparent;padding:16px}
+@media(max-width:760px){.cmp{grid-template-columns:1fr}}
+
+/* ── Cards ── */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:15px;margin:20px 0}
+.card{
+  background:var(--bg2);border:1px solid var(--bd);border-radius:10px;
+  padding:17px 19px;border-top:2.5px solid var(--blue);
+}
+.card.p2{border-top-color:var(--purple)}
+.card.p3{border-top-color:var(--cyan)}
+.card.p4{border-top-color:var(--amber)}
+.card h5{font:650 14px var(--mono);color:var(--tx);margin-bottom:9px}
+.card .rl{font:600 10.5px var(--mono);letter-spacing:.09em;text-transform:uppercase;
+  color:var(--tx3);display:block;margin-bottom:5px}
+.card p{font-size:13px;margin:0;line-height:1.65}
+
+/* ── QA ── */
+.qa{border:1px solid var(--bd);border-radius:9px;margin-bottom:14px;overflow:hidden;background:var(--bg2)}
+.qa .q{
+  padding:13px 18px;background:var(--bg3);font-weight:600;font-size:14px;
+  color:var(--tx);display:flex;gap:11px;align-items:baseline;border-bottom:1px solid var(--bd);
+}
+.qa .q span{color:var(--blue);font-family:var(--mono);font-size:12.5px;flex-shrink:0}
+.qa .a{padding:15px 18px;font-size:13.8px;color:var(--tx2);line-height:1.75}
+.qa .a p:last-child{margin-bottom:0}
+.qa .a ul{margin-bottom:0}
+
+/* ── Footer ── */
+footer{
+  border-top:1px solid var(--bd);padding-top:26px;margin-top:64px;
+  color:var(--tx3);font-size:12.5px;font-family:var(--mono);
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd">
+    <div class="tag">ABP · DDD · Domain Modeling · Angular</div>
+    <h1>WMS 领域设计 <span>— 仓库 / 物料 / 出入库</span></h1>
+    <p class="sub">一个精简 WMS 的完整领域模型设计：聚合边界划分、实体与领域方法、状态机、库存一致性模型、应用层与领域层的职责切分，以及 Angular 前端的对接落地。全部基于 ABP Framework 10.6 与 DDD 实践。</p>
+    <div class="meta">
+      <span>目标项目 <b>Acme.Learn</b></span>
+      <span>技术栈 <b>ABP 10.6 / .NET 10 / EF Core / Angular 22</b></span>
+      <span>聚合根 <b>7</b></span>
+      <span>聚合内实体 <b>2</b></span>
+      <span>领域服务 <b>3</b></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h4>目录</h4>
+  <ol>
+    <li><a href="#s1"><i>01</i>边界与聚合划分</a></li>
+    <li><a href="#s2"><i>02</i>主数据：仓库 / 物料 / 库位</a></li>
+    <li><a href="#s3"><i>03</i>入库单与状态机</a></li>
+    <li><a href="#s4"><i>04</i>出库单与状态机</a></li>
+    <li><a href="#s5"><i>05</i>库存一致性模型</a></li>
+    <li><a href="#s6"><i>06</i>领域服务：跨聚合规则</a></li>
+    <li><a href="#s7"><i>07</i>应用服务层</a></li>
+    <li><a href="#s8"><i>08</i>目录结构全貌</a></li>
+    <li><a href="#s9"><i>09</i>前端：Angular 侧怎么接</a></li>
+    <li><a href="#s10"><i>10</i>设计陷阱与检查清单</a></li>
+    <li><a href="#s11"><i>11</i>关键设计问答</a></li>
+  </ol>
+</nav>
+
+<!-- ══════════ 01 ══════════ -->
+<section id="s1">
+  <h2><i>01</i>边界与聚合划分</h2>
+
+  <p>先给结论：<strong>这个精简 WMS 需要 7 个聚合根、2 个聚合内实体和 3 个领域服务</strong>。其中，出入库单的设计是否正确，直接决定整个系统的成败。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 340" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,PingFang SC,sans-serif">
+      <!-- 主数据组 -->
+      <rect x="14" y="30" width="292" height="132" rx="9" fill="rgba(56,139,253,.07)" stroke="#3d444d"/>
+      <text x="30" y="52" fill="#58a6ff" font-size="11" font-weight="700" letter-spacing="1">主数据 MASTER DATA</text>
+      <rect x="30" y="66" width="122" height="38" rx="6" fill="#1c2128" stroke="#58a6ff" stroke-width="1.4"/>
+      <text x="91" y="83" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">Warehouse</text>
+      <text x="91" y="96" fill="#6e7681" font-size="9.5" text-anchor="middle">聚合根</text>
+      <rect x="168" y="66" width="122" height="38" rx="6" fill="#1c2128" stroke="#58a6ff" stroke-width="1.4"/>
+      <text x="229" y="83" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">Material</text>
+      <text x="229" y="96" fill="#6e7681" font-size="9.5" text-anchor="middle">聚合根</text>
+      <rect x="30" y="114" width="122" height="38" rx="6" fill="#1c2128" stroke="#bc8cff" stroke-width="1.4"/>
+      <text x="91" y="131" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">Location</text>
+      <text x="91" y="144" fill="#bc8cff" font-size="9.5" text-anchor="middle">聚合根（妥协）</text>
+
+      <!-- 业务单据组 -->
+      <rect x="374" y="30" width="292" height="132" rx="9" fill="rgba(210,153,34,.07)" stroke="#3d444d"/>
+      <text x="390" y="52" fill="#d29922" font-size="11" font-weight="700" letter-spacing="1">业务单据 TRANSACTIONS</text>
+      <rect x="390" y="66" width="122" height="38" rx="6" fill="#1c2128" stroke="#d29922" stroke-width="1.4"/>
+      <text x="451" y="83" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">InboundOrder</text>
+      <text x="451" y="96" fill="#d29922" font-size="9.5" text-anchor="middle">聚合根 + 行</text>
+      <rect x="528" y="66" width="122" height="38" rx="6" fill="#1c2128" stroke="#d29922" stroke-width="1.4"/>
+      <text x="589" y="83" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">OutboundOrder</text>
+      <text x="589" y="96" fill="#d29922" font-size="9.5" text-anchor="middle">聚合根 + 行</text>
+
+      <!-- 库存组 -->
+      <rect x="14" y="196" width="652" height="120" rx="9" fill="rgba(63,185,80,.07)" stroke="#3d444d"/>
+      <text x="30" y="218" fill="#3fb950" font-size="11" font-weight="700" letter-spacing="1">库存 INVENTORY</text>
+      <rect x="30" y="232" width="160" height="42" rx="6" fill="#1c2128" stroke="#3fb950" stroke-width="1.4"/>
+      <text x="110" y="250" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">Inventory</text>
+      <text x="110" y="264" fill="#3fb950" font-size="9.5" text-anchor="middle">实时库存 · 聚合根</text>
+      <rect x="206" y="232" width="180" height="42" rx="6" fill="#1c2128" stroke="#39c5cf" stroke-width="1.4"/>
+      <text x="296" y="250" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">InventoryTransaction</text>
+      <text x="296" y="264" fill="#39c5cf" font-size="9.5" text-anchor="middle">流水 · 只增不改</text>
+      <rect x="402" y="232" width="140" height="42" rx="6" fill="#1c2128" stroke="#bc8cff" stroke-width="1.4"/>
+      <text x="472" y="250" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">InventoryManager</text>
+      <text x="472" y="264" fill="#bc8cff" font-size="9.5" text-anchor="middle">领域服务</text>
+      <text x="562" y="250" fill="#6e7681" font-size="10.5" text-anchor="start">跨聚合</text>
+      <text x="562" y="264" fill="#6e7681" font-size="10.5" text-anchor="start">库存操作</text>
+    </svg>
+  </div>
+
+  <h3>为什么库位要「妥协」成独立聚合根</h3>
+
+  <p>这是本设计里唯一的判断难点：<strong>业务上库位依附于仓库，技术上却必须独立</strong>。</p>
+
+  <table>
+    <thead><tr><th>判断依据</th><th>Location 的实际情况</th><th>指向</th></tr></thead>
+    <tbody>
+      <tr><td>有独立生命周期吗</td><td>随仓库创建/删除，不单独存在</td><td><span class="bd bd-info">聚合内</span></td></tr>
+      <tr><td>会被单独大量查询吗</td><td>会 —— 库存查询、上架推荐都按库位查</td><td><span class="bd bd-warn">倾向独立</span></td></tr>
+      <tr><td>业务不变量跨库位吗</td><td>「同一仓库内库位编码唯一」，边界在 Warehouse 内</td><td><span class="bd bd-info">聚合内</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note note-purple">
+    <span class="lbl">设计决策</span>
+    <p><strong>把 Location 独立成聚合根。</strong>理由是查询频率压倒了其他一切考量：作为聚合内实体，你无法独立分页查询库位，只能先加载 Warehouse 再逐个遍历。DDD 允许为了性能在边界上做妥协，但要意识到这是妥协，而不是「本来就这么设计」。</p>
+    <p style="margin-top:9px"><strong>反过来，单据行（OrderLine）必须是聚合内实体</strong>：它和单头共享同一条不变量（「一张单不能有重复物料」），而且从不被单独查询。</p>
+  </div>
+
+  <h3>完整聚合清单</h3>
+
+  <div class="cards">
+    <div class="card">
+      <span class="rl">主数据</span>
+      <h5>Warehouse</h5>
+      <p>仓库。聚合根。含编码、名称、地址和启用状态。</p>
+    </div>
+    <div class="card">
+      <span class="rl">主数据</span>
+      <h5>Material</h5>
+      <p>物料。聚合根。含「是否批次管理」开关，决定库存是否需要按批号维度管理。</p>
+    </div>
+    <div class="card p2">
+      <span class="rl">主数据</span>
+      <h5>Location</h5>
+      <p>库位。聚合根（妥协）。含存储区、拣选区、暂存区等类型。</p>
+    </div>
+    <div class="card p4">
+      <span class="rl">业务单据</span>
+      <h5>InboundOrder</h5>
+      <p>入库单。聚合根 + 行。带五状态状态机，是全系统核心之一。</p>
+    </div>
+    <div class="card p4">
+      <span class="rl">业务单据</span>
+      <h5>OutboundOrder</h5>
+      <p>出库单。聚合根 + 行。状态机比入库单多一个「分配」阶段。</p>
+    </div>
+    <div class="card p3">
+      <span class="rl">库存</span>
+      <h5>Inventory</h5>
+      <p>实时库存。聚合根。含在库量和已分配量，可用量是计算属性。</p>
+    </div>
+    <div class="card p3">
+      <span class="rl">库存</span>
+      <h5>InventoryTransaction</h5>
+      <p>库存流水。聚合根。只增不改，带结存快照。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 02 ══════════ -->
+<section id="s2">
+  <h2><i>02</i>主数据：仓库 / 物料 / 库位</h2>
+
+  <p>三个主数据聚合的规则密度都很低，写法也高度相似：<strong>维度字段在构造时定死，需要校验的字段用领域方法守护，其余字段直接读写</strong>。下面三个实体就按这个模式依次展开。</p>
+
+  <h3>Warehouse 仓库</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain\Wms\Warehouses\Warehouse.cs</span>
+
+<pre><code><span class="k">public class</span> <span class="t">Warehouse</span> : <span class="t">FullAuditedAggregateRoot</span>&lt;<span class="t">Guid</span>&gt;
+{
+    <span class="k">public string</span> Code { <span class="k">get</span>; <span class="k">private set</span>; }        <span class="c">// WH001</span>
+    <span class="k">public string</span> Name { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public string</span> Address { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public bool</span> IsActive { <span class="k">get</span>; <span class="k">private set</span>; }
+
+    <span class="k">protected</span> <span class="f">Warehouse</span>() { }
+
+    <span class="k">public</span> <span class="f">Warehouse</span>(<span class="t">Guid</span> id, <span class="k">string</span> code, <span class="k">string</span> name) : <span class="k">base</span>(id)
+    {
+        <span class="f">SetCode</span>(code);
+        <span class="f">SetName</span>(name);
+        IsActive = <span class="k">false</span>;   <span class="c">// 新建一律停用，配好库位/设备后再启用</span>
+    }
+
+    <span class="k">public</span> <span class="t">Warehouse</span> <span class="f">SetCode</span>(<span class="k">string</span> code)
+    {
+        Check.<span class="f">NotNullOrWhiteSpace</span>(code, <span class="k">nameof</span>(code), maxLength: <span class="n">32</span>);
+        Code = code;
+        <span class="k">return this</span>;
+    }
+
+    <span class="k">public</span> <span class="t">Warehouse</span> <span class="f">SetName</span>(<span class="k">string</span> name)
+    {
+        Check.<span class="f">NotNullOrWhiteSpace</span>(name, <span class="k">nameof</span>(name), maxLength: <span class="n">128</span>);
+        Name = name;
+        <span class="k">return this</span>;
+    }
+
+    <span class="k">public void</span> <span class="f">Activate</span>()   =&gt; IsActive = <span class="k">true</span>;    <span class="c">// 状态变更必须走业务动词，而不是公开 setter</span>
+    <span class="k">public void</span> <span class="f">Deactivate</span>() =&gt; IsActive = <span class="k">false</span>;
+}</code></pre>
+
+  <div class="note note-blue">
+    <span class="lbl">要点</span>
+    <p>编码校验（非空、长度）放在<strong>领域方法</strong>里，<strong>而不是放在 AppService</strong>。这是充血模型与贫血模型最直观的分界线。</p>
+    <p style="margin-top:9px"><strong>状态字段同理，而且更严格：一律 <code>private set</code> + 成对的业务动词（<code>Activate()</code> / <code>Deactivate()</code>）。</strong>只要留了公开 setter，自动映射器（<code>ObjectMapper.Map</code>，等价于 <code>BeanUtils.copyProperties</code>）就能绕过规则直接改状态；换成 <code>private set</code>，这条路会被编译器堵死 —— <strong>把不变量变成编译错误，而不是靠代码规范</strong>。所以有 <code>IsActive</code> 这个字段，就必须有成对的动词方法；只声明字段不给方法，等于这个状态谁也改不了。</p>
+    <p style="margin-top:9px">再记一条：<strong>布尔字段描述「事实」，动词方法表达「指令」</strong>，不要让一个布尔同时承担两件事。顺带看三个实体的构造函数 —— 默认值不同是刻意的：<strong>仓库建好后要配库位、配设备，所以新建即停用（<code>false</code>）；物料和库位建好即可用（<code>true</code>）</strong>。默认值本身就是业务规则，必须是有意识的选择，不能随手写。</p>
+  </div>
+
+  <h3>Material 物料</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain\Wms\Materials\Material.cs</span>
+
+<pre><code><span class="k">public class</span> <span class="t">Material</span> : <span class="t">FullAuditedAggregateRoot</span>&lt;<span class="t">Guid</span>&gt;
+{
+    <span class="k">public string</span> Code { <span class="k">get</span>; <span class="k">private set</span>; }           <span class="c">// 物料编码</span>
+    <span class="k">public string</span> Name { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public string</span> Specification { <span class="k">get</span>; <span class="k">private set</span>; }  <span class="c">// 规格型号</span>
+    <span class="k">public string</span> Unit { <span class="k">get</span>; <span class="k">private set</span>; }           <span class="c">// 单位</span>
+    <span class="k">public</span> <span class="t">MaterialCategory</span> Category { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public bool</span> IsBatchManaged { <span class="k">get</span>; <span class="k">private set</span>; }   <span class="c">// 是否批次管理</span>
+    <span class="k">public bool</span> IsActive { <span class="k">get</span>; <span class="k">private set</span>; }
+
+    <span class="k">protected</span> <span class="f">Material</span>() { }
+
+    <span class="k">public</span> <span class="f">Material</span>(<span class="t">Guid</span> id, <span class="k">string</span> code, <span class="k">string</span> name,
+                    <span class="k">string</span> unit, <span class="t">MaterialCategory</span> category)
+        : <span class="k">base</span>(id)
+    {
+        <span class="f">SetCode</span>(code);
+        <span class="f">SetName</span>(name);
+        <span class="f">SetUnit</span>(unit);
+        Category = category;
+        IsActive = <span class="k">true</span>;
+    }
+
+    <span class="k">public</span> <span class="t">Material</span> <span class="f">SetCode</span>(<span class="k">string</span> code)
+    {
+        Check.<span class="f">NotNullOrWhiteSpace</span>(code, <span class="k">nameof</span>(code), maxLength: <span class="n">64</span>);
+        Code = code;
+        <span class="k">return this</span>;
+    }
+
+    <span class="k">public</span> <span class="t">Material</span> <span class="f">SetUnit</span>(<span class="k">string</span> unit)
+    {
+        Check.<span class="f">NotNullOrWhiteSpace</span>(unit, <span class="k">nameof</span>(unit), maxLength: <span class="n">16</span>);
+        Unit = unit;
+        <span class="k">return this</span>;
+    }
+
+    <span class="k">public void</span> <span class="f">EnableBatchManagement</span>() =&gt; IsBatchManaged = <span class="k">true</span>;
+
+    <span class="k">public void</span> <span class="f">Activate</span>()   =&gt; IsActive = <span class="k">true</span>;     <span class="c">// 有 IsActive 字段就必须有成对的动词方法</span>
+    <span class="k">public void</span> <span class="f">Deactivate</span>() =&gt; IsActive = <span class="k">false</span>;
+}
+
+<span class="k">public enum</span> <span class="t">MaterialCategory</span>
+{
+    RawMaterial  = <span class="n">1</span>,   <span class="c">// 原材料</span>
+    SemiFinished = <span class="n">2</span>,   <span class="c">// 半成品</span>
+    Finished     = <span class="n">3</span>,   <span class="c">// 成品</span>
+    Packaging    = <span class="n">4</span>    <span class="c">// 包材</span>
+}</code></pre>
+
+  <h3>Location 库位</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain\Wms\Locations\Location.cs</span>
+
+<pre><code><span class="k">public class</span> <span class="t">Location</span> : <span class="t">FullAuditedAggregateRoot</span>&lt;<span class="t">Guid</span>&gt;
+{
+    <span class="k">public</span> <span class="t">Guid</span> WarehouseId { <span class="k">get</span>; <span class="k">private set</span>; }      <span class="c">// ← 跨聚合：只存 Id</span>
+    <span class="k">public string</span> Code { <span class="k">get</span>; <span class="k">private set</span>; }           <span class="c">// A-01-01-01</span>
+    <span class="k">public string</span> Zone { <span class="k">get</span>; <span class="k">private set</span>; }           <span class="c">// 存储区/拣选区/暂存区</span>
+    <span class="k">public</span> <span class="t">LocationType</span> Type { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public bool</span> IsActive { <span class="k">get</span>; <span class="k">private set</span>; }
+
+    <span class="k">protected</span> <span class="f">Location</span>() { }
+
+    <span class="k">public</span> <span class="f">Location</span>(<span class="t">Guid</span> id, <span class="t">Guid</span> warehouseId, <span class="k">string</span> code,
+                    <span class="k">string</span> zone, <span class="t">LocationType</span> type)
+        : <span class="k">base</span>(id)
+    {
+        WarehouseId = warehouseId;      <span class="c">// 只存 Id，绝不存 Warehouse 对象</span>
+        <span class="f">SetCode</span>(code);
+        Zone = zone;
+        Type = type;
+        IsActive = <span class="k">true</span>;
+    }
+
+    <span class="k">public</span> <span class="t">Location</span> <span class="f">SetCode</span>(<span class="k">string</span> code)
+    {
+        Check.<span class="f">NotNullOrWhiteSpace</span>(code, <span class="k">nameof</span>(code), maxLength: <span class="n">64</span>);
+        Code = code;
+        <span class="k">return this</span>;
+    }
+
+    <span class="k">public void</span> <span class="f">Activate</span>()   =&gt; IsActive = <span class="k">true</span>;
+    <span class="k">public void</span> <span class="f">Deactivate</span>() =&gt; IsActive = <span class="k">false</span>;
+}
+
+<span class="k">public enum</span> <span class="t">LocationType</span>
+{
+    Storage    = <span class="n">1</span>,   <span class="c">// 存储位</span>
+    Picking    = <span class="n">2</span>,   <span class="c">// 拣选位</span>
+    Receiving  = <span class="n">3</span>,   <span class="c">// 收货暂存位</span>
+    Shipping   = <span class="n">4</span>,   <span class="c">// 发货暂存位</span>
+    Quarantine = <span class="n">5</span>    <span class="c">// 待检位</span>
+}</code></pre>
+
+  <div class="note note-amber">
+    <span class="lbl">注意</span>
+    <p><code>WarehouseId</code> 的类型是 <code>Guid</code>，而<strong>不是</strong> <code>Warehouse</code> 对象。这正是 DDD 跨聚合引用规则的直接体现，详见第 10 节。</p>
+  </div>
+</section>
+
+<!-- ══════════ 03 ══════════ -->
+<section id="s3">
+  <h2><i>03</i>入库单与状态机</h2>
+
+  <h3>状态机先行</h3>
+
+  <p>设计单据的第一步<strong>不是写类，而是画状态机</strong>。入库单的状态流转如下：</p>
+
+  <div class="fsm">
+    <div class="st st-draft">Draft<small>草稿</small></div>
+    <div class="arw">→</div>
+    <div class="st st-run">Confirmed<small>已确认</small></div>
+    <div class="arw">→</div>
+    <div class="st st-mid">Receiving<small>收货中</small></div>
+    <div class="arw">→</div>
+    <div class="st st-end">Completed<small>已完成</small></div>
+  </div>
+
+  <p style="text-align:center;margin-top:-8px;color:#f85149;font-size:13px">
+    ↳ 另外，<strong>Draft / Confirmed / Receiving</strong> 三个状态均可取消，转入 <strong>Cancelled（已取消）</strong>；<strong>Completed 是终态，不可取消</strong>
+  </p>
+
+  <table>
+    <thead><tr><th>状态</th><th>含义</th><th>允许的操作</th><th>能否编辑行</th></tr></thead>
+    <tbody>
+      <tr><td><code>Draft</code></td><td>草稿，刚创建</td><td>增删行、确认、取消</td><td><span class="bd bd-ok">可以</span></td></tr>
+      <tr><td><code>Confirmed</code></td><td>已确认，等待收货</td><td>开始收货、取消</td><td><span class="bd bd-no">禁止</span></td></tr>
+      <tr><td><code>Receiving</code></td><td>收货进行中</td><td>继续收货、完成</td><td><span class="bd bd-no">禁止</span></td></tr>
+      <tr><td><code>Completed</code></td><td>收货完成，库存已增加</td><td>仅查询</td><td><span class="bd bd-no">禁止</span></td></tr>
+      <tr><td><code>Cancelled</code></td><td>已取消</td><td>仅查询</td><td><span class="bd bd-no">禁止</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>InboundOrder 实体</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain\Wms\InboundOrders\InboundOrder.cs</span>
+
+<pre><code><span class="k">public class</span> <span class="t">InboundOrder</span> : <span class="t">FullAuditedAggregateRoot</span>&lt;<span class="t">Guid</span>&gt;
+{
+    <span class="k">public string</span> OrderNo { <span class="k">get</span>; <span class="k">private set</span>; }              <span class="c">// IN20260911001</span>
+    <span class="k">public</span> <span class="t">Guid</span> WarehouseId { <span class="k">get</span>; <span class="k">private set</span>; }            <span class="c">// 跨聚合 → Id</span>
+    <span class="k">public</span> <span class="t">InboundType</span> Type { <span class="k">get</span>; <span class="k">private set</span>; }            <span class="c">// 采购/退货/调拨</span>
+    <span class="k">public string</span> SourceOrderNo { <span class="k">get</span>; <span class="k">private set</span>; }        <span class="c">// 来源单号</span>
+    <span class="k">public</span> <span class="t">InboundOrderStatus</span> Status { <span class="k">get</span>; <span class="k">private set</span>; }   <span class="c">// 状态机</span>
+
+    <span class="k">private readonly</span> <span class="t">List</span>&lt;<span class="t">InboundOrderLine</span>&gt; _lines = <span class="k">new</span>();
+    <span class="k">public</span> <span class="t">IReadOnlyCollection</span>&lt;<span class="t">InboundOrderLine</span>&gt; Lines =&gt; _lines.<span class="f">AsReadOnly</span>();  <span class="c">// ← 只读暴露</span>
+
+    <span class="k">protected</span> <span class="f">InboundOrder</span>()
+    {
+        _lines = <span class="k">new</span> <span class="t">List</span>&lt;<span class="t">InboundOrderLine</span>&gt;();               <span class="c">// EF Core 需要</span>
+    }
+
+    <span class="k">public</span> <span class="f">InboundOrder</span>(<span class="t">Guid</span> id, <span class="k">string</span> orderNo, <span class="t">Guid</span> warehouseId,
+                        <span class="t">InboundType</span> type, <span class="k">string</span> sourceOrderNo) : <span class="k">base</span>(id)
+    {
+        <span class="f">SetOrderNo</span>(orderNo);
+        WarehouseId = warehouseId;
+        Type = type;
+        SourceOrderNo = sourceOrderNo;
+        Status = <span class="t">InboundOrderStatus</span>.Draft;                    <span class="c">// 初始状态</span>
+    }
+
+    <span class="c">// ── 领域方法（业务规则集中在这里）──────────────────</span>
+    <span class="k">public</span> <span class="t">InboundOrderLine</span> <span class="f">AddLine</span>(<span class="t">Guid</span> materialId, <span class="k">decimal</span> quantity,
+                                     <span class="t">Guid</span>? locationId = <span class="k">null</span>)
+    {
+        <span class="f">EnsureEditable</span>();                                     <span class="c">// 状态守卫</span>
+        Check.<span class="f">Positive</span>(quantity, <span class="k">nameof</span>(quantity));
+
+        <span class="k">if</span> (_lines.<span class="f">Any</span>(x =&gt; x.MaterialId == materialId))      <span class="c">// 不变量：不可重复物料</span>
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.DuplicateMaterialInOrder);
+
+        <span class="k">var</span> line = <span class="k">new</span> <span class="t">InboundOrderLine</span>(
+            <span class="t">GuidGenerator</span>.<span class="f">Create</span>(), Id, materialId, quantity, locationId);
+
+        _lines.<span class="f">Add</span>(line);
+        <span class="k">return</span> line;
+    }
+
+    <span class="k">public void</span> <span class="f">RemoveLine</span>(<span class="t">Guid</span> lineId)
+    {
+        <span class="f">EnsureEditable</span>();
+        <span class="k">var</span> line = _lines.<span class="f">FirstOrDefault</span>(x =&gt; x.Id == lineId)
+            ?? <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.LineNotFound);
+        _lines.<span class="f">Remove</span>(line);
+    }
+
+    <span class="k">public void</span> <span class="f">Confirm</span>()                                     <span class="c">// Draft → Confirmed</span>
+    {
+        <span class="k">if</span> (Status != <span class="t">InboundOrderStatus</span>.Draft)
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.InvalidStatusTransition);
+        <span class="k">if</span> (!_lines.<span class="f">Any</span>())
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.OrderHasNoLine);
+
+        Status = <span class="t">InboundOrderStatus</span>.Confirmed;
+    }
+
+    <span class="k">public void</span> <span class="f">StartReceiving</span>()                              <span class="c">// Confirmed → Receiving</span>
+    {
+        <span class="k">if</span> (Status != <span class="t">InboundOrderStatus</span>.Confirmed)
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.InvalidStatusTransition);
+        Status = <span class="t">InboundOrderStatus</span>.Receiving;
+    }
+
+    <span class="k">public void</span> <span class="f">Complete</span>()                                    <span class="c">// Receiving → Completed</span>
+    {
+        <span class="k">if</span> (Status != <span class="t">InboundOrderStatus</span>.Receiving)
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.InvalidStatusTransition);
+
+        <span class="c">// 不变量：所有行必须收满</span>
+        <span class="k">if</span> (_lines.<span class="f">Any</span>(x =&gt; x.ReceivedQuantity &lt; x.ExpectedQuantity))
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.NotAllLinesReceived);
+
+        Status = <span class="t">InboundOrderStatus</span>.Completed;
+    }
+
+    <span class="k">public void</span> <span class="f">Cancel</span>()                                      <span class="c">// 任意非完成态 → Cancelled</span>
+    {
+        <span class="k">if</span> (Status == <span class="t">InboundOrderStatus</span>.Completed)
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.CannotCancelCompletedOrder);
+        Status = <span class="t">InboundOrderStatus</span>.Cancelled;
+    }
+
+    <span class="k">private void</span> <span class="f">EnsureEditable</span>()
+    {
+        <span class="k">if</span> (Status != <span class="t">InboundOrderStatus</span>.Draft)
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.OrderNotEditable);
+    }
+}
+
+<span class="k">public enum</span> <span class="t">InboundType</span> { Purchase = <span class="n">1</span>, Return = <span class="n">2</span>, Transfer = <span class="n">3</span>, Other = <span class="n">9</span> }
+
+<span class="k">public enum</span> <span class="t">InboundOrderStatus</span>
+{
+    Draft     = <span class="n">0</span>,    <span class="c">// 草稿</span>
+    Confirmed = <span class="n">1</span>,    <span class="c">// 已确认（待收货）</span>
+    Receiving = <span class="n">2</span>,    <span class="c">// 收货中</span>
+    Completed = <span class="n">3</span>,    <span class="c">// 已完成</span>
+    Cancelled = <span class="n">9</span>     <span class="c">// 已取消</span>
+}</code></pre>
+
+  <div class="note note-red">
+    <span class="lbl">这个类是全系统最关键的</span>
+    <ul>
+      <li><code>_lines</code> 是 <code>private readonly List&lt;&gt;</code>，对外只暴露 <code>IReadOnlyCollection</code> —— <strong>外部不能直接调用 <code>order.Lines.Add(...)</code></strong>，必须走 <code>AddLine()</code></li>
+      <li>所有状态流转<strong>都是领域方法</strong>，并且都带守卫（<code>EnsureEditable</code>）</li>
+      <li>业务异常用 <code>BusinessException</code> 加错误码常量，AppService 不用管，ABP 会自动转成 HTTP 400</li>
+    </ul>
+  </div>
+
+  <h3>InboundOrderLine 入库单行</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain\Wms\InboundOrders\InboundOrderLine.cs</span>
+
+<pre><code><span class="k">public class</span> <span class="t">InboundOrderLine</span> : <span class="t">Entity</span>&lt;<span class="t">Guid</span>&gt;          <span class="c">// ← Entity，不是 AggregateRoot</span>
+{
+    <span class="k">public</span> <span class="t">Guid</span> InboundOrderId { <span class="k">get</span>; <span class="k">private set</span>; }  <span class="c">// 指回父聚合</span>
+    <span class="k">public</span> <span class="t">Guid</span> MaterialId { <span class="k">get</span>; <span class="k">private set</span>; }      <span class="c">// 跨聚合 → Id</span>
+    <span class="k">public</span> <span class="t">Guid</span>? LocationId { <span class="k">get</span>; <span class="k">private set</span>; }     <span class="c">// 目标库位</span>
+    <span class="k">public decimal</span> ExpectedQuantity { <span class="k">get</span>; <span class="k">private set</span>; }   <span class="c">// 应收</span>
+    <span class="k">public decimal</span> ReceivedQuantity { <span class="k">get</span>; <span class="k">private set</span>; }   <span class="c">// 实收</span>
+
+    <span class="k">protected</span> <span class="f">InboundOrderLine</span>() { }
+
+    <span class="k">internal</span> <span class="f">InboundOrderLine</span>(<span class="t">Guid</span> id, <span class="t">Guid</span> inboundOrderId, <span class="t">Guid</span> materialId,
+                              <span class="k">decimal</span> expectedQuantity, <span class="t">Guid</span>? locationId) : <span class="k">base</span>(id)
+    {
+        InboundOrderId = inboundOrderId;
+        MaterialId = materialId;
+        LocationId = locationId;
+        ExpectedQuantity = expectedQuantity;
+        ReceivedQuantity = <span class="n">0</span>;
+    }
+
+    <span class="c">/// &lt;summary&gt;收货 —— 只能由父聚合调用&lt;/summary&gt;</span>
+    <span class="k">internal void</span> <span class="f">Receive</span>(<span class="k">decimal</span> quantity, <span class="t">Guid</span> locationId)
+    {
+        Check.<span class="f">Positive</span>(quantity, <span class="k">nameof</span>(quantity));
+        <span class="k">if</span> (ReceivedQuantity + quantity &gt; ExpectedQuantity)
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.OverReceive);
+
+        ReceivedQuantity += quantity;
+        LocationId = locationId;
+    }
+}</code></pre>
+
+  <div class="note note-green">
+    <span class="lbl">关键设计</span>
+    <p>构造器和 <code>Receive</code> 方法都是 <code>internal</code> —— <strong>只有同程序集（Domain 项目内部）才能调用</strong>。这意味着 <code>InboundOrder</code> 调得到，而 AppService 调不到。这是<strong>聚合封装</strong>的硬约束：外部只能通过聚合根操作聚合内的实体。</p>
+  </div>
+</section>
+
+<!-- ══════════ 04 ══════════ -->
+<section id="s4">
+  <h2><i>04</i>出库单与状态机</h2>
+
+  <p>结构与入库单完全对称，但状态机多了一个 <strong>Allocated（已分配）</strong> 阶段 —— 这是 WMS 出库与入库最大的区别。</p>
+
+  <div class="fsm">
+    <div class="st st-draft">Draft<small>草稿</small></div>
+    <div class="arw">→</div>
+    <div class="st st-run">Confirmed<small>已确认</small></div>
+    <div class="arw">→</div>
+    <div class="st st-mid">Allocated<small>已分配库存</small></div>
+    <div class="arw">→</div>
+    <div class="st st-mid">Picking<small>拣货中</small></div>
+    <div class="arw">→</div>
+    <div class="st st-run">Shipped<small>已发货</small></div>
+    <div class="arw">→</div>
+    <div class="st st-end">Completed<small>已完成</small></div>
+  </div>
+
+  <div class="note note-amber">
+    <span class="lbl">为什么需要 Allocated 阶段</span>
+    <p>如果没有「分配」这一步，两个出库单会同时看到同一批库存都显示「可用」，等双双确认后才发现货不够。<strong><code>Allocate</code> 的作用就是把库存「锁定」下来</strong> —— 增加 <code>Inventory.AllocatedQuantity</code>，使 <code>AvailableQuantity</code>（= 在库量 − 已分配量）相应减少。</p>
+  </div>
+
+<pre><code><span class="k">public class</span> <span class="t">OutboundOrder</span> : <span class="t">FullAuditedAggregateRoot</span>&lt;<span class="t">Guid</span>&gt;
+{
+    <span class="k">public string</span> OrderNo { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public</span> <span class="t">Guid</span> WarehouseId { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public</span> <span class="t">OutboundType</span> Type { <span class="k">get</span>; <span class="k">private set</span>; }        <span class="c">// 销售/领料/调拨/报废</span>
+    <span class="k">public string</span> SourceOrderNo { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public</span> <span class="t">OutboundOrderStatus</span> Status { <span class="k">get</span>; <span class="k">private set</span>; }
+
+    <span class="k">private readonly</span> <span class="t">List</span>&lt;<span class="t">OutboundOrderLine</span>&gt; _lines = <span class="k">new</span>();
+    <span class="k">public</span> <span class="t">IReadOnlyCollection</span>&lt;<span class="t">OutboundOrderLine</span>&gt; Lines =&gt; _lines.<span class="f">AsReadOnly</span>();
+
+    <span class="c">// 状态机：Draft → Confirmed → Allocated → Picking → Shipped → Completed</span>
+    <span class="c">// 关键领域方法：Confirm / Allocate / StartPicking / Ship / Complete / Cancel</span>
+
+    <span class="k">public void</span> <span class="f">Allocate</span>(<span class="t">Guid</span> lineId, <span class="t">Guid</span> inventoryId, <span class="k">decimal</span> quantity)
+    {
+        <span class="k">if</span> (Status != <span class="t">OutboundOrderStatus</span>.Confirmed)
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.InvalidStatusTransition);
+
+        <span class="k">var</span> line = _lines.<span class="f">First</span>(x =&gt; x.Id == lineId);
+
+        line.<span class="f">Allocate</span>(inventoryId, quantity);       <span class="c">// 记录分配到哪条库存记录</span>
+    }
+}</code></pre>
+
+  <h3>OutboundOrderLine 出库单行</h3>
+
+  <p>出库行比入库行多两个字段：<code>AllocatedQuantity</code>（已分配量）和 <code>InventoryId</code>（锁定的是哪条库存记录）。</p>
+
+<pre><code><span class="k">public class</span> <span class="t">OutboundOrderLine</span> : <span class="t">Entity</span>&lt;<span class="t">Guid</span>&gt;
+{
+    <span class="k">public</span> <span class="t">Guid</span> OutboundOrderId { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public</span> <span class="t">Guid</span> MaterialId { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public decimal</span> RequiredQuantity { <span class="k">get</span>; <span class="k">private set</span>; }   <span class="c">// 需求</span>
+    <span class="k">public decimal</span> AllocatedQuantity { <span class="k">get</span>; <span class="k">private set</span>; }  <span class="c">// 已分配</span>
+    <span class="k">public decimal</span> ShippedQuantity { <span class="k">get</span>; <span class="k">private set</span>; }    <span class="c">// 已发货</span>
+    <span class="k">public</span> <span class="t">Guid</span>? InventoryId { <span class="k">get</span>; <span class="k">private set</span>; }        <span class="c">// 锁定的库存记录</span>
+
+    <span class="k">internal void</span> <span class="f">Allocate</span>(<span class="t">Guid</span> inventoryId, <span class="k">decimal</span> quantity)
+    {
+        Check.<span class="f">Positive</span>(quantity, <span class="k">nameof</span>(quantity));
+        <span class="k">if</span> (AllocatedQuantity + quantity &gt; RequiredQuantity)
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.OverAllocate);
+
+        InventoryId = inventoryId;
+        AllocatedQuantity += quantity;
+    }
+}</code></pre>
+</section>
+
+<!-- ══════════ 05 ══════════ -->
+<section id="s5">
+  <h2><i>05</i>库存一致性模型</h2>
+
+  <p>这是最需要你拍板的地方。共有三个选项：</p>
+
+  <table>
+    <thead><tr><th>方案</th><th>说明</th><th>适用</th><th>选择</th></tr></thead>
+    <tbody>
+      <tr><td><strong>A. 纯流水</strong></td><td>只存所有出入库流水，库存 = SUM(入) − SUM(出)</td><td>数据量小、查询少</td><td><span class="bd bd-warn">不推荐</span></td></tr>
+      <tr><td><strong>B. 流水 + 实时库存表</strong></td><td>流水做账，另有 <code>Inventory</code> 表冗余实时量</td><td><strong>绝大多数 WMS</strong></td><td><span class="bd bd-ok">推荐</span></td></tr>
+      <tr><td><strong>C. 只存实时库存</strong></td><td>无流水</td><td>不可追溯</td><td><span class="bd bd-no">不要用</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Inventory 实时库存</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain\Wms\Inventories\Inventory.cs</span>
+
+<pre><code><span class="k">public class</span> <span class="t">Inventory</span> : <span class="t">FullAuditedAggregateRoot</span>&lt;<span class="t">Guid</span>&gt;
+{
+    <span class="k">public</span> <span class="t">Guid</span> WarehouseId { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public</span> <span class="t">Guid</span> LocationId { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public</span> <span class="t">Guid</span> MaterialId { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public string</span> BatchNo { <span class="k">get</span>; <span class="k">private set</span>; }             <span class="c">// 批次号（可空）</span>
+    <span class="k">public decimal</span> Quantity { <span class="k">get</span>; <span class="k">private set</span>; }            <span class="c">// 在库量</span>
+    <span class="k">public decimal</span> AllocatedQuantity { <span class="k">get</span>; <span class="k">private set</span>; }   <span class="c">// 已分配（被出库单锁定）</span>
+
+    <span class="k">public decimal</span> AvailableQuantity =&gt; Quantity - AllocatedQuantity;   <span class="c">// 计算属性</span>
+
+    <span class="c">// ── 领域方法 ──</span>
+    <span class="k">public void</span> <span class="f">Allocate</span>(<span class="k">decimal</span> quantity)
+    {
+        Check.<span class="f">Positive</span>(quantity, <span class="k">nameof</span>(quantity));
+        <span class="k">if</span> (quantity &gt; AvailableQuantity)                        <span class="c">// 不变量：不能超可用量</span>
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.InsufficientStock);
+        AllocatedQuantity += quantity;
+    }
+}</code></pre>
+
+  <div class="note note-blue">
+    <span class="lbl">关键在 AvailableQuantity</span>
+    <p>出库分配时<strong>必须校验可用量，而不是在库量</strong>。<code>AvailableQuantity</code> 作为计算属性（无 setter、不落库），恰好表达了「在库量减去已被其他单据锁定的部分」这一业务语义。</p>
+  </div>
+
+  <h3>InventoryTransaction 库存流水</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain\Wms\Inventories\InventoryTransaction.cs</span>
+
+<pre><code><span class="k">public class</span> <span class="t">InventoryTransaction</span> : <span class="t">CreationAuditedAggregateRoot</span>&lt;<span class="t">Guid</span>&gt;
+{
+    <span class="k">public</span> <span class="t">Guid</span> WarehouseId { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public</span> <span class="t">Guid</span> LocationId { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public</span> <span class="t">Guid</span> MaterialId { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public string</span> BatchNo { <span class="k">get</span>; <span class="k">private set</span>; }
+    <span class="k">public decimal</span> Quantity { <span class="k">get</span>; <span class="k">private set</span>; }        <span class="c">// 正数入，负数出</span>
+    <span class="k">public decimal</span> BalanceAfter { <span class="k">get</span>; <span class="k">private set</span>; }    <span class="c">// 结存快照</span>
+    <span class="k">public</span> <span class="t">TransactionType</span> Type { <span class="k">get</span>; <span class="k">private set</span>; }    <span class="c">// Inbound/Outbound/Adjust</span>
+    <span class="k">public string</span> SourceOrderNo { <span class="k">get</span>; <span class="k">private set</span>; }    <span class="c">// 来源单据</span>
+}</code></pre>
+
+  <div class="note note-purple">
+    <span class="lbl">基类选择的业务含义</span>
+    <p>注意流水表继承的是 <code>CreationAuditedAggregateRoot</code>，而<strong>不是</strong> <code>FullAuditedAggregateRoot</code>。两者的差异在于前者<strong>没有软删除，也没有修改审计</strong> —— 因为<strong>流水只能追加，不能改也不能删</strong>。这是「基类选择体现业务语义」的典型案例，也是 ABP 相比 MyBatis-Plus 的一个便利之处。</p>
+  </div>
+
+  <table>
+    <thead><tr><th>ABP 基类</th><th>带来什么</th><th>适用</th></tr></thead>
+    <tbody>
+      <tr><td><code>AggregateRoot&lt;Guid&gt;</code></td><td>只有 Id + 并发戳</td><td>纯业务对象</td></tr>
+      <tr><td><code>CreationAuditedAggregateRoot&lt;Guid&gt;</code></td><td>+ 创建人/创建时间</td><td><strong>流水、日志</strong></td></tr>
+      <tr><td><code>AuditedAggregateRoot&lt;Guid&gt;</code></td><td>+ 修改人/修改时间</td><td>不需软删的业务数据</td></tr>
+      <tr><td><code>FullAuditedAggregateRoot&lt;Guid&gt;</code></td><td>+ 软删除（IsDeleted）</td><td><strong>主数据、单据（默认选择）</strong></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════ 06 ══════════ -->
+<section id="s6">
+  <h2><i>06</i>领域服务：跨聚合规则</h2>
+
+  <p>有些规则<strong>放不进任何单个聚合</strong> —— 这正是领域服务存在的理由。</p>
+
+  <h3>InventoryManager 库存管理器</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain\Wms\Inventories\InventoryManager.cs</span>
+
+<pre><code><span class="k">public class</span> <span class="t">InventoryManager</span> : <span class="t">DomainService</span>
+{
+    <span class="k">private readonly</span> <span class="t">IInventoryRepository</span> _inventoryRepo;
+    <span class="k">private readonly</span> <span class="t">ILocationRepository</span> _locationRepo;
+
+    <span class="c">/// &lt;summary&gt;入库落库 —— 跨 Inventory 和 Location 两个聚合&lt;/summary&gt;</span>
+    <span class="k">public async</span> <span class="t">Task</span> <span class="f">PutawayAsync</span>(<span class="t">Guid</span> warehouseId, <span class="t">Guid</span> locationId,
+                                   <span class="t">Guid</span> materialId, <span class="k">string</span> batchNo, <span class="k">decimal</span> quantity,
+                                   <span class="k">string</span> sourceOrderNo)
+    {
+        <span class="c">// 1. 校验库位合法</span>
+        <span class="k">var</span> location = <span class="k">await</span> _locationRepo.<span class="f">GetAsync</span>(locationId);
+        <span class="k">if</span> (location.Type == <span class="t">LocationType</span>.Shipping)
+            <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="t">WmsErrorCodes</span>.InvalidPutawayLocation);
+
+        <span class="c">// 2. 查库存记录（不存在则新建）</span>
+        <span class="k">var</span> inventory = <span class="k">await</span> _inventoryRepo.<span class="f">FindAsync</span>(
+                            warehouseId, locationId, materialId, batchNo);
+
+        inventory ??= <span class="k">new</span> <span class="t">Inventory</span>(
+            <span class="t">GuidGenerator</span>.<span class="f">Create</span>(), warehouseId, locationId, materialId, batchNo);
+
+        inventory.<span class="f">Increase</span>(quantity);
+        <span class="k">await</span> _inventoryRepo.<span class="f">InsertOrUpdateAsync</span>(inventory);
+
+        <span class="c">// 3. 记一条 InventoryTransaction 流水</span>
+        <span class="c">// 4. 发布领域事件 InventoryChangedEvent</span>
+    }
+
+    <span class="c">/// &lt;summary&gt;出库拣货 —— 扣减库存&lt;/summary&gt;</span>
+    <span class="k">public async</span> <span class="t">Task</span> <span class="f">PickAsync</span>(<span class="t">Guid</span> inventoryId, <span class="k">decimal</span> quantity,
+                                <span class="k">string</span> sourceOrderNo) { <span class="c">/* ... */</span> }
+}</code></pre>
+
+  <div class="note note-green">
+    <span class="lbl">为什么是领域服务而不是 AppService</span>
+    <p>因为它<strong>需要跨聚合读写，而且全是纯业务规则</strong> —— 既不含 DTO 转换，也不含权限校验。放到 Application 层，既会让领域规则污染应用层，也会让它无法被其他领域服务复用。</p>
+  </div>
+
+  <h3>InboundOrderManager 单号生成</h3>
+
+<pre><code><span class="k">public class</span> <span class="t">InboundOrderManager</span> : <span class="t">DomainService</span>
+{
+    <span class="k">private readonly</span> <span class="t">IInboundOrderRepository</span> _orderRepo;
+
+    <span class="c">/// &lt;summary&gt;生成单号：IN + 日期 + 4位流水&lt;/summary&gt;</span>
+    <span class="k">public async</span> <span class="t">Task</span>&lt;<span class="k">string</span>&gt; <span class="f">GenerateOrderNoAsync</span>()
+    {
+        <span class="k">var</span> datePart = <span class="t">DateTime</span>.Now.<span class="f">ToString</span>(<span class="s">"yyyyMMdd"</span>);
+        <span class="k">var</span> count = <span class="k">await</span> _orderRepo.<span class="f">CountAsync</span>(
+            x =&gt; x.OrderNo.<span class="f">StartsWith</span>(<span class="s">$"IN{datePart}"</span>));
+        <span class="k">return</span> <span class="s">$"IN{datePart}{(count + 1):D4}"</span>;
+    }
+}</code></pre>
+
+  <div class="note note-red">
+    <span class="lbl">并发缺陷警告</span>
+    <p>上面的实现<strong>存在并发问题</strong> —— 两个请求可能拿到同一个 <code>count</code>，从而生成重复单号。生产环境必须改用<strong>数据库序列</strong>或 <strong>Redis 原子自增</strong>。</p>
+    <p style="margin-top:9px">这恰好划出了「领域服务承载业务规则」与「基础设施问题」之间的边界：<strong>并发控制属于基础设施</strong>，不该硬塞进领域服务。正确做法是在领域服务里注入一个 <code>IOrderNumberGenerator</code> 抽象，实现交给基础设施层。</p>
+  </div>
+
+  <h3>WmsErrorCodes 错误码常量</h3>
+
+  <p>前文的领域方法里反复出现 <code>WmsErrorCodes.XXX</code>，它集中定义了全部业务错误码，定义如下。</p>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Domain\Wms\WmsErrorCodes.cs</span>
+
+<pre><code><span class="k">namespace</span> <span class="t">Acme.Learn.Wms</span>;
+
+<span class="k">public static class</span> <span class="t">WmsErrorCodes</span>
+{
+    <span class="c">// ── 入库单 ──</span>
+    <span class="k">public const string</span> DuplicateMaterialInOrder   = <span class="s">"Wms:DuplicateMaterialInOrder"</span>;   <span class="c">// 单据内重复物料</span>
+    <span class="k">public const string</span> LineNotFound               = <span class="s">"Wms:LineNotFound"</span>;               <span class="c">// 单据行不存在</span>
+    <span class="k">public const string</span> OrderHasNoLine             = <span class="s">"Wms:OrderHasNoLine"</span>;             <span class="c">// 单据无明细行</span>
+    <span class="k">public const string</span> InvalidStatusTransition    = <span class="s">"Wms:InvalidStatusTransition"</span>;    <span class="c">// 无效的状态流转</span>
+    <span class="k">public const string</span> NotAllLinesReceived        = <span class="s">"Wms:NotAllLinesReceived"</span>;        <span class="c">// 有行未收满</span>
+    <span class="k">public const string</span> CannotCancelCompletedOrder = <span class="s">"Wms:CannotCancelCompletedOrder"</span>; <span class="c">// 已完成单不可取消</span>
+    <span class="k">public const string</span> OrderNotEditable           = <span class="s">"Wms:OrderNotEditable"</span>;           <span class="c">// 非草稿不可编辑</span>
+    <span class="k">public const string</span> OverReceive                = <span class="s">"Wms:OverReceive"</span>;                <span class="c">// 超量收货</span>
+    <span class="k">public const string</span> OverAllocate               = <span class="s">"Wms:OverAllocate"</span>;               <span class="c">// 超量分配</span>
+
+    <span class="c">// ── 库存 ──</span>
+    <span class="k">public const string</span> InsufficientStock          = <span class="s">"Wms:InsufficientStock"</span>;          <span class="c">// 库存不足</span>
+    <span class="k">public const string</span> OverDeallocate             = <span class="s">"Wms:OverDeallocate"</span>;             <span class="c">// 取消分配的量大过已分配量</span>
+    <span class="k">public const string</span> InvalidPutawayLocation     = <span class="s">"Wms:InvalidPutawayLocation"</span>;     <span class="c">// 上架库位非法</span>
+}</code></pre>
+
+  <div class="note note-blue">
+    <span class="lbl">错误码为什么用字符串而不是数字</span>
+    <p>ABP 的 <code>BusinessException</code> 用「前缀:语义」形式的<strong>字符串</strong>作为错误码，是为了让它<strong>直接当作本地化 key 使用</strong> —— <code>"Wms:InvalidStatusTransition"</code> 就是 <code>zh-Hans.json</code> 里的键名。</p>
+    <p style="margin-top:9px">整条链路是：领域层 <code>throw new BusinessException(WmsErrorCodes.InvalidStatusTransition)</code> → ABP 内置的异常过滤器按 code 查出本地化文案 → 向前端返回 <code>{"code":"Wms:InvalidStatusTransition","message":"无效的状态流转"}</code>，HTTP 状态码为 <strong>400</strong>（业务错误，而不是 500 系统错误）。</p>
+  </div>
+</section>
+
+<!-- ══════════ 07 ══════════ -->
+<section id="s7">
+  <h2><i>07</i>应用服务层</h2>
+
+  <p>领域层把规则定好了，应用服务层则负责把它们<strong>编排成对外的用例</strong>。它的形态很统一：<strong>取聚合 → 调领域方法 → 存回去</strong>，自身不写任何业务判断。</p>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\src\Acme.Learn.Application\Wms\InboundOrders\InboundOrderAppService.cs</span>
+
+<pre><code><span class="k">public class</span> <span class="t">InboundOrderAppService</span> :
+    <span class="t">Acme.LearnAppService</span>,
+    <span class="t">IInboundOrderAppService</span>
+{
+    <span class="k">private readonly</span> <span class="t">IInboundOrderRepository</span> _orderRepo;
+    <span class="k">private readonly</span> <span class="t">InboundOrderManager</span> _orderManager;
+    <span class="k">private readonly</span> <span class="t">InventoryManager</span> _inventoryManager;
+
+    <span class="c">// ── CRUD ──────────────────────────────────────</span>
+    <span class="k">public async</span> <span class="t">Task</span>&lt;<span class="t">PagedResultDto</span>&lt;<span class="t">InboundOrderDto</span>&gt;&gt; <span class="f">GetListAsync</span>(
+        <span class="t">GetInboundOrdersInput</span> input)
+    {
+        <span class="k">var</span> totalCount = <span class="k">await</span> _orderRepo.<span class="f">GetCountAsync</span>(<span class="c">/* filters */</span>);
+        <span class="k">var</span> items = <span class="k">await</span> _orderRepo.<span class="f">GetListAsync</span>(<span class="c">/* ... */</span>, includeDetails: <span class="k">true</span>);
+        <span class="k">return new</span> <span class="t">PagedResultDto</span>&lt;<span class="t">InboundOrderDto</span>&gt;(
+            totalCount,
+            <span class="t">ObjectMapper</span>.<span class="f">Map</span>&lt;<span class="t">List</span>&lt;<span class="t">InboundOrder</span>&gt;, <span class="t">List</span>&lt;<span class="t">InboundOrderDto</span>&gt;&gt;(items));
+    }
+
+    <span class="k">public async</span> <span class="t">Task</span>&lt;<span class="t">InboundOrderDto</span>&gt; <span class="f">GetAsync</span>(<span class="t">Guid</span> id)
+    {
+        <span class="k">var</span> order = <span class="k">await</span> _orderRepo.<span class="f">GetAsync</span>(id, includeDetails: <span class="k">true</span>);
+        <span class="k">return</span> <span class="t">ObjectMapper</span>.<span class="f">Map</span>&lt;<span class="t">InboundOrder</span>, <span class="t">InboundOrderDto</span>&gt;(order);
+    }
+
+    <span class="c">// ── 业务操作：全部委托给领域对象/领域服务 ──────</span>
+    <span class="k">public async</span> <span class="t">Task</span>&lt;<span class="t">InboundOrderDto</span>&gt; <span class="f">CreateAsync</span>(
+        <span class="t">CreateUpdateInboundOrderDto</span> input)
+    {
+        <span class="k">var</span> order = <span class="k">new</span> <span class="t">InboundOrder</span>(
+            <span class="t">GuidGenerator</span>.<span class="f">Create</span>(),
+            <span class="k">await</span> _orderManager.<span class="f">GenerateOrderNoAsync</span>(),
+            input.WarehouseId,
+            input.Type,
+            input.SourceOrderNo);
+
+        <span class="k">foreach</span> (<span class="k">var</span> line <span class="k">in</span> input.Lines)
+            order.<span class="f">AddLine</span>(line.MaterialId, line.Quantity, line.LocationId);
+
+        <span class="k">await</span> _orderRepo.<span class="f">InsertAsync</span>(order, autoSave: <span class="k">true</span>);
+        <span class="k">return</span> <span class="t">ObjectMapper</span>.<span class="f">Map</span>&lt;<span class="t">InboundOrder</span>, <span class="t">InboundOrderDto</span>&gt;(order);
+    }
+
+    <span class="k">public async</span> <span class="t">Task</span> <span class="f">AddLineAsync</span>(<span class="t">Guid</span> id, <span class="t">AddInboundOrderLineDto</span> input)
+    {
+        <span class="k">var</span> order = <span class="k">await</span> _orderRepo.<span class="f">GetAsync</span>(id, includeDetails: <span class="k">true</span>);
+        order.<span class="f">AddLine</span>(input.MaterialId, input.Quantity, input.LocationId);   <span class="c">// 规则在领域层</span>
+        <span class="k">await</span> _orderRepo.<span class="f">UpdateAsync</span>(order);
+    }
+
+    <span class="k">public async</span> <span class="t">Task</span> <span class="f">ConfirmAsync</span>(<span class="t">Guid</span> id)
+    {
+        <span class="k">var</span> order = <span class="k">await</span> _orderRepo.<span class="f">GetAsync</span>(id);
+        order.<span class="f">Confirm</span>();                                       <span class="c">// 状态守卫在领域层</span>
+        <span class="k">await</span> _orderRepo.<span class="f">UpdateAsync</span>(order);
+    }
+
+    <span class="c">/// &lt;summary&gt;收货 —— 跨聚合操作，走领域服务&lt;/summary&gt;</span>
+    <span class="k">public async</span> <span class="t">Task</span> <span class="f">ReceiveAsync</span>(<span class="t">Guid</span> id, <span class="t">ReceiveInputDto</span> input)
+    {
+        <span class="k">var</span> order = <span class="k">await</span> _orderRepo.<span class="f">GetAsync</span>(id, includeDetails: <span class="k">true</span>);
+        order.<span class="f">StartReceiving</span>();
+
+        <span class="k">foreach</span> (<span class="k">var</span> item <span class="k">in</span> input.Items)
+        {
+            <span class="k">var</span> line = order.Lines.<span class="f">First</span>(x =&gt; x.Id == item.LineId);
+            line.<span class="f">Receive</span>(item.Quantity, item.LocationId);
+            <span class="k">await</span> _inventoryManager.<span class="f">PutawayAsync</span>(
+                order.WarehouseId, item.LocationId,
+                line.MaterialId, item.BatchNo, item.Quantity, order.OrderNo);
+        }
+
+        <span class="k">await</span> _orderRepo.<span class="f">UpdateAsync</span>(order);
+    }
+}</code></pre>
+
+  <div class="note note-blue">
+    <span class="lbl">观察 AppService 的形态</span>
+    <p>每个方法几乎都是「<strong>取聚合 → 调领域方法 → 存回去</strong>」。<strong>既没有 if/else 业务判断，也没有字段校验</strong>。这就是充血模型下 AppService 该有的样子 —— 它是「编排者」，而不是「决策者」。</p>
+  </div>
+
+  <div class="note note-amber">
+    <span class="lbl">另一条路：继承 CrudAppService</span>
+    <p>本节示例是<strong>手写</strong> AppService，方法名因此可以完全是业务术语（<code>ConfirmAsync</code> / <code>ReceiveAsync</code>）。如果改用 <code>CrudAppService&lt;TEntity, TDto, TKey, TGetListInput, TCreateInput&gt;</code>，可以白拿 5 个 CRUD 方法（含分页、排序、权限校验），<strong>代价是方法名被框架钉死</strong> —— <code>CreateAsync</code> / <code>UpdateAsync</code> / <code>MapToEntityAsync</code> 都是基类 <code>AbstractKeyCrudAppService</code> 里的 <code>virtual</code> 钩子，子类 <code>override</code> 时签名必须<strong>逐字一致</strong>，改一个字母就编译不过。名字里没有业务含义，是因为它本来就是「通用 CRUD 机器上的通用零件」。</p>
+    <p style="margin-top:9px">其中 <code>MapToEntityAsync</code> 就是 <strong>DTO → 实体</strong>那一步。基类默认实现是 <code>ObjectMapper.Map&lt;TCreateInput, TEntity&gt;(input)</code>，等价于 <code>BeanUtils.copyProperties</code>；<strong>但它搬不动 <code>private set</code> 的属性</strong> —— 这恰恰是好事，说明外部确实改不了状态。代价是必须手写 override，显式调用领域方法：</p>
+  </div>
+
+<pre><code><span class="c">// 基类默认：反射拷贝。private set 的属性一律搬不过来 —— 这正是我们要的效果</span>
+<span class="k">protected virtual</span> <span class="t">TEntity</span> <span class="f">MapToEntity</span>(<span class="t">TCreateInput</span> createInput)
+    =&gt; <span class="t">ObjectMapper</span>.<span class="f">Map</span>&lt;<span class="t">TCreateInput</span>, <span class="t">TEntity</span>&gt;(createInput);
+
+<span class="c">// 子类重写：手工搬运，规则一条都绕不过去</span>
+<span class="k">protected override</span> <span class="t">Task</span>&lt;<span class="t">Warehouse</span>&gt; <span class="f">MapToEntityAsync</span>(<span class="t">CreateWarehouseDto</span> input)
+{
+    <span class="k">var</span> warehouse = <span class="k">new</span> <span class="t">Warehouse</span>(<span class="t">GuidGenerator</span>.<span class="f">Create</span>(), input.Code, input.Name);
+    <span class="k">return</span> <span class="t">Task</span>.<span class="f">FromResult</span>(warehouse);   <span class="c">// 状态不在这里谈：构造函数已定「新建即停用」</span>
+}
+
+<span class="c">// 更新路径同理：只搬允许改的字段，状态变更交给独立的启用/停用接口</span>
+<span class="k">protected override</span> <span class="t">Task</span> <span class="f">MapToEntityAsync</span>(<span class="t">UpdateWarehouseDto</span> input, <span class="t">Warehouse</span> entity)
+{
+    entity.<span class="f">SetName</span>(input.Name);
+    <span class="k">return</span> <span class="t">Task</span>.<span class="f">CompletedTask</span>;
+}
+</code></pre>
+
+  <div class="cmp">
+    <div>
+      <div class="ch bad">✗ 贫血模型（芋道习惯）</div>
+<pre><code><span class="k">public async</span> <span class="t">Task</span> <span class="f">ConfirmAsync</span>(<span class="t">Guid</span> id)
+{
+    <span class="k">var</span> order = <span class="k">await</span> _repo.<span class="f">GetAsync</span>(id);
+
+    <span class="c">// 业务规则全堆在 Service 里</span>
+    <span class="k">if</span> (order.Status != Draft)
+        <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="s">"..."</span>);
+    <span class="k">if</span> (!order.Lines.<span class="f">Any</span>())
+        <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="s">"..."</span>);
+
+    order.Status = Confirmed;   <span class="c">// 直接改字段</span>
+    <span class="k">await</span> _repo.<span class="f">UpdateAsync</span>(order);
+}</code></pre>
+    </div>
+    <div>
+      <div class="ch good">✓ 充血模型（DDD）</div>
+<pre><code><span class="k">public async</span> <span class="t">Task</span> <span class="f">ConfirmAsync</span>(<span class="t">Guid</span> id)
+{
+    <span class="k">var</span> order = <span class="k">await</span> _repo.<span class="f">GetAsync</span>(id);
+
+    order.<span class="f">Confirm</span>();   <span class="c">// 规则在领域对象内部</span>
+
+    <span class="k">await</span> _repo.<span class="f">UpdateAsync</span>(order);
+}
+
+<span class="c">// InboundOrder.cs 里：</span>
+<span class="k">public void</span> <span class="f">Confirm</span>()
+{
+    <span class="k">if</span> (Status != <span class="t">InboundOrderStatus</span>.Draft)
+        <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="s">"Wms:InvalidStatusTransition"</span>);
+    <span class="k">if</span> (!_lines.<span class="f">Any</span>())
+        <span class="k">throw new</span> <span class="t">BusinessException</span>(<span class="s">"Wms:OrderHasNoLine"</span>);
+    Status = <span class="t">InboundOrderStatus</span>.Confirmed;
+}</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ 08 ══════════ -->
+<section id="s8">
+  <h2><i>08</i>目录结构全貌</h2>
+
+  <h3>Domain 项目</h3>
+  <div class="tree"><span class="dir">src\Acme.Learn.Domain\Wms\</span>
+├── <span class="dir">Warehouses\</span>
+│   ├── <span class="file">Warehouse.cs</span>
+│   ├── <span class="file">IWarehouseRepository.cs</span>
+│   └── <span class="file">WarehouseManager.cs</span>
+├── <span class="dir">Materials\</span>
+│   ├── <span class="file">Material.cs</span>
+│   ├── <span class="file">MaterialCategory.cs</span>
+│   ├── <span class="file">IMaterialRepository.cs</span>
+│   └── <span class="file">MaterialManager.cs</span>
+├── <span class="dir">Locations\</span>
+│   ├── <span class="file">Location.cs</span>
+│   ├── <span class="file">LocationType.cs</span>
+│   └── <span class="file">ILocationRepository.cs</span>
+├── <span class="dir">InboundOrders\</span>
+│   ├── <span class="key">InboundOrder.cs</span>          <span class="cm">← 核心：状态机</span>
+│   ├── <span class="file">InboundOrderLine.cs</span>
+│   ├── <span class="file">InboundType.cs</span>
+│   ├── <span class="file">InboundOrderStatus.cs</span>
+│   ├── <span class="file">IInboundOrderRepository.cs</span>
+│   ├── <span class="file">InboundOrderManager.cs</span>
+│   └── <span class="dir">Events\</span>
+│       └── <span class="file">InboundOrderCompletedEvent.cs</span>
+├── <span class="dir">OutboundOrders\</span>
+│   └── <span class="cm">(对称结构)</span>
+├── <span class="dir">Inventories\</span>
+│   ├── <span class="key">Inventory.cs</span>              <span class="cm">← 核心：可用量</span>
+│   ├── <span class="file">InventoryTransaction.cs</span>
+│   ├── <span class="file">TransactionType.cs</span>
+│   ├── <span class="file">IInventoryRepository.cs</span>
+│   └── <span class="key">InventoryManager.cs</span>       <span class="cm">← 跨聚合的库存规则</span>
+└── <span class="file">WmsErrorCodes.cs</span>              <span class="cm">← 错误码常量</span></div>
+
+  <h3>Application.Contracts 项目（DTO 与服务接口）</h3>
+  <div class="tree"><span class="dir">src\Acme.Learn.Application.Contracts\Wms\</span>
+├── <span class="dir">Warehouses\</span>
+│   ├── <span class="file">WarehouseDto.cs</span>
+│   ├── <span class="file">CreateUpdateWarehouseDto.cs</span>
+│   ├── <span class="file">GetWarehousesInput.cs</span>
+│   └── <span class="file">IWarehouseAppService.cs</span>
+├── <span class="dir">Materials\</span>  <span class="cm">...</span>
+├── <span class="dir">InboundOrders\</span>
+│   ├── <span class="file">InboundOrderDto.cs</span>
+│   ├── <span class="file">InboundOrderLineDto.cs</span>
+│   ├── <span class="file">CreateUpdateInboundOrderDto.cs</span>
+│   ├── <span class="file">ReceiveInputDto.cs</span>
+│   ├── <span class="file">GetInboundOrdersInput.cs</span>
+│   ├── <span class="file">IInboundOrderAppService.cs</span>
+│   └── <span class="file">InboundOrderPermissions.cs</span>   <span class="cm">← 权限常量</span>
+└── <span class="cm">...</span></div>
+
+  <h3>EntityFrameworkCore 项目（映射与仓储实现）</h3>
+  <div class="tree"><span class="dir">src\Acme.Learn.EntityFrameworkCore\Wms\</span>
+├── <span class="key">WmsDbContextModelCreatingExtensions.cs</span>   <span class="cm">← 所有映射配置集中在这</span>
+├── <span class="dir">Warehouses\</span>
+│   └── <span class="file">WarehouseRepository.cs</span>
+├── <span class="dir">Materials\</span>  <span class="cm">...</span>
+├── <span class="dir">Locations\</span>   <span class="cm">...</span>
+├── <span class="dir">InboundOrders\</span>
+│   └── <span class="file">InboundOrderRepository.cs</span>
+├── <span class="dir">OutboundOrders\</span>  <span class="cm">...</span>
+└── <span class="dir">Inventories\</span>  <span class="cm">...</span></div>
+
+  <h3>Angular 前端项目（第 09 节详述）</h3>
+  <div class="tree"><span class="dir">angular\src\</span>
+├── <span class="file">main.ts</span>                       <span class="cm">← 启动引导</span>
+├── <span class="dir">environments\</span>
+│   └── <span class="key">environment.ts</span>              <span class="cm">← 后端地址（前后端唯一连接点）</span>
+├── <span class="dir">app\</span>
+│   ├── <span class="file">app.config.ts</span>               <span class="cm">← 全局 DI 容器</span>
+│   ├── <span class="file">app.routes.ts</span>               <span class="cm">← 顶层路由表</span>
+│   ├── <span class="file">route.provider.ts</span>           <span class="cm">← 侧边栏菜单注册</span>
+│   ├── <span class="key">proxy\</span>                      <span class="cm">← generate-proxy 生成，当前不存在</span>
+│   │   └── <span class="dir">acme\learn\wms\</span>
+│   │       ├── <span class="file">inbound-order.service.ts</span>
+│   │       └── <span class="file">inventory.service.ts</span>
+│   └── <span class="dir">wms\</span>                        <span class="cm">← 你的 WMS 页面</span>
+│       ├── <span class="dir">inbound-orders\</span>
+│       │   ├── <span class="file">inbound-order-list.component.ts</span>
+│       │   ├── <span class="file">inbound-order-list.component.html</span>
+│       │   └── <span class="file">inbound-orders.routes.ts</span>
+│       ├── <span class="dir">inventories\</span>
+│       ├── <span class="dir">warehouses\</span>
+│       └── <span class="key">wms.routes.ts</span>          <span class="cm">← WMS 路由汇总</span>
+└── <span class="dir">assets\</span>
+    └── <span class="dir">styles.scss</span>             <span class="cm">← 全局样式</span></div>
+
+  <h3>各层职责一览</h3>
+  <table>
+    <thead><tr><th>层</th><th>项目 / 目录</th><th>职责</th><th>规则密度</th></tr></thead>
+    <tbody>
+      <tr><td>领域层</td><td><code>Acme.Learn.Domain\Wms\</code></td><td>实体 + 状态机 + 领域服务</td><td><span class="bd bd-ok">高 · 充血</span></td></tr>
+      <tr><td>契约层</td><td><code>Acme.Learn.Application.Contracts\Wms\</code></td><td>DTO + 服务接口 + 权限常量</td><td>—</td></tr>
+      <tr><td>应用层</td><td><code>Acme.Learn.Application\Wms\</code></td><td>编排与 DTO 映射，不写业务规则</td><td><span class="bd bd-warn">薄</span></td></tr>
+      <tr><td>持久化</td><td><code>Acme.Learn.EntityFrameworkCore\Wms\</code></td><td>映射配置 + 仓储实现</td><td>—</td></tr>
+      <tr><td>接口层</td><td>自动生成（<code>/api/app/...</code>）</td><td>HTTP 端点</td><td>—</td></tr>
+      <tr><td><strong>前端</strong></td><td><code>angular\src\app\wms\</code></td><td>页面、交互、状态展示</td><td><span class="bd bd-p">UI 层</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════ 09 ══════════ -->
+<section id="s9">
+  <h2><i>09</i>前端：Angular 侧怎么接</h2>
+
+  <p>后端设计得再漂亮，最终也要靠前端把状态机和库存展示出来。这一节讲的是<strong>后端这套 DDD 设计在前端具体怎么落地</strong>。</p>
+
+  <h3>先明确一件事：前端没有 DDD</h3>
+
+  <div class="note note-amber">
+    <span class="lbl">关键认知</span>
+    <p><strong>DDD 是后端的概念，前端不搞聚合、不搞充血实体、也不搞领域服务。</strong> 前端只需要三样东西：DTO 的 TypeScript 类型、调用 API 的 Service，以及页面组件。别把后端的建模思想硬搬到前端 —— 那样只会写出过度设计的垃圾代码。</p>
+  </div>
+
+  <p>前端要做的对接工作只有三步：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 190" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,PingFang SC,sans-serif">
+      <defs>
+        <marker id="ar2" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#6e7681"/>
+        </marker>
+      </defs>
+      <rect x="20" y="56" width="150" height="62" rx="8" fill="rgba(210,153,34,.12)" stroke="#d29922" stroke-width="1.4"/>
+      <text x="95" y="78" fill="#e6edf3" font-size="12.5" text-anchor="middle" font-weight="600">① 后端写 AppService</text>
+      <text x="95" y="96" fill="#9da7b3" font-size="10" text-anchor="middle">暴露 /api/app/inbound-order</text>
+
+      <line x1="174" y1="87" x2="222" y2="87" stroke="#6e7681" stroke-width="1.5" marker-end="url(#ar2)"/>
+
+      <rect x="226" y="56" width="180" height="62" rx="8" fill="rgba(56,139,253,.12)" stroke="#58a6ff" stroke-width="1.4"/>
+      <text x="316" y="78" fill="#e6edf3" font-size="12.5" text-anchor="middle" font-weight="600">② abp generate-proxy -t ng</text>
+      <text x="316" y="96" fill="#9da7b3" font-size="10" text-anchor="middle">生成 TS 类型 + 请求函数</text>
+
+      <line x1="410" y1="87" x2="458" y2="87" stroke="#6e7681" stroke-width="1.5" marker-end="url(#ar2)"/>
+
+      <rect x="462" y="56" width="180" height="62" rx="8" fill="rgba(188,140,255,.12)" stroke="#bc8cff" stroke-width="1.4"/>
+      <text x="552" y="78" fill="#e6edf3" font-size="12.5" text-anchor="middle" font-weight="600">③ 写页面组件</text>
+      <text x="552" y="96" fill="#9da7b3" font-size="10" text-anchor="middle">模板 + 交互 + 状态（自己写）</text>
+
+      <text x="340" y="160" fill="#9da7b3" font-size="11" text-anchor="middle">② 是自动的，① ③ 是手写的 —— 前端的工作量集中在 ③</text>
+    </svg>
+  </div>
+
+  <h3>第一步：前端目录规划</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\angular\src\app\</span>
+
+  <div class="tree"><span class="dir">src\app\</span>
+├── <span class="file">app.config.ts</span>            <span class="cm">← 加 WMS 的 provider（如需）</span>
+├── <span class="file">app.routes.ts</span>            <span class="cm">← 加一条 wms 路由</span>
+├── <span class="file">route.provider.ts</span>        <span class="cm">← 加菜单项</span>
+├── <span class="key">proxy\</span>                   <span class="cm">← ② 自动生成，别手改</span>
+│   └── <span class="dir">acme\learn\wms\</span>
+│       ├── <span class="file">inbound-order.service.ts</span>
+│       ├── <span class="file">models.ts</span>
+│       └── <span class="file">inventory.service.ts</span>
+└── <span class="dir">wms\</span>                     <span class="cm">← ③ 你写页面的地方</span>
+    ├── <span class="key">wms.routes.ts</span>         <span class="cm">← WMS 路由汇总</span>
+    ├── <span class="dir">inbound-orders\</span>
+    │   ├── <span class="file">inbound-order-list.component.ts</span>    <span class="cm">← 列表页（含收货操作）</span>
+    │   ├── <span class="file">inbound-order-list.component.html</span>
+    │   └── <span class="file">inbound-orders.routes.ts</span>
+    ├── <span class="dir">inventories\</span>
+    │   └── <span class="file">inventory-list.component.ts</span>          <span class="cm">← 库存查询页</span>
+    ├── <span class="dir">warehouses\</span>
+    │   ├── <span class="file">warehouse-list.component.ts</span>           <span class="cm">← 父组件：主数据 CRUD（贫血，照抄模板）</span>
+    │   └── <span class="file">warehouse-table.component.ts</span>         <span class="cm">← 子组件：与父组件同目录</span>
+    ├── <span class="dir">materials\</span>
+    └── <span class="dir">shared\</span>                <span class="cm">← 组件 / 工具被多页共用时放这</span></div>
+
+  <div class="note note-blue">
+    <span class="lbl">核心分界</span>
+    <ul>
+      <li><code>proxy\</code> —— <strong>自动生成，绝对不要手改</strong>。后端改了 API，只要重跑一次 <code>abp generate-proxy -t ng</code> 覆盖即可</li>
+      <li><code>wms\</code> —— <strong>你的地盘</strong>，页面、模板和交互都在这里</li>
+    </ul>
+  </div>
+
+  <h3>第二步：生成 proxy（要等后端有 WMS 代码之后）</h3>
+
+<pre><code><span class="c"># 1. 先起后端（generate-proxy 要拉 swagger 文档）</span>
+cd D:\yudao\abp\Acme.Learn\src\Acme.Learn.HttpApi.Host
+dotnet run
+
+<span class="c"># 2. 另开终端，在前端目录跑生成命令</span>
+cd D:\yudao\abp\Acme.Learn\angular
+abp generate-proxy -t ng
+
+<span class="c"># 生成产物：src\app\proxy\acme\learn\wms\</span>
+<span class="c">#   ├── inbound-order.service.ts    ← 请求函数</span>
+<span class="c">#   └── models.ts                   ← DTO 的 TS 类型</span></code></pre>
+
+  <p>生成出来的 service 长这样（结构示意）：</p>
+
+<pre><code><span class="c">// src\app\proxy\acme\learn\wms\inbound-order.service.ts —— 自动生成</span>
+<span class="f">@Injectable</span>({ providedIn: <span class="s">'root'</span> })
+<span class="k">export class</span> <span class="t">InboundOrderService</span> {
+  <span class="k">private</span> rest = <span class="f">inject</span>(<span class="t">RestService</span>);
+
+  <span class="c">// 对应后端 GetListAsync / CreateAsync / ConfirmAsync / ReceiveAsync</span>
+  <span class="f">getList</span>(input: <span class="t">GetInboundOrdersInput</span>): <span class="t">Observable</span>&lt;<span class="t">PagedResultDto</span>&lt;<span class="t">InboundOrderDto</span>&gt;&gt;
+  <span class="f">get</span>(id: <span class="k">string</span>): <span class="t">Observable</span>&lt;<span class="t">InboundOrderDto</span>&gt;
+  <span class="f">create</span>(input: <span class="t">CreateUpdateInboundOrderDto</span>): <span class="t">Observable</span>&lt;<span class="t">InboundOrderDto</span>&gt;
+  <span class="f">addLine</span>(id: <span class="k">string</span>, input: <span class="t">AddInboundOrderLineDto</span>): <span class="t">Observable</span>&lt;<span class="t">void</span>&gt;
+  <span class="f">confirm</span>(id: <span class="k">string</span>): <span class="t">Observable</span>&lt;<span class="t">void</span>&gt;
+  <span class="f">receive</span>(id: <span class="k">string</span>, input: <span class="t">ReceiveInputDto</span>): <span class="t">Observable</span>&lt;<span class="t">void</span>&gt;
+}
+
+<span class="c">// models.ts —— DTO 的 TS 类型，和后端 C# 类一一对应</span>
+<span class="k">export interface</span> <span class="t">InboundOrderDto</span> {
+  id?: <span class="k">string</span>;
+  orderNo?: <span class="k">string</span>;
+  warehouseId?: <span class="k">string</span>;
+  type?: <span class="t">InboundType</span>;
+  status?: <span class="t">InboundOrderStatus</span>;
+  lines?: <span class="t">InboundOrderLineDto</span>[];
+}</code></pre>
+
+  <div class="note note-green">
+    <span class="lbl">为什么要生成而不是手写</span>
+    <p><code>RestService</code> 会自动带上 <strong>Bearer token</strong> 和 <strong><code>__tenant</code> 租户头</strong>，401 时还会自动跳转登录。这些你在芋道里靠 axios 拦截器做的事，ABP 都内置了；如果手写 <code>http.get</code>，就得自己处理这一整套。</p>
+  </div>
+
+  <h3>@Injectable({ providedIn: 'root' }) 是什么</h3>
+
+  <p>先看它长什么样，再逐部分拆开：</p>
+
+<pre><code><span class="p">@Injectable</span>({ <span class="f">providedIn</span>: <span class="s">'root'</span> })
+<span class="k">export class</span> <span class="t">WarehouseService</span> { }</code></pre>
+
+  <p>这行装饰器回答的是一个很具体的问题：<strong>这个服务类由谁创建、在哪里创建、创建几个实例？</strong> Angular 的依赖注入容器需要先知道这些信息，才能把它交给需要它的组件。</p>
+
+  <p>拆成两部分看：</p>
+
+  <ul>
+    <li><code>@Injectable()</code> —— 告诉 Angular「<strong>这个类可以被注入到别处</strong>」，相当于给类打上「可被容器管理」的标记；没有它，即使写了 <code>providedIn</code> 也不会生效。</li>
+    <li><code>providedIn: 'root'</code> —— 指定<strong>注册到根注入器</strong>。这样一来整个应用共享<strong>同一个实例</strong>（单例），任何组件注入它拿到的都是同一份。</li>
+  </ul>
+
+  <p>对照 Spring，这一步相当于 <code>@Service</code>：</p>
+
+  <div class="cmp">
+    <div>
+      <div class="ch good">Angular</div>
+<pre><code><span class="p">@Injectable</span>({ <span class="f">providedIn</span>: <span class="s">'root'</span> })
+<span class="k">export class</span> <span class="t">WarehouseService</span> { }
+
+<span class="c">// 任何组件都能注入，全局一份</span></code></pre>
+    </div>
+    <div>
+      <div class="ch good">Spring</div>
+<pre><code><span class="p">@Service</span>
+<span class="k">public class</span> <span class="t">WarehouseService</span> { }
+
+<span class="c">// 任何 Bean 都能 @Autowired，默认 singleton</span></code></pre>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>维度</th><th>Angular</th><th>Spring</th></tr></thead>
+    <tbody>
+      <tr><td>声明可注入</td><td><code>@Injectable()</code></td><td><code>@Service</code></td></tr>
+      <tr><td>注册容器</td><td><code>providedIn: 'root'</code></td><td>自动扫描（<code>@ComponentScan</code>）</td></tr>
+      <tr><td>作用域</td><td>根注入器 = 全局单例</td><td>默认 singleton</td></tr>
+      <tr><td>注入方式</td><td><strong>构造函数参数类型</strong></td><td>构造函数 / 字段注入</td></tr>
+    </tbody>
+  </table>
+
+  <h4>关键差异：Angular 不会自动扫描</h4>
+
+  <p>这是和 Spring 最容易踩坑的一处不同。Spring 靠 <code>@ComponentScan</code> 自动发现 Bean，<strong>Angular 则不会</strong> —— 不声明 <code>providedIn</code>，容器里就查无此类，组件注入时直接抛 <code>NullInjectorError</code>：</p>
+
+<pre><code><span class="p">@Injectable</span>()                    <span class="c">// ❌ 容器不知道该怎么造它</span>
+<span class="k">export class</span> <span class="t">ListService</span> { }
+
+<span class="p">@Injectable</span>({ <span class="f">providedIn</span>: <span class="s">'root'</span> })  <span class="c">// ✅ 容器自动知道怎么造它</span>
+<span class="k">export class</span> <span class="t">WarehouseService</span> { }</code></pre>
+
+  <p>那么没有 <code>providedIn</code> 的服务就没法用了吗？也不是 —— 可以<strong>在某个组件的 <code>providers</code> 里手动声明</strong>，效果等同于「由这个组件负责创建这个实例」。具体该写在哪个组件、谁能用，放到后面「组件三件套」一节里，结合父子组件讲清楚。</p>
+
+  <h4>@Injectable 与 @Component 不是一回事</h4>
+
+  <p>这两个装饰器名字像、用法也像，很容易被理解为「<code>@Injectable</code> 是 <code>@Component</code> 的简化版，表示根组件在这里声明」。<strong>但这个理解是错的</strong> —— 它们管的是两件完全不同的事：一个是「服务」，一个是「界面」。</p>
+
+  <table>
+    <thead><tr><th></th><th><code>@Injectable()</code></th><th><code>@Component()</code></th></tr></thead>
+    <tbody>
+      <tr><td>管什么</td><td><strong>服务</strong></td><td><strong>组件</strong></td></tr>
+      <tr><td>干什么</td><td>让类<strong>可被注入</strong>（DI 注册）</td><td>定义一个<strong>有模板、能被渲染</strong>的 UI 单元</td></tr>
+      <tr><td>有 DOM 吗</td><td><span class="bd bd-no">没有</span></td><td><span class="bd bd-ok">有</span>（<code>template</code> / <code>templateUrl</code>）</td></tr>
+      <tr><td>有生命周期吗</td><td><span class="bd bd-no">没有</span></td><td><span class="bd bd-ok">有</span>（<code>ngOnInit</code> / <code>ngOnDestroy</code>…）</td></tr>
+      <tr><td>Spring 类比</td><td><code>@Service</code> / <code>@Repository</code></td><td><code>@RestController</code> + 视图</td></tr>
+      <tr><td><code>providedIn:'root'</code></td><td>注册到<strong>根注入器</strong>（作用域）</td><td><span class="bd bd-no">无此概念</span></td></tr>
+    </tbody>
+  </table>
+
+  <p>用 Spring 对照一下就清楚了 —— <code>@Service</code> 不是 <code>@RestController</code> 的简化版，两者地位平行、职责不同：</p>
+
+  <div class="cmp">
+    <div>
+      <div class="ch good">服务：被注入，无 UI</div>
+<pre><code><span class="c">// Angular</span>
+<span class="p">@Injectable</span>({ <span class="f">providedIn</span>: <span class="s">'root'</span> })
+<span class="k">export class</span> <span class="t">WarehouseService</span> { }
+
+<span class="c">// Spring 等价</span>
+<span class="p">@Service</span>
+<span class="k">public class</span> <span class="t">WarehouseService</span> { }</code></pre>
+    </div>
+    <div>
+      <div class="ch good">组件：有模板，可渲染</div>
+<pre><code><span class="c">// Angular</span>
+<span class="p">@Component</span>({ <span class="f">selector</span>: <span class="s">'app-warehouse'</span> })
+<span class="k">export class</span> <span class="t">WarehouseComponent</span> { }
+
+<span class="c">// Spring 等价</span>
+<span class="p">@RestController</span>
+<span class="k">public class</span> <span class="t">WarehouseController</span> { }</code></pre>
+    </div>
+  </div>
+
+  <h4>providedIn:'root' 的 root 指什么？</h4>
+
+  <p>它指的是<strong>根注入器（Root Injector）</strong>，<strong>而不是「根组件」</strong>。这两个是不同的东西：</p>
+
+  <ul>
+    <li><strong>根组件</strong> —— 就是 <code>AppComponent</code>，页面上的根 DOM 节点；</li>
+    <li><strong>根注入器</strong> —— 应用的<strong>顶层 DI 容器</strong>，在 Angular 启动时创建，<code>providedIn:'root'</code> 的服务就挂在它下面。</li>
+  </ul>
+
+  <p>关键在于，根注入器位于<strong>根组件之上</strong> —— 所有组件（包括根组件自己）都从它那里取服务：</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 250" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,PingFang SC,sans-serif">
+      <defs>
+        <marker id="ar5" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#6e7681"/>
+        </marker>
+      </defs>
+
+      <rect x="200" y="18" width="280" height="52" rx="8" fill="rgba(56,139,253,.12)" stroke="#58a6ff" stroke-width="1.4"/>
+      <text x="340" y="40" fill="#e6edf3" font-size="12.5" text-anchor="middle" font-weight="600">Root Injector（根注入器）</text>
+      <text x="340" y="58" fill="#9da7b3" font-size="10.5" text-anchor="middle">providedIn:'root' 的服务挂这里</text>
+
+      <line x1="340" y1="72" x2="340" y2="100" stroke="#6e7681" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ar5)"/>
+
+      <rect x="230" y="102" width="220" height="42" rx="7" fill="rgba(188,140,255,.12)" stroke="#bc8cff" stroke-width="1.4"/>
+      <text x="340" y="128" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">AppComponent（根组件）</text>
+
+      <line x1="340" y1="146" x2="340" y2="172" stroke="#6e7681" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ar5)"/>
+
+      <rect x="250" y="174" width="180" height="38" rx="7" fill="rgba(63,185,80,.12)" stroke="#3fb950" stroke-width="1.4"/>
+      <text x="340" y="198" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">子组件…</text>
+
+      <path d="M 540,192 L 580,192 L 580,44 L 540,44" fill="none" stroke="#d29922" stroke-width="1.6" marker-end="url(#ar5)"/>
+      <text x="596" y="118" fill="#d29922" font-size="10.5" text-anchor="middle" transform="rotate(90 596 118)">向上取用</text>
+
+      <text x="60" y="235" fill="#9da7b3" font-size="11">根注入器在根组件「之上」—— 所以 providedIn:'root' 的含义恰恰是「哪都不用声明」</text>
+    </svg>
+  </div>
+
+  <div class="note note-blue">
+    <span class="lbl">一句话总结</span>
+    <p><code>@Injectable({providedIn:'root'})</code> ≈ Spring 的 <code>@Service</code>；<code>@Component</code> ≈ Spring 的 <code>@RestController</code> + 模板。<strong>前者管 DI 注册，后者管 UI 定义，两者互不替代。</strong></p>
+  </div>
+
+  <h3>组件三件套：selector / providers / inputs</h3>
+
+  <p>写页面的第一步，是看懂组件类上的 <code>@Component</code> 装饰器。先别急着记字段名，先看一段真实代码 —— 一个「仓库列表页」父组件，里面嵌了一个「表格」子组件：</p>
+
+<pre><code><span class="c">// ── 父组件：仓库列表页 ──</span>
+<span class="p">@Component</span>({
+  <span class="f">selector</span>: <span class="s">'app-warehouse-list'</span>,
+  <span class="f">providers</span>: [<span class="t">WarehouseService</span>],   <span class="c">// ← 在这里「提供」服务</span>
+  <span class="f">template</span>: <span class="s">`&lt;app-warehouse-table [data]="items"&gt;&lt;/app-warehouse-table&gt;`</span>
+})
+<span class="k">export class</span> <span class="t">WarehouseListComponent</span> {
+  <span class="f">constructor</span>(<span class="k">private</span> svc: <span class="t">WarehouseService</span>) { }  <span class="c">// 父组件注入</span>
+}
+
+<span class="c">// ── 子组件：表格 ──</span>
+<span class="p">@Component</span>({
+  <span class="f">selector</span>: <span class="s">'app-warehouse-table'</span>,
+  <span class="f">inputs</span>: [<span class="s">'data'</span>]
+})
+<span class="k">export class</span> <span class="t">WarehouseTableComponent</span> {
+  <span class="f">constructor</span>(<span class="k">private</span> svc: <span class="t">WarehouseService</span>) { }  <span class="c">// 子组件也能注入到「同一个」实例</span>
+}</code></pre>
+
+  <p>这段代码里，父组件的模板中出现了 <code>&lt;app-warehouse-table&gt;</code>，它就是子组件，<strong>父子关系由此建立</strong>。而这两段 <code>@Component</code> 的参数回答的是三个不同的问题：这个组件怎么被引用？它需要哪些依赖？它对外接收什么数据？</p>
+
+  <h4>selector —— 这个组件在 HTML 里叫什么</h4>
+
+  <p><code>selector: 'app-warehouse-table'</code> 定义了组件的<strong>标签名</strong>。父组件模板里写 <code>&lt;app-warehouse-table&gt;&lt;/app-warehouse-table&gt;</code>，Angular 就知道要把这个位置渲染成子组件。</p>
+
+  <p>类比 Spring，它像 <code>@RequestMapping("/warehouse")</code> —— 都是「让外界能找到我」的标识符。区别在于 Spring 找的是 HTTP 路径，Angular 找的是 HTML 标签。</p>
+
+  <h4>providers —— 这个组件负责提供哪些服务</h4>
+
+  <p>父组件的 <code>providers: [WarehouseService]</code>，含义是：<strong>父组件自己创建一个 <code>WarehouseService</code> 实例，供自己及子孙组件使用。</strong></p>
+
+  <p>这是 Angular 和 Spring 差别最大的地方。Spring 只有一个全局容器，Bean 定义在哪里都一样；Angular 的容器<strong>是一棵组件树</strong>，每个组件都是一个小注入器。<code>providers</code> 写在哪个组件上，实例就在哪里创建，作用域也到哪里为止。</p>
+
+  <p>所以父组件只要写了 <code>providers</code>，子组件就<strong>什么都不用写</strong>，只要在构造函数里声明参数就能拿到 —— Angular 会自动向上查找，最终在父组件那一层找到实例，父子共享同一个：</p>
+
+<pre><code><span class="f">constructor</span>(<span class="k">private</span> svc: <span class="t">WarehouseService</span>) { }   <span class="c">// 父：拿到自己 providers 里的那个</span>
+<span class="f">constructor</span>(<span class="k">private</span> svc: <span class="t">WarehouseService</span>) { }   <span class="c">// 子：向上查找，拿到同一个 ✓</span></code></pre>
+
+  <p>反过来说，如果子组件<strong>也写一遍</strong> <code>providers: [WarehouseService]</code>，它就会创建一个<strong>新的</strong>实例，父子各持一份，数据不再共享。这不会报错，但会变成一个很难查的静默 bug —— 详细展开见后文「层级注入器」一节。</p>
+
+  <h4>inputs —— 这个组件对外接收什么数据</h4>
+
+  <p>子组件写的 <code>inputs: ['data']</code>，含义是：<strong>允许父组件通过 <code>[data]="..."</code> 往我这里传值</strong>，传进来的值会绑定到子组件的 <code>data</code> 字段上。</p>
+
+  <p>父组件模板里的 <code>[data]="items"</code> 与之配套：<strong>方括号代表数据从父流向子</strong>。子组件如果不声明 <code>inputs</code>，父组件就没法写这个方括号，双方对不上。</p>
+
+<pre><code><span class="c">// ── 子组件：接收什么，写在元数据里 ──</span>
+<span class="p">@Component</span>({
+  <span class="f">selector</span>: <span class="s">'app-warehouse-table'</span>,
+  <span class="f">inputs</span>: [<span class="s">'data'</span>],
+})
+<span class="k">export class</span> <span class="t">WarehouseTableComponent</span> {
+  data: <span class="t">WarehouseDto</span>[] = [];        <span class="c">// ← 字段仍要自己定义，否则运行时是 undefined</span>
+}
+
+<span class="c">// ── 父组件模板：把数据传下去 ──</span>
+&lt;<span class="t">app-warehouse-table</span> [data]=<span class="s">"items"</span>&gt;&lt;/<span class="t">app-warehouse-table</span>&gt;</code></pre>
+
+  <table>
+    <thead><tr><th>写法</th><th>方向</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td><code>[data]="items"</code></td><td>父 → 子</td><td>方括号 = 输入绑定，把父的 <code>items</code> 传进子的 <code>data</code></td></tr>
+      <tr><td><code>(saved)="onSaved($event)"</code></td><td>子 → 父</td><td>圆括号 = 输出绑定，子组件 <code>emit()</code> 什么，这里就收到什么</td></tr>
+      <tr><td><code>[(ngModel)]</code></td><td>双向</td><td>方 + 圆 = 双向绑定</td></tr>
+    </tbody>
+  </table>
+
+  <p>这三种绑定基本覆盖了日常的组件通信。子组件要往外发消息，就在自己身上声明 <code>@Output() saved = new EventEmitter&lt;string&gt;()</code>，需要时 <code>this.saved.emit(id)</code>，父组件用圆括号接住。至于<strong>兄弟组件、或者隔了好几层的组件</strong>，没有直接相邻的父子关系可走，有两条路：<strong>把 state 提到它们的共同父组件</strong>，再由父组件用 <code>@Input</code> 分发、用 <code>@Output</code> 收消息；或者<strong>注入同一个 service</strong> 中转（作用域由 <code>providers</code> 决定）。</p>
+
+<pre><code><span class="c">// ── 子 → 父：子组件声明事件，父组件用圆括号接住 ──</span>
+<span class="p">@Component</span>({ <span class="f">selector</span>: <span class="s">'app-warehouse-table'</span> })
+<span class="k">export class</span> <span class="t">WarehouseTableComponent</span> {
+  <span class="p">@Output</span>() saved = <span class="k">new</span> <span class="t">EventEmitter</span>&lt;<span class="k">string</span>&gt;();
+
+  <span class="f">save</span>(id: <span class="k">string</span>) {
+    <span class="c">// ...调用生成出来的 API 保存</span>
+    <span class="k">this</span>.saved.<span class="f">emit</span>(id);                    <span class="c">// 把消息抛给父组件</span>
+  }
+}
+
+<span class="c">// ── 父组件模板：方括号传下去，圆括号接回来 ──</span>
+&lt;<span class="t">app-warehouse-table</span>
+  [data]=<span class="s">"items"</span>
+  (saved)=<span class="s">"onSaved($event)"</span>&gt;
+&lt;/<span class="t">app-warehouse-table</span>&gt;
+<span class="c">// onSaved(id) 里通常是刷新列表</span>
+
+<span class="c">// ── 兄弟 / 跨层级：注入同一个 service 中转，不必层层往下传 ──</span>
+<span class="p">@Injectable</span>()                                  <span class="c">// 不写 providedIn，作用域交给 providers 决定</span>
+<span class="k">export class</span> <span class="t">TableSelectionService</span> {
+  selectedId = <span class="s">''</span>;
+}
+
+<span class="p">@Component</span>({
+  <span class="f">selector</span>: <span class="s">'app-warehouse-list'</span>,
+  <span class="f">providers</span>: [<span class="t">TableSelectionService</span>],       <span class="c">// ← 在共同祖先上声明一次</span>
+})
+<span class="k">export class</span> <span class="t">WarehouseListComponent</span> { }
+
+<span class="c">// 它下面任意层级的组件注入 TableSelectionService，拿到的都是同一份</span></code></pre>
+
+  <div class="note note-green">
+    <span class="lbl">两个组件要共享同一份数据：状态提升</span>
+    <p>当两个组件需要<strong>显示同一份数据、并且一起更新</strong>时（比如表格和分页器共用当前页码），做法是把这份数据<strong>「向上」提到它们共同的那层父组件</strong>里，再由父组件分发给两边 —— 这就是<strong>状态提升</strong>（lifting state up）。</p>
+    <p style="margin-top:9px">对照 React：React 把 state 提上去后，用 <code>count={count}</code> 往下传值，同时把 <code>handleClick</code> <strong>当 prop 往下传函数</strong>。Angular 前半段一样（<code>[data]="items"</code> 往下传），后半段不同 —— <strong>不传函数</strong>，而是让子组件 <code>emit</code>，父组件在模板里用 <code>(saved)="onSaved($event)"</code> 绑定。两者本质是同一个模式：<strong>数据往下流，事件往上报</strong>。</p>
+    <p style="margin-top:9px">所以 Angular 里的选择比 React 简单：数据只涉及一对父子时，直接 <code>@Input</code> / <code>@Output</code>，压根不用谈「提升」；需要两个兄弟共用、层级又浅时，把 state 提到共同父组件；层级深、或同一份数据被多处使用时，直接用 service —— Angular 有 DI，service 能注入到任意层级，不必像 React 那样为了绕开层层传 props 才动用 Context（Angular 的 service + <code>providers</code> 就对应 React 的 Context）。</p>
+  </div>
+
+  <div class="note note-amber">
+    <span class="lbl">inputs 是老写法，新代码用 @Input()</span>
+    <p><code>inputs: ['data']</code> 是在元数据里批量声明的旧语法，<strong>既没有类型提示，也不能设默认值</strong>。现代 Angular 一律改用装饰器：</p>
+    <pre style="margin:10px 0 0"><code><span class="p">@Input</span>() data: <span class="t">WarehouseDto</span>[] = [];   <span class="c">// 推荐：自带声明 + 类型 + 默认值</span></code></pre>
+    <p style="margin-top:10px">注意：<code>inputs: ['data']</code> 只是「允许父组件传值」的声明，子组件<strong>仍然要在类里定义 <code>data</code> 字段</strong>，否则运行时它是 <code>undefined</code>。<code>@Input()</code> 写法则把这两步合成了一步。</p>
+  </div>
+
+  <div class="note note-blue">
+    <span class="lbl">三个字段的分工，一句话记住</span>
+    <ul>
+      <li><code>selector</code> —— 解决「<strong>怎么被引用</strong>」（HTML 标签名）</li>
+      <li><code>providers</code> —— 解决「<strong>依赖从哪来</strong>」（实例在哪创建、作用域多大）</li>
+      <li><code>inputs</code> —— 解决「<strong>数据怎么进来</strong>」（父组件传值的入口）</li>
+    </ul>
+    <p style="margin-top:9px"><strong>三者互不相关</strong>：<code>providers</code> 管依赖注入，<code>inputs</code> 管数据绑定，这是两条独立的线，别混在一起理解。</p>
+  </div>
+
+  <h4>这两个组件的文件放在哪</h4>
+
+  <p>前面那段代码里，父组件是 <code>WarehouseListComponent</code>，子组件是 <code>WarehouseTableComponent</code>，那它们的文件分别该放到哪个目录？<strong>默认答案是：放在同一个目录。</strong></p>
+
+  <p>子组件只服务于父组件这一个页面，不算公共资产，所以跟着父组件走，不为它单独建目录：</p>
+
+  <div class="tree"><span class="dir">wms\warehouses\</span>
+├── <span class="file">warehouse-list.component.ts</span>      <span class="cm">← 父组件（列表页）</span>
+├── <span class="file">warehouse-list.component.html</span>
+├── <span class="file">warehouse-table.component.ts</span>     <span class="cm">← 子组件（表格），同目录</span>
+└── <span class="file">warehouse-table.component.html</span></div>
+
+  <p>两条约定：</p>
+
+  <ul>
+    <li><strong>文件名 = 类名转 kebab-case</strong> —— <code>WarehouseTableComponent</code> 对应 <code>warehouse-table.component.ts</code>，这是 Angular CLI 的固定规则，不必另起名字。</li>
+    <li><strong>只有被多个页面复用时，才提升到公共目录</strong> —— 一旦子组件不再只服务列表页（比如某个弹窗里也要用它），再把它挪到 <code>wms\shared\components\</code> 之类的地方。</li>
+  </ul>
+
+  <div class="note note-blue">
+    <span class="lbl">和芋道对照</span>
+    <p>Java / 芋道按<strong>层</strong>分包：同一个业务对象会被拆进 <code>controller\</code>、<code>service\</code>、<code>dal\</code> 三个目录。Angular 反过来，按<strong>块</strong>分包：一个页面相关的组件都躺在同一个目录。所以「这个子组件放哪」的答案不是「放进哪个层」，而是「<strong>放在用它那个页面旁边</strong>」。</p>
+  </div>
+
+  <h4>共享的组件、工具放在哪，怎么引用</h4>
+
+  <p>前面那条约定说「被多个页面复用时才提升出去」，那到底提升到哪一层、放进去之后又怎么用起来？共享按<strong>范围</strong>分三层：放低了，该复用的组件会被复制好几遍；放高了，页面私有的组件又会污染全局。</p>
+
+  <table>
+    <thead><tr><th>范围</th><th>放哪</th><th>什么时候提升到这一层</th></tr></thead>
+    <tbody>
+      <tr><td>页面私有</td><td><code>wms\warehouses\</code></td><td>默认位置 —— 只给这一个页面用（如 <code>warehouse-table</code>）</td></tr>
+      <tr><td>WMS 内共享</td><td><code>wms\shared\</code></td><td>WMS 里出现<strong>第二个</strong>使用方（如库位选择器）</td></tr>
+      <tr><td>全应用共享</td><td><code>app\shared\</code></td><td>WMS 之外的模块也要用（ABP 自带的 <code>@abp/ng.components</code> 就在这一层）</td></tr>
+    </tbody>
+  </table>
+
+  <p>以 <code>wms\shared\</code> 为例，它同时装共享组件和共享工具函数：</p>
+
+  <div class="tree"><span class="dir">wms\shared\</span>
+├── <span class="dir">components\</span>
+│   ├── <span class="file">index.ts</span>                     <span class="cm">← 统一出口（可选）</span>
+│   ├── <span class="dir">location-picker\</span>
+│   │   ├── <span class="file">location-picker.component.ts</span>
+│   │   └── <span class="file">location-picker.component.html</span>
+│   └── <span class="dir">batch-no-picker\</span>
+│       └── <span class="file">batch-no-picker.component.ts</span>
+└── <span class="dir">utils\</span>
+    └── <span class="file">quantity.util.ts</span>            <span class="cm">← 纯函数，如数量格式化</span></div>
+
+  <p>引用都靠 <code>import</code>：组件要在使用方的 <code>imports</code> 里登记（前面父子组件那段代码为突出 DI 与数据绑定把它省掉了，真实代码里不能省）；工具函数则像普通模块一样导入、直接调用。</p>
+
+<pre><code><span class="c">// ① 共享组件：使用方登记后，模板里才能用它的 selector</span>
+<span class="c">// wms\warehouses\warehouse-list.component.ts</span>
+<span class="p">@Component</span>({
+  <span class="f">selector</span>: <span class="s">'app-warehouse-list'</span>,
+  <span class="f">imports</span>: [<span class="t">LocationPickerComponent</span>],    <span class="c">// ← 不写这行，&lt;app-location-picker&gt; 会被当成未知标签</span>
+  <span class="f">templateUrl</span>: <span class="s">'./warehouse-list.component.html'</span>,
+})
+<span class="k">export class</span> <span class="t">WarehouseListComponent</span> { }
+
+<span class="c">// ② 共享工具函数：当普通模块导入，直接调用</span>
+<span class="k">import</span> { <span class="t">formatQuantity</span> } <span class="k">from</span> <span class="s">'../../shared/utils/quantity.util'</span>;
+
+<span class="c">// ③ 可选：给组件加一个统一出口 index.ts，导入路径能短一点</span>
+<span class="c">// import { LocationPickerComponent } from '../../shared/components';</span></code></pre>
+
+  <div class="note note-blue">
+    <span class="lbl">关键辨析：共享的是「代码」，不是「实例」</span>
+    <p>这一点正好和前面的 <code>providers</code> 对照，别混：</p>
+    <ul>
+      <li><code>providers</code> 管的是<strong>实例</strong>怎么共享 —— 同一份 service 实例交给多个组件；</li>
+      <li><code>imports</code> 管的是<strong>代码</strong>怎么复用 —— 同一份组件定义被多个页面写进模板。</li>
+    </ul>
+    <p style="margin-top:9px">模板里每写一次 <code>&lt;app-location-picker&gt;</code>，Angular 都会新建一个<strong>独立的组件实例</strong>，各有各的字段与生命周期，数据天然不互通。要在两个实例之间交换数据，得靠 <code>@Input()</code> / <code>@Output()</code>，或者让它们注入<strong>同一个 service</strong>。</p>
+  </div>
+
+  <h4>先说清前提：写在哪个组件里，谁才能用</h4>
+
+  <p>这一段的前提要先说清：<strong>谁需要 <code>ListService</code>、<code>providers</code> 该写在哪个组件上</strong>。回到前面那对父子组件 —— 父组件是 <code>WarehouseListComponent</code>（列表页），子组件是 <code>WarehouseTableComponent</code>（表格）。假设<strong>两个组件都要用 <code>ListService</code></strong>，而它没有 <code>providedIn</code>。</p>
+
+  <p>这时有两种放法，效果完全不同：</p>
+
+  <div class="cmp">
+    <div>
+      <div class="ch good">✓ 写在父组件（推荐）</div>
+<pre><code><span class="c">// 父组件：列表页</span>
+<span class="p">@Component</span>({
+  <span class="f">selector</span>: <span class="s">'app-warehouse-list'</span>,
+  <span class="f">providers</span>: [<span class="t">ListService</span>],          <span class="c">// ← 只有这里声明</span>
+})
+<span class="k">export class</span> <span class="t">WarehouseListComponent</span> {
+  <span class="f">constructor</span>(<span class="k">private</span> listService: <span class="t">ListService</span>) { }
+}
+
+<span class="c">// 子组件：表格 —— 什么都不用写</span>
+<span class="k">export class</span> <span class="t">WarehouseTableComponent</span> {
+  <span class="f">constructor</span>(<span class="k">private</span> listService: <span class="t">ListService</span>) { }
+  <span class="c">// 向上找到父组件那份，父子共享同一个 ✓</span>
+}</code></pre>
+    </div>
+    <div>
+      <div class="ch bad">✗ 写在子组件（用不了）</div>
+<pre><code><span class="c">// 父组件：列表页 —— 没写 providers</span>
+<span class="p">@Component</span>({ <span class="f">selector</span>: <span class="s">'app-warehouse-list'</span> })
+<span class="k">export class</span> <span class="t">WarehouseListComponent</span> {
+  <span class="f">constructor</span>(<span class="k">private</span> listService: <span class="t">ListService</span>) { }
+  <span class="c">// ❌ 向上找到 Root Injector，两个都没有 → 报错</span>
+}
+
+<span class="c">// 子组件：表格 —— 在这里声明管不到父组件</span>
+<span class="p">@Component</span>({
+  <span class="f">selector</span>: <span class="s">'app-warehouse-table'</span>,
+  <span class="f">providers</span>: [<span class="t">ListService</span>],          <span class="c">// ← 只能自己用</span>
+})
+<span class="k">export class</span> <span class="t">WarehouseTableComponent</span> { }</code></pre>
+    </div>
+  </div>
+
+  <p><strong>为什么写在父组件里，子组件就能用？</strong>因为 Angular 查找依赖是<strong>沿组件树向上冒泡</strong>的。子组件要 <code>ListService</code> 时，先看自己的 <code>providers</code>（没有），再往上看父组件的（找到了），于是就用父组件创建的那一份。所以<strong>声明的位置决定了「谁能用」</strong>：写在父组件，父组件及其所有子孙都能用；写在子组件，只有子组件自己（及其子孙）能用，父组件用不到。</p>
+
+  <div class="note note-blue">
+    <span class="lbl">判断口诀</span>
+    <p><strong>谁用谁声明，往上写一层更保险。</strong>如果只有某个组件用，就写在它自己身上；如果父组件和子组件都要用（并且需要共享同一份数据），就写在<strong>它们共同的那个父组件</strong>上。</p>
+  </div>
+
+  <div class="note note-red">
+    <span class="lbl">这就是 Abp 的 ListService 需要注意的地方</span>
+    <p><strong>Abp 自动生成的 <code>ListService</code> 就没有 <code>providedIn: 'root'</code></strong>，所以必须在组件的 <code>providers</code> 里手动声明，否则会报错。这也是它和其他服务唯一的区别 —— 记住这一条就够了。</p>
+    <p style="margin-top:9px">落到 WMS 场景：<strong>列表页父组件 <code>WarehouseListComponent</code> 声明一次，它下面的表格子组件就能共用同一份分页状态</strong>。「分页与 ListService」一节会再结合真实代码讲一遍。</p>
+  </div>
+
+  <h3>Angular 的 DI 与 Spring 的根本差异：层级注入器</h3>
+
+  <p>Spring 是<strong>一个容器、一份定义</strong>；Angular 则是<strong>每个组件都是一个小容器，向上查找最近的 <code>providers</code></strong>。这个差异决定了「代码该写在父组件还是子组件」。</p>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 420" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,PingFang SC,sans-serif">
+      <defs>
+        <marker id="ar3" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#d29922"/>
+        </marker>
+        <marker id="ar4" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#6e7681"/>
+        </marker>
+      </defs>
+
+      <rect x="200" y="20" width="280" height="56" rx="8" fill="rgba(56,139,253,.12)" stroke="#58a6ff" stroke-width="1.4"/>
+      <text x="340" y="43" fill="#e6edf3" font-size="12.5" text-anchor="middle" font-weight="600">Root Injector</text>
+      <text x="340" y="61" fill="#9da7b3" font-size="10.5" text-anchor="middle">providedIn:'root' 的服务在这里</text>
+
+      <line x1="340" y1="78" x2="340" y2="112" stroke="#6e7681" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ar4)"/>
+
+      <rect x="150" y="114" width="380" height="76" rx="8" fill="rgba(188,140,255,.12)" stroke="#bc8cff" stroke-width="1.4"/>
+      <text x="340" y="137" fill="#e6edf3" font-size="12.5" text-anchor="middle" font-weight="600">WarehouseListComponent（父）</text>
+      <text x="340" y="156" fill="#c9d1d9" font-size="11" text-anchor="middle">providers: [ WarehouseService ]</text>
+      <text x="340" y="174" fill="#9da7b3" font-size="10.5" text-anchor="middle">← 实例在这里创建，本子树共享</text>
+
+      <line x1="340" y1="192" x2="340" y2="226" stroke="#6e7681" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#ar4)"/>
+
+      <rect x="150" y="228" width="380" height="76" rx="8" fill="rgba(63,185,80,.12)" stroke="#3fb950" stroke-width="1.4"/>
+      <text x="340" y="251" fill="#e6edf3" font-size="12.5" text-anchor="middle" font-weight="600">WarehouseTableComponent（子）</text>
+      <text x="340" y="270" fill="#c9d1d9" font-size="11" text-anchor="middle">constructor(private svc: WarehouseService)</text>
+      <text x="340" y="288" fill="#9da7b3" font-size="10.5" text-anchor="middle">不写 providers，向上找到父的那份</text>
+
+      <path d="M 545,266 L 585,266 L 585,152 L 545,152" fill="none" stroke="#d29922" stroke-width="1.6" marker-end="url(#ar3)"/>
+      <text x="600" y="209" fill="#d29922" font-size="10.5" text-anchor="middle" transform="rotate(90 600 209)">查找方向</text>
+
+      <rect x="90" y="330" width="500" height="72" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="110" y="353" fill="#d29922" font-size="11.5" font-weight="600">要点</text>
+      <text x="110" y="373" fill="#c9d1d9" font-size="11">1. providers 只在「提供的那一层」写一次，不要父子各写一遍</text>
+      <text x="110" y="391" fill="#c9d1d9" font-size="11">2. 两个组件各写一遍 providers，会造出两个实例（数据不共享，静默 bug）</text>
+    </svg>
+  </div>
+
+  <h4>三种常见情况</h4>
+
+  <table>
+    <thead><tr><th>情况</th><th>服务定义方式</th><th>组件该怎么写</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>情况 1</strong><br>最常见</td>
+        <td><code>@Injectable({providedIn:'root'})</code></td>
+        <td>父子<strong>都只写 <code>constructor</code></strong>，谁都不用写 <code>providers</code></td>
+        <td>父子拿到<strong>同一个实例</strong><br><span class="bd bd-ok">全局单例</span></td>
+      </tr>
+      <tr>
+        <td><strong>情况 2</strong><br>Abp 的 ListService</td>
+        <td>没有 <code>providedIn</code></td>
+        <td><strong>只在父组件写一次 <code>providers</code></strong>，子组件不写</td>
+        <td>子组件自动向上找到父那份<br><span class="bd bd-ok">共享</span></td>
+      </tr>
+      <tr>
+        <td><strong>情况 3</strong><br>容易踩的坑</td>
+        <td>没有 <code>providedIn</code></td>
+        <td>父子<strong>各写一遍 <code>providers</code></strong></td>
+        <td>两个独立实例，数据不共享<br><span class="bd bd-no">静默 bug</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+<pre><code><span class="c">// 情况 1：父子都只写 constructor，拿到全局单例</span>
+<span class="f">constructor</span>(<span class="k">private</span> svc: <span class="t">WarehouseService</span>) { }   <span class="c">// 父</span>
+<span class="f">constructor</span>(<span class="k">private</span> svc: <span class="t">WarehouseService</span>) { }   <span class="c">// 子 —— 同一个实例 ✓</span>
+
+<span class="c">// 情况 2：父组件提供，子组件只注入</span>
+<span class="p">@Component</span>({ <span class="f">providers</span>: [<span class="t">ListService</span>] })              <span class="c">// 父：在这里提供</span>
+<span class="k">export class</span> <span class="t">WarehouseListComponent</span> { }
+
+<span class="k">export class</span> <span class="t">WarehouseTableComponent</span> {          <span class="c">// 子：不写 providers</span>
+  <span class="f">constructor</span>(<span class="k">private</span> svc: <span class="t">ListService</span>) { }      <span class="c">// 自动向上找到父的那份 ✓</span>
+}</code></pre>
+
+  <h3>语法糖：constructor 参数属性</h3>
+
+  <p><code>constructor(private svc: WarehouseService) { }</code> 这一行其实做了好几件事，逐字拆开看：</p>
+
+<pre><code><span class="f">constructor</span>(          <span class="c">// ① 构造函数 —— Angular 创建组件时调用它</span>
+  <span class="k">private</span>             <span class="c">// ② 访问修饰符 —— 自动生成一个类字段 private svc</span>
+  svc                 <span class="c">// ③ 字段名 —— 类内部用 this.svc 访问</span>
+  : <span class="t">WarehouseService</span>  <span class="c">// ④ 类型注解 —— Angular 靠这个「类型」去注入器里查</span>
+) { }                 <span class="c">// ⑤ 空方法体 —— 不需要赋值，Angular 自动塞进来</span></code></pre>
+
+  <p>关键在于，<code>private svc: X</code> 是 TypeScript 的<strong>参数属性语法糖</strong>，等价于下面手写的三行：</p>
+
+  <div class="cmp">
+    <div>
+      <div class="ch bad">✗ 手写（啰嗦）</div>
+<pre><code><span class="k">export class</span> <span class="t">WarehouseListComponent</span> {
+  <span class="k">private</span> svc: <span class="t">WarehouseService</span>;   <span class="c">// 声明</span>
+
+  <span class="f">constructor</span>(svc: <span class="t">WarehouseService</span>) {
+    <span class="k">this</span>.svc = svc;                 <span class="c">// 赋值</span>
+  }
+}</code></pre>
+    </div>
+    <div>
+      <div class="ch good">✓ 语法糖（一行顶三行）</div>
+<pre><code><span class="k">export class</span> <span class="t">WarehouseListComponent</span> {
+  <span class="f">constructor</span>(<span class="k">private</span> svc: <span class="t">WarehouseService</span>) { }
+}
+
+<span class="c">// 两段代码完全等价</span></code></pre>
+    </div>
+  </div>
+
+  <div class="note note-blue">
+    <span class="lbl">和 Spring 对照</span>
+    <p>Spring 里写的是 <code>private final WarehouseService svc;</code> 加构造函数，<strong>写法几乎一模一样</strong>。区别只在于「谁触发注入」：Spring 靠 <code>@Autowired</code>（或单构造器自动注入），Angular 则靠<strong>方法参数类型</strong>。</p>
+  </div>
+
+  <div class="note note-amber">
+    <span class="lbl">一句话总结</span>
+    <p><strong>父组件的 <code>providers</code> 决定实例在哪里创建，子组件靠 <code>constructor</code> 参数类型自动向上取用；<code>inputs</code> 则负责数据从父流到子。DI 和数据绑定是两条独立的线，别混在一起。</strong></p>
+  </div>
+
+  <h3>第三步：写页面（真正的工作量在这）</h3>
+
+  <h4>① 注册路由</h4>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\angular\src\app\app.routes.ts</span>
+
+<pre><code><span class="k">export const</span> APP_ROUTES: <span class="t">Routes</span> = [
+  { path: <span class="s">''</span>, pathMatch: <span class="s">'full'</span>,
+    loadComponent: () =&gt; <span class="k">import</span>(<span class="s">'./home/home.component'</span>).<span class="f">then</span>(c =&gt; c.<span class="t">HomeComponent</span>) },
+
+  <span class="c">// ↓↓↓ 你加的：WMS 模块路由</span>
+  { path: <span class="s">'wms'</span>,
+    loadChildren: () =&gt; <span class="k">import</span>(<span class="s">'./wms/wms.routes'</span>).<span class="f">then</span>(m =&gt; m.<span class="t">WMS_ROUTES</span>) },
+
+  <span class="c">// 框架自带的（不要动）</span>
+  { path: <span class="s">'identity'</span>, loadChildren: () =&gt; <span class="k">import</span>(<span class="s">'@abp/ng.identity'</span>).<span class="f">then</span>(c =&gt; c.<span class="f">createRoutes</span>()) },
+  <span class="c">// ...</span>
+];</code></pre>
+
+  <h4>② 注册侧边栏菜单</h4>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\angular\src\app\route.provider.ts</span>
+
+<pre><code>routes.<span class="f">add</span>([
+  { path: <span class="s">'/'</span>, name: <span class="s">'::Menu:Home'</span>, iconClass: <span class="s">'fas fa-home'</span>,
+    order: <span class="n">1</span>, layout: <span class="t">eLayoutType</span>.application },
+
+  <span class="c">// ↓↓↓ 你加的：WMS 菜单组</span>
+  { path: <span class="s">'/wms'</span>, name: <span class="s">'::Menu:Wms'</span>, iconClass: <span class="s">'fas fa-warehouse'</span>,
+    order: <span class="n">10</span>, layout: <span class="t">eLayoutType</span>.application },
+  { path: <span class="s">'/wms/inbound-orders'</span>, name: <span class="s">'::Menu:InboundOrders'</span>,
+    parentName: <span class="s">'::Menu:Wms'</span>, order: <span class="n">1</span>, iconClass: <span class="s">''</span>,
+    layout: <span class="t">eLayoutType</span>.application },
+  { path: <span class="s">'/wms/inventories'</span>, name: <span class="s">'::Menu:Inventories'</span>,
+    parentName: <span class="s">'::Menu:Wms'</span>, order: <span class="n">2</span>, iconClass: <span class="s">''</span>,
+    layout: <span class="t">eLayoutType</span>.application },
+]);</code></pre>
+
+  <h4>③ 写列表页组件（对照后端状态机）</h4>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\angular\src\app\wms\inbound-orders\inbound-order-list.component.ts</span>
+
+<pre><code><span class="f">@Component</span>({
+  selector: <span class="s">'app-inbound-order-list'</span>,
+  templateUrl: <span class="s">'./inbound-order-list.component.html'</span>,
+  imports: [<span class="t">CommonModule</span>, <span class="t">LocalizationPipe</span>, <span class="t">PermissionDirective</span>],
+})
+<span class="k">export class</span> <span class="t">InboundOrderListComponent</span> <span class="k">implements</span> <span class="t">OnInit</span> {
+  <span class="c">// 注入生成出来的 service（不是手写的）</span>
+  <span class="k">private</span> inboundOrderService = <span class="f">inject</span>(<span class="t">InboundOrderService</span>);
+
+  orders: <span class="t">InboundOrderDto</span>[] = [];
+  totalCount = <span class="n">0</span>;
+  loading = <span class="k">false</span>;
+
+  <span class="c">// 把枚举挂到组件上，模板里就能直接用 Status.Draft（否则模板访问不到）</span>
+  <span class="k">readonly</span> <span class="t">Status</span> = <span class="t">InboundOrderStatus</span>;
+
+  <span class="f">ngOnInit</span>() {
+    <span class="k">this</span>.<span class="f">load</span>();
+  }
+
+  <span class="f">load</span>() {
+    <span class="k">this</span>.loading = <span class="k">true</span>;
+    <span class="k">this</span>.inboundOrderService
+      .<span class="f">getList</span>({ maxResultCount: <span class="n">10</span>, skipCount: <span class="n">0</span> })
+      .<span class="f">subscribe</span>(res =&gt; {
+        <span class="k">this</span>.orders = res.items ?? [];
+        <span class="k">this</span>.totalCount = res.totalCount ?? <span class="n">0</span>;
+        <span class="k">this</span>.loading = <span class="k">false</span>;
+      });
+  }
+
+  <span class="c">// ── 业务操作：全部调用生成的 API，不写任何业务规则 ──</span>
+  <span class="f">confirm</span>(id: <span class="k">string</span>) {
+    <span class="k">this</span>.inboundOrderService.<span class="f">confirm</span>(id).<span class="f">subscribe</span>(() =&gt; {
+      <span class="k">this</span>.<span class="f">load</span>();          <span class="c">// 重新加载（状态变了）</span>
+    });
+  }
+
+  <span class="c">// 按钮能不能点 —— 复刻后端状态机（前端只做「显隐」，不做「校验」）</span>
+  <span class="f">canConfirm</span>(order: <span class="t">InboundOrderDto</span>): <span class="k">boolean</span> {
+    <span class="k">return</span> order.status === <span class="t">InboundOrderStatus</span>.Draft;
+  }
+
+  <span class="f">canReceive</span>(order: <span class="t">InboundOrderDto</span>): <span class="k">boolean</span> {
+    <span class="k">return</span> order.status === <span class="t">InboundOrderStatus</span>.Confirmed
+        || order.status === <span class="t">InboundOrderStatus</span>.Receiving;
+  }
+}</code></pre>
+
+  <div class="note note-red">
+    <span class="lbl">前端最重要的一条纪律</span>
+    <p><strong>前端只做「显示控制」，不做「规则校验」。</strong></p>
+    <p style="margin-top:9px"><code>canConfirm()</code> 决定按钮显不显示 —— 但<strong>真正的合法性判断在后端</strong>。前端就算被绕过（改 JS 直接调 API），后端的 <code>order.Confirm()</code> 守卫依然会拦下来。</p>
+    <p style="margin-top:9px">这正是「领域对象的自我保护」的价值所在 —— <strong>它不信任任何调用方，包括前端。</strong></p>
+  </div>
+
+  <h4>④ 模板（对照状态显示）</h4>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\angular\src\app\wms\inbound-orders\inbound-order-list.component.html</span>
+
+<pre><code>&lt;<span class="t">div</span> class=<span class="s">"card"</span>&gt;
+  &lt;<span class="t">table</span> class=<span class="s">"table"</span>&gt;
+    &lt;<span class="t">thead</span>&gt;
+      &lt;<span class="t">tr</span>&gt;
+        &lt;<span class="t">th</span>&gt;{{ <span class="s">'::OrderNo'</span> | <span class="f">abpLocalization</span> }}&lt;/<span class="t">th</span>&gt;
+        &lt;<span class="t">th</span>&gt;{{ <span class="s">'::Type'</span> | <span class="f">abpLocalization</span> }}&lt;/<span class="t">th</span>&gt;
+        &lt;<span class="t">th</span>&gt;{{ <span class="s">'::Status'</span> | <span class="f">abpLocalization</span> }}&lt;/<span class="t">th</span>&gt;
+        &lt;<span class="t">th</span>&gt;{{ <span class="s">'::Actions'</span> | <span class="f">abpLocalization</span> }}&lt;/<span class="t">th</span>&gt;
+      &lt;/<span class="t">tr</span>&gt;
+    &lt;/<span class="t">thead</span>&gt;
+    &lt;<span class="t">tbody</span>&gt;
+      <span class="c">&lt;!-- 控制流语法（Angular 17+） --&gt;</span>
+      <span class="k">@for</span> (order <span class="k">of</span> orders; track order.id) {
+        &lt;<span class="t">tr</span>&gt;
+          &lt;<span class="t">td</span>&gt;{{ order.orderNo }}&lt;/<span class="t">td</span>&gt;
+          &lt;<span class="t">td</span>&gt;{{ order.type }}&lt;/<span class="t">td</span>&gt;
+          &lt;<span class="t">td</span>&gt;
+            <span class="c">&lt;!-- 状态徽章：不同状态不同颜色 --&gt;</span>
+            &lt;<span class="t">span</span> [class]="<span class="s">'badge badge-'</span> + order.status"&gt;
+              {{ <span class="s">'::Enum:InboundOrderStatus.'</span> + order.status | <span class="f">abpLocalization</span> }}
+            &lt;/<span class="t">span</span>&gt;
+          &lt;/<span class="t">td</span>&gt;
+          &lt;<span class="t">td</span>&gt;
+            <span class="c">&lt;!-- 状态机 → 按钮显隐 --&gt;</span>
+            <span class="k">@if</span> (<span class="f">canConfirm</span>(order)) {
+              &lt;<span class="t">button</span> (click)=<span class="s">"confirm(order.id)"</span>
+                      *<span class="f">abpPermission</span>=<span class="s">"'Wms.InboundOrders.Confirm'"</span>&gt;
+                {{ <span class="s">'::Confirm'</span> | <span class="f">abpLocalization</span> }}
+              &lt;/<span class="t">button</span>&gt;
+            }
+            <span class="k">@if</span> (<span class="f">canReceive</span>(order)) {
+              &lt;<span class="t">button</span> (click)=<span class="s">"openReceiveDialog(order.id)"</span>
+                      *<span class="f">abpPermission</span>=<span class="s">"'Wms.InboundOrders.Receive'"</span>&gt;
+                {{ <span class="s">'::Receive'</span> | <span class="f">abpLocalization</span> }}
+              &lt;/<span class="t">button</span>&gt;
+            }
+          &lt;/<span class="t">td</span>&gt;
+        &lt;/<span class="t">tr</span>&gt;
+      }
+    &lt;/<span class="t">tbody</span>&gt;
+  &lt;/<span class="t">table</span>&gt;
+
+  <span class="c">&lt;!-- 页码 --&gt;</span>
+  &lt;<span class="t">abp-pagination</span>
+    [totalCount]=<span class="s">"totalCount"</span>
+    [maxResultCount]=<span class="s">"10"</span>
+    (pageChange)=<span class="s">"onPageChange($event)"</span>&gt;
+  &lt;/<span class="t">abp-pagination</span>&gt;
+&lt;/<span class="t">div</span>&gt;</code></pre>
+
+
+  <h3>后端 ↔ 前端 对照表</h3>
+
+  <table>
+    <thead><tr><th>后端（C#）</th><th>前端（TS）</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>InboundOrderDto</code></td><td><code>InboundOrderDto</code> interface</td><td>generate-proxy 自动生成，与后端一一对应</td></tr>
+      <tr><td><code>InboundOrderStatus</code> enum</td><td><code>InboundOrderStatus</code> enum</td><td>自动生成，值一致</td></tr>
+      <tr><td><code>InboundOrderAppService.ConfirmAsync</code></td><td><code>InboundOrderService.confirm()</code></td><td>方法名转小驼峰</td></tr>
+      <tr><td><code>order.Confirm()</code> 状态守卫</td><td><code>canConfirm()</code> 按钮显隐</td><td><strong>前端只控制显隐，不做校验</strong></td></tr>
+      <tr><td><code>[Authorize("Wms.InboundOrders.Confirm")]</code></td><td><code>*abpPermission="'Wms.InboundOrders.Confirm'"</code></td><td><strong>同一个权限名</strong></td></tr>
+      <tr><td><code>BusinessException(WmsErrorCodes.X)</code></td><td>HTTP 400 → 全局错误提示</td><td>前端无需手写错误处理</td></tr>
+      <tr><td><code>PagedResultDto&lt;T&gt;</code></td><td><code>PagedResultDto&lt;T&gt;</code></td><td><code>res.items</code> / <code>res.totalCount</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note note-purple">
+    <span class="lbl">权限名要完全一致</span>
+    <p>后端 <code>.Contracts\Wms\InboundOrders\InboundOrderPermissions.cs</code> 里定义的权限常量，和前端 <code>*abpPermission</code> 里使用的字符串，<strong>必须完全一致</strong>。建议后端定义常量、前端也维护一份常量文件，别在两边都写裸字符串。</p>
+  </div>
+
+  <h3>分页与 ListService（可选的省力工具）</h3>
+
+  <p>ABP 提供了 <code>ListService</code> 帮你管理分页、排序、筛选和 loading，它可以用，但要注意其中的坑：</p>
+
+<pre><code><span class="c">// 用 ListService 的写法（省掉一堆样板代码）</span>
+<span class="k">export class</span> <span class="t">InboundOrderListComponent</span> {
+  list = <span class="f">inject</span>(<span class="t">ListService</span>);     <span class="c">// ← 注意：没有 providedIn:'root'</span>
+
+  <span class="k">constructor</span>() {
+    <span class="c">// 必须在组件构造函数里注册数据源（组件级 provider）</span>
+    <span class="k">this</span>.list.<span class="f">hookToQuery</span>((query, sort) =&gt;
+      <span class="k">this</span>.inboundOrderService.<span class="f">getList</span>({ ...query, ...sort })
+    );
+  }
+
+  get data$() { <span class="k">return</span> <span class="k">this</span>.list.data$; }        <span class="c">// 数据流</span>
+  get total$() { <span class="k">return</span> <span class="k">this</span>.list.total$; }      <span class="c">// 总数流</span>
+}
+
+<span class="c">// 组件里要加 provider（因为 ListService 没设 providedIn:'root'）</span>
+<span class="f">@Component</span>({
+  <span class="c">// ...</span>
+  providers: [<span class="t">ListService</span>],     <span class="c">// ← 这行不能少，否则每个组件共享同一个实例</span>
+})</code></pre>
+
+  <div class="note note-amber">
+    <span class="lbl">ListService 的坑</span>
+    <p><code>ListService</code> <strong>没有 <code>providedIn: 'root'</code></strong>，必须<strong>在组件级 provide</strong>。忘了这一行，会导致多个列表页共用同一个实例、数据互相串台。这是 ABP Angular 最经典的坑之一。</p>
+  </div>
+
+  <h3>本地化：所有文案不要硬编码</h3>
+
+  <span class="path">D:\yudao\abp\Acme.Learn\angular\src\assets\localization\（或后端资源）</span>
+
+<pre><code>{
+  <span class="s">"Menu:Wms"</span>: <span class="s">"仓储管理"</span>,
+  <span class="s">"Menu:InboundOrders"</span>: <span class="s">"入库单"</span>,
+  <span class="s">"Menu:Inventories"</span>: <span class="s">"库存查询"</span>,
+  <span class="s">"OrderNo"</span>: <span class="s">"单号"</span>,
+  <span class="s">"Enum:InboundOrderStatus.Draft"</span>: <span class="s">"草稿"</span>,
+  <span class="s">"Enum:InboundOrderStatus.Confirmed"</span>: <span class="s">"已确认"</span>,
+  <span class="s">"Enum:InboundOrderStatus.Receiving"</span>: <span class="s">"收货中"</span>,
+  <span class="s">"Enum:InboundOrderStatus.Completed"</span>: <span class="s">"已完成"</span>,
+  <span class="s">"Wms:InvalidStatusTransition"</span>: <span class="s">"无效的状态流转"</span>
+}</code></pre>
+
+  <div class="note note-blue">
+    <span class="lbl">两个 key 的用途不同</span>
+    <ul>
+      <li><code>Enum:InboundOrderStatus.Draft</code> —— 供前端页面显示状态</li>
+      <li><code>Wms:InvalidStatusTransition</code> —— 与后端 <code>WmsErrorCodes</code> 完全同名，后端抛异常时前端直接显示中文</li>
+    </ul>
+  </div>
+
+  <h3>这个 WMS 前端的模块分级</h3>
+
+  <p>前端的工作量同样应按<strong>规则密度</strong>分级 —— 规则越少的页面越可以照抄模板，规则越密的页面越需要精写：</p>
+
+  <table>
+    <thead><tr><th>页面</th><th>复杂度</th><th>做法</th></tr></thead>
+    <tbody>
+      <tr><td>仓库 / 物料 / 库位管理</td><td>低（纯 CRUD）</td><td>照抄 ABP 自带的 users 页面，改字段即可</td></tr>
+      <tr><td>入库单列表</td><td>中（状态机 + 收货弹窗）</td><td>状态徽章 + 按钮显隐 + 收货对话框</td></tr>
+      <tr><td>出库单列表</td><td>中高（多一步分配）</td><td>比入库多「分配」交互，要选库存</td></tr>
+      <tr><td>库存查询</td><td>低（只读）</td><td>纯查询列表 + 筛选条件</td></tr>
+      <tr><td>收货弹窗</td><td><strong>高</strong></td><td>行级实收量输入 + 库位选择器，是全前端最复杂的组件</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note note-green">
+    <span class="lbl">最省力的起点</span>
+    <p>ABP 自带的 <code>node_modules\@abp\ng.identity\src\lib\components\users\users.component.ts</code> 是<strong>整个仓库里唯一一个完整的 CRUD + 权限 + 弹窗 + 分页范例</strong>。写主数据页面时直接照抄它的结构，能省掉 80% 的摸索。</p>
+  </div>
+</section>
+
+<!-- ══════════ 10 ══════════ -->
+<section id="s10">
+  <h2><i>10</i>设计陷阱与检查清单</h2>
+
+  <h3>最容易设计错的四个地方</h3>
+
+  <div class="note note-red">
+    <span class="lbl">陷阱 1</span>
+    <p><strong>把单据行独立成聚合根。</strong> 这样就会失去「一张单不能有重复物料」这一不变量的保证 —— 因为校验需要跨聚合查询，而这种查询在并发下并不可靠。</p>
+  </div>
+
+  <div class="note note-red">
+    <span class="lbl">陷阱 2</span>
+    <p><strong>把 <code>Material</code> 对象塞进 <code>InboundOrderLine</code>。</strong> 也就是写成 <code>public Material Material { get; set; }</code>。这会模糊聚合边界，使「一次事务只改一个聚合」的约束失效。</p>
+  </div>
+
+  <div class="note note-red">
+    <span class="lbl">陷阱 3</span>
+    <p><strong>把库存加减写在 AppService 里。</strong> 库存的变化规则（可用量校验、批次维度、流水记录）属于领域层，而不属于应用层。写在 AppService 里，会导致这些规则无法被其他场景复用。</p>
+  </div>
+
+  <div class="note note-red">
+    <span class="lbl">陷阱 4</span>
+    <p><strong>给状态字段留公开 setter，或者让 DTO 也带一个同名的状态字段。</strong> 留公开 setter，自动映射器就能绕过领域方法直接改状态，规则形同虚设；而 DTO 再带一个同名的 <code>IsActive</code>，就变成<strong>一个名字承担两种语义</strong> —— 实体里是<strong>事实</strong>（现在是不是启用），DTO 里是<strong>指令</strong>（应该被改成什么）。混在同一个名字下，读代码的人必然串。</p>
+    <p style="margin-top:9px"><strong>做法：</strong>状态字段 <code>private set</code>；DTO 里<strong>不放</strong>状态字段；启用/停用做成独立接口（<code>POST /api/app/warehouse/{id}/activate</code>）—— <strong>用动词表达指令，用布尔描述事实</strong>，两者分开，混淆就没有立足点。</p>
+  </div>
+
+  <h3>设计一个聚合时的检查清单</h3>
+
+  <table>
+    <thead><tr><th>#</th><th>问题</th><th>判断结果 → 做法</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>这是聚合根还是聚合内实体？</td><td>有独立生命周期 / 能被单独查询 → <strong>聚合根</strong>；必须依附于某根存在 → <strong>Entity</strong></td></tr>
+      <tr><td>2</td><td>它跟别人的关系是什么？</td><td>同一聚合内 → 可有导航属性 + Include；<strong>跨聚合 → 只存 Id</strong></td></tr>
+      <tr><td>3</td><td>业务不变量是什么？</td><td>写成带校验的<strong>领域方法</strong>，不放 Service</td></tr>
+      <tr><td>4</td><td>基类选哪个？</td><td>需审计+软删 → <code>FullAuditedAggregateRoot</code>；只追加 → <code>CreationAuditedAggregateRoot</code></td></tr>
+      <tr><td>5</td><td>关系配置写在哪？</td><td>EntityFrameworkCore 项目的 <code>ConfigureXxx</code> 扩展方法</td></tr>
+    </tbody>
+  </table>
+
+  <h3>外键写法的变化对照</h3>
+
+  <table>
+    <thead><tr><th>场景</th><th>JPA / 芋道</th><th>ABP / EF Core</th></tr></thead>
+    <tbody>
+      <tr><td>声明外键列</td><td><code>@Column(name="author_id")</code></td><td><code>public Guid AuthorId { get; private set; }</code></td></tr>
+      <tr><td>声明关系</td><td><code>@ManyToOne</code> + <code>@JoinColumn</code></td><td><code>public Author Author { get; private set; }</code> 或配置里 <code>HasOne</code></td></tr>
+      <tr><td><strong>跨聚合引用</strong></td><td><code>@ManyToOne</code> 直接存对象</td><td><strong>只存 Id</strong>，不存对象</td></tr>
+      <tr><td>关系配置位置</td><td>实体上的注解</td><td><code>ConfigureXxx</code> 扩展方法（<strong>独立文件</strong>）</td></tr>
+      <tr><td>级联删除</td><td><code>cascade = CascadeType.ALL</code></td><td><code>OnDelete(DeleteBehavior.Cascade)</code></td></tr>
+      <tr><td>懒加载</td><td><code>FetchType.LAZY</code></td><td><strong>默认不懒加载</strong>，需要显式 <code>Include</code></td></tr>
+      <tr><td>集合初始化</td><td><code>new ArrayList&lt;&gt;()</code></td><td><code>new List&lt;Chapter&gt;()</code>，<strong>并且需要 <code>private set</code></strong></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note note-amber">
+    <span class="lbl">三个必踩的坑</span>
+    <ul>
+      <li><strong>集合属性必须初始化</strong> —— <code>protected Book() { Chapters = new List&lt;BookChapter&gt;(); }</code>，否则会出现 null 引用</li>
+      <li><strong>EF Core 默认不懒加载</strong> —— <code>book.Author.Name</code> 在 ABP 里会直接抛 <code>NullReferenceException</code>，这跟 JPA 的直觉正好相反</li>
+      <li><strong>多对多关系要求「你自己建中间表」</strong> —— 中间表往往带有业务含义（借出时间、归还时间），应该设计成独立聚合根</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════ 10 ══════════ -->
+<section id="s11">
+  <h2><i>11</i>关键设计问答</h2>
+
+  <div class="qa">
+    <div class="q"><span>Q1</span>一张入库单能不能跨仓库？</div>
+    <div class="a">
+      <p><strong>不能。</strong> <code>WarehouseId</code> 放在单头上。跨仓库属于调拨业务，应该拆成「出库单 + 入库单」两张单据，而不是在一张单上写两个仓库。</p>
+      <p style="margin-top:9px">这符合「一次事务只改一个聚合」的原则 —— 跨仓库落库必然要修改两个仓库的库存，天然违反聚合边界。</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span>Q2</span>批号（BatchNo）放在哪一层？</div>
+    <div class="a">
+      <p>放在<strong>库存（Inventory）和单据行</strong>上，<strong>不放在物料主数据</strong>上。</p>
+      <p style="margin-top:9px">物料只声明「是否批次管理」（<code>IsBatchManaged</code> 开关），具体的批号则属于业务运行数据。这正是「主数据描述类型，业务数据描述实例」的划分。</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span>Q3</span>要不要做库存预留（Allocated）？</div>
+    <div class="a">
+      <p><strong>要。</strong> 否则两个出库单会同时抢同一批货。</p>
+      <p style="margin-top:9px"><code>AllocatedQuantity</code> 就是为此而存在的：<strong>出库单确认时分配（<code>Allocate</code>），发货完成时扣减（<code>Decrease</code>）</strong>。在这中间的一段时间里，库存被「锁定」，<code>AvailableQuantity</code> 相应减少，其他单据就抢不到了。</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span>Q4</span>收货时库位怎么定？</div>
+    <div class="a">
+      <p>有两种模式：<strong>① 在单头上指定</strong>（简单）　<strong>② 收货时人工指定 / 系统推荐</strong>（真实 WMS）</p>
+      <p style="margin-top:9px">本设计采用的是<strong>行级 <code>LocationId</code></strong>，两种模式都能支持。如果要做「系统推荐库位」，那只是 <code>InventoryManager</code> 里的一个算法方法，属于领域服务。</p>
+    </div>
+  </div>
+
+  <div class="qa">
+    <div class="q"><span>Q5</span>Inventory 表会不会成为热点？</div>
+    <div class="a">
+      <p><strong>会。</strong> 同一个「库位 + 物料 + 批次」的记录会被高频更新，单行锁会成为瓶颈。</p>
+      <p style="margin-top:9px">生产级 WMS 通常按「库位 + 物料 + 批次」分片，或者用 Redis 做缓存加异步落库。但<strong>你现在是在学框架，用最简单的实现即可</strong> —— 先把领域模型跑通，性能优化是后面的事。</p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:36px">设计顺序</h3>
+
+  <div class="diagram">
+    <svg viewBox="0 0 680 200" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,Segoe UI,PingFang SC,sans-serif">
+      <defs>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L7,3 z" fill="#6e7681"/>
+        </marker>
+      </defs>
+      <rect x="12" y="60" width="140" height="66" rx="8" fill="rgba(210,153,34,.12)" stroke="#d29922" stroke-width="1.4"/>
+      <text x="82" y="86" fill="#e6edf3" font-size="12.5" text-anchor="middle" font-weight="600">① 画状态机</text>
+      <text x="82" y="105" fill="#9da7b3" font-size="10" text-anchor="middle">Draft → ... → Done</text>
+
+      <line x1="156" y1="93" x2="188" y2="93" stroke="#6e7681" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="192" y="60" width="140" height="66" rx="8" fill="rgba(63,185,80,.12)" stroke="#3fb950" stroke-width="1.4"/>
+      <text x="262" y="80" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">② 定库存时机</text>
+      <text x="262" y="97" fill="#9da7b3" font-size="9.5" text-anchor="middle">哪个状态触发</text>
+      <text x="262" y="111" fill="#9da7b3" font-size="9.5" text-anchor="middle">Putaway / Pick</text>
+
+      <line x1="336" y1="93" x2="368" y2="93" stroke="#6e7681" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="372" y="60" width="140" height="66" rx="8" fill="rgba(188,140,255,.12)" stroke="#bc8cff" stroke-width="1.4"/>
+      <text x="442" y="80" fill="#e6edf3" font-size="12" text-anchor="middle" font-weight="600">③ 定聚合边界</text>
+      <text x="442" y="97" fill="#9da7b3" font-size="9.5" text-anchor="middle">单头=聚合根</text>
+      <text x="442" y="111" fill="#9da7b3" font-size="9.5" text-anchor="middle">单行=聚合内实体</text>
+
+      <line x1="516" y1="93" x2="548" y2="93" stroke="#6e7681" stroke-width="1.5" marker-end="url(#ar)"/>
+
+      <rect x="552" y="60" width="116" height="66" rx="8" fill="rgba(56,139,253,.12)" stroke="#58a6ff" stroke-width="1.4"/>
+      <text x="610" y="86" fill="#e6edf3" font-size="12.5" text-anchor="middle" font-weight="600">④ 写实体类</text>
+      <text x="610" y="105" fill="#9da7b3" font-size="10" text-anchor="middle">最后才动手</text>
+
+      <text x="340" y="172" fill="#f85149" font-size="11.5" text-anchor="middle" font-weight="600">先状态机，后实体类 —— 与「先建表」的顺序完全相反</text>
+    </svg>
+  </div>
+
+  <div class="note note-blue">
+    <span class="lbl">一句话总结</span>
+    <p>这个 WMS 的核心不是表，而是 <strong>两个状态机（入库单、出库单）加上一个库存一致性模型</strong>。设计顺序应该是：画单据状态机 → 确定库存的加减时机 → 定聚合边界 → <strong>最后</strong>才轮到写实体类。</p>
+  </div>
+</section>
+
+<footer>
+  <span>WMS 领域设计 · ABP 10.6 / DDD · 后端与 Angular 前端</span>
+  <span>目标项目 Acme.Learn · 2026-09-12</span>
+</footer>
+
+</div>
+</body>
+</html>

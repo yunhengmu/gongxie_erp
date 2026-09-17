@@ -1,0 +1,104 @@
+﻿@using Volo.Abp.Validation.StringValues
+@using Microsoft.Extensions.Localization
+@inherits AbpFeatureManagementComponentBase
+
+<Modal @ref="Modal" Closing="@ClosingModal" Size="ModalSize.Large">
+    <ModalContent>
+        <ModalHeader>
+            <ModalTitle>@L["Features"]@ProviderKeyDisplayName</ModalTitle>
+            <CloseButton Clicked="CloseModal" />
+        </ModalHeader>
+        @if (Groups == null || !Groups.Any())
+        {
+            <span class="m-3">@L["NoFeatureFoundMessage"]</span>
+        }
+        else
+        {
+            <ModalBody>
+                <Tabs TabPosition="TabPosition.Start" Pills="true" @bind-SelectedTab="@SelectedTabName">
+                    <Items>
+                        @foreach (var group in Groups)
+                        {
+                            <Tab Name="@GetNormalizedGroupName(group.Name)">
+                                <span>@group.DisplayName</span>
+                            </Tab>
+                        }
+                    </Items>
+                    <Content>
+                        @for (var i = 0; i < Groups.Count; i++)
+                        {
+                            var index = i;
+                            <TabPanel Name="@GetNormalizedGroupName(Groups[index].Name)">
+                                <h4>@Groups[index].DisplayName</h4>
+                                <hr class="mt-2 mb-3" />
+                                @foreach (var feature in Groups[index].Features)
+                                {
+                                    <div class="mt-2">
+                                        @{
+                                            var disabled = IsDisabled(feature);
+
+                                            if (feature.ValueType is FreeTextStringValueType)
+                                            {
+                                                <Field Style="@GetFeatureStyles(feature)">
+                                                    <FieldLabel>@GetShownName(feature)</FieldLabel>
+                                                    <TextInput Disabled="@disabled"
+                                                          Value="@feature.Value"
+                                                          ValueChanged="@(async (v) => await OnFeatureValueChangedAsync(v, feature))" />
+                                                    @if (feature.Description != null)
+                                                    {
+                                                        <div class="form-text">@feature.Description</div>
+                                                    }
+                                                </Field>
+                                            }
+
+                                            if (feature.ValueType is SelectionStringValueType)
+                                            {
+                                                var items = ((SelectionStringValueType)feature.ValueType).ItemSource.Items;
+                                                var selectedValue = SelectionStringValues[feature.Name];
+                                                <Field Style="@GetFeatureStyles(feature)">
+                                                    <FieldLabel>@GetShownName(feature)</FieldLabel>
+                                                    <Select TValue="string" Disabled="disabled" Value="selectedValue" ValueChanged="s => SelectionStringValues[feature.Name] = s">
+                                                        @foreach (var item in items)
+                                                        {
+                                                            <SelectItem Value="@item.Value">
+                                                                @CreateStringLocalizer(item.DisplayText.ResourceName).GetString(item.DisplayText.Name)
+                                                            </SelectItem>
+                                                        }
+                                                    </Select>
+                                                    @if (feature.Description != null)
+                                                    {
+                                                        <div class="form-text">@feature.Description</div>
+                                                    }
+                                                </Field>
+                                            }
+
+                                            if (feature.ValueType is ToggleStringValueType)
+                                            {
+                                                <Field Style="@GetFeatureStyles(feature)">
+                                                    <Check TValue="bool" Disabled="disabled" Value="@ToggleValues[feature.Name]" ValueChanged="@(async (v) => await OnSelectedValueChangedAsync(v, feature))">
+                                                        @GetShownName(feature)
+                                                    </Check>
+                                                    @if (feature.Description != null)
+                                                    {
+                                                        <div class="form-text">@feature.Description</div>
+                                                    }
+                                                </Field>
+                                            }
+                                        }
+                                    </div>
+                                }
+
+                            </TabPanel>
+                        }
+                    </Content>
+                </Tabs>
+            </ModalBody>
+            <ModalFooter>
+                <Button class="btn btn-link" Clicked="CloseModal">@L["Cancel"]</Button>
+                <Button Color="Color.Primary" Outline Clicked="@(async () => await DeleteAsync(ProviderName,ProviderKey))">@L["ResetToDefault"]</Button>
+                <Button Color="Color.Primary" Clicked="SaveAsync">@L["Save"]</Button>
+            </ModalFooter>
+        }
+
+    </ModalContent>
+</Modal>

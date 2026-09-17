@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="ObI6LmGeK72rQJBpN3DOLI">
+<head data-page-node-id="Boj2ckuBLOWvYku8faeCkN">
+<meta charset="UTF-8" data-page-node-id="zgmRDfEIpwmJzKYcDsKPtQ">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="EMD3XmkE4nNsPNxey6KEpC">
+<title>ABP module 代码详解</title>
+<style>
+:root{
+  --bg:#ffffff; --bg-sub:#f7f8fa; --bg-code:#f4f6f8; --bg-inline:#eef1f5;
+  --text:#1f2328; --text-sub:#59636e; --text-mute:#8b949e;
+  --border:#d8dee4; --border-soft:#e6e9ed;
+  --blue:#0969da; --blue-bg:#ddf4ff; --green:#1a7f37; --green-bg:#dafbe1;
+  --amber:#9a6700; --amber-bg:#fff8c5; --red:#cf222e; --red-bg:#ffebe9;
+  --purple:#8250df; --purple-bg:#fbefff; --teal:#0f6e56; --teal-bg:#e1f5ee;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117; --bg-sub:#161b22; --bg-code:#161b22; --bg-inline:#21262d;
+    --text:#e6edf3; --text-sub:#9198a1; --text-mute:#6e7681;
+    --border:#30363d; --border-soft:#21262d;
+    --blue:#4493f8; --blue-bg:#0c2d6b; --green:#3fb950; --green-bg:#0f2f1a;
+    --amber:#d29922; --amber-bg:#3a2d00; --red:#f85149; --red-bg:#3d1418;
+    --purple:#ab7df8; --purple-bg:#2b1c4a; --teal:#3fb9a0; --teal-bg:#0c2f28;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.72;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1060px;margin:0 auto;padding:46px 26px 100px}
+header.doc{border-bottom:1px solid var(--border);padding-bottom:24px;margin-bottom:28px}
+header.doc .eyebrow{font-size:12.5px;letter-spacing:.12em;color:var(--text-mute);text-transform:uppercase;font-weight:600}
+header.doc h1{font-size:29px;line-height:1.3;margin:12px 0;font-weight:700;letter-spacing:-.01em}
+header.doc p.lead{color:var(--text-sub);font-size:15.5px;margin:0;max-width:830px}
+h2{font-size:21px;font-weight:700;margin:46px 0 6px;padding-top:14px;letter-spacing:-.01em}
+h2 .num{color:var(--blue);font-variant-numeric:tabular-nums;margin-right:8px}
+h3{font-size:16px;font-weight:650;margin:26px 0 8px}
+p{margin:12px 0}
+ul,ol{margin:12px 0;padding-left:24px}
+li{margin:5px 0}
+code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  font-size:12.5px;background:var(--bg-inline);padding:2px 6px;border-radius:5px;
+  word-break:break-all;white-space:normal}
+pre{background:var(--bg-code);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:15px 17px;overflow-x:auto;margin:14px 0;line-height:1.58}
+pre code{background:none;padding:0;font-size:12.5px;white-space:pre;word-break:normal}
+.callout{border-left:3px solid var(--blue);background:var(--blue-bg);padding:13px 18px;
+  border-radius:0 var(--radius) var(--radius) 0;margin:18px 0;font-size:14.3px}
+.callout.warn{border-color:var(--amber);background:var(--amber-bg)}
+.callout.tip{border-color:var(--green);background:var(--green-bg)}
+.callout.danger{border-color:var(--red);background:var(--red-bg)}
+.callout p:first-child{margin-top:0}.callout p:last-child{margin-bottom:0}
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.4px}
+th,td{border:1px solid var(--border-soft);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--bg-sub);font-weight:650;white-space:nowrap}
+td code{font-size:12.1px}
+.pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:20px;font-weight:600;vertical-align:middle}
+.pill.be{background:var(--blue-bg);color:var(--blue)}
+.pill.fe{background:var(--amber-bg);color:var(--amber)}
+.pill.data{background:var(--teal-bg);color:var(--teal)}
+.pill.core{background:var(--purple-bg);color:var(--purple)}
+.toc{background:var(--bg-sub);border:1px solid var(--border-soft);border-radius:var(--radius);padding:18px 24px;margin:24px 0}
+.toc h3{margin:0 0 10px;font-size:13px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-mute)}
+.toc ol{margin:0;padding-left:20px;columns:2;column-gap:30px}
+@media(max-width:760px){.toc ol{columns:1}}
+.toc li{margin:4px 0;font-size:13.8px}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.foot{margin-top:56px;padding-top:20px;border-top:1px solid var(--border);color:var(--text-mute);font-size:13px}
+</style>
+</head>
+<body data-page-node-id="u7idoJHRA0HGxkocPK2aCF">
+<div class="wrap" data-page-node-id="f0OchvAU5oYCeJEtTItEVH">
+
+<header class="doc" data-page-node-id="Yis1Qyai3twt9B3dCzppjt">
+  <div class="eyebrow" data-page-node-id="LD4kN01DzOJYgMpYcCQYQb">ABP Framework rel-10.6 · module 详解</div>
+  <h1 data-page-node-id="DbKOgTQquWFfKDodnLziFy">module 代码到底是什么：以 identity 模块为标本</h1>
+  <p class="lead" data-page-node-id="3xkonbZY9urmyiCm5kqJpy">一个 ABP 应用模块的完整解剖——物理骨架、两个描述文件、19 个项目、真实依赖链、前端变体、以及模块类到底在做什么。所有数据取自 <code data-page-node-id="bsvR0we70illoZSYwyQ5Kk">D:\yudao\abp\ABP-Framework-rel-10.6\modules\identity</code> 实际源码。</p>
+</header>
+
+<div class="callout warn" data-page-node-id="QtNZR0BYktFO0dlgduvpKX">
+<p data-page-node-id="yAdGvZIPf3UnOTvW4VRo6X"><strong data-page-node-id="rH8BVW0eMFniadhJPuATIA">先纠正一个前提：<code data-page-node-id="JBNcxfyjyXcycgovjOvuDc">modules\</code> 是让你「读」的，不是让你「写」的。</strong></p>
+<p data-page-node-id="vphUAek9IXK4wwu3OXm4jF">你的项目里引用的是<strong data-page-node-id="fBDxGllEhUOtTDayo18wbY">编译好的 NuGet / npm 包</strong>——module 的源码根本不会出现在你的项目里。改它没有意义，升级时会被覆盖。</p>
+<p data-page-node-id="rhfmji7PHlpUn9Cg1Y7BCE">准确的表述是：<b data-page-node-id="X5FMwBOPZn1SizyCLNhP0f">约 90% 的「参考阅读」在 <code data-page-node-id="yxdutur3lTzZNRFOWq8MW3">modules\</code>，而「编写」在你自己的项目里</b>（用 <code data-page-node-id="On1mHCz3aoBsCmUT1OmYGQ">abp new</code> 生成，结构同 <code data-page-node-id="MFFbwBOe8Ny5GYpvEAJCpO">templates\app\</code>）。</p>
+</div>
+
+<div class="toc" data-page-node-id="NpRJYTIO1rK8h12o8zKVEj">
+  <h3 data-page-node-id="3tAG4OJfsA8KEk9BOW5WG3">目录</h3>
+  <ol data-page-node-id="jtixm2pXbSALkAo4Cw1sCK">
+    <li data-page-node-id="LxDHiPhMbZ6mrkuAz90iA8"><a href="#s1" data-page-node-id="B8xDKKTXnir7eoWU5kBHHV">module 的物理骨架</a></li>
+    <li data-page-node-id="85Z1H7bfa5fqcTJmR1eAy8"><a href="#s2" data-page-node-id="ljq4RpXgON9yhnNuvLSO4t">两个描述文件：.abpmdl 与 .abppkg</a></li>
+    <li data-page-node-id="yEuVympLvkAL2GCp0Bh3wU"><a href="#s3" data-page-node-id="GHYCt1supA4rBCiIcNAmDA">一个模块有多少项目（19 个）</a></li>
+    <li data-page-node-id="PuamUC6ClGEuy18agnRZo9"><a href="#s4" data-page-node-id="Hss1un4Jx3IBroOTIy3P6N">真实依赖链</a></li>
+    <li data-page-node-id="EKGQp5bFJMRpVKgYBsRZ7o"><a href="#s5" data-page-node-id="D0SSJNDHpnOrNTX3KcqvEm">前端的四种变体</a></li>
+    <li data-page-node-id="YEpJUTJ2A7bO3bA3NIB2qP"><a href="#s6" data-page-node-id="cMRh5JTWGMt1DxjUvghTNw">模块类在做什么</a></li>
+    <li data-page-node-id="163Slkv7bsAMBg3SNcFJ6d"><a href="#s7" data-page-node-id="5fVdPvpx6C5liYNoJTSm8U">模块如何被装配进项目</a></li>
+    <li data-page-node-id="fPUluTRBEfsivxDGzEFY1h"><a href="#s8" data-page-node-id="gNKoXG1pFynyAz0sT0Rowd">你该怎么用 modules 学代码</a></li>
+  </ol>
+</div>
+
+<!-- ============ 1 ============ -->
+<h2 id="s1" data-page-node-id="pkH38CSIaFDJkMZmjloTn8"><span class="num" data-page-node-id="kGgQG9R54nHCQcpdZBtT4l">01</span>module 的物理骨架</h2>
+
+<p data-page-node-id="6R8RCyP13ppuijhzta7CIj">打开任意一个模块（以 blogging 为例），顶层永远是这几个东西：</p>
+
+<pre data-page-node-id="AQk8VObkXH9EbMMu1PGvmG"><code data-page-node-id="InzQ0cqymZh2kJftgUgzum">D:\yudao\abp\ABP-Framework-rel-10.6\modules\blogging\
+├── src\        ← 模块本体：各个分层项目的源码（你主要看这里）
+├── test\       ← 各层对应的测试项目
+├── app\        ← 本地调试宿主（一个能跑起来的小应用，把这模块装进去）
+├── docs\       ← 模块文档（部分模块才有）
+├── README.md
+├── NuGet.md
+├── Volo.Blogging.abpmdl        ← 模块清单（ABP Studio 读它）
+├── Volo.Blogging.abpsln        ← ABP Studio 解决方案描述
+├── Volo.Blogging.slnx          ← .NET 解决方案文件
+└── Volo.Blogging.sln.DotSettings</code></pre>
+
+<p data-page-node-id="rmLcQtPkUmovT1KUElSzW4">不同模块的骨架会有增删，对照如下：</p>
+
+<table data-page-node-id="UVsoxwuOeWS23V7jI1VC4j">
+<thead data-page-node-id="GwG5HxHrGPkp6EjM67fqnG"><tr data-page-node-id="ucRGN1DKem4RU5lGSBXEH7"><th data-page-node-id="4LX0ljUHUtv92HjKAxb213">模块</th><th data-page-node-id="OF5m7uda4KsWEYCznmNk6b">顶层目录</th><th data-page-node-id="MlhaBavF6eGhLQxRZOfAy8">特点</th></tr></thead>
+<tbody data-page-node-id="gg3l1fcKs85VzGZ9oJcSmB">
+<tr data-page-node-id="h5djqZ3efonaGM9RAJCdod"><td data-page-node-id="y8jf6umt2Yhl68SGFfhOkZ"><code data-page-node-id="zlKUArjivgGorh92Oymp09">blogging</code></td><td data-page-node-id="RBkQJj3IBiAuAFMRxdYRiQ">src / test / app / docs</td><td data-page-node-id="EvV8FtAguYBXEOBwQIrMpA">有独立文档目录</td></tr>
+<tr data-page-node-id="CJVsGh76KBacXbSuflFBL4"><td data-page-node-id="AZ1vasBzpJUsaewIwP7jIX"><code data-page-node-id="NHjw69ZQDzDCbYODAeffDU">identity</code></td><td data-page-node-id="XYDI33cHKdnDmk4QRMAFvd">src / test</td><td data-page-node-id="Bmr6noXj5vmReJAWiCgPQN">最「纯」的模块——只有代码和测试，没带调试宿主</td></tr>
+<tr data-page-node-id="wMf24WIE6Xkp3rC5vrIcW2"><td data-page-node-id="KZ3jeliqKBp1Yk5tt93UlN"><code data-page-node-id="iSx4jnE3726C3LSFTT0bOt">cms-kit</code></td><td data-page-node-id="isqtBLEDL4053bLyEBbYci">src / test / angular / host / database + docker-compose*.yml</td><td data-page-node-id="9DP6tl9hnVtXWZCii2NPlk">三套 UI 全有 + 数据库容器编排</td></tr>
+<tr data-page-node-id="ouwyCEBx51UShOP106x7C2"><td data-page-node-id="N2goVBHUcBikRIeyquMLWl"><code data-page-node-id="BQ9ZLphTFhoUnpNco9hjaC">docs</code></td><td data-page-node-id="Bjjvzxdnpew7nvCiMFmGnR">src / test / app + docker-compose*.yml</td><td data-page-node-id="GxYIHVVvl00uFQg2OvMkLt">带 Docker 部署</td></tr>
+<tr data-page-node-id="0tjGei9kYjn9MqskmqNUP2"><td data-page-node-id="xBQU6JYQ6msZF2Jrz5fZh0"><code data-page-node-id="3J6jbVStm39iPBqpHarRXb">users</code></td><td data-page-node-id="L9s4F3Mtmw5TZaOtQoIb90">src</td><td data-page-node-id="t3u0OwRt4HDxm5PTgqvzXz">极简——只有源码，连测试都没有</td></tr>
+<tr data-page-node-id="vopSd5CbTd5JwJrTAoNn6B"><td data-page-node-id="XKqHeSApeVZANOF1l0u9mX"><code data-page-node-id="wnFGc2zmbcYgkAdrcMP3ry">client-simulation</code></td><td data-page-node-id="CWmJV98qeNove0bPVQbhg9">src / demo</td><td data-page-node-id="SI91WQMhsjvUrbbHc5FSvd">用 demo 代替 test</td></tr>
+</tbody>
+</table>
+
+<div class="callout" data-page-node-id="GpKC0tpnvgVtV4pheva9ew">
+<p data-page-node-id="aVjE1QFm67nizGzNk9SxyT"><strong data-page-node-id="26OxyrPmkkNiEObYmV9PXV">「app」和「host」是什么？</strong>它们是<b data-page-node-id="KygFzbB02eNVfCN3zSxc9h">把这个模块装进去跑起来的调试宿主</b>。因为模块本身是个类库，不能直接 <code data-page-node-id="EMG8GPWo6OJFdbrxDqNHDq">dotnet run</code>。比如 blogging 的 <code data-page-node-id="p5AmANvFXtAIQvZrIZOq3Q">app\Volo.BloggingTestApp\</code> 就是个 Razor Pages 小应用，你可以打开它看效果。<b data-page-node-id="rjJN0qWlUo95ppWf8uEItg">这也是「模块可独立开发」的体现——每个模块自带一个最小可运行环境。</b></p>
+</div>
+
+<!-- ============ 2 ============ -->
+<h2 id="s2" data-page-node-id="8WEMmF3RJ1OhPM6TnE8EQx"><span class="num" data-page-node-id="ycLJYBnxhgLMbTNFZAYg0p">02</span>两个描述文件：.abpmdl 与 .abppkg</h2>
+
+<p data-page-node-id="cBg1df5iKpoEsEJxj9eRAH">这两个文件在普通 .NET 项目里没有，是 ABP 特有的元数据，用于工具链（主要是 ABP Studio）。</p>
+
+<h3 data-page-node-id="tufhxbzOpd98x1MdyJQn9j">.abpmdl —— 模块清单</h3>
+<p data-page-node-id="AuvbXPTf3speEgXBnzG53I">位于模块根目录，列出这个模块包含的所有包项目。blogging 的真实内容（节选）：</p>
+
+<pre data-page-node-id="hnxoS7ZD1jvi6AAD2eNiP0"><span class="path" data-page-node-id="4TAcUR1BhC3pBdw8Y7XxVW">modules\blogging\Volo.Blogging.abpmdl</span><code data-page-node-id="u3Y1fMVO9VkMzDhY8tuDpQ">{
+  <span class="s" data-page-node-id="cNWcjGnSDF8aGOfMYqXJDM">"folders"</span>: { <span class="s" data-page-node-id="NfH69EIUhcS2CyT2RnjLFm">"items"</span>: { <span class="s" data-page-node-id="1FEQ6ULLGHmRP00NtkJG85">"src"</span>: {}, <span class="s" data-page-node-id="jRQDnJaOHgRPY2GisFDM9K">"app"</span>: {}, <span class="s" data-page-node-id="G3aprxwv7B09YU5A75iRva">"test"</span>: {} } },
+  <span class="s" data-page-node-id="CrFO0CeHiupFNlBCldb4n1">"packages"</span>: {
+    <span class="s" data-page-node-id="NjSTG8ENfwSynMPewtAvjt">"Volo.Blogging.Domain"</span>: {
+      <span class="s" data-page-node-id="l2So4CGHhHziKN5ueTgKCR">"path"</span>: <span class="s" data-page-node-id="JukD1wo4S17GiB02PKEx31">"src/Volo.Blogging.Domain/Volo.Blogging.Domain.abppkg"</span>,
+      <span class="s" data-page-node-id="iBnNlUyOk9nerWSdy4YbFA">"folder"</span>: <span class="s" data-page-node-id="iZ2B1bqoEU4BIRFYfcDeTb">"src"</span>
+    },
+    <span class="s" data-page-node-id="1kE6dwhosirOyJTExzHU1y">"Volo.Blogging.Application"</span>: {
+      <span class="s" data-page-node-id="aCFbCQAFmaGEregS0FjWbC">"path"</span>: <span class="s" data-page-node-id="PqEm5Eo2izb5MPpGndPGNH">"src/Volo.Blogging.Application/Volo.Blogging.Application.abppkg"</span>,
+      <span class="s" data-page-node-id="PFJzeLKidyb0JuXNHqTkho">"folder"</span>: <span class="s" data-page-node-id="PE4zqSGMRXETbIxD0fiIbh">"src"</span>
+    },
+    <span class="s" data-page-node-id="GssdI2nePx1a7HQ0Vp12tD">"Volo.Blogging.Web"</span>: {
+      <span class="s" data-page-node-id="JInv2x0USuAVJtAqmpy30E">"path"</span>: <span class="s" data-page-node-id="C7vLMRW1r0PUYNAbOXtv8f">"src/Volo.Blogging.Web/Volo.Blogging.Web.abppkg"</span>,
+      <span class="s" data-page-node-id="1GDnqmfsUyuMBP6HNkiAGm">"folder"</span>: <span class="s" data-page-node-id="2fupGjzT0XYv1jPN9zynkR">"src"</span>
+    },
+    <span class="c" data-page-node-id="XfBffx9GPCIoxOyOpxQsjY">// ... 共 23 个包</span>
+  }
+}</code></pre>
+
+<p data-page-node-id="L0KGbZZFNdnOcRIW4AYMBb"><b data-page-node-id="2aQ4eE4Vs1MMmyycixixWX">作用：</b>告诉工具「这个模块由哪些包组成、分别在哪个目录」。ABP Studio 靠它来画模块依赖图、做可视化。</p>
+
+<h3 data-page-node-id="5SJ185sKeBcVSGM4lVzlgK">.abppkg —— 每个包的角色声明</h3>
+<p data-page-node-id="F0pvLHkXgJ7K6rAobP97S5">每个项目目录下有一个，内容极简：</p>
+
+<pre data-page-node-id="9QJl3uI6rwJ9f8kIZINaDc"><span class="path" data-page-node-id="wfGzT8ygnD2UUug4mEyF3F">modules\blogging\src\Volo.Blogging.Domain\Volo.Blogging.Domain.abppkg</span><code data-page-node-id="0F2elfmHgCijmlRAYcnCn6">{ "role": "lib.domain" }</code></pre>
+
+<p data-page-node-id="Z6yWF0VAjHToyCvFBSvHHQ">identity 模块里实测到的全部 role 取值：</p>
+
+<table data-page-node-id="k9dJQNhf9wFJgtJBv0fJ0K">
+<thead data-page-node-id="jGYW8JV6QXHmZCFKmMU3T7"><tr data-page-node-id="LuxkZMarIviTiDCH8OaIfH"><th data-page-node-id="KwjzO8DhoZj2D3GPEuAwHH">role</th><th data-page-node-id="ybHHgPYowuST2uwiCvk25m">项目</th><th data-page-node-id="X5rFk2juWR4pfyw5jcKJs3">层</th></tr></thead>
+<tbody data-page-node-id="orFxLpivcwqF0u2seP7r0U">
+<tr data-page-node-id="qYwRBu7J9FYnHXqj9bccQf"><td data-page-node-id="t1XwVkqgMg9pBI9Dw3o8ee"><code data-page-node-id="DMKQq5Ex3JLvqDb5A62Qrb">lib.domain-shared</code></td><td data-page-node-id="RtYjPge4A4XRueSO7Nox08">Volo.Abp.Identity.Domain.Shared</td><td data-page-node-id="rRnpBt8kpTFpOURGilagda"><span class="pill core" data-page-node-id="KFU2V2FLRAU4de26PEZhnC">领域共享</span></td></tr>
+<tr data-page-node-id="LAdDtqb5HHvmuxdAoCaU3X"><td data-page-node-id="D5X04WwWBlOUMrhcsyc4gX"><code data-page-node-id="3IXo0L1UfGzzHb8Fxwfps3">lib.domain</code></td><td data-page-node-id="kc5TGeuVLEcTydesdJjtu8">Volo.Abp.Identity.Domain</td><td data-page-node-id="BubdM4ch7fGiXw1PA8D69l"><span class="pill core" data-page-node-id="X0YDMKYe7JAnd6AtRMGKhc">领域</span></td></tr>
+<tr data-page-node-id="hIOGi2aS7DMeNdLHnO7DbO"><td data-page-node-id="RPtHgmNS3ORFBgBZDZRyug"><code data-page-node-id="jS2DBLxQHp6j7HhB2suBkb">lib.application-contracts</code></td><td data-page-node-id="4QMXfs0XCJ3eDy4hIYRULH">Volo.Abp.Identity.Application.Contracts</td><td data-page-node-id="p5EmSyVD1nUMszCOzbq5l5"><span class="pill be" data-page-node-id="3THnErkHb6t6boLgvM1VCf">应用</span></td></tr>
+<tr data-page-node-id="mVlpfvy2zGqEhnrJQgEDiL"><td data-page-node-id="6P5jfaLf8cKBGNUjRrZEWp"><code data-page-node-id="pXxfy3dTjJq7PlMqXtz7Br">lib.application</code></td><td data-page-node-id="oSQBzQE4pTGFtuVZ8QsH3h">Volo.Abp.Identity.Application</td><td data-page-node-id="EcTHK5FJl14p7QceRLd2ew"><span class="pill be" data-page-node-id="aQmf0HKIonjf6i0bzRhEGj">应用</span></td></tr>
+<tr data-page-node-id="HRPVZm1WSvlEZVYQD5yQLb"><td data-page-node-id="9i4to7SMpeaAlZXblR5fvZ"><code data-page-node-id="qVMoUG4GLPdRCcnvLjuIyX">lib.http-api</code></td><td data-page-node-id="zKcEfXoYZOHmPV6Slw1YgK">Volo.Abp.Identity.HttpApi</td><td data-page-node-id="qesnFuaTUVNYw7kvTl09sI"><span class="pill be" data-page-node-id="PA4J47u3kbkMU9ul99rKyD">接口</span></td></tr>
+<tr data-page-node-id="b7qQ8RxFVrMeMeZtT89V0X"><td data-page-node-id="VZbcwpTItOrMyiqr9ITt66"><code data-page-node-id="P35xo2TQvxrMBnmEo7MEJe">lib.http-api-client</code></td><td data-page-node-id="8zCeuRxtsHCIOz46GDdixh">Volo.Abp.Identity.HttpApi.Client</td><td data-page-node-id="0h0TSxgN4Ir0ZJ8WjBIzfC"><span class="pill be" data-page-node-id="pZo2UKJGrIi29DNL8OjESy">接口</span></td></tr>
+<tr data-page-node-id="tp1yGFyE8N4RURaDmq5Tn4"><td data-page-node-id="sVSr5apQrCXAdAvCiOLgGc"><code data-page-node-id="5znoeLXSdWtgHGqospsSFG">lib.ef</code></td><td data-page-node-id="PF13DGyEYvRECE0vIfkPux">Volo.Abp.Identity.EntityFrameworkCore</td><td data-page-node-id="mYigkuVvRkdAhL1LF4h7M9"><span class="pill data" data-page-node-id="8CBM1b9HtgMzm48DaP9rw5">数据</span></td></tr>
+<tr data-page-node-id="S144uwbLVay0GtaJdh3krf"><td data-page-node-id="SQwd6KKsuuHvODZhQloa2j"><code data-page-node-id="tLYB3dwoev7DHUoVUGA3gl">lib.mongodb</code></td><td data-page-node-id="s9WoVKqszmAVKTNvrM93ZV">Volo.Abp.Identity.MongoDB</td><td data-page-node-id="yTPPHGxjsjmEW9UWQLa72e"><span class="pill data" data-page-node-id="c5iFH2KLMqH0xCg5Yv2Gc6">数据</span></td></tr>
+<tr data-page-node-id="5jRwbkFqQlVPHYeDqNfy1w"><td data-page-node-id="5CppyGXvBNyGCyyGFAIunS"><code data-page-node-id="vybuvoZ6FC2OAR9e3BpJ59">lib.mvc</code></td><td data-page-node-id="YLCYMwDQ1t3xlSpVTuvVe3">Volo.Abp.Identity.Web</td><td data-page-node-id="kYhzfcxp6mr1dUHZ0qOXWO"><span class="pill fe" data-page-node-id="KnNVIXFv1aaveDarw6GLBC">MVC 前端</span></td></tr>
+<tr data-page-node-id="IWEHWEDH18jsCjH4yukYas"><td data-page-node-id="ghTDlKZ4Q0TWOMG3WTFAht"><code data-page-node-id="plYz35MW0CquxgJ77Ulcqy">lib.blazor</code></td><td data-page-node-id="VAuwiC1OhU84xj72skoVXz">Volo.Abp.Identity.Blazor</td><td data-page-node-id="iBRw6HgbEoFFzRnI98R0qy"><span class="pill fe" data-page-node-id="mqDE5egEdu2sQKbzKxBMet">Blazor 前端</span></td></tr>
+<tr data-page-node-id="OyCSAJ8BcLYIoAXllA19ca"><td data-page-node-id="qKXbKf4Pe0xXBhwYtBeX9z"><code data-page-node-id="1wmngAOhDBzfCLJGjOFLkp">lib.blazor-server</code></td><td data-page-node-id="PChSF18mIiJ4HK2sah9BXb">Volo.Abp.Identity.Blazor.Server</td><td data-page-node-id="5htevhHrzCm4b87CxWW0Sn"><span class="pill fe" data-page-node-id="hCNoCXE9DhNPivJcEJ9ce7">Blazor 前端</span></td></tr>
+<tr data-page-node-id="ccYN48b7zqNL1jWKpq1CB8"><td data-page-node-id="VMBAU6awIMxXdRN0DIfw1H"><code data-page-node-id="jQG4c2iifZy2dzchFcW98j">lib.blazor-wasm</code></td><td data-page-node-id="9ODYXTGhBSQuDincdUxkPj">Volo.Abp.Identity.Blazor.WebAssembly</td><td data-page-node-id="JnVU8rigF6fTwgD35ShUmN"><span class="pill fe" data-page-node-id="ouDOqi5PTqOM5tjOAZMgl2">Blazor 前端</span></td></tr>
+</tbody>
+</table>
+
+<p data-page-node-id="SEpuxYPw4cBgEkbDbadv4e">另有 <code data-page-node-id="rElZfpNDfOxvCoZ9EpEEip">.abppkg.analyze.json</code>（分析报告）和少数空 role 的包（如 <code data-page-node-id="SdcGejGEBkOM77VsDIIzbD">Volo.Abp.Identity.AspNetCore</code>）。</p>
+
+<div class="callout tip" data-page-node-id="dNdNUFfDMoQBmFXiM5rEPE">
+<p data-page-node-id="wfPi5XbAcEIqStS8IAOLiR"><strong data-page-node-id="TOkYYEm7nW9AmoK4R4lvgf">这个 role 字段对你有实际用途：</strong>它把「项目名 → 架构层」的对应关系<b data-page-node-id="D07GcAVixuSvFrHwnKHBPv">机器可读地固定下来了</b>。当你拿不准某个项目属于哪一层时，看它的 <code data-page-node-id="D2BEDhALTbso0eJWuD6Hil">.abppkg</code> 就知道。</p>
+</div>
+
+<!-- ============ 3 ============ -->
+<h2 id="s3" data-page-node-id="14k9NtDXbNIFrXTqrkv54E"><span class="num" data-page-node-id="7Y6zHwoX0aDCNm1TccuYF6">03</span>一个模块有多少项目（19 个）</h2>
+
+<p data-page-node-id="tnZbqVUoJjO4ZMUs0BNKx7">identity 是「中等偏上复杂度」的模块，<code data-page-node-id="oRUbz34I6IJ6qbHx37igJ7">src\</code> 下有 18 个项目。<b data-page-node-id="ZSlCQxPZ5LmjYSjxnAPbgs">注意它不是按「一层一个项目」组织的，而是「一层 × 多种前端」</b>：</p>
+
+<pre data-page-node-id="7pH8o2Oek4uOYnqxURL0Fm"><code data-page-node-id="cxnkDgRq5HSSQAlYY9qWMb">D:\yudao\abp\ABP-Framework-rel-10.6\modules\identity\src\</code></pre>
+
+<table data-page-node-id="2dNHtROjbVEaBZFYbdBg9Z">
+<thead data-page-node-id="IYGUpYwGQLEQ1Dn7G8EPun"><tr data-page-node-id="nbohcmXoIw6pZFsMmpZVu0"><th data-page-node-id="86vbWqlbdGUN19zfNczuuE">分组</th><th data-page-node-id="LDnXETAYcgGnz4m8NPlsnm">项目</th><th data-page-node-id="01VEOhLcuqqt998HmmCB1h">说明</th></tr></thead>
+<tbody data-page-node-id="EN8OJGTUuD3Ak0aNFJGBue">
+<tr data-page-node-id="JWXkWdZytaw7cHAWMCIsut"><td rowspan="2" data-page-node-id="KKhOJf9rnslfOLaTHtKPJC"><span class="pill core" data-page-node-id="ckAW1OL5ll81zsq8rHEnZS">领域</span></td>
+    <td data-page-node-id="iL2vD6mUtwCr7fq11kGyUo">Volo.Abp.Identity.Domain.Shared</td><td data-page-node-id="LFk0SJCZo83znAOfaXgodp">常量、本地化、错误码</td></tr>
+<tr data-page-node-id="4g2gZofwMENUYXOTWzHaGr"><td data-page-node-id="nFGX8I7HoCoAX1LyE0GdpM">Volo.Abp.Identity.Domain</td><td data-page-node-id="W1dDbXvhMnSIkI52fiYP7L">实体、仓储接口、领域服务</td></tr>
+
+<tr data-page-node-id="svXTZ5XmKiQv2SvSuYeuL0"><td rowspan="2" data-page-node-id="xyRbJnBvXMAxY6RAYplBLC"><span class="pill be" data-page-node-id="ebYihKH66Lm1EBrwRjpC5a">应用</span></td>
+    <td data-page-node-id="6jtiSjgnrDWTqbnLHrNk4I">Volo.Abp.Identity.Application.Contracts</td><td data-page-node-id="0L0O5fd9hfLZHCxr07pdEg">DTO、接口、权限</td></tr>
+<tr data-page-node-id="OS2gONlsAJxHr6fOlH8e5T"><td data-page-node-id="I3RTH0cAgErwRev6nIZ1he">Volo.Abp.Identity.Application</td><td data-page-node-id="WXBOaaW0sslbSY1642E5aq">接口实现</td></tr>
+
+<tr data-page-node-id="DVyUVPecTZ52ItY5a5e5Tq"><td rowspan="2" data-page-node-id="0JqrdraCwQSzzQmH8NgnEc"><span class="pill data" data-page-node-id="MTX8NHMC5WteFcPzt7jw9e">数据</span></td>
+    <td data-page-node-id="JMA8F2ZARnjBZ16IVHxpCD">Volo.Abp.Identity.EntityFrameworkCore</td><td data-page-node-id="2D5kvf1cuiEtDUp2eyJoUc">EF Core 实现（<b data-page-node-id="zLNxG36nhPbcUzXz1lGiXd">二选一</b>）</td></tr>
+<tr data-page-node-id="NfDxTpbcvGxap9IUV4DNNF"><td data-page-node-id="M1pifSI7dnIeCDfxEomDch">Volo.Abp.Identity.MongoDB</td><td data-page-node-id="gE03keAFihGYFw2MFA4TDR">MongoDB 实现（<b data-page-node-id="9sMyb32yyhBjh3yLHGTJLM">二选一</b>）</td></tr>
+
+<tr data-page-node-id="iXziZURBF2Ls6IPA1dxHMj"><td rowspan="2" data-page-node-id="VQvgcFUSZFwbBjUu6G9Jwy"><span class="pill be" data-page-node-id="w37xiCklCg38eQCKLMflAg">接口</span></td>
+    <td data-page-node-id="UgQ1eZdAzoiv0wllPMgLzT">Volo.Abp.Identity.HttpApi</td><td data-page-node-id="Rm1HaAs0GYaBtGg5VEXeWh">REST 控制器</td></tr>
+<tr data-page-node-id="vz4YJG3lfUFLkVGWqe3hKW"><td data-page-node-id="W0xwXqerniYN548m0QpSVh">Volo.Abp.Identity.HttpApi.Client</td><td data-page-node-id="VBTbUsSEYd8MVUEl2r6pWZ">远程调用代理</td></tr>
+
+<tr data-page-node-id="9HUwj9NNoCcYCGUTjc3bF4"><td rowspan="6" data-page-node-id="COAMjU2suTs7V0E9dDocuU"><span class="pill fe" data-page-node-id="4llg2Z5CRwNJmXFN2Q4rLJ">前端</span></td>
+    <td data-page-node-id="PFSPZSyIECcfDz0ggP556P">Volo.Abp.Identity.Web</td><td data-page-node-id="JM3ORcVZt10xZawwQLBDD3">MVC / Razor Pages</td></tr>
+<tr data-page-node-id="GDuIFT3ChEJUtqcGFCaFan"><td data-page-node-id="jYubwNdFLOBltlJBi36LhA">Volo.Abp.Identity.Blazor</td><td data-page-node-id="wKrOmIuWLTcwU4GKasUeV6">Blazor 共享 UI</td></tr>
+<tr data-page-node-id="vyR6GHnTd7vrWUTCOSEyzu"><td data-page-node-id="MiTMSCWVwu2zayUYXyyGYM">Volo.Abp.Identity.Blazor.Server</td><td data-page-node-id="fWbNN8Dg3JhDgnM00YfUAh">Blazor Server 变体</td></tr>
+<tr data-page-node-id="CUfs6SCXlzQAgXWmIdz8TG"><td data-page-node-id="yKlZVTGGUm9mwzrbYGWvGj">Volo.Abp.Identity.Blazor.WebAssembly</td><td data-page-node-id="F3KsXdQOBMwHX1vYTkmUfN">Blazor WASM 变体</td></tr>
+<tr data-page-node-id="InN8n7TvSbxNE1n2ivrRBA"><td data-page-node-id="MbzFDCp0SWWm7EcFJXw11R">Volo.Abp.Identity.Blazor.MudBlazor</td><td data-page-node-id="LlEDiPcEML6uGu3FLHZGZW">MudBlazor 主题共享 UI</td></tr>
+<tr data-page-node-id="eCT33JPKIMFFVlNuTLbUdl"><td data-page-node-id="prGVrD0gynjxzD2WMvsamQ">Volo.Abp.Identity.Blazor.MudBlazor.Server / .WebAssembly</td><td data-page-node-id="332NEY5fV8yfilGMytI3Pc">MudBlazor 的两个宿主变体</td></tr>
+
+<tr data-page-node-id="HDWf4B405Riz0dIVfBTGg4"><td rowspan="3" data-page-node-id="Zg6CzV27TguCehQjC58hrB">其它</td>
+    <td data-page-node-id="Pl4QKFOFDgE35MkVifGm4a">Volo.Abp.Identity.AspNetCore</td><td data-page-node-id="OFKiOVuCzSAHh3C7G44jCF">ASP.NET Core 集成（认证相关）</td></tr>
+<tr data-page-node-id="VETUCEapUOyvHKbCv7PCRx"><td data-page-node-id="DsNMOlO8HNqTPyXyvkwaUX">Volo.Abp.Identity.Installer</td><td data-page-node-id="ycRdW308Ah808CdnNGJ0BX">安装器（把模块装进宿主）</td></tr>
+<tr data-page-node-id="wYyw0hX1mqCp7oomhsEM98"><td data-page-node-id="bdm8AuCKLYoQAozl0KkyXV">Volo.Abp.PermissionManagement.Domain.Identity</td><td data-page-node-id="mDkv7QOSDdHjtfaB4Y2KZQ">权限管理对 Identity 的扩展</td></tr>
+</tbody>
+</table>
+
+<div class="callout" data-page-node-id="WLcwvxRI2MWDajt6X99Nz3">
+<p data-page-node-id="UHC2HMNbkgRgsiDHzBcwPV"><strong data-page-node-id="RqoSN1969hfzBc4cE2XW3M">关键观察：6 个前端项目，但后端只有 1 套。</strong>这就是上一轮说过的「后端一套、前端多套」。你的项目只会引用其中<b data-page-node-id="nHCicLXESQLdunhbn3QQVa">一个</b>前端项目（或对 Angular 而言是 npm 包），其余不需要。</p>
+</div>
+
+<p data-page-node-id="5yPMVvaOffBPyXyG20NZSS"><b data-page-node-id="fwEv6xOWJfWor6u6yZw7P9">项目内的目录规律：</b>类文件不在项目根，而在<b data-page-node-id="DkZiEwKcJuMuf4gtWgzpEF">镜像命名空间的目录</b>下。例如：</p>
+<pre data-page-node-id="CSxhfZNeTLIwqchZkhhUxP"><code data-page-node-id="TPyYx7Ylvk8YXlGfh19ph4">src\Volo.Abp.Identity.Application\Volo\Abp\Identity\AbpIdentityApplicationModule.cs
+                                    └──────┬──────┘
+                                  镜像命名空间 Volo.Abp.Identity</code></pre>
+<p data-page-node-id="DfhYCQAAUiuKtQ27AB3ClQ">所以看到 <code data-page-node-id="5q9Ug41Bzj6gbmldu5gzqf">Volo\Abp\Identity\</code> 这样的深层目录不要意外——那是 C# 的命名空间目录惯例。</p>
+
+<!-- ============ 4 ============ -->
+<h2 id="s4" data-page-node-id="eR7rXtlcTzozQ57E1ZJEuj"><span class="num" data-page-node-id="RpEypc2wjcZSVOz2SBMNBd">04</span>真实依赖链（这是 module 代码的骨架）</h2>
+
+<p data-page-node-id="woo7qlOriJ0gvLXVTrlEZO">下面是从 identity 各模块类的 <code data-page-node-id="a5B53k5I8SPSlNognEywun">[DependsOn]</code> 实际读出来的数据。<b data-page-node-id="gGQ9mmYeekSh9pGh6YITDK">这张表就是 module 的架构真相</b>：</p>
+
+<table data-page-node-id="XQ5vV8XcTzmBVyeRWQf39Q">
+<thead data-page-node-id="qWDXbq0UWgD63fjH0piEjq"><tr data-page-node-id="eri0NPF8LJ1gN3qktyd2Zu"><th data-page-node-id="JAEfgHCmSWdxki4NuEppAL">模块类</th><th data-page-node-id="PJiA3ONdtFEY5MHD4CSo4s">DependsOn</th></tr></thead>
+<tbody data-page-node-id="9r5q8NZHlPCMHPGFN9khvb">
+<tr data-page-node-id="e3nT8Y0nOOCNkjEQ374Fwb"><td data-page-node-id="OwxxPYXbOE1krBkagEr2Vc">AbpIdentityDomainSharedModule</td><td data-page-node-id="M0BmB2ke1EELdy6NEETYSQ">AbpUsersDomainShared、AbpValidation、AbpFeatures</td></tr>
+<tr data-page-node-id="yFPUZcC5biGriG4Orledgg"><td data-page-node-id="B24KByxMmev5zLXIQHJeEC">AbpIdentityDomainModule</td><td data-page-node-id="MMCIGQWSCcmCP5aCq57zP4">AbpDddDomain、<b data-page-node-id="x88084BmZVzgCwtPN0KqiP">Domain.Shared</b>、AbpUsersDomain、Mapperly</td></tr>
+<tr data-page-node-id="Yk6GPaVNPgsmcAfRFYgtAh"><td data-page-node-id="a9tA8rFCdxNUOTMIVEnput">AbpIdentityApplicationContractsModule</td><td data-page-node-id="br74x8UjkWK4BXAmhgq4uY"><b data-page-node-id="jwuBCM6YxLt0zeJk2jStyS">Domain.Shared</b>、AbpUsersAbstraction、AbpAuthorization、PermissionManagement.Contracts</td></tr>
+<tr data-page-node-id="8sWqYWABH1WdoyoYY2XeLJ"><td data-page-node-id="09hICN40rm8zXFBHPMJwVv">AbpIdentityApplicationModule</td><td data-page-node-id="Gttdqfi0X6GTyvsUDdNycM"><b data-page-node-id="UPDXS8qP3D6sz20RvKCCFU">Domain</b>、<b data-page-node-id="gZ6gaLzclQ1rvsJB1Dzjml">Application.Contracts</b>、Mapperly、PermissionManagement.Application</td></tr>
+<tr data-page-node-id="DDlRh0S0gyTg7hhtN7Wevz"><td data-page-node-id="Ndy6mO034izC8QNLKo5MdF"><b data-page-node-id="27WXjR6cyIee7hsJzVbg0A">AbpIdentityHttpApiModule</b></td><td data-page-node-id="Zss7kDaqb75K7ghPSWvgAQ"><b data-page-node-id="pmk1BoKJrPHt6jqDpsx90u">Application.Contracts</b> + AbpAspNetCoreMvc　<span class="pill" style="background:var(--green-bg);color:var(--green)" data-page-node-id="F5qunwRd3A6elgjLEXygVb">不依赖 Application</span></td></tr>
+<tr data-page-node-id="1QkWQGAe3JHCF3o0hhD4U7"><td data-page-node-id="speaOqN1b7qs93xR0TbOLl">AbpIdentityHttpApiClientModule</td><td data-page-node-id="7KjhVpEgg7ODMQ5fTEWfM8"><b data-page-node-id="EpBE9RqZ56T27Quj4GLkGN">Application.Contracts</b> + AbpHttpClient</td></tr>
+<tr data-page-node-id="UUILv8H5OXAa6WiQoDbGJq"><td data-page-node-id="bBGF2erJxLUzNEW2CVgHOf">AbpIdentityEntityFrameworkCoreModule</td><td data-page-node-id="SJ4xWwU2yPTRZ9D9kdHnFE"><b data-page-node-id="CwBN1wmzCJIBdFJEO2jA2W">Domain</b>、AbpUsersEntityFrameworkCore</td></tr>
+<tr data-page-node-id="TrWq47E7SgPMEwVvZG6Dbv"><td data-page-node-id="cgQaYLYq8E1tgRErcYKezQ">AbpIdentityBlazorModule</td><td data-page-node-id="mbsJeQy3WXC1iDS9S4K7tr"><b data-page-node-id="lqdjMA2UoaszN73S4194f1">Application.Contracts</b>、Mapperly、PermissionManagement.Blazor、BlazoriseUI</td></tr>
+<tr data-page-node-id="hFgxpbPAma9kwJoPYCEFmc"><td data-page-node-id="83BVsSBSOrETv9mKHd5wh9">AbpIdentityWebModule</td><td data-page-node-id="O9dsLfCgAy0BF85Js0wkHe"><b data-page-node-id="ctf5iHldANrBMi5OOA6DvA">Application.Contracts</b>、Mapperly、PermissionManagement.Web、AspNetCoreMvcUiThemeShared</td></tr>
+</tbody>
+</table>
+
+<div class="callout tip" data-page-node-id="9Jk9fdjnuLETcjAQZA5GxW">
+<p data-page-node-id="mDhO5H8ZqZl4nyQqbAKfve"><strong data-page-node-id="pLFvqcAKaRBMBCGqbImqAu">一条贯穿全表的铁律：</strong>所有「消费者」——<code data-page-node-id="gDZWxNbjRTlHsMk0cQXmyi">HttpApi</code>、<code data-page-node-id="AQbVldGw7KEuPJkz2ytc7u">HttpApi.Client</code>、<code data-page-node-id="sgOHdHgH7MxnQeDlbrA2IH">Web</code>、<code data-page-node-id="e8vVKFbJGZijxHGFd8UxOn">Blazor</code>——<b data-page-node-id="BzHvft9EsTs1sFuh6h94Tc">清一色只依赖 <code data-page-node-id="RK7eEyjy8wxWGOHCMFkzKm">Application.Contracts</code>，没有任何一个依赖 <code data-page-node-id="IWgCyeujyOsfDukiVcasUh">Application</code></b>。</p>
+<p data-page-node-id="B6nhocF4WyLrPpK5uTYjY1">只有 <code data-page-node-id="Qp0lzvNnNdp1mmmaY4cZRa">Application</code> 自己同时依赖 <code data-page-node-id="YFAGRRHgyuXK9gkEBo4E2j">Domain</code>（拿实体和仓储）和 <code data-page-node-id="mCWPuzYYSrRDCgJLhqmaVB">Application.Contracts</code>（实现接口）。</p>
+<p data-page-node-id="f9pqAERAVsDn21QdLzN9F9">这就是「接口与实现分离」在模块里的落地：<b data-page-node-id="Mao5LRmZpej5D6LVd9xojY">契约层是唯一的稳定边界，消费者只认契约。</b></p>
+</div>
+
+<p data-page-node-id="QSQNlPpwnJYuaaaek9GCPS">把它画成方向图（箭头 = 依赖）：</p>
+
+<pre data-page-node-id="2tsFURaWlxyseRAqGp5eqP"><code data-page-node-id="nHld0UpcoKkyoSQkuEpwpA">        HttpApi   HttpApi.Client   Web(MVC)   Blazor*        ← 消费者
+             \         |            |          /
+              \        |            |         /
+               ▼       ▼            ▼        ▼
+           ┌──────────────────────────────────┐
+           │      Application.Contracts       │  ← 唯一稳定边界
+           └──────────────────────────────────┘
+                    ▲                      ▲
+                    │ 实现                 │
+           ┌────────┴────────┐             │
+           │   Application   │             │
+           └────────┬────────┘             │
+                    ▼                      │
+           ┌──────────────────┐            │
+           │      Domain      │            │
+           └────────┬─────────┘            │
+                    ▼                      │
+           ┌──────────────────┐            │
+           │  Domain.Shared   │            │
+           └──────────────────┘
+                    ▲
+           ┌────────┴─────────┐
+           │ EF Core / MongoDB│  ← 仓储实现，也只依赖 Domain
+           └──────────────────┘</code></pre>
+
+<!-- ============ 5 ============ -->
+<h2 id="s5" data-page-node-id="QUsLYn7tN5gfeMCd53UTWc"><span class="num" data-page-node-id="xEoiv07UeOeb3N9fmk1J7Z">05</span>前端的四种变体</h2>
+
+<p data-page-node-id="xcGBVpJ84dfGbwBSOPxAto">模块的前端不只有「有或没有」，而是<b data-page-node-id="HvS3M2nE7266Qv7aMg7awl">多种技术栈各一份</b>。以 identity 为例：</p>
+
+<table data-page-node-id="b0jPR2YNEh6PxC6CeyReTH">
+<thead data-page-node-id="BxWrVBeMFJyT8EbXm9aHFH"><tr data-page-node-id="WB9tj33UlI5BibBNmaAdyi"><th data-page-node-id="ej7QfC5G1EaeCQninJXfXr">前端形态</th><th data-page-node-id="h0sLX4gfbq2kKVSTziqEFY">项目 / 位置</th><th data-page-node-id="pHNk7xVNO9QgTZuowyM9x6">发布方式</th></tr></thead>
+<tbody data-page-node-id="pCL5rcNoRb1f33YL4C33m9">
+<tr data-page-node-id="fZlAFfcoXCLOACh4UkhJLH"><td data-page-node-id="rjYtsL143dZImDekqEDVKY">MVC / Razor Pages</td><td data-page-node-id="aWZVvwEzqJF2skyuEzWLg6"><code data-page-node-id="Rv1pxvFPJaNoVAmD53GGKQ">src\Volo.Abp.Identity.Web\</code></td><td data-page-node-id="oeGeTShGs27PfQ36Lr8qfC">NuGet（<code data-page-node-id="o85tV4LtFbSOwgPDuOCr5D">lib.mvc</code>）</td></tr>
+<tr data-page-node-id="I66QTA7zJzbY2DiRWIIRC5"><td data-page-node-id="UKKo1ZEDj6arya3EL0K3KU">Blazor Server</td><td data-page-node-id="b0LymqV2GCYWKIEIODtFCo"><code data-page-node-id="pZhF5rmQmWscVkRJWsL6LB">src\Volo.Abp.Identity.Blazor.Server\</code></td><td data-page-node-id="DLjnTPTSvrUmEp10NFCbtz">NuGet（<code data-page-node-id="s5HnTvuPeUhzjVpvSB2GfP">lib.blazor-server</code>）</td></tr>
+<tr data-page-node-id="XsTJXm3wcBi7B38TdBYzx8"><td data-page-node-id="nl3wPNv2IvDnZzvVciFBXG">Blazor WebAssembly</td><td data-page-node-id="BFLVOcDLF8hx7Yx9knFO1d"><code data-page-node-id="xC9jn5ie0eG3XXXxytrs0X">src\Volo.Abp.Identity.Blazor.WebAssembly\</code></td><td data-page-node-id="WDKraSdn28wWCTa0yYsC0n">NuGet（<code data-page-node-id="xpUgBy1twbdDt84fmOrSN7">lib.blazor-wasm</code>）</td></tr>
+<tr data-page-node-id="T7xFXHGildghwJGrltD9Pc"><td data-page-node-id="ymJWHPGmQf3K0mDVK4p4yQ">Blazor + MudBlazor 主题</td><td data-page-node-id="NXCmOvtsVgTaicFlTTORTB"><code data-page-node-id="nNHtML3xsDlV1ZskyAPZOz">src\Volo.Abp.Identity.Blazor.MudBlazor*\</code>（3 个）</td><td data-page-node-id="2dAuVFdog2F2mFBHwMS2Go">NuGet</td></tr>
+<tr data-page-node-id="H6LC401ZuV8mrKlAkhECb7"><td data-page-node-id="JeCJbuqZ5BnvkhlSlGpH12"><strong data-page-node-id="jNUeKBM3WH9fp0nenaHfzk">Angular</strong></td><td data-page-node-id="UsgXlSaX4PeyH7bghtUT79"><code data-page-node-id="wU8j6qyNfIqGBIfIuRPhcs">npm\ng-packs\packages\identity\</code></td><td data-page-node-id="DFJrct8F3uOi17cV89p37s"><strong data-page-node-id="ass1FscrqSDtql0xXetxWw">npm</strong>（<code data-page-node-id="kv1RchHqAjvF4Kg1b3cw1p">@abp/ng.identity</code>）</td></tr>
+</tbody>
+</table>
+
+<p data-page-node-id="ztfA2MtEZ0rhuBTKolsDy7">看一个 MVC 前端项目内部长什么样——<b data-page-node-id="7tG4pa7OWXhEzneR7mchuV">它的页面组织方式和 Angular 惊人地一致</b>：</p>
+
+<pre data-page-node-id="FCtZuA4Eknw5zwsZX6l2Jw"><code data-page-node-id="ch5QDR7sFQiEB9iry6Hpsf">src\Volo.Abp.Identity.Web\
+├── AbpIdentityWebModule.cs              模块类（下面详解）
+├── AbpIdentityWebMappers.cs             对象映射
+├── Navigation\
+│   ├── AbpIdentityWebMainMenuContributor.cs   菜单注册
+│   └── IdentityMenuNames.cs                   菜单名常量
+├── Pages\Identity\
+│   ├── IdentityPageModel.cs              PageModel 基类
+│   ├── Users\
+│   │   ├── Index.cshtml / .cshtml.cs          列表页
+│   │   ├── CreateModal.cshtml / .cshtml.cs    新增弹窗
+│   │   ├── EditModal.cshtml / .cshtml.cs      编辑弹窗
+│   │   ├── index.js / index.css
+│   └── Roles\  （同结构）
+├── wwwroot\client-proxies\identity-proxy.js   自动生成的 JS 代理
+└── compilerconfig.json</code></pre>
+
+<div class="callout" data-page-node-id="DmA7inCDrCLzCvUWYTfb4g">
+<p data-page-node-id="fGNh6NGmyKb6vFDLOuvqBN"><strong data-page-node-id="jyzR3M8w3zQJw7Isj30gCF">「列表页 + CreateModal + EditModal」这个三件套，就是 ABP 前端页面的标准形态</strong>，无论 MVC 还是 Angular 都一样：一个列表页 + 两个弹窗（新增/编辑）。对比一下 Angular 版的 <code data-page-node-id="8ia07fthZapxh1VjHYINmT">users.component.ts</code>——它是把新增和编辑合并到同一个 modal 里用 <code data-page-node-id="c5HvmmquSZZCUpi7FjjhIq">selected?.id</code> 区分。两种做法都能用，MVC 版拆得更显式。</p>
+</div>
+
+<!-- ============ 6 ============ -->
+<h2 id="s6" data-page-node-id="UlrIDcMaQVVtrNNH6HIpEn"><span class="num" data-page-node-id="JA8Ob64tU2IrbhALm6pDsn">06</span>模块类在做什么</h2>
+
+<p data-page-node-id="fMxf4YmRMQ11VfDn29wMK6">模块类（<code data-page-node-id="E79PcKYA7BSRgwUkSp5sXR">*Module.cs</code>）是每个项目的入口。它看起来只是几行 <code data-page-node-id="E6CF5FDOWfNX8s7imDJzEx">[DependsOn]</code>，但里面藏着这个项目全部的装配逻辑。以 <code data-page-node-id="1MU0AqKQiuFR4DbMeeYnQo">AbpIdentityWebModule</code> 为例，三个生命周期方法各司其职：</p>
+
+<table data-page-node-id="LLOTK0ichD0D4FJgNPMeZZ">
+<thead data-page-node-id="El3FQystPVCCk6zRfaKjND"><tr data-page-node-id="QlNFjhmAg2ajumMZAFvNo8"><th data-page-node-id="f9AgIJqruW6hCcwmrT8kk8">方法</th><th data-page-node-id="f8u2ldDBl9iuY3avM8SCiV">做什么</th><th data-page-node-id="MKFKjI5da046A6wtyosEwI">为什么放这里</th></tr></thead>
+<tbody data-page-node-id="wQnqj5xZTpjqDFidJJJzlp">
+<tr data-page-node-id="jU4ftqu5xQEcJqfy5nofk1"><td data-page-node-id="JvAyDI7N3nIPfCQGrtHnv0"><code data-page-node-id="4lNHrhj1eHb1Ju9GJl7nlc">PreConfigureServices</code></td>
+    <td data-page-node-id="6f7d2dphkkIGRA7Oryvlfv">
+      • <code data-page-node-id="KzlQC1N9bxFK5ECwA1H1gM">AddAssemblyResource(...)</code> —— 把这个程序集的本地化资源接进框架<br data-page-node-id="Rl54c9Fby938PnCCpKp7QG">
+      • <code data-page-node-id="762SLmUHCHrMP0NKUNg25R">AddApplicationPartIfNotExists(...)</code> —— 把本程序集的 Razor Pages 注册进宿主 MVC
+    </td>
+    <td data-page-node-id="7Dg6FHo81RD1CgZGibB3nZ">Pre 阶段执行得最早，此时还没构建容器，适合「告诉框架我要参与」</td></tr>
+
+<tr data-page-node-id="ACUBfdiiFRuwrT7v85rf9j"><td data-page-node-id="uqzkh1nP0wdzH9Xb0FvlZi"><code data-page-node-id="9lN9ZyP1dA1RlR1Q1XEd4R">ConfigureServices</code></td>
+    <td data-page-node-id="IljAWL4WGrNdIdJak4JLWF">
+      • <code data-page-node-id="EJJjpqiBDvh0ARh2IWZeUC">AbpNavigationOptions.MenuContributors.Add(...)</code> —— 注册菜单贡献者<br data-page-node-id="dzFUDZvxM0NPQxBmWhYlb4">
+      • <code data-page-node-id="vUz6u2c1hlX8N0DixxAQlg">FileSets.AddEmbedded&lt;&gt;(...)</code> —— 把 wwwroot 等静态资源挂到虚拟文件系统<br data-page-node-id="JsSCZDqDGc88pAm5NmUUbL">
+      • <code data-page-node-id="cpwz5dlbc3QcsB8C2l4E8S">AddMapperlyObjectMapper&lt;&gt;(...)</code> —— 注册对象映射<br data-page-node-id="eZIILk21uBbwiYswKXkRCV">
+      • <code data-page-node-id="6W2bDpR57FCily2wDndQHD">RazorPagesOptions.Conventions.AuthorizePage("/Identity/Users/Index", IdentityPermissions.Users.Default)</code> —— <b data-page-node-id="sb21oWcJVnfixraKwalwGg">逐页声明权限</b><br data-page-node-id="TM5zpg1jxacFhP23Zvfmld">
+      • <code data-page-node-id="sEnyVuj3obo1PdsJ0MzEce">AbpPageToolbarOptions</code> —— 给列表页加「新建」按钮，并绑定 <code data-page-node-id="bM8kWdnzweAYikCJpOUWEp">requiredPolicyName</code><br data-page-node-id="Nr8pIdqfvlBU0AkwjRHPSE">
+      • <code data-page-node-id="2GgVC9GeDYfNHsA6SSslO6">DynamicJavaScriptProxyOptions.DisableModule(...)</code> —— 关掉不需要的动态 JS 代理
+    </td>
+    <td data-page-node-id="fkBYcdqlSUjtUwQDHAfbB5">主体配置阶段，DI 容器正在构建</td></tr>
+
+<tr data-page-node-id="uKG0x9jDaAZaetRt7GisLK"><td data-page-node-id="LCRV7rh2e50A3rHgC3JhPo"><code data-page-node-id="Vbfm8ephTaDYTVEAP03ICi">PostConfigureServices</code></td>
+    <td data-page-node-id="KtpW4UlgZcP3mnN4T3N7eg"><code data-page-node-id="OMKRYpWWzakvgfxv0tkxFP">ModuleExtensionConfigurationHelper.ApplyEntityConfigurationToUi(...)</code> —— 把「实体扩展配置」应用到 UI 表单上</td>
+    <td data-page-node-id="7YuJDlLrMeguURFbOf8NkE">Post 阶段，等所有模块都配置完再收尾——因为要确保其它模块的扩展已就位</td></tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="ipifcIe2LxOUQMtfpNZeBF">源码（节选）</h3>
+
+<pre data-page-node-id="sROQ2gykPHpIKxwATwf3zy"><span class="path" data-page-node-id="DPONhd4IKKYWym8fbC3jp7">modules\identity\src\Volo.Abp.Identity.Web\AbpIdentityWebModule.cs</span><code data-page-node-id="QBEBA1sINXpHBr5B2MUFuM"><span class="n" data-page-node-id="iYINt3rpVq4ZSaX5O4bzEU">[DependsOn(typeof(AbpIdentityApplicationContractsModule))]</span>   <span class="c" data-page-node-id="S1TrbIjKz3eJJVEy7c8Rhn">// ← 只依赖契约</span>
+<span class="n" data-page-node-id="HGEC1f2NKusNqUwprK6KI3">[DependsOn(typeof(AbpPermissionManagementWebModule))]</span>
+<span class="n" data-page-node-id="sbdJZv662R0pGAAUhGFTM7">[DependsOn(typeof(AbpAspNetCoreMvcUiThemeSharedModule))]</span>
+<span class="k" data-page-node-id="ZYkv27cBVxSTMTXmKfS9jy">public class</span> <span class="t" data-page-node-id="hEioSk8HMKWOdA4ZhdfspH">AbpIdentityWebModule</span> : <span class="t" data-page-node-id="KmKBBlWnmq40lK92mVOVQI">AbpModule</span>
+{
+    <span class="k" data-page-node-id="FBvVPuYJSsx1U9QjcMQHtU">public override void</span> <span class="t" data-page-node-id="ccT1jHYBsd0sq6Kt14WBmq">ConfigureServices</span>(<span class="t" data-page-node-id="xrmOzyQTrhKPGGp4opQqtc">ServiceConfigurationContext</span> context)
+    {
+        <span class="c" data-page-node-id="dQnerDfSsTP3t27Es3ErzU">// 1. 菜单</span>
+        Configure&lt;<span class="t" data-page-node-id="6C1HldCbwuzFNUCOOKSBnx">AbpNavigationOptions</span>&gt;(options =&gt;
+            options.MenuContributors.<span class="t" data-page-node-id="E69iGHe294iRbjh4UM6I4S">Add</span>(<span class="k" data-page-node-id="P1aIX7SjlUDnyDCW0mrIzo">new</span> <span class="t" data-page-node-id="uGxnlujBc4WUF0CxIxXAUa">AbpIdentityWebMainMenuContributor</span>()));
+
+        <span class="c" data-page-node-id="6WAAxigMiW630EBuV3rtMc">// 2. 静态资源进虚拟文件系统</span>
+        Configure&lt;<span class="t" data-page-node-id="NMfjAy1AC7dgTpQEtcP5uI">AbpVirtualFileSystemOptions</span>&gt;(options =&gt;
+            options.FileSets.<span class="t" data-page-node-id="xZowLLeaPksDgPlNzHB1Mi">AddEmbedded</span>&lt;<span class="t" data-page-node-id="ZvZEKuzhhBTWWpQMriaw09">AbpIdentityWebModule</span>&gt;());
+
+        <span class="c" data-page-node-id="3CDvcHbSG4TcxfnpJltJBP">// 3. 对象映射</span>
+        context.Services.<span class="t" data-page-node-id="Ry2SbrFSOn1FnJmVM7OyoC">AddMapperlyObjectMapper</span>&lt;<span class="t" data-page-node-id="Ku46HLHxyh4UcDmRxNN9FY">AbpIdentityWebModule</span>&gt;();
+
+        <span class="c" data-page-node-id="h6ipktikHpiWewZnniU8Nd">// 4. ★ 逐页声明权限 —— 页面级鉴权</span>
+        Configure&lt;<span class="t" data-page-node-id="3rRhSJ8m8LLIckNzsLHJiV">RazorPagesOptions</span>&gt;(options =&gt;
+        {
+            options.Conventions.<span class="t" data-page-node-id="JC6mEmH2CEuf2YUFNXoVC7">AuthorizePage</span>(<span class="s" data-page-node-id="Bh0JlNb5dXpzf3CVcvLlHO">"/Identity/Users/Index"</span>,       <span class="t" data-page-node-id="InuJw890sBNhxgVxHC6Y2w">IdentityPermissions</span>.Users.Default);
+            options.Conventions.<span class="t" data-page-node-id="qqDF4w9v0QgALff6aR0ukg">AuthorizePage</span>(<span class="s" data-page-node-id="QhaSMFANmd2wXSVdNvYcHz">"/Identity/Users/CreateModal"</span>, <span class="t" data-page-node-id="Eh4AEDt7APleM8SO33wlJ1">IdentityPermissions</span>.Users.Create);
+            options.Conventions.<span class="t" data-page-node-id="NtZbCOSiyLGb9dMGLYJXWL">AuthorizePage</span>(<span class="s" data-page-node-id="gOMgjGclXNi5rUKR6VTzkC">"/Identity/Users/EditModal"</span>,   <span class="t" data-page-node-id="hMGhRHWJgzBROnw3HD14xQ">IdentityPermissions</span>.Users.Update);
+        });
+
+        <span class="c" data-page-node-id="7oH6Qg2XAYDgdfH7mCERqQ">// 5. 列表页工具栏按钮 + 权限</span>
+        Configure&lt;<span class="t" data-page-node-id="uCpknTLY85UxW2rAwjZRjg">AbpPageToolbarOptions</span>&gt;(options =&gt;
+            options.<span class="t" data-page-node-id="su7gbBKcEpm6doBGdNJr6v">Configure</span>&lt;<span class="t" data-page-node-id="D0G0xXow4yvtt0gXcTaqid">Users.IndexModel</span>&gt;(toolbar =&gt;
+                toolbar.<span class="t" data-page-node-id="0LJCtmfQGvSwvwdpG3dqPk">AddButton</span>(
+                    <span class="t" data-page-node-id="IeWQXBBiwgKIz8VaHxcPYH">LocalizableString</span>.<span class="t" data-page-node-id="vi11QDIjGgtro2MPgBSvVx">Create</span>&lt;<span class="t" data-page-node-id="MeTZtWIiLHqYeAm4bn1tt8">IdentityResource</span>&gt;(<span class="s" data-page-node-id="piNGHtF4MF0Ibj9mtxFhkQ">"NewUser"</span>),
+                    icon: <span class="s" data-page-node-id="MywXPr4gDP9rJtBEh7Dwj4">"plus"</span>,
+                    name: <span class="s" data-page-node-id="frKCBtmnYrA5iTDvJOPLfU">"CreateUser"</span>,
+                    requiredPolicyName: <span class="t" data-page-node-id="DCZMp6peMzQWMC6aCfmQGw">IdentityPermissions</span>.Users.Create)));
+    }
+}</code></pre>
+
+<div class="callout tip" data-page-node-id="wVJQzYuZeXgH6kZG4cClq8">
+<p data-page-node-id="cpN8DNqDSl9mS0pj3fhAKS"><strong data-page-node-id="MBBDVD3eaJzTIbm47gwcxx">这解释了一个你可能疑惑的事：为什么模块的权限「自动就生效了」？</strong>因为权限不是靠页面里写 if 判断，而是<b data-page-node-id="EQBExl1aHMmh8kZQmGC9WR">在模块类里集中声明</b>——<code data-page-node-id="LUBAub4RpoI1yPkbQdQagn">AuthorizePage</code> 管页面能不能进，<code data-page-node-id="6rdWX0L8aCEr7PiGQvYvFG">AddButton</code> 的 <code data-page-node-id="KaHwbDIXtwjOksZse4yWkE">requiredPolicyName</code> 管按钮显不显示，方法上的 <code data-page-node-id="AzqS1R6cyB27zv4Wqyjavs">[Authorize]</code> 管接口能不能调。三处都指向同一个权限常量。</p>
+</div>
+
+<!-- ============ 7 ============ -->
+<h2 id="s7" data-page-node-id="KPEcfiEhgHqkg3LXEDXVmt"><span class="num" data-page-node-id="purC4fRpxdBp0Q1LOCAGcM">07</span>模块如何被装配进项目</h2>
+
+<p data-page-node-id="PC990o16ztqLfIZJmtIqfs">模块写完了，怎么让它在一个应用里生效？靠<b data-page-node-id="AHHZYCtenCAta7z4IGb8sV">依赖链传导</b>——你只需要在自己的宿主模块里 <code data-page-node-id="WJMCukRqvAGtwfqWeXMxjZ">DependsOn</code> 一次，整条链会自动装配。</p>
+
+<pre data-page-node-id="JWgWugSwjGeuhmWIlaHqEN"><code data-page-node-id="fumboy1qsBOorWRB5VjORZ"><span class="c" data-page-node-id="8akO0YXXux2oRFGKCIgrvn">// 你自己项目的宿主模块（比如 MyApp.HttpApi.Host 的模块类）</span>
+<span class="n" data-page-node-id="yBvDOOJLZNimeZGZaQzJQQ">[DependsOn(
+    typeof(AbpIdentityApplicationModule),      </span><span class="c" data-page-node-id="fa8eL7Ngfq6nTzuq1TV12U">// ← 引入服务端实现</span><span class="n" data-page-node-id="8A61s0uEIvXV7ondo66CHB">
+    typeof(AbpIdentityEntityFrameworkCoreModule),</span><span class="c" data-page-node-id="8Z8x9CxJ3IzGVTHVFvEHY3">// ← 引入 EF 实现</span><span class="n" data-page-node-id="7rSHZap0MG0fjF47TczgKs">
+    typeof(AbpIdentityHttpApiModule),          </span><span class="c" data-page-node-id="OUBMm4wFFyK9bLpIMEpw5F">// ← 暴露 REST 接口</span><span class="n" data-page-node-id="mDLXuH2uWHZfreg9Bfs2dJ">
+    typeof(AbpIdentityWebModule)               </span><span class="c" data-page-node-id="isxBF4GCq2RMlRthcBgqRo">// ← 引入 MVC 界面（如果用 MVC）</span><span class="n" data-page-node-id="OGKUj7GqFAqnTnuaimuGfD">
+)]</span>
+<span class="k" data-page-node-id="fiCcJbZrHlY0Bx705U6RA5">public class</span> <span class="t" data-page-node-id="FfVuEaYSt9XoyKHYGTiRea">MyAppHttpApiHostModule</span> : <span class="t" data-page-node-id="06GPV1dCkWqHzc8e9yNhbC">AbpModule</span> { }</code></pre>
+
+<p data-page-node-id="af8xfyq9mX7oycDMe83XGw">框架启动时会：</p>
+<ol data-page-node-id="GHMiiDffcFfJOkU7oy5x9j">
+<li data-page-node-id="DkU5mrJZCN5g6BL52jr78h">读你的 <code data-page-node-id="5xNgUNCqOasCbQdJJrcT0T">[DependsOn]</code>，递归收集所有间接依赖（<code data-page-node-id="NUZ8kFVJkEfULnJbpDFVR7">FillModules</code>）</li>
+<li data-page-node-id="S2406HDBbFE1eNv8RJwLOx">按依赖关系<b data-page-node-id="eTdv59xTf1VhnKr3tQJMVQ">拓扑排序</b>，保证被依赖的先初始化</li>
+<li data-page-node-id="tGbs41p9evLKsCJ1i1ceMo">依次调用每个模块的 <code data-page-node-id="7wMEv8fBlTEJnJ50kAdnCL">PreConfigureServices</code> → <code data-page-node-id="Tz3D7NktAyuqqmm0PiBqRi">ConfigureServices</code> → <code data-page-node-id="fsVr9LODu5xprJbz2DmFH1">PostConfigureServices</code></li>
+</ol>
+
+<p data-page-node-id="6dVX1XGA8NPDQBCC0UDTdG">这就是为什么「装了 Identity 模块，用户管理和角色管理页面就直接有了」——页面、权限、菜单、REST 接口全在模块里配好了，你只是把它<strong data-page-node-id="wvaWOtUQ5JPzeRuJH1KVFY">接</strong>了进来。</p>
+
+<div class="callout warn" data-page-node-id="IbdnCLyurwB6tPsjcwHtv9">
+<p data-page-node-id="xRneDNEW5uHn8exQ7oE7Yw"><strong data-page-node-id="yDWGh3J03AYPMgzgouLfGf">注意 Angular 不一样：</strong>Angular 侧的「装配」不走 <code data-page-node-id="qgu2aCpXPGx4w3HJjLAUUv">[DependsOn]</code>，而是走 <code data-page-node-id="Dl17ZSxFZDj5WoDK57K5Qy">app.config.ts</code> 的 provider + <code data-page-node-id="QAFa9fXTSZN5uIs55ozl0J">app.routes.ts</code> 的 <code data-page-node-id="jbbaCpqEgpgEluFfFQQD5Y">loadChildren</code>。这是两个体系，别混。</p>
+</div>
+
+<!-- ============ 8 ============ -->
+<h2 id="s8" data-page-node-id="HVx1sQDR7qPzmZK0UmRthE"><span class="num" data-page-node-id="tQ01MRDyqUfO8p9pOm1sHL">08</span>你该怎么用 modules 学代码</h2>
+
+<p data-page-node-id="GD7irp3RnKFCjDFXWBru3a">既然不能改，那读的时候带着什么问题去读？给你四个具体任务：</p>
+
+<ol data-page-node-id="0OMcQAr6viI7WwjQ7Z6H4b">
+<li data-page-node-id="TdpyOUmO8B6tCgvAUVfy1j"><b data-page-node-id="sHp9EV3VH5BHXpu7zNzdEf">学「一个业务功能怎么落地」</b> → 读 <code data-page-node-id="Bwr8UAuLAIkjdxIjFDrjk4">blogging</code> 的 Post 垂直切片（实体→仓储→DTO→AppService→控制器），共 16 个文件。这是全仓库最干净的范例。</li>
+<li data-page-node-id="A2JDpL3VybLNMteBv8drRK"><b data-page-node-id="sSBv5ZyDC3KLJszFbGrW0Z">学「一个功能怎么拆成 19 个项目」</b> → 读 identity 的 <code data-page-node-id="jJlushXMM8lSrrXvkxP8qk">src\</code> 目录列表 + 各 <code data-page-node-id="7xft6XF0tK4UsAxsvnmyFZ">.abppkg</code> 的 role。<b data-page-node-id="pbkSHRWVM1vn9r6de5vTop">重点理解「为什么前端要拆成 6 个项目」。</b></li>
+<li data-page-node-id="QKkTlvMgU4NMDMtXcuOX66"><b data-page-node-id="53T8umbnBVb6SexEWQZjCo">学「模块类怎么写」</b> → 打开 <code data-page-node-id="q53IDDX0rzKf7maKXHHycm">AbpIdentityWebModule.cs</code>，看它是怎么把菜单、静态资源、对象映射、页面权限、工具栏按钮一次性配完的。<b data-page-node-id="7IuuPNu5FvrFiipDxCSjoU">你写自己项目的 Web 层时，照这个结构抄。</b></li>
+<li data-page-node-id="iH8JG6HcTVw4wrxg9FdnUQ"><b data-page-node-id="veHtmqqkDxGRYABKZt8Gjp">学「页面长什么样」</b> → 读 <code data-page-node-id="CZQHv5HvmJ6b30neqJ5F76">Volo.Abp.Identity.Web\Pages\Identity\Users\</code> 下的 Index + CreateModal + EditModal 三件套（MVC），或 <code data-page-node-id="NdDnJ2xRcFq4hba2C6fjgI">npm\ng-packs\packages\identity\</code> 的 users 组件（Angular）。二者对照看，能明白 ABP 的页面模式是技术栈无关的。</li>
+</ol>
+
+<div class="callout tip" data-page-node-id="m75OxtBSH5hvkdeROWTovx">
+<p data-page-node-id="hhR5TTHIE959GiF7k7Eiic"><strong data-page-node-id="B2jExzOFWBW1Y8P2DMoiB4">最后强调一次边界：</strong>读 modules → 抄它的<b data-page-node-id="JqoZ22AdhdDkqMFf4SniEj">结构和方法</b>；写代码 → 在你<b data-page-node-id="BJEGxIG2uha6mtdH2zP6Jt">自己的项目</b>里。如果你确实需要改模块行为，用 ABP 的三个正规手段：<b data-page-node-id="Gt9zUEWamixTgT5mOUHtak">配置</b>（<code data-page-node-id="esUPIkNjSmpTC3ZfWPuboV">Configure&lt;XxxOptions&gt;</code>）、<b data-page-node-id="cn4BFmIYnGL3OqV50ot9zO">替换服务</b>（<code data-page-node-id="LUbAhSeIEFAqAAa8rUBVck">[Dependency(ReplaceServices = true)]</code>）、<b data-page-node-id="GcOhBfdXHk8y547QrhMUok">扩展点</b>（贡献者模式，如 <code data-page-node-id="d1u8ioHq4SKrCt6KjvZNbA">MenuContributors</code>）。不要去改 modules 目录里的源码。</p>
+</div>
+
+<div class="foot" data-page-node-id="wAsdpkfim6NaAefjCJlJaF">
+本文所有结构、项目清单、<code data-page-node-id="VXIKFShJnHThvjR0b4R4Lg">.abppkg</code> role 取值、依赖声明均从 <code data-page-node-id="PSJW6a9Y5vHTR7YFM24Wzc">D:\yudao\abp\ABP-Framework-rel-10.6\modules\</code> 实际源码读取，未作推测。
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,18 @@
+﻿@typeparam TEntity
+@typeparam TResourceType
+@using Volo.Abp.Localization
+@inherits ExtensionPropertyComponentBase<TEntity, TResourceType>
+
+@if (PropertyInfo != null && Entity != null)
+{
+    <Validation Validator="@Validate" MessageLocalizer="@LH.Localize">
+        <Field>
+            <FieldLabel>@PropertyInfo.GetLocalizedDisplayName(StringLocalizerFactory)</FieldLabel>
+            <TimeInput TValue="TimeSpan?" @bind-Value="@Value" Disabled="IsReadonlyField">
+                 <Feedback>
+                    <ValidationError/>
+                </Feedback>
+            </TimeInput>
+        </Field>
+    </Validation>
+}

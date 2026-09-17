@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="KlpDBkhH4zPskkOGANjVko">
+<head data-page-node-id="tv0Deq6SF9uuPn6DPvsRmS">
+<meta charset="UTF-8" data-page-node-id="AgjTNGcC7am9xud0kxfEzV">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="I6eP0wvJEWF4lB3JzJEDi2">
+<title>ABP Framework 深度解析与开发指南</title>
+<style>
+:root{
+  --bg:#ffffff; --bg-sub:#f7f8fa; --bg-code:#f4f6f8; --bg-inline:#eef1f5;
+  --text:#1f2328; --text-sub:#59636e; --text-mute:#8b949e;
+  --border:#d8dee4; --border-soft:#e6e9ed;
+  --blue:#0969da; --blue-bg:#ddf4ff; --green:#1a7f37; --green-bg:#dafbe1;
+  --amber:#9a6700; --amber-bg:#fff8c5; --red:#cf222e; --red-bg:#ffebe9;
+  --purple:#8250df; --purple-bg:#fbefff; --teal:#0f6e56; --teal-bg:#e1f5ee;
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0d1117; --bg-sub:#161b22; --bg-code:#161b22; --bg-inline:#21262d;
+    --text:#e6edf3; --text-sub:#9198a1; --text-mute:#6e7681;
+    --border:#30363d; --border-soft:#21262d;
+    --blue:#4493f8; --blue-bg:#0c2d6b; --green:#3fb950; --green-bg:#0f2f1a;
+    --amber:#d29922; --amber-bg:#3a2d00; --red:#f85149; --red-bg:#3d1418;
+    --purple:#ab7df8; --purple-bg:#2b1c4a; --teal:#3fb9a0; --teal-bg:#0c2f28;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:48px 28px 100px}
+header.doc{border-bottom:1px solid var(--border);padding-bottom:26px;margin-bottom:34px}
+header.doc .eyebrow{font-size:12.5px;letter-spacing:.12em;color:var(--text-mute);text-transform:uppercase;font-weight:600}
+header.doc h1{font-size:31px;line-height:1.3;margin:12px 0 12px;font-weight:700;letter-spacing:-.01em}
+header.doc p.lead{color:var(--text-sub);font-size:15.5px;margin:0;max-width:760px}
+header.doc .meta{margin-top:16px;font-size:13px;color:var(--text-mute);display:flex;gap:16px;flex-wrap:wrap}
+header.doc .meta code{font-size:12px}
+
+h2{font-size:22px;font-weight:700;margin:52px 0 6px;padding-top:14px;letter-spacing:-.01em}
+h2 .num{color:var(--blue);font-variant-numeric:tabular-nums;margin-right:9px}
+h3{font-size:17px;font-weight:650;margin:32px 0 10px}
+h4{font-size:15px;font-weight:650;margin:22px 0 8px;color:var(--text)}
+p{margin:12px 0}
+ul,ol{margin:12px 0;padding-left:24px}
+li{margin:6px 0}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+code{
+  font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  font-size:12.7px;background:var(--bg-inline);padding:2px 6px;border-radius:5px;
+  color:var(--text);white-space:nowrap;
+}
+pre{
+  background:var(--bg-code);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:16px 18px;overflow-x:auto;margin:14px 0;line-height:1.62;
+}
+pre code{background:none;padding:0;font-size:12.7px;white-space:pre;color:var(--text)}
+pre .path{
+  display:block;color:var(--text-mute);font-size:11.5px;margin:-16px -18px 12px;
+  padding:9px 18px;border-bottom:1px solid var(--border-soft);background:var(--bg-sub);
+  border-radius:var(--radius) var(--radius) 0 0;white-space:normal;
+}
+.k{color:var(--purple)}   /* keyword */
+.t{color:var(--blue)}     /* type */
+.s{color:var(--green)}    /* string */
+.c{color:var(--text-mute);font-style:italic} /* comment */
+.n{color:var(--amber)}    /* number/attr */
+
+.callout{
+  border-left:3px solid var(--blue);background:var(--blue-bg);
+  padding:13px 18px;border-radius:0 var(--radius) var(--radius) 0;margin:18px 0;font-size:14.3px;
+}
+.callout.warn{border-color:var(--amber);background:var(--amber-bg)}
+.callout.tip{border-color:var(--green);background:var(--green-bg)}
+.callout.danger{border-color:var(--red);background:var(--red-bg)}
+.callout strong{font-weight:650}
+.callout p:first-child{margin-top:0}.callout p:last-child{margin-bottom:0}
+
+table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13.6px}
+th,td{border:1px solid var(--border-soft);padding:9px 12px;text-align:left;vertical-align:top}
+th{background:var(--bg-sub);font-weight:650;white-space:nowrap}
+td code{font-size:12.2px;white-space:normal}
+
+.toc{
+  background:var(--bg-sub);border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:20px 26px;margin:28px 0;
+}
+.toc h3{margin:0 0 12px;font-size:14px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-mute)}
+.toc ol{margin:0;padding-left:20px;columns:2;column-gap:32px}
+@media(max-width:680px){.toc ol{columns:1}}
+.toc li{margin:5px 0;font-size:14px}
+
+.pill{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:20px;font-weight:600;letter-spacing:.02em;vertical-align:middle}
+.pill.domain{background:var(--purple-bg);color:var(--purple)}
+.pill.app{background:var(--blue-bg);color:var(--blue)}
+.pill.infra{background:var(--teal-bg);color:var(--teal)}
+.pill.ui{background:var(--amber-bg);color:var(--amber)}
+
+.layer{
+  border:1px solid var(--border-soft);border-radius:var(--radius);
+  padding:14px 18px;margin:10px 0;background:var(--bg);
+}
+.layer .lt{font-weight:650;font-size:14.5px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.layer .ld{color:var(--text-sub);font-size:13.4px;margin-top:5px}
+.layer .lp{font-family:monospace;font-size:12.2px;color:var(--text-mute);margin-top:7px;word-break:break-all}
+
+.steps{counter-reset:s;list-style:none;padding:0;margin:18px 0}
+.steps>li{counter-increment:s;position:relative;padding:0 0 18px 46px;border-left:2px solid var(--border-soft);margin-left:15px}
+.steps>li:last-child{border-left-color:transparent}
+.steps>li::before{
+  content:counter(s);position:absolute;left:-16px;top:0;width:30px;height:30px;border-radius:50%;
+  background:var(--blue);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;
+}
+.steps>li .st{font-weight:650;font-size:15px;margin-bottom:2px}
+.steps>li .sd{color:var(--text-sub);font-size:13.6px}
+
+hr{border:0;border-top:1px solid var(--border-soft);margin:40px 0}
+.foot{margin-top:60px;padding-top:22px;border-top:1px solid var(--border);color:var(--text-mute);font-size:13px}
+</style>
+</head>
+<body data-page-node-id="YPMCkKXqs10TMMvjz0bdOG">
+<div class="wrap" data-page-node-id="hR4IG5WPb5xdRxjZH0AUZW">
+
+<header class="doc" data-page-node-id="bDfMVhkGlZaE1axFlPWkv2">
+  <div class="eyebrow" data-page-node-id="KHumySRuOVRmeEttuQ9czJ">Deep Research · ABP Framework rel-10.6</div>
+  <h1 data-page-node-id="pngTwda6iSDcPw2XVvs2TT">ABP Framework 深度解析与开发指南</h1>
+  <p class="lead" data-page-node-id="DxlxoAvaPMra4tKvuWyp1F">基于本仓库源码（<code data-page-node-id="qxG4I2reApmKD2K98bkDSW">D:\yudao\abp\ABP-Framework-rel-10.6</code>）逐目录核验：框架是什么、分层怎么切、一个业务功能从领域模型到前端页面如何落地——精细到目录与文件级别。</p>
+  <div class="meta" data-page-node-id="qMMuyuSaKwQeSO1dDJdtJv">
+    <span data-page-node-id="LkS8uon8v2b7ejTrPV0uWy">源码基线：ABP 10.6 (rel-10.6)</span>
+    <span data-page-node-id="e8KfgbNIOOE53DHzVIujSt">技术栈：.NET / ASP.NET Core / EF Core / Angular / Blazor</span>
+    <span data-page-node-id="imWc090m8GL4umYIgkmFg6">证据来源：.cursorrules、templates/、modules/blogging、framework/src</span>
+  </div>
+</header>
+
+<div class="toc" data-page-node-id="F53286GFeJwOyVx2Buc7N3">
+  <h3 data-page-node-id="MDcCSlc42iXKSp50ACTrNK">目录</h3>
+  <ol data-page-node-id="2ci9kaWjBQUUKyqJTKsRhA">
+    <li data-page-node-id="gnrvdI6uYbPtnbBy0PkH3F"><a href="#s1" data-page-node-id="s91I6raCHBWmQvhNIqOKxB">这个仓库到底是什么</a></li>
+    <li data-page-node-id="ax2U9vbjZCuAp6ZyhGk8pG"><a href="#s2" data-page-node-id="2V4lK01vC4dj8dB2KQ6nJV">六根支柱：ABP 的核心机制</a></li>
+    <li data-page-node-id="hqTjVKakEMjqsVDXrda76K"><a href="#s3" data-page-node-id="m8l8yHLVBsHGK3dvUDC1Jw">解决方案分层与依赖方向</a></li>
+    <li data-page-node-id="PLMAXjZjUWJFN4B1RO9cxf"><a href="#s4" data-page-node-id="3d4EBDOm5p7BFzcU40CqS2">目录 · 文件级别速查表</a></li>
+    <li data-page-node-id="mseVueY22ndeQO0HrW2szG"><a href="#s5" data-page-node-id="39qvSJsXdSDlIEtWHPrlvJ">端到端开发工作流</a></li>
+    <li data-page-node-id="n8FhB6xNcWWSXmFEZbGBph"><a href="#s6" data-page-node-id="Ouu8uDgAnPS9SPsgIPbE0l">后端：从业务到 Model 再到业务代码</a></li>
+    <li data-page-node-id="5Se5Qinac4nCq1CjpOFOHQ"><a href="#s7" data-page-node-id="4DHgnE9NQ5CE2nNOpt7Fig">前端：页面到底怎么写</a></li>
+    <li data-page-node-id="YeBXJaFwWj2qlmAc8BQ3eo"><a href="#s8" data-page-node-id="Q7DF8CmirsxiEK4JbCQAhV">命名与编码约定</a></li>
+    <li data-page-node-id="KR1malRnOAYjKOP8eJYjHV"><a href="#s9" data-page-node-id="FYv8AYEPBbuol3JFlLHvjP">CLI 命令与落地清单</a></li>
+  </ol>
+</div>
+
+<!-- ============================================ -->
+<h2 id="s1" data-page-node-id="C3GR35pAZvZfE6n9ACFcTo"><span class="num" data-page-node-id="5YBurT0HyrdNyPjLrZlFeE">01</span>这个仓库到底是什么</h2>
+
+<p data-page-node-id="Orb4CT1QbN0VTvnuB87dUc">打开 <code data-page-node-id="xtzEjISSKGS0NCFEkSYIOM">ABP-Framework-rel-10.6</code> 你看到的<strong data-page-node-id="A9iPWcrXKqR3w0UojSkHuJ">不是</strong>一个业务应用，而是 ABP 框架本体 + 周边生态的 monorepo。这一点必须先说清楚，否则目录结构会让人困惑。仓库根部的 <code data-page-node-id="h5lu6q5Gs4r9g13KUqfNjK">.cursorrules</code> 第一行就写明了：</p>
+
+<pre data-page-node-id="GXSwsuqvaUqSJvExHXBzWt"><span class="path" data-page-node-id="50idVJ36x7RkuRDUMYtwvR">D:\yudao\abp\ABP-Framework-rel-10.6\.cursorrules（第 2 行）</span><code data-page-node-id="sPdUPGdD1qCceZaCHSHcj7"><span class="c" data-page-node-id="c8PTBYe5EMYWcxtHRv5Kxw"># Scope: ABP Framework repository (abpframework/abp) — for developing ABP itself, not ABP-based applications.</span></code></pre>
+
+<p data-page-node-id="JUy3LFc0sXKe65L87KDe3d">根目录的主力目录各自承担不同职责：</p>
+
+<table data-page-node-id="biahCA1DRsbjuMzcvHGEc4">
+<thead data-page-node-id="dZUMq6VK6SrBXdSr8RSw0u"><tr data-page-node-id="RiRH4tKbJPY0wdIDlAXHJu"><th data-page-node-id="Oj9iix6Xh4wm9WXGb97PEP">目录</th><th data-page-node-id="lq6CoUQ80JZh51V3MSXpaL">是什么</th><th data-page-node-id="3tzHIHKUnVrYOn5cRwwINN">你什么时候会看它</th></tr></thead>
+<tbody data-page-node-id="crqxypPpxUOAPhr1myeQQP">
+<tr data-page-node-id="nQBKndDH8oIJpBHC1CtdO2"><td data-page-node-id="7XpjXBJNPUneLtffaImIlH"><code data-page-node-id="jenS4P0LNBeQ7dP3QszIf1">framework/src/</code></td><td data-page-node-id="v2Q1tIKLQSCG4j3LzgnA5m">框架内核，几百个 <code data-page-node-id="J92pTIjZcPg1SfrTl4cfFE">Volo.Abp.*</code> 包（DI、授权、本地化、审计、EventBus、DDD 基类…）</td><td data-page-node-id="IjzMMAQjr0oJU4f6VDar9N">想知道「这个能力框架怎么实现的」</td></tr>
+<tr data-page-node-id="hH1AowV060BjdCOl3YFP6A"><td data-page-node-id="jMKGC1QiCHYW1kKsLvpHhF"><code data-page-node-id="tZDbzROPinGgx2XQvoMFHL">modules/</code></td><td data-page-node-id="FXds7zADBtoSje5V1LzXbi">官方预置应用模块：<code data-page-node-id="gRKUxlqP4gJfCEv7XkJJMx">blogging</code>、<code data-page-node-id="bwQtltTpp2VoXMIilGEKk1">identity</code>、<code data-page-node-id="wHxciAEkepD4j9MuDXJ0V4">cms-kit</code>、<code data-page-node-id="KdSrnGgtrj9vYq1jXmn3xU">audit-logging</code>…</td><td data-page-node-id="HzQRlRlLhXsRLjkr4OnCj6"><strong data-page-node-id="qkngG1IMkVp5N4jp8nz2Pw">学业务代码怎么写的最佳范本</strong></td></tr>
+<tr data-page-node-id="cRCAyb5ClP4rFlycD1mVfj"><td data-page-node-id="21tchM8uPAORCODTmleHRP"><code data-page-node-id="UE6oikAvzyp6jkP8pL7WpM">templates/app/</code></td><td data-page-node-id="SkEOwM4SH1QMtUo4yO8Jb5">「单应用」启动模板（前后端完整脚手架）</td><td data-page-node-id="Hw7ZvUpT621DNBIa9jxoAD">照着它搭自己的项目</td></tr>
+<tr data-page-node-id="fFAuJB7CDxEh5dBciohZdb"><td data-page-node-id="zUsqJmM6VVaASNmLTzbfkj"><code data-page-node-id="n7XQvXbu4CdfIm7mhu45fT">templates/module/</code></td><td data-page-node-id="7fgoIaZOJFTFc1cAsHSkGr">「可复用模块」启动模板</td><td data-page-node-id="RKMy25y5fQOcym0UIPH9nm">写跨项目复用的业务模块</td></tr>
+<tr data-page-node-id="kzHqTfWMMOOzJjJZkyzCUw"><td data-page-node-id="dloEThSdk3nyHcF5LY6gFc"><code data-page-node-id="DEU7PHvSFPPN0YgbW9G5l9">templates/app-nolayers/</code>、<code data-page-node-id="0S254tuGBGtqbXQKbi5pK1">console</code>、<code data-page-node-id="LN5ucWzAHDN9BRa8aOgDWG">maui</code>、<code data-page-node-id="sY2UVzy0KslpYgObPEG0St">wpf</code></td><td data-page-node-id="I1lRJaOB1sQ21HY9t5iIyW">单层极简版 / 控制台 / 桌面端模板</td><td data-page-node-id="i2Edx0fQoDB8reTfNhnFwD">按需选择架构复杂度</td></tr>
+<tr data-page-node-id="8zxzEUw66h8ZDbsO7CzaFv"><td data-page-node-id="33zbL3BLPoksZaHvX2Xo0I"><code data-page-node-id="vxarFnSXLXRCduBAV0YNfH">npm/ng-packs/</code></td><td data-page-node-id="76uHAF4nGLr1ixoiCzABYP">Angular 侧的全部 <code data-page-node-id="KnkBBPY3sqUYAoeuuokQUD">@abp/ng.*</code> 包（identity、tenant-management、theme-basic…）</td><td data-page-node-id="rkBJ23fFLk1G1PKC3v6LIl">写 Angular 页面时用到的现成组件</td></tr>
+<tr data-page-node-id="osGyCigLbSEF9acivhjbjJ"><td data-page-node-id="ckAW6Ri9ghSrxNzHcRWTUb"><code data-page-node-id="HMC9T3DWLLW7YlldMK8igB">docs/</code>、<code data-page-node-id="Yza78BTnEajURBIijP3Ufc">studio/</code>、<code data-page-node-id="rPpITjHfhH8Vu2lsaMw6Yi">schemas/</code>、<code data-page-node-id="ReXYFyGhNoev4jxsPhOWrt">tools/</code></td><td data-page-node-id="Q9rhiB5stCw8E2oUJ0SMkg">文档、ABP Studio 桌面端、模型 schema、CLI 工具</td><td data-page-node-id="jgyInvvmeFjAAZVP4KiWtT">工具链与配置参考</td></tr>
+</tbody>
+</table>
+
+<div class="callout" data-page-node-id="czZ03kr5h9vREa1kfcZtsE">
+<p data-page-node-id="sv2lvlyjSpEDo2FuZtgYZ3"><strong data-page-node-id="1dMmp2SIHh7DcdfmBa5LPm">一句话定位：</strong>ABP 是架在 ASP.NET Core 之上的「企业级应用架构脚手架」。它把分层、模块化、多租户、横切关注点（授权/校验/异常/本地化/审计）全部做成了基础设施，让你只写业务。</p>
+</div>
+
+<h3 data-page-node-id="wPqBSWzL0BB1oFHHsTRyLp">两套模板的分工</h3>
+
+<p data-page-node-id="CgS1cZaj2RcF7rW11a6NGa"><strong data-page-node-id="SofFaC8nVAILHEBHimqnbS"><code data-page-node-id="4nSTA2D8rCJFtB3CwfSeEN">templates/app/</code>（单应用模板）</strong>——最终你会基于它建自己的项目。它的目录形如：</p>
+
+<pre data-page-node-id="ss038xYgmLfc1NpKtOyi8v"><code data-page-node-id="2EXeYqIt8NXOwivfsvDYBx">templates/app/
+├── angular/                         <span class="c" data-page-node-id="8vzulzEPdtIQ6JeYRe7Jnr"># Angular 前端（可选 UI 形态）</span>
+│   └── src/app/
+│       ├── app.routes.ts            <span class="c" data-page-node-id="ggvXTZIfFHH32hiFxw9S33"># 根路由：懒加载各功能域</span>
+│       ├── route.provider.ts        <span class="c" data-page-node-id="zR8XxRMfmCsQmPL9TgMIfi"># 把路由注册进 ABP 的 RoutesService</span>
+│       ├── home/                    <span class="c" data-page-node-id="CUoleGyKmzOmPt8oaoWSZq"># 首页组件示例</span>
+│       └── shared/shared.module.ts
+└── aspnet-core/
+    ├── src/
+    │   ├── *.Domain                <span class="c" data-page-node-id="g1fxSweR9LjjCkSGd8seNb"># 领域层</span>
+    │   ├── *.Domain.Shared         <span class="c" data-page-node-id="q7x3boygVBvBuk9RxEitTs"># 领域共享层</span>
+    │   ├── *.Application.Contracts <span class="c" data-page-node-id="23Lfh0A51JR75bCvdllkir"># 应用契约层</span>
+    │   ├── *.Application           <span class="c" data-page-node-id="OpX7ALVGYVW5UUo0OTuFap"># 应用实现层</span>
+    │   ├── *.EntityFrameworkCore   <span class="c" data-page-node-id="JaHjxCe4Y1SMlMD1zqAKuh"># EF Core 集成</span>
+    │   ├── *.MongoDB               <span class="c" data-page-node-id="DuOlsbuenGrzCkNiGVuzhL"># MongoDB 集成（可选）</span>
+    │   ├── *.HttpApi               <span class="c" data-page-node-id="8HoDqC5scT5YTVnQqE4HxZ"># REST 控制器</span>
+    │   ├── *.HttpApi.Client        <span class="c" data-page-node-id="m6v5KvVWRTUa1WHQOihM1f"># 远程客户端代理</span>
+    │   ├── *.HttpApi.Host          <span class="c" data-page-node-id="fnVFKwKDuOBRAJ2pJRzVzs"># API 宿主（启动项）</span>
+    │   ├── *.Web / *.Blazor*       <span class="c" data-page-node-id="hNvPS2g2jTrvzIfZTmPQTn"># MVC / Blazor 前端宿主</span>
+    │   └── *.AuthServer, *.DbMigrator
+    └── test/                       <span class="c" data-page-node-id="s2x7O7zFXfZwuEFQ90n31S"># 各层对应的测试工程</span></code></pre>
+
+<p data-page-node-id="1PSjoxJ7KNQaFIBbvREQnJ"><strong data-page-node-id="r2Kxo6IvOaGrShRF3EqqMo"><code data-page-node-id="MS1LcxNfJbNy63I8JyN2rn">templates/module/</code>（模块模板）</strong>是「可复用业务模块」的标准骨架。它多了一个关键目录 <code data-page-node-id="bewkGROVH02a6rW5u7ZidM">Samples/</code>，里面放着一份 <strong data-page-node-id="CnavjbBaUPwoz2PZElfwzJ">官方认证的「新增一个功能」最小范例</strong>（<code data-page-node-id="S7o2oegmqrqcbPSiok88X4">ISampleAppService</code> → <code data-page-node-id="3sUb8XCr53HMcG9z2nHxJZ">SampleAppService</code> → <code data-page-node-id="ceBI3MsvGACNYhOKajpZ35">SampleController</code>）。本文第 6 节的代码写法，就是沿着这条官方路径展开的。</p>
+
+<!-- ============================================ -->
+<h2 id="s2" data-page-node-id="FID3i6GaGDnpSzLcdhRJT1"><span class="num" data-page-node-id="ztnceu2UWmmjUvIK86XtTY">02</span>六根支柱：ABP 的核心机制</h2>
+
+<p data-page-node-id="dZAOIuje4HbCSCIEGBj30B">不先理解这六个机制，后面看分层会觉得「为什么到处是 DependsOn / 为什么没写 new 就能用」。它们解释了 ABP 里几乎所有「约定优于配置」的魔法。</p>
+
+<h3 data-page-node-id="OaPZ5xSOgFkNcfyv0nASDr">① 模块化（Modularity）</h3>
+<p data-page-node-id="Zt8Wrnamv6lUwADUmDRkcD">每个程序集必须有且仅有一个 <code data-page-node-id="6t0PpkxlTZMBJUDyIyKDco">AbpModule</code> 子类，用 <code data-page-node-id="VlRsyrvggkRSro2wEB3rhD">[DependsOn(typeof(...))]</code> 声明它依赖哪些模块。框架启动时按依赖图做拓扑排序，依次调用各模块的 <code data-page-node-id="5SUKWMVpXewinmYThehfDd">ConfigureServices</code> / <code data-page-node-id="bplhtvAs5k7VsGKoOk1pYZ">OnApplicationInitialization</code>。</p>
+
+<pre data-page-node-id="bLYTyGqknuH5Z8EKNc70Az"><span class="path" data-page-node-id="sPBzaG2IeZ3zvzoKGm0IJ3">templates/app/.../MyProjectNameDomainModule.cs</span><code data-page-node-id="1Ne6pE23RfyA0dW3J9ZCuY"><span class="n" data-page-node-id="Q9YM3hHt7CXuG3x8H4R82S">[DependsOn(</span>
+    <span class="k" data-page-node-id="FyYFuWRdtZWTUYLtdeV2wb">typeof</span>(<span class="t" data-page-node-id="IZF5JGYEeqjWPnNzx5G0JN">MyProjectNameDomainSharedModule</span>),
+    <span class="k" data-page-node-id="BsVhMZz7ysYydt8ToKovYS">typeof</span>(<span class="t" data-page-node-id="tDBl98k1qN00yzgCWzGnQP">AbpIdentityDomainModule</span>),
+    <span class="k" data-page-node-id="VkojKIqsCPdfaM3byyABFS">typeof</span>(<span class="t" data-page-node-id="ViFi6QJBpBGU4ZwB2EoeDY">AbpTenantManagementDomainModule</span>),
+    <span class="k" data-page-node-id="i0YvnHKNI8FW19ekFdGjdX">typeof</span>(<span class="t" data-page-node-id="WU6juhgHU82Ar5sxRUNSGB">AbpAuditLoggingDomainModule</span>)
+<span class="n" data-page-node-id="Gqrmv0reOB6epuHxZfRLuZ">)]</span>
+<span class="k" data-page-node-id="Mz2XZVtPuL52VCu8vV80U6">public class</span> <span class="t" data-page-node-id="b37IWHGEZW4l4rjUqT5GjZ">MyProjectNameDomainModule</span> : <span class="t" data-page-node-id="jxaG6sb0uNwZLYvugif0tn">AbpModule</span>
+{
+    <span class="k" data-page-node-id="3ftt6KKed2MuXXjMHrLZWX">public override void</span> <span class="t" data-page-node-id="PpICpW69bYqCMx9PEzQuHF">ConfigureServices</span>(<span class="t" data-page-node-id="82yUDESn7EApTA7BtpD5Il">ServiceConfigurationContext</span> context)
+    {
+        Configure&lt;<span class="t" data-page-node-id="tWxtsCyLqGDlw6HTGJnDUL">AbpMultiTenancyOptions</span>&gt;(options =&gt;
+            options.IsEnabled = <span class="t" data-page-node-id="Wc8rwVcn4PPfjnttmkonHN">MultiTenancyConsts</span>.IsEnabled);
+    }
+}</code></pre>
+
+<p data-page-node-id="0N2drvHUVMNxbx3BBDobS9">这套机制带来的直接结果是：<strong data-page-node-id="fTQv9n8L6y41zO6GHnoMmm">业务模块可以独立开发、独立测试、按需装配</strong>，也是后面「模块化单体 / 微服务」两条架构路线的共同地基。</p>
+
+<h3 data-page-node-id="uk7kjJIwslBuuFxGT9NI3g">② 依赖注入的约定式注册</h3>
+<p data-page-node-id="Nd6PQpfng2Ry0H8sdwrbm8">ABP 不要求你写 <code data-page-node-id="BoZBtizg5WoD9LEXaWggUW">services.AddTransient&lt;IFoo, Foo&gt;()</code>。实现了这些接口的类会自动注册：</p>
+<ul data-page-node-id="lAXDAoXlzxLDBidoxrXEmk">
+<li data-page-node-id="BbVTVEHMaB8mXnxY9WJ3HU"><code data-page-node-id="lZuJNA9THJnw4QD4oKg2BB">ITransientDependency</code> / <code data-page-node-id="frxzu58EQS7HqNq4sUzZld">ISingletonDependency</code> / <code data-page-node-id="4baGuwRC8ECTXUg47MRXQU">IScopedDependency</code> —— 按生命周期自动注册</li>
+<li data-page-node-id="t4LiN5gcNPuES5anufQSLR"><code data-page-node-id="QpBgEWDoKGSHzY2BaT4KOc">IApplicationService</code>、<code data-page-node-id="qjECEP5TXpa2ZjcPiNYB9L">IDomainService</code>、<code data-page-node-id="EcP2pnCRlmx58DAz3cPlEF">IRepository</code> 等 —— 有专属约定</li>
+</ul>
+<p data-page-node-id="CARYLZbVzoRQjHpZCXX15g">所以你会看到 <code data-page-node-id="p0p6qlJPib5lCeXe6a42cg">PostAppService</code> 构造函数里直接注入 <code data-page-node-id="lOqeTCvwRlw7be9JX7AI3W">IPostRepository</code>，却没有任何地方写注册代码。</p>
+
+<h3 data-page-node-id="QVC12urPV1KuntKsDrW45f">③ 仓储抽象（Repository）</h3>
+<p data-page-node-id="0AhwLqI7QIby6PZfgLJO7F">领域层只依赖仓储<strong data-page-node-id="YFGqQIueBG3WluuFi7H8kL">接口</strong>（如 <code data-page-node-id="cgmsPm64cWqEtsFHGkhwCm">IPostRepository</code>），实现放在 ORM 集成层（<code data-page-node-id="14vYjxYXS3rdL3YtGcIHGJ">EfCorePostRepository</code>）。这意味着：换数据库（EF Core ↔ MongoDB）不影响领域逻辑。框架还提供 <code data-page-node-id="MzOqRkyVazxaWbMG9TyUKC">IRepository&lt;T, TKey&gt;</code> 泛型基座，自定义仓储继承它即获得 <code data-page-node-id="7tCqBR06wo2dbiw7wPIYhn">GetAsync/InsertAsync/UpdateAsync/DeleteAsync/GetListAsync</code> 全套能力。</p>
+
+<h3 data-page-node-id="Ge6UzhkFBVmHcarYx8Elra">④ 横切关注点自动化</h3>
+<table data-page-node-id="nCLpQ9RTWTM55illFqfbsf">
+<thead data-page-node-id="smHPt3u90bb2UzDleBNGpl"><tr data-page-node-id="AjK9URnabGAbtDo3AVSUK7"><th data-page-node-id="eEDnBLXsnfVGojP46EHr9b">关注点</th><th data-page-node-id="hqDAhPbMWCpxtEzBLk2UtL">你怎么用</th><th data-page-node-id="hXm9MJFQREqX4IINvKJj1C">框架做什么</th></tr></thead>
+<tbody data-page-node-id="CaSGGeEsuDZTtwwRNqXTFo">
+<tr data-page-node-id="etTVLbM2EUsNgB7vOgXiC1"><td data-page-node-id="QJZH0uOqH4uAcupVp6A7mj">授权</td><td data-page-node-id="DFciISOSjGoNdk9FDaBtSD">方法上打 <code data-page-node-id="S9FPOllAU8D90tfqXV9S3P">[Authorize(权限名)]</code></td><td data-page-node-id="4b1jJgpTTgAgZ01TnCaKA6">自动拦截、校验当前用户是否拥有该权限</td></tr>
+<tr data-page-node-id="RMFfc0V4vaqDen29PbyCRJ"><td data-page-node-id="anu6XzglKwEmHwMeTj45Fy">校验</td><td data-page-node-id="GqgiOFH5ubFnfTVHa7EfAy">DTO 上打 <code data-page-node-id="tswRo4cnNSV0ab1Dy7zsRz">[Required]</code> <code data-page-node-id="Z5IkwsyagYGFcsRyXO6S54">[DynamicStringLength]</code></td><td data-page-node-id="pP7BBsPRHTU7J60TExO63e">进入应用服务前自动验证，失败抛标准异常</td></tr>
+<tr data-page-node-id="XBHTfwvvG5B7K4iosDNdl8"><td data-page-node-id="Q396VGuim6mIc1SuueM3B5">异常处理</td><td data-page-node-id="5PCuJOhwm2QHWZP4qpBAAj">领域里抛 <code data-page-node-id="OPq6gFV6uBUMQxsviAvSaz">BusinessException("码")</code></td><td data-page-node-id="4gARVS7pHv8ghhw4Vvpp1q">统一转成规范的 JSON 错误响应 + 本地化消息</td></tr>
+<tr data-page-node-id="tI4uM3wAaETUUv5Jrrw8Zk"><td data-page-node-id="kHPFxdfSW5do1jbYuP4oCZ">本地化</td><td data-page-node-id="3VWNf7eFPHuNzQTaXtJktg">JSON 资源文件 + <code data-page-node-id="j4bl7DwXc9XKBqsRbpmjTz">L["Key"]</code></td><td data-page-node-id="56XZhrwscAOwxDZhANehDP">按请求语言自动切换</td></tr>
+<tr data-page-node-id="IMJ5mFxWvAP0VCzzFUcWMX"><td data-page-node-id="ospUkcCMmK3n6CB1ls1PKq">审计</td><td data-page-node-id="969uqcMacdiKUHDV3CWAWc">实体继承 <code data-page-node-id="1XHA7BaVAjscEbrnFToVwV">FullAuditedAggregateRoot</code></td><td data-page-node-id="tB3AcGUKn3sqtMTc9tLL3T">自动记录创建人/时间/修改人/软删除</td></tr>
+<tr data-page-node-id="JqhhHaXZHMsLtjafCcTrA6"><td data-page-node-id="boXxzYK7ckUcUtnBmBZ71T">数据过滤</td><td data-page-node-id="VMdp7iCyqwUSpAsbfZoCfr">无感</td><td data-page-node-id="sDHtvFriqEVk02UP4j5DlF">自动追加多租户、软删除过滤条件</td></tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="fXoWCG36CM4h0OUDcidu1N">⑤ 多租户（Multi-Tenancy）</h3>
+<p data-page-node-id="aFbse5EQqbDiwj7YzH3tEb">一个部署实例服务多个租户，数据自动隔离。开关就一行：<code data-page-node-id="w4xaGYVnXTioFlMmHtcbQa">MultiTenancyConsts.IsEnabled</code>；实体实现 <code data-page-node-id="MALnz1r6DmyoyFYU6y4HnW">IMultiTenant</code> 后，框架自动在所有查询上加租户过滤。</p>
+
+<h3 data-page-node-id="G1e1zfjpxNzmfNcxomJ8Sy">⑥ 事件总线（Event Bus）</h3>
+<p data-page-node-id="lcoDErlmfnTdW2BB24AfXe"><code data-page-node-id="JGxIFmqd1uGjS34wl1iTEI">ILocalEventBus</code>（进程内、同模块解耦）与 <code data-page-node-id="dzOyN9AERewItj9HiX7CjX">IDistributedEventBus</code>（跨服务）。ETO（事件传输对象）放 <code data-page-node-id="RkfZlZGAtfvKrgWArD5tE0">Domain.Shared</code>。blogging 模块里 <code data-page-node-id="RDjToJs7RIQKBPDGkpLzyB">PostChangedEvent</code> 就是用它做缓存失效的。</p>
+
+<!-- ============================================ -->
+<h2 id="s3" data-page-node-id="sv0Sk94Xk7jquxQ6MDy6Ui"><span class="num" data-page-node-id="kWWo4Y2wtaIhDGmM7hKP8g">03</span>解决方案分层与依赖方向</h2>
+
+<p data-page-node-id="EK0kli2mpiWKPsJvEvIY9y">这是整个框架最关键的一张图。ABP 强制「依赖单向向下」，<strong data-page-node-id="jDvbiz2JJjnETfSLigdXnR">越往下越稳定、越往上越易变</strong>。规则直接来自 <code data-page-node-id="NTytl2VxhFtEZUV2cYHhNZ">.cursorrules</code> 的 Layering 一节。</p>
+
+<table data-page-node-id="ZSCDOYFHMwgG2le2Ixjac8">
+<thead data-page-node-id="TiSjC8bAPhpKsjHD8H0Jsk"><tr data-page-node-id="AFccOT6d0E1EJscF8HJeb7"><th data-page-node-id="s07nPVG4oT8S25qWzk36Y5">层</th><th data-page-node-id="6BXXdJ2ryakWDqEEk7YOKh">职责</th><th data-page-node-id="fN3jJsUGGcIMZdky98odz3">可以依赖</th><th data-page-node-id="G525huH6dFBH1y1EIfrS9Y">严禁出现</th></tr></thead>
+<tbody data-page-node-id="tkUN2AsmW7ryeozXnaESQx">
+<tr data-page-node-id="SadYU5Im4M8p2bfDV9B9UW"><td data-page-node-id="GCFFBRwqPyle26ILbKAE3m"><span class="pill domain" data-page-node-id="NDUhIe6E5lcPs9jvcmlqN1">Domain.Shared</span></td><td data-page-node-id="M46Ay49N1g6rDUFLeEB6Fg">常量、枚举、错误码、多语言资源、ETO —— 所有层和第三方客户端都能安全引用的东西</td><td data-page-node-id="xuOKi1X3a6U6xz3VpTl5Qu">无（最底层）</td><td data-page-node-id="Wfcw6038N7QCFxIYehPyBs">实体、仓储、领域服务、业务对象</td></tr>
+<tr data-page-node-id="JeQY9TxI36pZI03zgmoKAC"><td data-page-node-id="0miqlJpU1oz80f3AWjtRHr"><span class="pill domain" data-page-node-id="acvqXRzUqBQ78bziUP3RTv">Domain</span></td><td data-page-node-id="AOyJbnbXHdGAlYtYK6QZvj">实体/聚合根、仓储<strong data-page-node-id="g7oQAciZYaKoNrEVaxNOGG">接口</strong>、领域服务、领域事件</td><td data-page-node-id="PpCP2H5H7Hm9seu3QzeQsQ">Domain.Shared</td><td data-page-node-id="OL0MdU3BKoZJq7pLpORgSF">EF Core、Web、DTO</td></tr>
+<tr data-page-node-id="3cUEcjG6B6Fiw7RuVN3LHu"><td data-page-node-id="v465mDRc8xbRZFIHvFLVqv"><span class="pill app" data-page-node-id="GpTBbMjCxPq7BYHEr7uZTT">Application.Contracts</span></td><td data-page-node-id="svQ6U1hCP096sNWvT0DH3g">应用服务<strong data-page-node-id="vwKK0PXY88cL9vxlyc2Y0I">接口</strong>、DTO、权限定义</td><td data-page-node-id="tD0iHAnP6ZVliJFFedeC1e">Domain.Shared</td><td data-page-node-id="4AA4Lrfc3NGgFgWE7L0VWM">实体、仓储实现</td></tr>
+<tr data-page-node-id="SDPgjsNnNIhgvCUVEq5WUc"><td data-page-node-id="jAYpX4SAmNyX7D85u0j7dd"><span class="pill app" data-page-node-id="a1InhGhmyKZoAgcdnHPEtX">Application</span></td><td data-page-node-id="UdaJRn3IoVtZ3NO8mVtPaI">应用服务<strong data-page-node-id="Xy8kmhuDHecggRzFbxP9Oo">实现</strong>、对象映射、用例编排</td><td data-page-node-id="VdIXlo0Oi4AABAtf7ybVJq">Domain + Application.Contracts</td><td data-page-node-id="4ZqHb2UpR0NB25KLH6vqGa">Web 类型（IFormFile/Stream）</td></tr>
+<tr data-page-node-id="jzE55gLBdGVbnr80aodqVP"><td data-page-node-id="Ki2cTm4nyIAfKyA2rVYyws"><span class="pill infra" data-page-node-id="DGrm6l5EkDykWLl4KBjNI8">EntityFrameworkCore</span></td><td data-page-node-id="LWbt4HvI6aC0zP85Ok4nbA">DbContext、实体映射、仓储<strong data-page-node-id="2GPwTwZDV9SimmMSx0o1WD">实现</strong>、迁移</td><td data-page-node-id="GR2fEBQRnCTDg2kDb9Atyn">Domain</td><td data-page-node-id="RBjCh8eVdkeKF2n2Oj67Zw">Application、HttpApi</td></tr>
+<tr data-page-node-id="nAouTACw0lkNCdEK4VCo1q"><td data-page-node-id="VhvcADM6jE5GYe3JLEiNZy"><span class="pill infra" data-page-node-id="DKtujA4v5QDF4xjYdAhARa">HttpApi</span></td><td data-page-node-id="nij9XaJABIsFCaWbB11uT6">REST 控制器（薄适配器）</td><td data-page-node-id="Vei7CTEbJQDUxlwTnCI445"><strong data-page-node-id="0b36TAyI2wyz3Ry4gxUdUV">仅</strong> Application.Contracts</td><td data-page-node-id="u38Sa1H98f3Xo0yKxHZ5al">Application（实现）</td></tr>
+<tr data-page-node-id="56kqZC1mwLFu3sucOJGVMt"><td data-page-node-id="Q2ilKiBaxvgt286Zgl7xqM"><span class="pill infra" data-page-node-id="6mkgVjNnHyMaQ2SKnXLmOV">HttpApi.Client</span></td><td data-page-node-id="F3iJ4myzfeFT3dzADhHVcp">远程调用代理</td><td data-page-node-id="4HL8GbJrjbJ6opBg19IEGD"><strong data-page-node-id="4dpFh3NscZk9kWAeORG76M">仅</strong> Application.Contracts</td><td data-page-node-id="YWXLfwixhPhWr0AH4AOHIX">Application</td></tr>
+<tr data-page-node-id="9086PiLKsgMEEzbquKhup4"><td data-page-node-id="8DLc79qTIaP4qFhEmCfuAO"><span class="pill ui" data-page-node-id="67z6CmLdnDAlsvBP8OB7Ht">Web / Blazor</span></td><td data-page-node-id="miSR3eTYVWx49aPrhfoRiK">UI 宿主与页面</td><td data-page-node-id="tmfCm7HZDFV4wJyV8no3f1"><strong data-page-node-id="BSKrJOQgAZpHjkOwjUYRvX">仅</strong> HttpApi</td><td data-page-node-id="AUdgu587UIhZTPmz0WtfX4">直接碰 Domain</td></tr>
+</tbody>
+</table>
+
+<div class="callout tip" data-page-node-id="TbzMr6mlp9w2HY2fLHfSWD">
+<p data-page-node-id="abkXEIbYjUbwUksGvX4tA3"><strong data-page-node-id="yQeu2S2z6yKNcXTLNiL43A">记住这条链，90% 的设计问题都能自检：</strong><br data-page-node-id="CVvoFwHcoGngdGMCuMC8Y7">
+<span class="pill ui" data-page-node-id="FfVmE8bExOqZi3F6LMZqNm">Web</span> → <span class="pill infra" data-page-node-id="jHZ1oqrzA46Fz5BQTOp2Da">HttpApi</span> → <span class="pill app" data-page-node-id="iAHOXofdkVC8ccUMGvVmtL">Application.Contracts</span> ← <span class="pill app" data-page-node-id="RyfBdOuCLG095OiLkSXBAc">Application</span> → <span class="pill domain" data-page-node-id="PIxs5CDvD1qaE0wfMvKgAF">Domain</span> → <span class="pill domain" data-page-node-id="j7UGpmvkTqeIHSldYtkoqk">Domain.Shared</span><br data-page-node-id="sal3fzgJ2nkeiYBK44dNVj">
+ORM 集成 → 只指向 Domain。</p>
+</div>
+
+<div class="callout warn" data-page-node-id="onrZGVxXEP07fiJaZyCmCK">
+<p data-page-node-id="BsJrgDsXB86G5SllKQMEqM"><strong data-page-node-id="wTW8AQMRbRuYVjsBHrVA2k">为什么 HttpApi 只能依赖 Contracts 而不能依赖 Application？</strong>因为「接口与实现分离」是这套架构的命门。控制器对着 <code data-page-node-id="3bq7CdRxJKvG5J13PrMez4">IPostAppService</code>（接口）编程，运行时由 DI 注入实现。这样同一套契约既能被本地应用服务实现，也能被 <code data-page-node-id="kfCEfgxUbqwx0KN4bKh7eI">HttpApi.Client</code> 拿去生成远程代理——微服务拆分时才不用改前端。</p>
+</div>
+
+<!-- ============================================ -->
+<h2 id="s4" data-page-node-id="jBzk0Fh7aMrYscdGRXEIxB"><span class="num" data-page-node-id="Ht9JhI1SanoG0ovwBlbHjW">04</span>目录 · 文件级别速查表</h2>
+
+<p data-page-node-id="nM20hs58CcrGp6u9neQY9S">下面是「某个业务功能（假设叫 Product）」在各层应该落到哪个文件。<strong data-page-node-id="vZFDfw4HVvpTbPZzZCuaxN">左边是模板里的真实路径规律，右边是这个功能该新增的文件。</strong></p>
+
+<table data-page-node-id="jAFF8FFzedZRq1pyNdj3zz">
+<thead data-page-node-id="bhWsviUrG3OrtGzlqMOwNz"><tr data-page-node-id="F6hz5LWmKDMuUEaY7JJZU6"><th data-page-node-id="fCa47AxomUHWMJjZ7xF4Ib">层</th><th data-page-node-id="1qRPD1ZsFAyApmvI6YdGAP">目录（模板路径规律）</th><th data-page-node-id="fcOKOcUvB5TCZFpRxiPNCe">你新增的文件</th></tr></thead>
+<tbody data-page-node-id="WQquRO8TBEoLtmEthumRnM">
+<tr data-page-node-id="vz3BGYrjnBBcDRAkx1D8fD"><td data-page-node-id="Nf11txlBOpbfrhuOXpZxBP">Domain.Shared</td><td data-page-node-id="gvwGLIWucuz2Mfkk0KdFM9"><code data-page-node-id="Qb1SIZvTUJEpvuHyCFYjHe">*.Domain.Shared/Products/</code></td><td data-page-node-id="ycwfst6LgtOWL0SflqTx45"><code data-page-node-id="nnYKrA1HT6P57FCLY7Ugry">ProductConsts.cs</code>（长度/规则常量）、<code data-page-node-id="CUpbwpXAgmNBClHPGVM54X">ProductEto.cs</code>（跨服务事件）</td></tr>
+<tr data-page-node-id="Gkrtg5Phs8nmyWQkD3hXnC"><td data-page-node-id="TqBwRyItfKoS0hyXaBL4Rp">Domain.Shared</td><td data-page-node-id="pOScyvlmPYcaMXVg1zUHBz"><code data-page-node-id="0b9tzxxSLnvGiLIP4E0O4s">*.Domain.Shared/Localization/&lt;项目&gt;/</code></td><td data-page-node-id="KdF9soKOfUvNoO7VeqBewb"><code data-page-node-id="i37gTP5P3eBBmAxHkcQiuO">en.json</code> / <code data-page-node-id="Vv6xuPo4k5kifGm9OlilFf">zh-Hans.json</code> 里补 key</td></tr>
+<tr data-page-node-id="9hQwTAVKy5fc5NvOGjneWk"><td data-page-node-id="SzJRQKH7ZTmLgZ98RYhhmn">Domain.Shared</td><td data-page-node-id="g6UvHLN5vAaeF0k57rQ9ob"><code data-page-node-id="6Vu0pU4IrIkHMQ6CXrFful">*.Domain.Shared/</code></td><td data-page-node-id="dLz47RihpCg01ZY40S5YuG"><code data-page-node-id="QGWGtXFFzbc4lnlwRqKCun">*DomainErrorCodes.cs</code>（业务错误码）</td></tr>
+<tr data-page-node-id="KhXFrm8eCA57nja6alyVOF"><td data-page-node-id="sdLYFLtJA9JttmGHabNlhC">Domain</td><td data-page-node-id="zvTbycb8qYR2N2D8YQAXxA"><code data-page-node-id="ZvlR63xBajj1oAEYqwUpWR">*.Domain/Products/</code></td><td data-page-node-id="uNBwlHxIBfootQkH8dpS4o"><code data-page-node-id="T7u7Yr69rBOpOZDNu2g9EK">Product.cs</code>（聚合根）、<code data-page-node-id="liXqFQj27weXhVG9eCTplf">IProductRepository.cs</code>（仓储接口）</td></tr>
+<tr data-page-node-id="CvkpUn3KwJVOkwTYVUdl0S"><td data-page-node-id="MuE6wadpJYHqsA9TdYgNJO">Domain</td><td data-page-node-id="4WzUY6uyolkG1zFvhuTYS6"><code data-page-node-id="yOe8HUmYRj7NPycXxOj9uo">*.Domain/Products/</code></td><td data-page-node-id="pZYW0EWoox6zUB4eaU8jAK"><code data-page-node-id="QJhEr3AxjAuGo9wmn5iTA3">ProductManager.cs</code>（领域服务，可选）</td></tr>
+<tr data-page-node-id="VbSuhQbvzBZ9jnQpQ4bluN"><td data-page-node-id="DexMGSPqw7BJi0ibNCdL1F">Application.Contracts</td><td data-page-node-id="i2LPg5fuhWEl8M5oRJqAJH"><code data-page-node-id="avb3NeGP2uW9j7Ogog1uoE">*.Application.Contracts/Products/</code></td><td data-page-node-id="gdQP1GQuS7eUfxFArQpUlB"><code data-page-node-id="fAX2CYoChakErvMPDCCDGQ">IProductAppService.cs</code></td></tr>
+<tr data-page-node-id="Q0OIUHgfeIHQFER44xkdgE"><td data-page-node-id="fUFFCH0E7beG2NrCQnkmIz">Application.Contracts</td><td data-page-node-id="oF19YOaqLazN7YDbDr6MtW"><code data-page-node-id="5DaXhIfI8G3IJyHMF2rRgT">*.Application.Contracts/Products/</code></td><td data-page-node-id="mejsFFRiPSaYMfW26WqGtO"><code data-page-node-id="0I49WDNC4YrFugkQMP8FWb">ProductDto.cs</code> / <code data-page-node-id="kkrATJs81HqHSkvdiZcnBg">CreateProductDto.cs</code> / <code data-page-node-id="BhFXW5IvYHC2D2Xk4J6N2f">UpdateProductDto.cs</code> / <code data-page-node-id="ZDtcc2JfKk8pHTmGbM3aEL">GetProductListDto.cs</code></td></tr>
+<tr data-page-node-id="pF8xY3LTQAsIIODwJu3EBc"><td data-page-node-id="gjlNG7OF4DAX8byzUqJiLk">Application.Contracts</td><td data-page-node-id="iezDejB85QBTfqMHtLBj4w"><code data-page-node-id="KXs5Bev1A86vX7N7ltpZmQ">*.Application.Contracts/Permissions/</code></td><td data-page-node-id="v5hT4fdNDTPEr7q0eYYtjI">改 <code data-page-node-id="O8ZjjjDKqp1P9VBy1fa5MH">*Permissions.cs</code> + <code data-page-node-id="BxzDbyCzHHC1icdY9GiB75">*PermissionDefinitionProvider.cs</code></td></tr>
+<tr data-page-node-id="lcjqEqliqOuoc1Xr1UPLLK"><td data-page-node-id="tE2UwCioeDdahhYQpPARcY">Application</td><td data-page-node-id="HGjviptLIgOBoUErgq3zO9"><code data-page-node-id="Po3KixPgbbDgrAqOIFXPE6">*.Application/Products/</code></td><td data-page-node-id="sxUPxIHCAN2wCHJXlJ5ydh"><code data-page-node-id="UFfWWDkaSgt2ULY6rnWjZm">ProductAppService.cs</code></td></tr>
+<tr data-page-node-id="pEBjO0StMTWSRjhR1pKWu5"><td data-page-node-id="ZA9SHmpfIt2DsAbrAsDzqB">Application</td><td data-page-node-id="v7GSGNEJAOGnobFWoXHIpn"><code data-page-node-id="QA0srTZ7jCaRjofA9SAmY8">*.Application/</code></td><td data-page-node-id="wcJd7Vs4xOzr21ooUYy0dn">改 <code data-page-node-id="9h84C9lNNJ7U0FLMZylfa8">*ApplicationMappers.cs</code>（Maperly 映射）</td></tr>
+<tr data-page-node-id="x6xnB6iEeJXMAjL87GDFlA"><td data-page-node-id="FHEaDcEibysanEdMKEBQzG">EntityFrameworkCore</td><td data-page-node-id="BoBs5McLRskj7z4V9DTDPg"><code data-page-node-id="U3CeR3pE5x00v0oxGS0RIt">*.EntityFrameworkCore/EntityFrameworkCore/</code></td><td data-page-node-id="jtM2BZRyblJrEktCyTlfhW">改 <code data-page-node-id="B1iZaPgYrBVtTLsVqM7h53">*DbContext.cs</code>（加 DbSet）</td></tr>
+<tr data-page-node-id="YDm8hRs4jq05DI3iIdb1Ja"><td data-page-node-id="bMOmYjcJM2cDkvhzhFUU2a">EntityFrameworkCore</td><td data-page-node-id="5dXIKPVFg62NDwZf9DxcA7"><code data-page-node-id="qmYl7jidTDYFvd3VFpBZhY">*.EntityFrameworkCore/EntityFrameworkCore/</code></td><td data-page-node-id="Vjl2aJCzbqBBpfBP1ETvXL">改 <code data-page-node-id="BBJ8ROPGdkjcG8gOOGQmS4">*DbContextModelCreatingExtensions.cs</code>（实体→表映射）</td></tr>
+<tr data-page-node-id="NuMkYADNvFy3uF8tKjdt0N"><td data-page-node-id="NH5C4K4JCDUExA2ck3qvnV">EntityFrameworkCore</td><td data-page-node-id="JD8PeXrLCWhd1DadkWvW1g"><code data-page-node-id="hgEGDMS9r2cJ4PgeDOYkJK">*.EntityFrameworkCore/Products/</code></td><td data-page-node-id="pWxLzuvBDBRedkpSuwM5cd"><code data-page-node-id="GdPQbyujrNyCNHBOBJRRVz">EfCoreProductRepository.cs</code></td></tr>
+<tr data-page-node-id="UP6SDoGOGP4QhW2AonUUID"><td data-page-node-id="GCS0NVHcPqXctIRTEbCf5k">EntityFrameworkCore</td><td data-page-node-id="9AU7Eb7i08F0Phqg07C17m"><code data-page-node-id="2KEllTzz3lsKI75CJjFUgj">*.EntityFrameworkCore/Migrations/</code></td><td data-page-node-id="F0ygZ2XmXXbNlUprolKQ0c">迁移文件（由 <code data-page-node-id="iD0bNlLBWbQ6BMELdv7DLj">dotnet ef</code> 生成，别手写）</td></tr>
+<tr data-page-node-id="WpxLeHZsvxuYGfeAoOeeE3"><td data-page-node-id="boCj06kxSk7nqaer4Gn5Yz">HttpApi</td><td data-page-node-id="ezoGhPnL7VbQkZMAx1SBq3"><code data-page-node-id="Ux0SP1gnH4JtXPrIHJFVA2">*.HttpApi/Products/</code></td><td data-page-node-id="2xNuBHwOnEiklufPODUvNT"><code data-page-node-id="EGgyxWXzvUFIpS7dqdsaE7">ProductsController.cs</code></td></tr>
+<tr data-page-node-id="UfiUsEymd5TfcSWDtPfjbT"><td data-page-node-id="OUd81SBDfLQDieN7cy4mTL">HttpApi.Client</td><td data-page-node-id="njkbaaEZlqcEIu5NfOsnX6"><code data-page-node-id="fJ4QIPQFLwVhrPotU1jUDu">*.HttpApi.Client/Products/</code></td><td data-page-node-id="oqscVUUBRKOXKkNHK2tm8i"><code data-page-node-id="iFLHYGWeaFVuGxWItaVCOw">ProductClientProxy.cs</code>（可选，跨服务调用时）</td></tr>
+<tr data-page-node-id="akBCWucgQvz0fBB7C5BlJx"><td data-page-node-id="3O8HKOm7qrfQ6Y8eP6MAud">Angular</td><td data-page-node-id="ZFuGhgzNLSlum6AnGXYa0Q"><code data-page-node-id="A0eSCcnN0oASlc1Nzrb7WL">src/app/products/</code></td><td data-page-node-id="YhLm6F72ujhuvkm4G1YVrR"><code data-page-node-id="zbawFCir3iKK1ObBbWF3DO">products.routes.ts</code>、<code data-page-node-id="ywfkYf0v10YtUxJYyQHiTG">product.service.ts</code>、<code data-page-node-id="PWC74btGvyFR2Naqv7QP0a">list/</code>、<code data-page-node-id="ln12iPpqrIJXeV4N5yIrY5">create-edit/</code></td></tr>
+<tr data-page-node-id="RShPSYqnVsoHfS1AZKZXH8"><td data-page-node-id="2jVOfQlVWMileoPKx6aBSD">Blazor</td><td data-page-node-id="nOtQLgJIdD52w35u5NL1MO"><code data-page-node-id="f5X1pyWDXlfLPBOIGqwBss">*.Blazor.Client/Pages/Products/</code></td><td data-page-node-id="6SSzakxml3HmaM4JH9EGfk"><code data-page-node-id="Kbc04YsXoZ02RTaBjsEsxO">Products.razor</code> + <code data-page-node-id="FEBOH2BdCkjbp3bdPCUIrt">Products.razor.cs</code></td></tr>
+<tr data-page-node-id="oEuzBwTIOLCbC8IacxBSOt"><td data-page-node-id="X6ncWZzaVytWgEvDbvKGjl">Web(MVC)</td><td data-page-node-id="OPxjP4L0AwONYQRiSf6HX9"><code data-page-node-id="rEQ2UEvqaT2kY1FebaZAxE">*.Web/Pages/Products/</code></td><td data-page-node-id="mPUqy0EafqV1ZHwLb1m8Ew"><code data-page-node-id="UFtNYDvO51rfgLYq8FUy9V">Index.cshtml</code> + <code data-page-node-id="kkYIy7pBQDUAEvrgxV41eL">Index.cshtml.cs</code></td></tr>
+</tbody>
+</table>
+
+<div class="callout" data-page-node-id="V1NsXeRi2Ex27FVy2ZL9Gi">
+<p data-page-node-id="iHTPCygUVf37FgbJoPKypa"><strong data-page-node-id="lYpAIy9KSpcsZMDrogR0DC">一个实用的判断口诀：</strong>「<em data-page-node-id="sylgvwI2eEazowvukVHffK">契约</em>（接口/DTO/权限）永远在 <code data-page-node-id="TuGmJSlBmihFgjfze5eHlN">.Contracts</code>；<em data-page-node-id="unVwsKD0BkuEd6OKIFRUzI">实现</em>在 <code data-page-node-id="wcu1JrY7UJZDV1Adxalei9">Application</code>；<em data-page-node-id="Xh301tzNDe4Vlqe56KWBzd">领域概念的纯形态</em>（实体、常量、仓储接口）在 <code data-page-node-id="cSm4bbBbknJv9mAmXlxzBk">Domain</code>/<code data-page-node-id="XOam0TWPyKgrTiroIKfH0t">Domain.Shared</code>；<em data-page-node-id="hpFbRYJYKHJSDpEBCc1Ser">和数据库耦合的东西</em>（DbContext、映射、SQL/LINQ）只在 ORM 层；<em data-page-node-id="hoMPQthxXMu2LN1bjZXr9D">和 HTTP 耦合的东西</em>只在 <code data-page-node-id="PKqcOsfoAD1zQv8HGSKFms">HttpApi</code>。」</p>
+</div>
+
+<!-- ============================================ -->
+<h2 id="s5" data-page-node-id="ec5EbrgGxI7zbQfMGehKGU"><span class="num" data-page-node-id="OG3FVqbhgaYOywYTBGG1D0">05</span>端到端开发工作流</h2>
+
+<p data-page-node-id="kKenPg6EFsyMqP1NlJK6hO">把上面所有规则收束成一条可执行的流水线。假设业务需求是「管理产品目录」，一个功能从 0 到界面上线要走这 9 步——<strong data-page-node-id="HAS9RWJ6giQoryWWnt05Cv">顺序很重要，因为依赖是单向的</strong>。</p>
+
+<ol class="steps" data-page-node-id="YYLeucgUJKpLaAa4WpD5DI">
+<li data-page-node-id="bj54l37ltwQIUFb8xPHP2L"><div class="st" data-page-node-id="Y6OD0Dhh1dq2a1ZPLQJKZi">领域建模：识别聚合根与不变量</div><div class="sd" data-page-node-id="8XeCm0ByxAU1PfdogimVzA">在纸上想清楚：Product 是一个聚合根吗？它有哪些必须成立的规则（标题非空、编码唯一）？哪些字段是它自己管的，哪些该引用别的聚合（只存 Id）？</div></li>
+<li data-page-node-id="D6NaXs9OUItA6ynnZjgbDO"><div class="st" data-page-node-id="tJA5aYZ1bxtwyAgaKzs0C1">Domain.Shared：先立常量与错误码</div><div class="sd" data-page-node-id="Jw8wExG3wXZpXLss0cCa0t">写 <code data-page-node-id="nWMvjS0V4ZTsFlwd7HiM5R">ProductConsts</code>（MaxNameLength 等），错误码写进 <code data-page-node-id="ITlyGQKWWwSYzHwfnlVKQt">*DomainErrorCodes</code>。常量先行的好处是各层都能引用同一份契约。</div></li>
+<li data-page-node-id="AwWDEmVCF6IqBmLoYVk30D"><div class="st" data-page-node-id="lgWzdQbJDJhf0Hx5RxZbn0">Domain：写实体</div><div class="sd" data-page-node-id="wHTZBvdoktDSn7GqFZGB3R">提供<strong data-page-node-id="5EJl46AIvoiZDciH0wD8XX">带参构造器</strong>（强制不变量）+ <strong data-page-node-id="DsFjSlF2sJqRD9QUUcCP3l">protected 无参构造器</strong>（给 ORM）；子集合在构造器里初始化；<strong data-page-node-id="MEvIHt03YccAnIqp2LyveQ">Id 不由实体内生成</strong>，从外部传入 <code data-page-node-id="o9ZUTNfDWxPtpyaOdfPv3X">IGuidGenerator</code> 生成的值。</div></li>
+<li data-page-node-id="x3CRATCToxANXCniO1SPWj"><div class="st" data-page-node-id="44E7aaxgIRXkM6pBFKcTQ1">Domain：定义仓储接口 +（可选）领域服务</div><div class="sd" data-page-node-id="bfeL82EkfxvfSD0PXs0Taj">只说「我需要什么查询能力」，不说怎么查。复杂领域规则放进 <code data-page-node-id="ZTvhnVIdZbVE9LSC24r3js">*Manager</code>。</div></li>
+<li data-page-node-id="Zh29GwMHWXxfBYDEtCztJc"><div class="st" data-page-node-id="X3nmUpKyQBvkD4Wt0hhhZq">EntityFrameworkCore：注册进 DbContext + 配置映射</div><div class="sd" data-page-node-id="mfuRxnv2K3STIPN373t1Bl">加 <code data-page-node-id="LG4qdVcGs3LlCpgtlh4v4t">DbSet&lt;Product&gt;</code>，在 <code data-page-node-id="kAOwYHoTqdIsICy2IEpVgt">ConfigureMyProjectName()</code> 扩展方法里配表名/字段长度/索引。然后生成迁移。这一步完成，数据库就通了。</div></li>
+<li data-page-node-id="sHCgrwNuyMLpU03Z6cagte"><div class="st" data-page-node-id="da3fCcDOPLChOiVYNFZC9q">EntityFrameworkCore：实现仓储</div><div class="sd" data-page-node-id="YlE2Y6MEILy8Jm6Bwjc0FP">继承 <code data-page-node-id="gckhFOT9mzg8ZdAHFujTqN">EfCoreRepository&lt;TDbContext, Product, Guid&gt;</code>，把接口里的查询用 LINQ 实现。</div></li>
+<li data-page-node-id="smnG6UTd8EKWuyucu7ghtg"><div class="st" data-page-node-id="q8gUL7lQfCGbII8EL3R5vf">Application.Contracts：定义 DTO 与 AppService 接口</div><div class="sd" data-page-node-id="4hTFuAjXw2Afu9Yl5xVAP5">输入 DTO 与输出 DTO 分开、不复用；接口里只出现 DTO 和原始类型，绝不出现实体。顺手把权限定义加上。</div></li>
+<li data-page-node-id="R0qxsPXVLQhZV9QVQFheLD"><div class="st" data-page-node-id="G6bbDOMYy6Prz8alLPMmtF">Application：实现 AppService</div><div class="sd" data-page-node-id="ecCI2pLcK0AiqclibBzF1C">用仓储取实体 → 调领域方法改状态 → <code data-page-node-id="lVzMPFahyFsDWszZUXSF1l">UpdateAsync</code> 落库 → 用 <code data-page-node-id="3jQPaxg4X3M3cKUar1LN3D">ObjectMapper</code> 映射成 DTO 返回。查询逻辑不写在这层。</div></li>
+<li data-page-node-id="zgeeJP4SDPYA1HZJyFEzNr"><div class="st" data-page-node-id="sgJzt5qUp140xWpO2NgAYf">HttpApi + 前端：暴露 API、写页面</div><div class="sd" data-page-node-id="VGqspUFa2Ygz87d3psedM0">控制器只是把 HTTP 转成对 AppService 的调用（几行）。前端则基于生成的代理写列表页 + 编辑弹窗。</div></li>
+</ol>
+
+<div class="callout warn" data-page-node-id="YUw2HNvvjHvCTwQm9UQbav">
+<p data-page-node-id="pFZGS6M5L5suBzQy7e1fAS"><strong data-page-node-id="AkGCnXt2X3ya0Odwz0hWkZ">顺序不能乱。</strong>常见错误是「先写前端、再补后端接口」，这会逼你把 DTO 设计成前端字段的堆砌，破坏契约层。按 1→9 走，每一步只依赖上一步的产出。</p>
+</div>
+
+<!-- ============================================ -->
+<h2 id="s6" data-page-node-id="qr3i0CIzZn1GA1rF84YDwZ"><span class="num" data-page-node-id="tDhihkA4aoS8LSZQBYvSpO">06</span>后端：从业务到 Model，再到业务代码</h2>
+
+<p data-page-node-id="AlOkHJT11qsjxenermYEtR">这一节全部用<strong data-page-node-id="ejDbibB8yF0Gpvf8MpnSrV">真实可编译的写法</strong>，范式取自仓库中两个来源：<code data-page-node-id="XZ5rF9AZDhGuyD9AqDCJvx">templates/module/.../Samples/</code>（官方最小范例）与 <code data-page-node-id="Epry7RF83Ujl7FmOb8Oeub">modules/blogging/src/.../Posts/</code>（真实完整业务）。下面以「产品 Product」为例，走完整条链路。</p>
+
+<h3 data-page-node-id="5USj6JGc2qCxTMsPSXVyh7">6.1 第一步：业务 → 模型（怎么"想"出实体）</h3>
+
+<p data-page-node-id="HCOs8bfKcr5RrLeaHs5MHa">ABP 用 DDD 的聚合根（Aggregate Root）概念。判断标准很简单：</p>
+
+<table data-page-node-id="YyWrBcprHhDFVDNZLExdcH">
+<thead data-page-node-id="eOo2sE919eQOTOL2yHNEKd"><tr data-page-node-id="WYf65QhzyFILPHHP73aViO"><th data-page-node-id="gS8h0GFZJyoCdvkrlgcADx">问题</th><th data-page-node-id="H4UhCEjkrqrnhXOLXKnX7r">如果是</th><th data-page-node-id="oOVUZG9luuG1UA2h9mIxwu">落法</th></tr></thead>
+<tbody data-page-node-id="2qe7Q7FXsDNyeHpw1v2owl">
+<tr data-page-node-id="vKFsbqHQF0Kej0kAO4FgR7"><td data-page-node-id="okrzbkv5RXgZTrcF93fSdk">这个东西有生命周期、被独立增删改查吗？</td><td data-page-node-id="MIMFpJV1QcY61ekE2jLRbH">是</td><td data-page-node-id="ULKhOnhXi5WVQP1PjMdewG">它是<strong data-page-node-id="5T5FRZPRp4FkXIbmr5D1go">聚合根</strong>，继承 <code data-page-node-id="kyfyh6Pqj3sHd2DHUnFpxV">AggregateRoot&lt;Guid&gt;</code>（或审计版），单独建仓储</td></tr>
+<tr data-page-node-id="vbDPEqVflxwgJaPgmIYOe1"><td data-page-node-id="gpgG7Nqc8tnCEJhVkMwepf">它必须依附于另一个聚合根存在吗？（如订单明细）</td><td data-page-node-id="RYdRiktpm8CQGQIpJ7btI5">是</td><td data-page-node-id="ldMabBL0Q922XTN0eUOrFw">它是<strong data-page-node-id="fkZOZSzGanCAXjTyeNnr56">子实体</strong>，属于父聚合，不单独建仓储</td></tr>
+<tr data-page-node-id="oEP9ycWW53XCVEn4o912jM"><td data-page-node-id="eCYX6IzPINmKgGl55JA0CB">我只是需要引用另一个聚合吗？</td><td data-page-node-id="zoqYON7NHK2vpV5CYsSu1E">是</td><td data-page-node-id="4ZO5uDTMa45j2zd0qDo4dh"><strong data-page-node-id="yBuywDblvFJiXT61qfWfwD">只存对方的 Id</strong>，不要加导航属性（.cursorrules 明确禁止）</td></tr>
+<tr data-page-node-id="SGXumJmWqITT2Qk9mK5NAY"><td data-page-node-id="io5ey0BcUC0DVRe1deD7QB">它有「不能为空的字段 / 不能违反的规则」吗？</td><td data-page-node-id="QqAzhoGuMSBHeBjJabzwl7">是</td><td data-page-node-id="MF80DInR3YkzAU70uBlvX2">这些进入构造器，让「创建即合法」</td></tr>
+</tbody>
+</table>
+
+<p data-page-node-id="jFF1BVQxyQyJzyF228SxmP">以 Product 为例：它有独立生命周期 → 聚合根；必须继承审计能力（谁建的/谁改的/软删除）→ 用 <code data-page-node-id="JYKEhJA2hu02MwTUNI4Sm4">FullAuditedAggregateRoot&lt;Guid&gt;</code>；Name 不能为空且必须在构造器校验。</p>
+
+<h3 data-page-node-id="FmFy9MaFiFgJZseMxs3Gsp">6.2 Domain.Shared：常量与错误码</h3>
+
+<pre data-page-node-id="O91sabW6gOckcYIVCJMjtE"><span class="path" data-page-node-id="HAKqlF9oKQbCZNZ7t3DFpK">src/MyCompanyName.MyProjectName.Domain.Shared/Products/ProductConsts.cs</span><code data-page-node-id="piENBYBQIAxaEkcjBqjKLW"><span class="k" data-page-node-id="keXj4iKa3NaC926rFF6ns8">namespace</span> <span class="t" data-page-node-id="6JtC37a1NeUYyUh4fNnmtO">MyCompanyName.MyProjectName.Products</span>;
+
+<span class="k" data-page-node-id="l5O7bLBEx6jUxvXBhWJAuz">public static class</span> <span class="t" data-page-node-id="Zp2dPLf37UplwhP6muBUFS">ProductConsts</span>
+{
+    <span class="k" data-page-node-id="xcsV2eDzRDcmI6p0dm2uXQ">public const int</span> MaxNameLength = <span class="n" data-page-node-id="WHI7msoUd8ktTRl2r5PBOg">128</span>;
+    <span class="k" data-page-node-id="Zs7FCpuH73G9GpljM1FSzn">public const int</span> MaxCodeLength = <span class="n" data-page-node-id="pvrCU9m0h4rM3mqx76Hplj">64</span>;
+    <span class="k" data-page-node-id="EL2oKXnYUHOtcG0bPPBzO3">public const int</span> MaxDescriptionLength = <span class="n" data-page-node-id="vFDhkIHS3Hn7CpCcRFxRay">1024</span>;
+}</code></pre>
+
+<pre data-page-node-id="KQYHndFdUtHyX5PmkXt0mB"><span class="path" data-page-node-id="y9bN7E0BblzPaCiEsgWxuC">src/MyCompanyName.MyProjectName.Domain.Shared/MyProjectNameDomainErrorCodes.cs</span><code data-page-node-id="uQckoFgsS8vSZCGxA7VZ2n"><span class="k" data-page-node-id="81ArHMDI95L07G3bSr7jkC">namespace</span> <span class="t" data-page-node-id="OzgV3m1Ua6cNZnq00ws3Yz">MyCompanyName.MyProjectName</span>;
+
+<span class="k" data-page-node-id="AQ3qkyo5NCOlCafOF5Xuwl">public static class</span> <span class="t" data-page-node-id="tKehBOyGgSD4hMXCBTnEAQ">MyProjectNameDomainErrorCodes</span>
+{
+    <span class="c" data-page-node-id="rupTiN9CS6UNZkLMAaTbFe">// 命名规范：模块名:错误名，便于本地化</span>
+    <span class="k" data-page-node-id="R888yNhQBc0dxhsN83tynx">public const string</span> ProductCodeAlreadyExists = <span class="s" data-page-node-id="dhMPKjHSCKaSyos93VdUrR">"MyProjectName:ProductCodeAlreadyExists"</span>;
+}</code></pre>
+
+<p data-page-node-id="F0ggw6n30lMnxswkyq8IId">错误码要在 <code data-page-node-id="SOkw3q5d8kksP0TQCZENmW">Domain.Shared/Localization/&lt;项目&gt;/zh-Hans.json</code> 里给出多语言文案，key 就是错误码本身。</p>
+
+<h3 data-page-node-id="uE85PXJ9snAhFf9ZqdHJ71">6.3 Domain：写实体（聚合根）</h3>
+
+<pre data-page-node-id="3Akuzs5KOPYWQbjpOcHX8C"><span class="path" data-page-node-id="xKqNbiR0mLwON4Sho9Jzvx">src/MyCompanyName.MyProjectName.Domain/Products/Product.cs</span><code data-page-node-id="Mh7vKznU0LITsVOJkZkHm7"><span class="k" data-page-node-id="wdhSBG9GZwJWFQhBPCFOk5">using</span> <span class="t" data-page-node-id="5C4tF6TJmEYoJXRkH3utGC">System</span>;
+<span class="k" data-page-node-id="HDAcSXAGJBHNp2wxl5uUip">using</span> <span class="t" data-page-node-id="fnfuFJ6Vxq7BDWqKQA1IkL">JetBrains.Annotations</span>;
+<span class="k" data-page-node-id="nRg917ZaBYwMrceBcbbNk8">using</span> <span class="t" data-page-node-id="T9i1MOB1Atj2Q3GOVZ3G6f">Volo.Abp</span>;
+<span class="k" data-page-node-id="C5PiempTR8G3g4RHr7lnjI">using</span> <span class="t" data-page-node-id="4kGe74uQK2VxCrhhYXmg7D">Volo.Abp.Domain.Entities.Auditing</span>;
+
+<span class="k" data-page-node-id="f5pqBESxHFNdpb4U4Fr2Oc">namespace</span> <span class="t" data-page-node-id="g4gnHWtDIib3VQSXAOYK0B">MyCompanyName.MyProjectName.Products</span>;
+
+<span class="c" data-page-node-id="oKHPgzV0R9BhkP4Ni27nBj">// FullAuditedAggregateRoot 自带：CreationTime/CreatorId/LastModificationTime/</span>
+<span class="c" data-page-node-id="84E59JKHjQ1txIGv3gxTSe">// IsDeleted/DeleterId —— 审计与软删除全部自动。</span>
+<span class="k" data-page-node-id="xRNd9Yh1ko7ZgebbVRXYbc">public class</span> <span class="t" data-page-node-id="6lkWFEgFuyj2lZCr6RBlik">Product</span> : <span class="t" data-page-node-id="ejvxuJcZL4nxPE8VCFr3AG">FullAuditedAggregateRoot</span>&lt;<span class="k" data-page-node-id="pARfSvDLhjWIvNgWngbsCu">Guid</span>&gt;
+{
+    <span class="c" data-page-node-id="VF9Xk8MrhuW7GtAmTy72VF">// 非公开 setter：外部无法绕过领域方法直接改状态</span>
+    <span class="k" data-page-node-id="me5PFDrTgzczV2XzShnmqp">public virtual string</span> Code { <span class="k" data-page-node-id="98crFRUsGAbzuHxBQfA6sY">get</span>; <span class="k" data-page-node-id="i6a03vNxnL6JsDSTOt3BQe">protected set</span>; }
+    <span class="k" data-page-node-id="nRHURw7tYDG6FEyYblEj9b">public virtual string</span> Name { <span class="k" data-page-node-id="V8jzhQGF2j627m6hW9WQhA">get</span>; <span class="k" data-page-node-id="JvgWWeSCsCYq1jOhogRux8">protected set</span>; }
+    <span class="k" data-page-node-id="mtmRAcpGbQurnPgHBsZ3HK">public virtual string</span> Description { <span class="k" data-page-node-id="TasMAAvKfMfkfHJRHmmjLH">get</span>; <span class="k" data-page-node-id="dWLmU6xwGAIiTHNjCNHniD">set</span>; }
+    <span class="k" data-page-node-id="Mv4PU86OoDoyWkvSwLXhxX">public virtual bool</span> IsActive { <span class="k" data-page-node-id="V60LrYQX695q5xqzCs4CU1">get</span>; <span class="k" data-page-node-id="PHYy0eIEHHcLkmAJpD2reB">protected set</span>; }
+
+    <span class="c" data-page-node-id="spvEVxu5T9D3q7GARI3VDh">// 【必须】给 ORM 用的无参构造器，用 protected 挡住业务代码</span>
+    <span class="k" data-page-node-id="HfKyM2KJHLCAQYHySLlAa2">protected</span> <span class="t" data-page-node-id="rlAcaMKdnDqhD19rBsB3bt">Product</span>() { }
+
+    <span class="c" data-page-node-id="ndynQmmMsMRPC1zxmboBsm">// 【必须】带参构造器：Id 由外部传入，不在这里 new Guid()</span>
+    <span class="k" data-page-node-id="56swS5GkqMnzBP2Q7Dg7y8">public</span> <span class="t" data-page-node-id="nWqKqykQhpZlyhYLp79ZON">Product</span>(<span class="k" data-page-node-id="THcV74tzbbE675zfFCdFaj">Guid</span> id, [<span class="t" data-page-node-id="aJsSpnXWmDiPJ37OcrEPjt">NotNull</span>] <span class="k" data-page-node-id="clurnGj1ceufcOt9mJXfjp">string</span> code, [<span class="t" data-page-node-id="6kg6Wyhl3Pk9ac0dRSOf7E">NotNull</span>] <span class="k" data-page-node-id="9bHcd4C4yv9BjGXQbVQTBb">string</span> name)
+    {
+        Id = id;
+        Code = <span class="t" data-page-node-id="yfX82QiXn4s2H7lAzHTOmx">Check</span>.NotNullOrWhiteSpace(code, <span class="k" data-page-node-id="WaBatXHUdgQOQGYFdi23Zp">nameof</span>(code));
+        Name = <span class="t" data-page-node-id="XXtyoDTTtbDdEpzD0QymNt">Check</span>.NotNullOrWhiteSpace(name, <span class="k" data-page-node-id="0RMhwEuLAbhn6cKs4VpU9C">nameof</span>(name));
+        IsActive = <span class="k" data-page-node-id="DRAKCDGHMGdt0wzprZf6EO">true</span>;
+    }
+
+    <span class="c" data-page-node-id="74xogRF2bY89wEXFjiYBvY">// 领域方法：表达业务动作，而非暴露 setter。返回 this 便于链式调用</span>
+    <span class="k" data-page-node-id="TfrxRIpjfpaXBZC7o9skMh">public virtual</span> <span class="t" data-page-node-id="taJH0adkU1skivwjNsGume">Product</span> SetName([<span class="t" data-page-node-id="q61U8rPSRQ9eOJQLxKveh0">NotNull</span>] <span class="k" data-page-node-id="Di4oZwo8F5lM7koC4NZBn0">string</span> name)
+    {
+        Name = <span class="t" data-page-node-id="IAVEg9pvaNkmN37RZoqEd6">Check</span>.NotNullOrWhiteSpace(name, <span class="k" data-page-node-id="EZlRzb6chtt2ROKZo002VE">nameof</span>(name));
+        <span class="k" data-page-node-id="xPFJQ9XCT2yzb0Hfc9Wz42">return this</span>;
+    }
+
+    <span class="k" data-page-node-id="FJNKRXW0X1Q6jhUiZxkuA9">public virtual void</span> Activate() =&gt; IsActive = <span class="k" data-page-node-id="1N9Hh6QcxdyZCzvngMpTUM">true</span>;
+    <span class="k" data-page-node-id="DkKzcBi64pGyFN1JRavFZ5">public virtual void</span> Deactivate() =&gt; IsActive = <span class="k" data-page-node-id="kshv8lZmJDOltpuhs7EJEo">false</span>;
+}</code></pre>
+
+<div class="callout danger" data-page-node-id="E0pG3WmduC5x5OyuAzBNed">
+<p data-page-node-id="6PPU8P79iFJyUPXDbUBpUz"><strong data-page-node-id="DkHMVBxLDggYAeCT9DGLfI">三条硬红线（.cursorrules 明确要求）：</strong>① 聚合根只能用<strong data-page-node-id="uyQzGshEcPSNAjr2qU65UT">单一 Id</strong>，禁止复合主键；② <strong data-page-node-id="lySlOHwxcaVto7c95dFtfI">禁止在构造器里生成 Guid</strong>——由调用方用 <code data-page-node-id="edBJaetK8Nka9S1qqZomQL">IGuidGenerator</code> 生成后传入；③ <strong data-page-node-id="CPtisLIVKF2Uf2BckWZRlK">引用其他聚合根只允许存 Id</strong>，禁止导航属性。</p>
+</div>
+
+<h3 data-page-node-id="hdKLIL2fJF0DzVYgxXBJ7K">6.4 Domain：仓储接口</h3>
+
+<pre data-page-node-id="riGdceIHcXPmRdfex9GgFF"><span class="path" data-page-node-id="rEUyRZiLDyJ2kO7sCWj7AX">src/MyCompanyName.MyProjectName.Domain/Products/IProductRepository.cs</span><code data-page-node-id="GQMmCtLTDEABgbBUeh11Cz"><span class="k" data-page-node-id="gabGyUCefCjiGoMG2ln6xV">using</span> <span class="t" data-page-node-id="yRVFSAXzNLttw4MYN11NYP">Volo.Abp.Domain.Repositories</span>;
+
+<span class="k" data-page-node-id="7omVdG8gbOxfhrK4HnGHFv">namespace</span> <span class="t" data-page-node-id="DpZETCiUuoxAEM5vX0dJje">MyCompanyName.MyProjectName.Products</span>;
+
+<span class="c" data-page-node-id="7QMzFFU4kJ4yld9ENSgumT">// IBasicRepository 只暴露基础 CRUD，不把 IQueryable 泄给上层</span>
+<span class="k" data-page-node-id="WwA7qHWf8doKUkW94MuGa6">public interface</span> <span class="t" data-page-node-id="QyrxF3qXfCTAr0NP9LBexM">IProductRepository</span> : <span class="t" data-page-node-id="ZQK0ZXcwDsmZdcUbd22ATM">IBasicRepository</span>&lt;<span class="t" data-page-node-id="TBNhI7Q1qIEK260XUFBpEw">Product</span>, <span class="k" data-page-node-id="aWC1SINi5M02EUZoxoF1uT">Guid</span>&gt;
+{
+    <span class="c" data-page-node-id="M37U3eFL6dGC1GHmhvYjIG">// 约定：全部 async + CancellationToken；返回集合的 includeDetails=false</span>
+    <span class="t" data-page-node-id="YC98EAr2A1jCIKjuj96sHz">Task</span>&lt;<span class="t" data-page-node-id="OekarAagG1ERnsOHVisyNx">List</span>&lt;<span class="t" data-page-node-id="FEfngHSS61UcfbJKo8WpUh">Product</span>&gt;&gt; GetListByCodeAsync(
+        <span class="k" data-page-node-id="6d1KEX1GoH3fxGUYgT91YG">string</span> code,
+        <span class="k" data-page-node-id="e0y7QBUnIrHRtS19Gog1wE">bool</span> includeDetails = <span class="k" data-page-node-id="UZoWem9vUAtgEBElIsDHZg">false</span>,
+        <span class="t" data-page-node-id="29TmM1hrW5HQ2uqo5Og92s">CancellationToken</span> cancellationToken = <span class="k" data-page-node-id="QBaNnWYHJAwSpIAHZx0dsR">default</span>);
+
+    <span class="c" data-page-node-id="kgKFIym2W9gyLZb9Q4ilXZ">// 返回单个实体的 includeDetails=true</span>
+    <span class="t" data-page-node-id="2oJODQ7IwxStD0NLHy3MTe">Task</span>&lt;<span class="t" data-page-node-id="XZTXOP8FCsCSAra1sa1nTP">Product</span>&gt; FindByCodeAsync(
+        <span class="k" data-page-node-id="QWXCORVSO1rmBodQzdhCXC">string</span> code,
+        <span class="k" data-page-node-id="hL6Bfa0mEtKXASQNVqQEn6">bool</span> includeDetails = <span class="k" data-page-node-id="5IjbIMVUrEz9TO8Mh0FwcF">true</span>,
+        <span class="t" data-page-node-id="nUH51a9AYplgBzQJqGlpCk">CancellationToken</span> cancellationToken = <span class="k" data-page-node-id="QP2bMv6OJYVkTnASbYq1UD">default</span>);
+
+    <span class="t" data-page-node-id="yetAMyEQEvlqjpfH47jqQx">Task</span>&lt;<span class="k" data-page-node-id="pkJE1KmWOJMCIsWIDjbonX">bool</span>&gt; IsCodeInUseAsync(
+        <span class="k" data-page-node-id="D9uSqnr5D1ShcOGAi0lrnL">string</span> code,
+        <span class="k" data-page-node-id="MQsxW3c4K1LmV29FjCQHpw">Guid</span>? excludedId = <span class="k" data-page-node-id="16TOcsW9S3ymOkARzUvh9A">null</span>,
+        <span class="t" data-page-node-id="ekIU2TfKjtD7N5BACapXQg">CancellationToken</span> cancellationToken = <span class="k" data-page-node-id="McsbCbBonLtOf7Z3f1V5R9">default</span>);
+}</code></pre>
+
+<p data-page-node-id="bBKfgVRym7IVHbOFYZS5jO">注意接口里<strong data-page-node-id="F89t4wm1TL0XLwAFVHvui6">没有出现任何 IQueryable / EF 类型</strong>——这是为了将来能换成 MongoDB 实现。博客模块的 <code data-page-node-id="sxRZteMpLbCrVlBc0uAzAc">IPostRepository</code> 就是这个写法的真实样本。</p>
+
+<h3 data-page-node-id="kl14pgljA6bhaZtCmIyJgi">6.5 EntityFrameworkCore：注册 DbContext 与实体映射</h3>
+
+<pre data-page-node-id="cajLrSYPFBB9UXn8KC07El"><span class="path" data-page-node-id="HmNjaKlTeLKJfqs3Q4BLmA">src/.../EntityFrameworkCore/EntityFrameworkCore/MyProjectNameDbContext.cs（节选）</span><code data-page-node-id="NHaKCmbEmwahbkZWx8wSnq"><span class="k" data-page-node-id="2BC5mXu9QUr7pgrzV3ETBU">public class</span> <span class="t" data-page-node-id="sBGD7Swg9v4AcDHrR6HyeF">MyProjectNameDbContext</span> : <span class="t" data-page-node-id="LG3q8I8H7WziN8BZU7kymR">AbpDbContext</span>&lt;<span class="t" data-page-node-id="nSEYV0XLDCGHj2ID10YmfG">MyProjectNameDbContext</span>&gt;
+{
+    <span class="c" data-page-node-id="oBXTXrIbsCJwxZvv7VOZvj">// 聚合根才有资格出现在 DbSet 上</span>
+    <span class="k" data-page-node-id="yU6A1FhQSEagCpZD8vHZTl">public</span> <span class="t" data-page-node-id="IWYl5m3RTZtZZEu7GjDhKc">DbSet</span>&lt;<span class="t" data-page-node-id="n05rnbsUr1m4pMb12JpkqZ">Product</span>&gt; Products { <span class="k" data-page-node-id="a8p7vQJHWL2TqUGYKvSpTC">get</span>; <span class="k" data-page-node-id="J65r2xhANsEjZL9bHF6Ubp">set</span>; }
+
+    <span class="k" data-page-node-id="bdCjRAfmvrxCZrzDhJoJZs">protected override void</span> <span class="t" data-page-node-id="zApWoE6ixtVBySJq7ffHkL">OnModelCreating</span>(<span class="t" data-page-node-id="eCv0QalZdRx8kR7Nh1toZT">ModelBuilder</span> builder)
+    {
+        <span class="k" data-page-node-id="0jr3P6wt2VS8nA0QYAb6Gh">base</span>.OnModelCreating(builder);
+        <span class="c" data-page-node-id="cLwDKeRyNl0hQYS7RaKIXO">// 不要在这里直接配实体，调用扩展方法</span>
+        builder.<span class="t" data-page-node-id="QvrZKIybVRfTj4T2ol6WJl">ConfigureMyProjectName</span>();
+    }
+}</code></pre>
+
+<pre data-page-node-id="I5lXmlYSOBbJoBs1w30ssY"><span class="path" data-page-node-id="fzxzDKbiFBDIFBFNABCcCI">src/.../EntityFrameworkCore/EntityFrameworkCore/MyProjectNameDbContextModelCreatingExtensions.cs</span><code data-page-node-id="sq2YH4plVEpiPmRCo7aeuI"><span class="k" data-page-node-id="EpQoAzzhlwxpR4CXSIIVEj">public static class</span> <span class="t" data-page-node-id="Z2RLNyNUUhrqCr5nh05Hsd">MyProjectNameDbContextModelCreatingExtensions</span>
+{
+    <span class="k" data-page-node-id="kuMCNqIhUOGakVMcccvndu">public static void</span> <span class="t" data-page-node-id="oGoPidQq72tpgoJ4ETYKIo">ConfigureMyProjectName</span>(<span class="k" data-page-node-id="z94MDfh9TAjIn62hBmKeoA">this</span> <span class="t" data-page-node-id="QX5RGIpRMpoGSJixELsECR">ModelBuilder</span> builder)
+    {
+        <span class="t" data-page-node-id="GCk19lXTYJDZLHywpXo84j">Check</span>.NotNull(builder, <span class="k" data-page-node-id="81jktc3jN687PiLTZgEhR7">nameof</span>(builder));
+
+        builder.<span class="t" data-page-node-id="MKFizpvPcfUFlGPfW54fVh">Entity</span>&lt;<span class="t" data-page-node-id="HLwdslroe3EpMPry6gdESr">Product</span>&gt;(b =&gt;
+        {
+            <span class="c" data-page-node-id="7a1AzzR7etXC4PwekwIyqi">// 表名 = 前缀 + 复数，前缀来自 MyProjectNameDbProperties.DbTablePrefix</span>
+            b.<span class="t" data-page-node-id="RBZt673A76ENcoiX528IQp">ToTable</span>(<span class="t" data-page-node-id="bXq7G5Db2k1A6PAZbehq6S">MyProjectNameDbProperties</span>.DbTablePrefix + <span class="s" data-page-node-id="B2GEZg3trxOF9URWv4tOku">"Products"</span>,
+                      <span class="t" data-page-node-id="ygbGBwVWDYxlVOAATLUkpu">MyProjectNameDbProperties</span>.DbSchema);
+
+            b.<span class="t" data-page-node-id="BASQzgCOLArfzXyMzD129L">ConfigureByConvention</span>();   <span class="c" data-page-node-id="4MBMegGEnfos84hF8pgq1R">// 自动配好基类属性（审计、并发戳等）</span>
+
+            b.<span class="t" data-page-node-id="XQj2Mg0w7oS6H6n75fCDBy">Property</span>(x =&gt; x.Code)
+             .<span class="t" data-page-node-id="yBwzJ1T9QqHRhcqv373iM5">IsRequired</span>()
+             .<span class="t" data-page-node-id="ggDpNvjCTNeQUeGofnopW2">HasMaxLength</span>(<span class="t" data-page-node-id="9Zw1a5vdxl7QA0bXvu2WCM">ProductConsts</span>.MaxCodeLength);
+
+            b.<span class="t" data-page-node-id="Xy7F7n9hCGuS5JXtYb40U9">Property</span>(x =&gt; x.Name)
+             .<span class="t" data-page-node-id="4EYYCxFvLIXSBAGcC420If">IsRequired</span>()
+             .<span class="t" data-page-node-id="zECzboeF9QM4EYzbJvO7sJ">HasMaxLength</span>(<span class="t" data-page-node-id="YZs0aETEIO7aAsK8M9lByu">ProductConsts</span>.MaxNameLength);
+
+            b.<span class="t" data-page-node-id="3FYSgErgurFsCktxSWCcH1">Property</span>(x =&gt; x.Description)
+             .<span class="t" data-page-node-id="yHZAftZUPtJqpj1LI9S25m">HasMaxLength</span>(<span class="t" data-page-node-id="HfcWkhgD3IFMoQyPuQ4JxQ">ProductConsts</span>.MaxDescriptionLength);
+
+            b.<span class="t" data-page-node-id="hjjv9fwEVdRKQTAzlDzfaP">HasIndex</span>(x =&gt; x.Code).<span class="t" data-page-node-id="GO5FpYyWpUH3UVm2rVdB7J">IsUnique</span>();   <span class="c" data-page-node-id="fyFd3li9Hoo2GEPJkYGqqk">// 编码唯一</span>
+        });
+    }
+}</code></pre>
+
+<p data-page-node-id="glNARkc1XrTA7lPuzTcpOe">配好后生成迁移（在 <code data-page-node-id="tqKim2EPCYRVtziI19PhAv">*.EntityFrameworkCore</code> 目录执行）：</p>
+<pre data-page-node-id="TypvKhpJVBpE016Ww6LKbE"><code data-page-node-id="BSRCHhLVlUii3bIZEOh0VH">dotnet ef migrations add Added_Product
+dotnet ef database update</code></pre>
+
+<h3 data-page-node-id="5P4HZS0GrfGzS0Pe07ngAs">6.6 EntityFrameworkCore：实现仓储</h3>
+
+<pre data-page-node-id="Ck04lBMiizL0BgHd7xh2MT"><span class="path" data-page-node-id="kU0GeHCm2q2DYnV2I6gVhI">src/.../EntityFrameworkCore/Products/EfCoreProductRepository.cs</span><code data-page-node-id="HJUYyWlJzVZnf8FNRfiRuk"><span class="k" data-page-node-id="p8vPtn3OAlQ1djG0RhKSWz">public class</span> <span class="t" data-page-node-id="fX9k7cgneJ6vr2X1vOSZz5">EfCoreProductRepository</span>
+    : <span class="t" data-page-node-id="dEqd4ololx3FdabFtkMyYQ">EfCoreRepository</span>&lt;<span class="t" data-page-node-id="nWqnHRBuHLRGiJmcZAqxJ6">IMyProjectNameDbContext</span>, <span class="t" data-page-node-id="e508AYvMrFpJmythCnSPoz">Product</span>, <span class="k" data-page-node-id="cDU8rh2EAhehkgcHweC9aq">Guid</span>&gt;,
+      <span class="t" data-page-node-id="hoXExHgi2aeZ7AluqyrpIU">IProductRepository</span>
+{
+    <span class="k" data-page-node-id="HoIiloTJGeb40iWGW0dlEY">public</span> <span class="t" data-page-node-id="TbyAlIPMrg8oPIX9zpUdgh">EfCoreProductRepository</span>(<span class="t" data-page-node-id="hdhEKSKmpd3Y9E2VXpB04v">IDbContextProvider</span>&lt;<span class="t" data-page-node-id="FBRZpsrnDsvWpan6o2MKHE">IMyProjectNameDbContext</span>&gt; provider)
+        : <span class="k" data-page-node-id="R2zNVRMTYREJLIOjfU0sN5">base</span>(provider) { }
+
+    <span class="k" data-page-node-id="ICOgbGTOozWPhcDX03B9yi">public async</span> <span class="t" data-page-node-id="ifYW6tv1LWB0PDVmeOWJVD">Task</span>&lt;<span class="t" data-page-node-id="ZaCdbbb178yGBHNFQCNpM0">List</span>&lt;<span class="t" data-page-node-id="RzfdsXZ0TMjsLdDoD39Mro">Product</span>&gt;&gt; <span class="t" data-page-node-id="RvDixAfCF40DlDO0FZT9pg">GetListByCodeAsync</span>(
+        <span class="k" data-page-node-id="O5wQkXBkCJJKfhJ5Xkor9d">string</span> code, <span class="k" data-page-node-id="wNA8VweNzXDzBWsyoXalo2">bool</span> includeDetails = <span class="k" data-page-node-id="3jnmNEGwfpCjgoYtG7mHws">false</span>,
+        <span class="t" data-page-node-id="IHDnTfG5NPsB3k0LJVG7nQ">CancellationToken</span> cancellationToken = <span class="k" data-page-node-id="jYdeL26yCCcNP5G0oVXXQH">default</span>)
+    {
+        <span class="k" data-page-node-id="MIMLYHUkIWHoJERHFKSip0">return await</span> (<span class="k" data-page-node-id="ai8Uiav4gTUIFnN2r13G1o">await</span> <span class="t" data-page-node-id="Rf4AgId4qT5AvF5pHwCuQC">GetDbSetAsync</span>())
+            .<span class="t" data-page-node-id="YfRIDZVixCsh8gRiqJPFK0">Where</span>(p =&gt; p.Code == code)
+            .<span class="t" data-page-node-id="TpB97zM3POhREwb54h11Og">ToListAsync</span>(<span class="t" data-page-node-id="rMS2iqIWzkDuKldWIiQ7bY">GetCancellationToken</span>(cancellationToken));
+    }
+
+    <span class="k" data-page-node-id="wBAdbcLtSkTJpiKHElaBBp">public async</span> <span class="t" data-page-node-id="T98hoLr88mOeJii8FTGoHD">Task</span>&lt;<span class="t" data-page-node-id="C43I6u4TvBU2pxTAle49F8">Product</span>&gt; <span class="t" data-page-node-id="FUzfbbMVMJITFNwK1c7vV4">FindByCodeAsync</span>(
+        <span class="k" data-page-node-id="8wIOb5EPUb4SQEyVHwOWBy">string</span> code, <span class="k" data-page-node-id="hqZOt1A1SqqkC9HUfF8bXX">bool</span> includeDetails = <span class="k" data-page-node-id="F6pgmc2RtPh4sREmqxbNPm">true</span>,
+        <span class="t" data-page-node-id="eWz7MINceM1kubU5ZR5QEC">CancellationToken</span> cancellationToken = <span class="k" data-page-node-id="IAGzHqaf2Hb5l1WdQCJDOL">default</span>)
+    {
+        <span class="k" data-page-node-id="SB4RVfPY3mr5gjZYueXPxG">return await</span> (<span class="k" data-page-node-id="brFVi8gTrwkoq5qJzzpgr3">await</span> <span class="t" data-page-node-id="MJE4HiopkxpqIjxaPuBfam">GetDbSetAsync</span>())
+            .<span class="t" data-page-node-id="MG2VGBN6Q0AOC8hP9vmBoU">FirstOrDefaultAsync</span>(p =&gt; p.Code == code,
+                              <span class="t" data-page-node-id="VIvFrCjQINX4IKCWMwFiiZ">GetCancellationToken</span>(cancellationToken));
+    }
+
+    <span class="k" data-page-node-id="GlehNuzc9IzRfYFaGNrtiy">public async</span> <span class="t" data-page-node-id="3LbDLs5l0Pg0ohyr3bjP7F">Task</span>&lt;<span class="k" data-page-node-id="4eBkM8C8rO6BvWl6xyjQgD">bool</span>&gt; <span class="t" data-page-node-id="LDhr842ckB8rRxlnIxAAGj">IsCodeInUseAsync</span>(
+        <span class="k" data-page-node-id="K932t027MfFCRkmJgyDMc6">string</span> code, <span class="k" data-page-node-id="1zoK1U7PGYSvv4LykS2Ova">Guid</span>? excludedId = <span class="k" data-page-node-id="bGDdFejempkE4TUWzlbljE">null</span>,
+        <span class="t" data-page-node-id="mIIswr93Cu2BW5kTZuFikW">CancellationToken</span> cancellationToken = <span class="k" data-page-node-id="O1KblbSzNhCg4QwXZk3bn6">default</span>)
+    {
+        <span class="k" data-page-node-id="DIgvHRJT2mi6q6BbDc5QYY">var</span> query = (<span class="k" data-page-node-id="IJPNKsZ5giwi90IXLfzxem">await</span> <span class="t" data-page-node-id="GxR46rbMj2ZfFrLstfEu35">GetDbSetAsync</span>()).<span class="t" data-page-node-id="x24bNX2EOE3SAleA5qdbbw">Where</span>(p =&gt; p.Code == code);
+        <span class="k" data-page-node-id="UJEzIAaKUFvguDMQY9HREY">if</span> (excludedId != <span class="k" data-page-node-id="AdW82lni5Za0LZu9V7LFL6">null</span>) query = query.<span class="t" data-page-node-id="e68eGm3cyV2tRTfAGQ5FVr">Where</span>(p =&gt; p.Id != excludedId);
+        <span class="k" data-page-node-id="h1m58sAKKvZ5jto2qtfhGC">return await</span> query.<span class="t" data-page-node-id="RtZxa1HIHJQLRrVbGvOMG3">AnyAsync</span>(<span class="t" data-page-node-id="h4SGCfmzXVsAppbpce6Wnq">GetCancellationToken</span>(cancellationToken));
+    }
+}</code></pre>
+
+<h3 data-page-node-id="HA9wZjULXICRYaBrydGq2q">6.7 Application.Contracts：DTO 与接口</h3>
+
+<pre data-page-node-id="ZpiDRzKHwyF4iztFFYWrIz"><span class="path" data-page-node-id="fYIAmBTjMGRa7j8qPHUHvj">src/.../Application.Contracts/Products/ProductDto.cs</span><code data-page-node-id="a1GjSY73aFfiI98gtessFh"><span class="k" data-page-node-id="LIOIsjolhsekuTTIuFJxHw">using</span> <span class="t" data-page-node-id="0vcyn9X1GhImBngdmQSGOK">Volo.Abp.Application.Dtos</span>;
+
+<span class="k" data-page-node-id="iXkVW3BF96lU2D8sIlxkzp">namespace</span> <span class="t" data-page-node-id="8836XNn0jOAAib3GszXNJ3">MyCompanyName.MyProjectName.Products</span>;
+
+<span class="c" data-page-node-id="jwciiEJSNM0j4ZmCm9S3AR">// 输出 DTO：继承审计 DTO，附带 IHasConcurrencyStamp 支持乐观并发</span>
+<span class="k" data-page-node-id="xGdm5irHCXHMCoFRaFN6Jj">public class</span> <span class="t" data-page-node-id="ahuLgpl9GCZHGr5pcGxrLY">ProductDto</span> : <span class="t" data-page-node-id="bzae3DQ4qxpHRJHWepwnQx">FullAuditedEntityDto</span>&lt;<span class="k" data-page-node-id="WqBdJQV3GRRT1H4BihFRoM">Guid</span>&gt;, <span class="t" data-page-node-id="ijUaCxwYKzTyhtSPFj2eT0">IHasConcurrencyStamp</span>
+{
+    <span class="k" data-page-node-id="xDuISBvQTMpMyQYATgqkjf">public string</span> Code { <span class="k" data-page-node-id="i5O45UvF5ShTGRs65lqBuO">get</span>; <span class="k" data-page-node-id="tMfScatYLxLAewryzllHuu">set</span>; }
+    <span class="k" data-page-node-id="9M1u5oRu4E3xeU5wdsllrx">public string</span> Name { <span class="k" data-page-node-id="MZsR0WWgugz0gzup1AHpNa">get</span>; <span class="k" data-page-node-id="TIfK17HcbsIsXzD2olmxHl">set</span>; }
+    <span class="k" data-page-node-id="2AJuhpFSfJ5ns9fsF95SB2">public string</span> Description { <span class="k" data-page-node-id="SmP6cTgtAndQVc6zGFYDbV">get</span>; <span class="k" data-page-node-id="CFQDgoO4W1a34927qGdtLe">set</span>; }
+    <span class="k" data-page-node-id="6A7YibQmEeShZJeCa4HK6B">public bool</span> IsActive { <span class="k" data-page-node-id="AiUO3YBPxBcW0UtjxbbHgc">get</span>; <span class="k" data-page-node-id="1otB1ZaDs3vOpmKu8ixEh7">set</span>; }
+    <span class="k" data-page-node-id="hEv7s9vIz08k50tC6qCTXE">public string</span> ConcurrencyStamp { <span class="k" data-page-node-id="Gn0cUdWAFElhkswMqY4T5M">get</span>; <span class="k" data-page-node-id="F9BwhioA9KH9rVLZepsFyB">set</span>; }
+}</code></pre>
+
+<pre data-page-node-id="RX7xPWu7cmBwtkMWXHSBxP"><span class="path" data-page-node-id="AkVmNOvUpgBmLwJCVDsoQX">src/.../Application.Contracts/Products/CreateProductDto.cs</span><code data-page-node-id="D6KY5PPGhu7VbUrPCYwboO"><span class="k" data-page-node-id="RDZRyxJZkVwZlREeXtJpxE">using</span> <span class="t" data-page-node-id="QBVlYqZxDGBXOFqRtkCDr4">System.ComponentModel.DataAnnotations</span>;
+<span class="k" data-page-node-id="TJL0b7pSg7hIbCaQipoN86">using</span> <span class="t" data-page-node-id="3JdS0rEDxUqESb7CDxhZdc">Volo.Abp.Validation</span>;
+
+<span class="k" data-page-node-id="onA6g6PP69I5D9wjHxzw5G">public class</span> <span class="t" data-page-node-id="Cbohzat6HX7AnQQDSveUo4">CreateProductDto</span>
+{
+    [<span class="t" data-page-node-id="amLorUOvbn0hF6QfzPoRDc">Required</span>]
+    [<span class="t" data-page-node-id="dhwuHCrhY5r7cFM2XypEHk">DynamicStringLength</span>(<span class="k" data-page-node-id="ToPVw3yc14Jmb6t7HMzzg9">typeof</span>(<span class="t" data-page-node-id="0VXsC9E5HS7v7pcneWBXRR">ProductConsts</span>), <span class="k" data-page-node-id="kQRe6eynRakzP3NPFsQ3Bq">nameof</span>(<span class="t" data-page-node-id="EU6jh4m0WfkfvaZqQn2LoV">ProductConsts</span>.MaxCodeLength))]
+    <span class="k" data-page-node-id="HQnD37AM7H8VoZ5iDzJRMN">public string</span> Code { <span class="k" data-page-node-id="k2sr9l9gmmEge75baUv2JX">get</span>; <span class="k" data-page-node-id="2n8FDsDpyKTP950sicDj2A">set</span>; }
+
+    [<span class="t" data-page-node-id="nd9p6JgCfiVDypD8B6bCjz">Required</span>]
+    [<span class="t" data-page-node-id="Pu2uRX45IbPJqrFxJB8oIK">DynamicStringLength</span>(<span class="k" data-page-node-id="firgh2EkRIWI2C1mNy7YMi">typeof</span>(<span class="t" data-page-node-id="5AijmgRmkuFAKJ44oaGnof">ProductConsts</span>), <span class="k" data-page-node-id="B0bM2I3ZChACYaSJrp2iXa">nameof</span>(<span class="t" data-page-node-id="VzNQrKcjRwiXsBgPpXpMmO">ProductConsts</span>.MaxNameLength))]
+    <span class="k" data-page-node-id="HNxu4seemOe9RBnIMPhMiO">public string</span> Name { <span class="k" data-page-node-id="PQNogCF1tnjbNAjIDjOJG7">get</span>; <span class="k" data-page-node-id="ZJtgf0G49DY7KtsbbQKzCV">set</span>; }
+
+    [<span class="t" data-page-node-id="KN5XfBC1OE6OQF6lQEITGs">DynamicStringLength</span>(<span class="k" data-page-node-id="Azjv2cpTkBboaVdYJldhDs">typeof</span>(<span class="t" data-page-node-id="73ZAOjS0DW4V53dUjBFVCk">ProductConsts</span>), <span class="k" data-page-node-id="X5aeb0gOdLlR8O0A7g3XdI">nameof</span>(<span class="t" data-page-node-id="5hAYSnlUuBBipO4FilzAqm">ProductConsts</span>.MaxDescriptionLength))]
+    <span class="k" data-page-node-id="vdzFQmVHEFhIMX6Zf940Bg">public string</span> Description { <span class="k" data-page-node-id="NJPMJRMsWpc0Cw4LevJdg3">get</span>; <span class="k" data-page-node-id="0mAghG0epGkfjxn8bhNxnZ">set</span>; }
+}</code></pre>
+
+<pre data-page-node-id="hxiCD7kYDKgHtZjpa0r9Yy"><span class="path" data-page-node-id="gWaC5VMR3kPHFVm8CyQuFT">src/.../Application.Contracts/Products/UpdateProductDto.cs</span><code data-page-node-id="I9EkM8dIC7uAvHXJ4WG98k"><span class="c" data-page-node-id="gHyRU2NtuaNNcMa0nXuPt1">// 关键：Update DTO 里【不包含 Id】，Id 走方法参数。这是框架强制约定。</span>
+<span class="k" data-page-node-id="GZHUD2yBy8lfwTDTvm80YV">public class</span> <span class="t" data-page-node-id="FwcTvfuCfixynBw7sbKQ0g">UpdateProductDto</span>
+{
+    [<span class="t" data-page-node-id="Y4CtommnZu8ZdSxTn1Psgq">Required</span>] <span class="k" data-page-node-id="UI6d3Ji36wxcKuRj2mAYoq">public string</span> Name { <span class="k" data-page-node-id="TRACFAPHU2rkYL1H3uDTqm">get</span>; <span class="k" data-page-node-id="0srBF04JDKeozfYoxVJU7q">set</span>; }
+    <span class="k" data-page-node-id="kPW6C9a5Dssy5wFLoueD4A">public string</span> Description { <span class="k" data-page-node-id="Y5aFzHRFwKNvvEOQ58W9hm">get</span>; <span class="k" data-page-node-id="1fAlWokPtdQLhzb63REe3g">set</span>; }
+    <span class="k" data-page-node-id="IBgBup4gXeKV7O3mdrIHFy">public string</span> ConcurrencyStamp { <span class="k" data-page-node-id="ulHR3NCtqLPZrGDFftPZBf">get</span>; <span class="k" data-page-node-id="LpbudfgjRfeFdNeEvuFtG9">set</span>; }
+}</code></pre>
+
+<pre data-page-node-id="hDBKhvYa9MxOnXOowVCiPa"><span class="path" data-page-node-id="JGzpq4kZFTiABs0oiDcZ6p">src/.../Application.Contracts/Products/GetProductListDto.cs</span><code data-page-node-id="Gc9lkNa2T38uPI2sioGuwp"><span class="k" data-page-node-id="d6uNFBXBzEH3htF1xwcpLu">using</span> <span class="t" data-page-node-id="kD4HgqZvFNujD0XoNu4ULf">Volo.Abp.Application.Dtos</span>;
+
+<span class="c" data-page-node-id="P6mU0UVBwA5jAEvQppTYI2">// 查询 DTO：继承 PagedAndSortedResultRequestDto，自带分页/排序参数</span>
+<span class="k" data-page-node-id="OBFoeHc69qOWQNctOZ89UY">public class</span> <span class="t" data-page-node-id="zUUnmOFjsO5BYHh91pb3Qw">GetProductListDto</span> : <span class="t" data-page-node-id="H40pb8Dotho8Ce27aXHTxa">PagedAndSortedResultRequestDto</span>
+{
+    <span class="k" data-page-node-id="vUey53Q5TG3H2HSbCCLv7J">public string</span> Filter { <span class="k" data-page-node-id="bJ5PUE2nXtAf00WD4j0XoH">get</span>; <span class="k" data-page-node-id="y6aUMzaT3bdcsWoRyU9Imi">set</span>; }
+}</code></pre>
+
+<pre data-page-node-id="BxL0F3gZHSaTApJGdkYidb"><span class="path" data-page-node-id="DGSymD9O4jnNSUgeLJVzbf">src/.../Application.Contracts/Products/IProductAppService.cs</span><code data-page-node-id="ZYX01Wmxfi1siLZx5QIQrM"><span class="k" data-page-node-id="UJpY01JwSIsfaR1qlfJKhu">using</span> <span class="t" data-page-node-id="Rh9nrrRGFYUDFSEsQIYLqC">Volo.Abp.Application.Dtos</span>;
+<span class="k" data-page-node-id="sawya9KNhByLmGsbLZBZJh">using</span> <span class="t" data-page-node-id="FW1ngs6uJHDPdtAXNDAAlC">Volo.Abp.Application.Services</span>;
+
+<span class="k" data-page-node-id="MlQaBWr6IOUAiisbxwiXc5">public interface</span> <span class="t" data-page-node-id="ZOhDSavIWcLFMoBycDXYZo">IProductAppService</span> : <span class="t" data-page-node-id="F7fkwg88EFNAPEclmEn2E5">IApplicationService</span>
+{
+    <span class="c" data-page-node-id="oKCszBFXgs2nIbZ6j6NTea">// 标准 CRUD 命名：不在方法名里重复实体名（GetAsync 而非 GetProductAsync）</span>
+    <span class="t" data-page-node-id="A1gnKW7OS4ZGBlLUME8AyB">Task</span>&lt;<span class="t" data-page-node-id="ZXn87DGHB6U3ZVGHiqfvIe">ProductDto</span>&gt; <span class="t" data-page-node-id="6R0m77DYJi5wYYBEia8xCM">GetAsync</span>(<span class="k" data-page-node-id="zZFlXnONEpEX8Ba9NESRMW">Guid</span> id);
+    <span class="t" data-page-node-id="2VPdGXcf4ElBZvaOJrrrOS">Task</span>&lt;<span class="t" data-page-node-id="pusbJlKNN2zlBbp642QbyO">PagedResultDto</span>&lt;<span class="t" data-page-node-id="OdPxyhp2i40vEoPCJzd1fd">ProductDto</span>&gt;&gt; <span class="t" data-page-node-id="vZcOTb5ZVYDSXtgwqXphdL">GetListAsync</span>(<span class="t" data-page-node-id="RnCwqHI0vC4ErETpIolF6r">GetProductListDto</span> input);
+    <span class="t" data-page-node-id="OafjOkivfdBXr9CKWWEAky">Task</span>&lt;<span class="t" data-page-node-id="M5n3G5LX9hhLurRAmPVzwg">ProductDto</span>&gt; <span class="t" data-page-node-id="CHzI75wKaSfbJ1aT81AUWX">CreateAsync</span>(<span class="t" data-page-node-id="HYEq7KFRRXGgAb6crVgqrz">CreateProductDto</span> input);
+    <span class="t" data-page-node-id="yUCrlvuDrs9z9JoJBSp2ow">Task</span>&lt;<span class="t" data-page-node-id="qsBVaX9LgwJww94RWBWqu5">ProductDto</span>&gt; <span class="t" data-page-node-id="GidqChgg53wNLsGV7DTFfA">UpdateAsync</span>(<span class="k" data-page-node-id="2dVG346DDdDqYMrdt7kls5">Guid</span> id, <span class="t" data-page-node-id="BaLo6oCOfbHsdGW9S8YHi8">UpdateProductDto</span> input);
+    <span class="t" data-page-node-id="dWCY8TerfD0Ly5BPZ6S6FU">Task</span> <span class="t" data-page-node-id="HsesTIdLgpaGTpPhkCf7D2">DeleteAsync</span>(<span class="k" data-page-node-id="ns6rem6ejERPqUeH5zgwx5">Guid</span> id);
+}</code></pre>
+
+<p data-page-node-id="ObpqxCguEHqFQeZwUcc6qT">接口必须继承 <code data-page-node-id="yEpmGa9pRSEl5oDo7VqoC8">IApplicationService</code>；<strong data-page-node-id="DNUwKKXNH8bpmEgvlIpTZU">绝不能出现实体或 <code data-page-node-id="LPXppDKRb9envZ4YN5VTkf">IFormFile</code> 之类的 Web 类型</strong>。权限定义与接口同层：</p>
+
+<pre data-page-node-id="PawQ7Dn6VpT8ZShn20YCTy"><span class="path" data-page-node-id="hOSQ9rBba6AThL2BEnSmwA">src/.../Application.Contracts/Permissions/MyProjectNamePermissions.cs（节选）</span><code data-page-node-id="yXGRuq568AXlHl3sEZ91OA"><span class="k" data-page-node-id="KdG7MrhaPHgvTLvKwd9T0h">public static class</span> <span class="t" data-page-node-id="6rfla3wfHUivbgMj8qGaYj">MyProjectNamePermissions</span>
+{
+    <span class="k" data-page-node-id="0G87PqrGXvHLRcpD5y0sIV">public const string</span> GroupName = <span class="s" data-page-node-id="wkqjHENscFCJc1rLxowYMA">"MyProjectName"</span>;
+
+    <span class="k" data-page-node-id="WzSDljl9QOkoqvyOfeEuex">public static class</span> <span class="t" data-page-node-id="XoAv8kjlSnHYy2Gi0lsriq">Products</span>
+    {
+        <span class="k" data-page-node-id="sK4Hb9vqBCsYzGGmE8ZPDC">public const string</span> Default = GroupName + <span class="s" data-page-node-id="CqkjKacMZNILXs7pK78NwW">".Products"</span>;
+        <span class="k" data-page-node-id="l3PUmVaAgPukFsGyDTobQf">public const string</span> Create  = Default + <span class="s" data-page-node-id="8JY1jqF8L53Y0Juym0F5UW">".Create"</span>;
+        <span class="k" data-page-node-id="GIo5ANfj6cHTDCmPvQN6Pi">public const string</span> Update  = Default + <span class="s" data-page-node-id="AHMlCsRLU87rwkpEwDY2ZP">".Update"</span>;
+        <span class="k" data-page-node-id="M9SsLRWhEtNjzCEo3JhGDA">public const string</span> Delete  = Default + <span class="s" data-page-node-id="ayhhvh4Xa7G2R2kuW9ooCu">".Delete"</span>;
+    }
+}</code></pre>
+
+<pre data-page-node-id="0RjN5gqA0ZwpHIaaL9MeVx"><span class="path" data-page-node-id="uNGrPHsdaEytFG2iEDbRaD">src/.../Application.Contracts/Permissions/MyProjectNamePermissionDefinitionProvider.cs</span><code data-page-node-id="gRRPWqQuczfGk8FWcYJBKI"><span class="k" data-page-node-id="rkLx2Jzg57IJrQ9eMbIbD0">public class</span> <span class="t" data-page-node-id="cQiIDdQkJDAGA7cItECCWh">MyProjectNamePermissionDefinitionProvider</span> : <span class="t" data-page-node-id="VDGNmoyssgaJfXRpcl6z8R">PermissionDefinitionProvider</span>
+{
+    <span class="k" data-page-node-id="lIMfSxMiDarBa7yuIyqDd5">public override void</span> <span class="t" data-page-node-id="49jQlA7HkBVYtBLL2aPwDg">Define</span>(<span class="t" data-page-node-id="rr7N2aZdA4aeJWQocT0b43">IPermissionDefinitionContext</span> context)
+    {
+        <span class="k" data-page-node-id="D7CMGVopiBt1RAyDy1sSTK">var</span> group = context.<span class="t" data-page-node-id="UNwasTi0kIyFb6etc5PXCo">AddGroup</span>(<span class="t" data-page-node-id="3EaTCXMFeS7Wn6PEyKIslN">MyProjectNamePermissions</span>.GroupName, <span class="t" data-page-node-id="bjCdfMnig8PRKaYXrgF3Gh">L</span>(<span class="s" data-page-node-id="dSIUgCGawWZo7Wo9IXoYnb">"Permission:MyProjectName"</span>));
+
+        <span class="k" data-page-node-id="A2At6WVSJFwXVSV77RjrJ7">var</span> products = group.<span class="t" data-page-node-id="c7JraSWqSGb98R4qbULjIB">AddPermission</span>(
+            <span class="t" data-page-node-id="UwCWT4Lt0T8MiIrTLUXVJ3">MyProjectNamePermissions</span>.Products.Default, <span class="t" data-page-node-id="HxSsprj1tFz3WCyX5mN1c4">L</span>(<span class="s" data-page-node-id="stUZ81ZsfNztH09WVwMBgc">"Permission:Products"</span>));
+
+        products.<span class="t" data-page-node-id="nIBO9eznlt5BiSzm6FY14h">AddChild</span>(<span class="t" data-page-node-id="9drDls8IGmRezkxrULjYxc">MyProjectNamePermissions</span>.Products.Create, <span class="t" data-page-node-id="uZTWWAdz9NnNRtGpGxVtkM">L</span>(<span class="s" data-page-node-id="zcDnZNtFwwY4RzyrczHzis">"Permission:Create"</span>));
+        products.<span class="t" data-page-node-id="Ic9bYQCWeVUljG8WGg2TFw">AddChild</span>(<span class="t" data-page-node-id="YdmIki6PyvqAp2UlQDw2Ct">MyProjectNamePermissions</span>.Products.Update, <span class="t" data-page-node-id="LAWJdzyI24upJw5px3uc9x">L</span>(<span class="s" data-page-node-id="GGzDLWtPB8hBKJrONmS5f5">"Permission:Edit"</span>));
+        products.<span class="t" data-page-node-id="ol1FtFbuXCeZso0ccptqMH">AddChild</span>(<span class="t" data-page-node-id="NAUmOf1vYLHa3zDneE8hEB">MyProjectNamePermissions</span>.Products.Delete, <span class="t" data-page-node-id="UIg98nU2X3AZ62k6f1CbDy">L</span>(<span class="s" data-page-node-id="HZvOa3mUTeJBVGZyfpVNDw">"Permission:Delete"</span>));
+    }
+
+    <span class="k" data-page-node-id="Mt06WbtdYL5vqkqL9FDwnX">private static</span> <span class="t" data-page-node-id="aD0oAId6xa58CGT6o0KLsc">LocalizableString</span> <span class="t" data-page-node-id="sYXXrYVcWhFsRpprxHT8di">L</span>(<span class="k" data-page-node-id="Xigx4AGR8zGkeiJ76MXNqw">string</span> name)
+        =&gt; <span class="t" data-page-node-id="tg0oXnDJNbaAarV7bgDSGR">LocalizableString</span>.<span class="t" data-page-node-id="B0CzcnTqoLEhbkFwaEvYzM">Create</span>&lt;<span class="t" data-page-node-id="vZQSK8FyNzZ0xnGhQFivLu">MyProjectNameResource</span>&gt;(name);
+}</code></pre>
+
+<h3 data-page-node-id="f5RpyhElFFAjb50FdNltvD">6.8 Application：实现应用服务（业务代码主战场）</h3>
+
+<pre data-page-node-id="mbKvL8wKtbCmjfaeE4KfQi"><span class="path" data-page-node-id="h8CgUAqX1St7ICQqA1ebkf">src/.../Application/Products/ProductAppService.cs</span><code data-page-node-id="spZxHOEJAGV6FDLssK4mZr"><span class="k" data-page-node-id="CUjrqgqGraU1J5S1BZuoDh">using</span> <span class="t" data-page-node-id="yQMZrT6cVdOBqSFYyEWDRc">Microsoft.AspNetCore.Authorization</span>;
+<span class="k" data-page-node-id="TDCe06OfKcFuPAIwEMPaOL">using</span> <span class="t" data-page-node-id="RYdZo1mpoQkb4hrqXI5PaF">Volo.Abp.Application.Dtos</span>;
+<span class="k" data-page-node-id="2EoBsxH3CsBeZDpW8lYEGy">using</span> <span class="t" data-page-node-id="eg7fEyFecuAE4fDUHGCvpt">Volo.Abp.Domain.Repositories</span>;
+
+<span class="k" data-page-node-id="7x9bvv0hy5AGUeBii3JuRf">namespace</span> <span class="t" data-page-node-id="JqPLDh6q2orZn1QylLerBE">MyCompanyName.MyProjectName.Products</span>;
+
+<span class="k" data-page-node-id="SAi7fadnzCigSUQr6isJiC">public class</span> <span class="t" data-page-node-id="4DDYsChOYceOmO9pwV5Gpq">ProductAppService</span> : <span class="t" data-page-node-id="1CewVQpM2HDcFkSMshujlO">MyProjectNameAppService</span>, <span class="t" data-page-node-id="hpQpIMAj9QpCFT1416PnOD">IProductAppService</span>
+{
+    <span class="k" data-page-node-id="IOWtDC4CjhJYwe62ICwtQi">private readonly</span> <span class="t" data-page-node-id="CdTxCO59ZBGkffRFVDHyMd">IProductRepository</span> _productRepository;
+
+    <span class="c" data-page-node-id="Lqo1bY5ShV35VP5Ips3BEQ">// 构造器注入仓储接口 —— 无需手写 DI 注册，ABP 自动完成</span>
+    <span class="k" data-page-node-id="jFgg0Ssn9mK6YuVo416r8B">public</span> <span class="t" data-page-node-id="MsB0h1viWKJMobNr7zeXIO">ProductAppService</span>(<span class="t" data-page-node-id="OZq3Ow2yDzqYPCPGb4ks8M">IProductRepository</span> productRepository)
+        =&gt; _productRepository = productRepository;
+
+    <span class="k" data-page-node-id="etANUrSNR2jDi3JLr7oKoa">public virtual async</span> <span class="t" data-page-node-id="s89Dqrx4bXSjfnaPrRrTbH">Task</span>&lt;<span class="t" data-page-node-id="4Q7Ar1MsCXCRAnWtLsVHx4">ProductDto</span>&gt; <span class="t" data-page-node-id="Ka5iHYit39n7aSja4sCcdq">GetAsync</span>(<span class="k" data-page-node-id="s6TNRW6QtzlsLyJ0XWNC72">Guid</span> id)
+    {
+        <span class="k" data-page-node-id="L3Oiw1aUKg2lDkpkAvIqAe">var</span> product = <span class="k" data-page-node-id="5FAEhQE96dudXC5KTIEVlm">await</span> _productRepository.<span class="t" data-page-node-id="rUYTrHgYzGQS9T6bge1mql">GetAsync</span>(id);
+        <span class="k" data-page-node-id="v5Ck0E0fkdoH4lH4CH9N0z">return</span> <span class="t" data-page-node-id="c2j3GEyabJMMczc0c7ekmq">ObjectMapper</span>.<span class="t" data-page-node-id="4DXBtMTLW9vYBhj3oqt4su">Map</span>&lt;<span class="t" data-page-node-id="K6FcQplrXdVRVGHvbe8RDQ">Product</span>, <span class="t" data-page-node-id="zOAi5cb49pbujZkDMyAKVA">ProductDto</span>&gt;(product);
+    }
+
+    <span class="k" data-page-node-id="PyXVg4UwLpBFG5AQwhF6EE">public virtual async</span> <span class="t" data-page-node-id="NLfDF1pZCXRATAnKT2oDqf">Task</span>&lt;<span class="t" data-page-node-id="ApIC6tmN5EFmACksuB9IxN">PagedResultDto</span>&lt;<span class="t" data-page-node-id="LJKiiIiX51ikmSxwnervuH">ProductDto</span>&gt;&gt; <span class="t" data-page-node-id="XdItY6DI9Y0hXPuy0cMGGF">GetListAsync</span>(<span class="t" data-page-node-id="ZsoB5jiWo4drQ8F7Xwpvt9">GetProductListDto</span> input)
+    {
+        <span class="c" data-page-node-id="iWWArb9BgCWGqkDREgPhJc">// 仓储只需暴露 IQueryable 的用法在实现层；这里用基础能力</span>
+        <span class="k" data-page-node-id="NinfQWTJAW2CF4s7ibg5Ek">var</span> totalCount = <span class="k" data-page-node-id="5KGeoAZE2Fr7Pf6tTw0TKe">await</span> _productRepository.<span class="t" data-page-node-id="jCwYShmXlkrXELRfGEZMQi">GetCountAsync</span>();
+        <span class="k" data-page-node-id="aHHOg1Z18sixX6uHEnHKPk">var</span> items = <span class="k" data-page-node-id="nDxu6VOZZWPJ86cRgC5cuk">await</span> _productRepository.<span class="t" data-page-node-id="2sHCsR4rG4A3Nf6mEROC00">GetPagedListAsync</span>(
+            input.SkipCount, input.MaxResultCount, input.Sorting);
+
+        <span class="k" data-page-node-id="JRIChMw5WeT4CXwE7oASdG">return new</span> <span class="t" data-page-node-id="whCGOMmsSB5xtm8Aovp7Cg">PagedResultDto</span>&lt;<span class="t" data-page-node-id="a0IdFwAaH9g3JCKzRAL7rT">ProductDto</span>&gt;(
+            totalCount,
+            <span class="t" data-page-node-id="FoEKsmPH6KpJXlTK5SMnTf">ObjectMapper</span>.<span class="t" data-page-node-id="OqTRgAODj9TDZ9FbCqoj2p">Map</span>&lt;<span class="t" data-page-node-id="THSoCBmABKMvWm9hACnVwY">List</span>&lt;<span class="t" data-page-node-id="eOK13yEnqKG71Df30PbJ8R">Product</span>&gt;, <span class="t" data-page-node-id="M7HA3lLahZ662gWsKkL96m">List</span>&lt;<span class="t" data-page-node-id="7AswHU7squbjg5hmAxfCC5">ProductDto</span>&gt;&gt;(items));
+    }
+
+    [<span class="t" data-page-node-id="I5tD2oJtWhPprNJhGQr6OJ">Authorize</span>(<span class="t" data-page-node-id="e3VMGbur4sQKfqrr956mDc">MyProjectNamePermissions</span>.Products.Create)]
+    <span class="k" data-page-node-id="90BWgY20OgNWY6c291oSY9">public virtual async</span> <span class="t" data-page-node-id="Q1ohQBEJDXqFqCfZ2qOkDR">Task</span>&lt;<span class="t" data-page-node-id="MdLbr7GzXIHwTopc6MhdsC">ProductDto</span>&gt; <span class="t" data-page-node-id="2PUrgnAJo3jeYUn1xxlwA8">CreateAsync</span>(<span class="t" data-page-node-id="0xzbZnFIM8rlGHv5GvnGnd">CreateProductDto</span> input)
+    {
+        <span class="c" data-page-node-id="NPj8KnWqbwnbHRON4lC3Ld">// 业务规则：编码不能重复 —— 违反时抛带错误码的业务异常</span>
+        <span class="k" data-page-node-id="SE6TOreSJVOHDuzBXoDfWO">if</span> (<span class="k" data-page-node-id="eSRBQImSoJpHEM8DhAvlj2">await</span> _productRepository.<span class="t" data-page-node-id="aGQBImAlwjC3beNbZelCI0">IsCodeInUseAsync</span>(input.Code))
+        {
+            <span class="k" data-page-node-id="sdcIaTRFDTt4N7HHivCtCE">throw new</span> <span class="t" data-page-node-id="BhgGC4qD1a58uQhBVzKyuH">BusinessException</span>(<span class="t" data-page-node-id="vDwAm5OdR75ClRAEzu33Te">MyProjectNameDomainErrorCodes</span>.ProductCodeAlreadyExists)
+                .<span class="t" data-page-node-id="lE46PgHJ7cDPjmXYJxjpp0">WithData</span>(<span class="s" data-page-node-id="53MrMX8dWUDFTzhg3YxE5I">"Code"</span>, input.Code);
+        }
+
+        <span class="c" data-page-node-id="5xZf0D8XtTxoKk75POAmD4">// Id 由 IGuidGenerator 生成（ApplicationService 基类已提供 GuidGenerator）</span>
+        <span class="k" data-page-node-id="syxYtTBlGQCDHseBbv0c4E">var</span> product = <span class="k" data-page-node-id="z82tuNIG5ZHKRxpiW7rqIR">new</span> <span class="t" data-page-node-id="lCzBTgBm8ry6EDZdeRDZgx">Product</span>(<span class="t" data-page-node-id="EEVyRYgXP6S73OonZp9QXl">GuidGenerator</span>.<span class="t" data-page-node-id="WXinzXDsPbApJZTRsbS6p9">Create</span>(), input.Code, input.Name)
+        {
+            Description = input.Description
+        };
+
+        <span class="k" data-page-node-id="iq2ech5cnpTDZb7v5EJCPD">await</span> _productRepository.<span class="t" data-page-node-id="YDIPpVBOUzXVgfxskC7IcK">InsertAsync</span>(product);
+        <span class="k" data-page-node-id="3gmyaOghqxxj0HpeVGsj24">return</span> <span class="t" data-page-node-id="NDHDdtDZYZRGTRaRbOs0Qt">ObjectMapper</span>.<span class="t" data-page-node-id="jKOlm32a7TKFSBlRogKYZe">Map</span>&lt;<span class="t" data-page-node-id="CsJy0bo1iDEOieYDzbiFYe">Product</span>, <span class="t" data-page-node-id="bYt5LYW1Cpxb8ThmvApRX5">ProductDto</span>&gt;(product);
+    }
+
+    [<span class="t" data-page-node-id="BVobYC5W0F2DftKgAIZTBo">Authorize</span>(<span class="t" data-page-node-id="QFMuNEXtoXZYgYVzFVX4Ti">MyProjectNamePermissions</span>.Products.Update)]
+    <span class="k" data-page-node-id="X362njxegGpQjDH7TmJbI3">public virtual async</span> <span class="t" data-page-node-id="zf8wXEgkFNzAyPpYH6K0qj">Task</span>&lt;<span class="t" data-page-node-id="RMWKBmNGpgBfj6zEq8wnVK">ProductDto</span>&gt; <span class="t" data-page-node-id="tGoyaDlqSBO71csADxRhII">UpdateAsync</span>(<span class="k" data-page-node-id="zhAVNwv7HlZQClJ8VkAQD7">Guid</span> id, <span class="t" data-page-node-id="r2jTvsYpbSRZfnIyzUfx8O">UpdateProductDto</span> input)
+    {
+        <span class="k" data-page-node-id="nTdmpphH4zWenN2NFqZLaB">var</span> product = <span class="k" data-page-node-id="GcMQPnyzJcznOOntu13J0N">await</span> _productRepository.<span class="t" data-page-node-id="JMnSbFg2cNy6aJZysBOG1a">GetAsync</span>(id);
+
+        <span class="c" data-page-node-id="JEgXOeblfRR7ESH9H6FznA">// 通过领域方法改状态，而不是直接 set 属性</span>
+        product.<span class="t" data-page-node-id="1Cf24bDioAeKKnGD0SQ4WM">SetName</span>(input.Name);
+        product.Description = input.Description;
+        product.<span class="t" data-page-node-id="GQ8hcUcX8RACYjvW7E4z36">SetConcurrencyStampIfNotNull</span>(input.ConcurrencyStamp);
+
+        <span class="c" data-page-node-id="5p5vMEtoLQPhrsyXXhqeEA">// 显式落库：不依赖 EF 变更跟踪，保证语义清晰</span>
+        product = <span class="k" data-page-node-id="0MclDVH0JCUqAK3ivFgVO7">await</span> _productRepository.<span class="t" data-page-node-id="2cjvuYIag2IoxsivN1pn6C">UpdateAsync</span>(product);
+        <span class="k" data-page-node-id="1ZYnbFlLCr1U5Xjj4pPfCT">return</span> <span class="t" data-page-node-id="nKgdBEJ3w4u2e6gKdaEpiN">ObjectMapper</span>.<span class="t" data-page-node-id="M0vUtfCTeKmaqwABA6NwCZ">Map</span>&lt;<span class="t" data-page-node-id="pHHXRb7VA47CLgQKOAJUzP">Product</span>, <span class="t" data-page-node-id="WCm56Qi3XuqqKg0kbEiVEC">ProductDto</span>&gt;(product);
+    }
+
+    [<span class="t" data-page-node-id="LkuHu3EdG52zWPPxHYl5si">Authorize</span>(<span class="t" data-page-node-id="aiGAKfNfRxCS3cAz5MwrHm">MyProjectNamePermissions</span>.Products.Delete)]
+    <span class="k" data-page-node-id="Eh5Hch71ylwYAZTJICdBzA">public virtual async</span> <span class="t" data-page-node-id="jHT3kQXbrG1069tZncYFpo">Task</span> <span class="t" data-page-node-id="C0VFdlFLzpUFAZyycEdaIF">DeleteAsync</span>(<span class="k" data-page-node-id="38Vg9HIU5xFZ7NsAPon45W">Guid</span> id)
+        =&gt; <span class="k" data-page-node-id="8o9DIVh0UmTMfBNuh3Tisc">await</span> _productRepository.<span class="t" data-page-node-id="naexCClAG0uWhSrM2ACaeb">DeleteAsync</span>(id);
+}</code></pre>
+
+<p data-page-node-id="63trOFt4luaV2W19CBxtLI">实体 → DTO 的映射配置在 <code data-page-node-id="MdDHZpuRr9cR7Be3NurqFl">*ApplicationMappers.cs</code>（ABP 10.x 已从 AutoMapper 迁到 <strong data-page-node-id="4VcThmfU0NVPStiAVxrdLc">Mapperly</strong>，编译期生成映射代码）：</p>
+
+<pre data-page-node-id="xW6RV7QsBiMtw189pF8IDF"><span class="path" data-page-node-id="BakBd6Lm6MEMAoQ3goca0L">src/.../Application/MyProjectNameApplicationMappers.cs</span><code data-page-node-id="bzkidynexXZU8YxEX4O9XQ"><span class="k" data-page-node-id="RJM6I7QFrbYd0LkBajo4Jh">using</span> <span class="t" data-page-node-id="7AxNBuOtWydQyHB9ZSq7j9">Riok.Mapperly.Abstractions</span>;
+<span class="k" data-page-node-id="OaPGr9ZNlnNSnhyBes6Flk">using</span> <span class="t" data-page-node-id="kn1twsKAwPDPfx26AXthIh">Volo.Abp.Mapperly</span>;
+
+[<span class="t" data-page-node-id="MLJWNZzHjZH1VJq1wQfyHy">Mapper</span>]
+<span class="k" data-page-node-id="ob6hQrHec1wq4Rq66xqLSY">public partial class</span> <span class="t" data-page-node-id="tKxAdighNpPuTzkOFXKSLa">MyProjectNameApplicationMappers</span>
+{
+    <span class="c" data-page-node-id="ZlkA5HAapu2LJ5GFKxKlcK">// 约定式映射：同名同类型属性自动对应，必要时用 [MapProperty] 指定</span>
+    <span class="k" data-page-node-id="lKzQIvCzNFx5ZoOXfkeI5v">public partial</span> <span class="t" data-page-node-id="grDG9GTPrbxWM9kKLq6de2">ProductDto</span> <span class="t" data-page-node-id="NZKlHHEyBM1CgbIJorY6s4">ToProductDto</span>(<span class="t" data-page-node-id="HYIRheB8kiaT8Gvk624yXo">Product</span> source);
+    <span class="k" data-page-node-id="eVyuueTffGcj7QWkvIqgTJ">public partial</span> <span class="t" data-page-node-id="eXGD0wbIgJAarYWeIaGOsw">List</span>&lt;<span class="t" data-page-node-id="IaoivLay1nG34ZEda1YmRI">ProductDto</span>&gt; <span class="t" data-page-node-id="KN2HomaL6hmrvH1uCU2fQL">ToProductDtoList</span>(<span class="t" data-page-node-id="xt9zUBsE3QpBm6lVsDBKHf">List</span>&lt;<span class="t" data-page-node-id="kyBbCQPT815hw3mWcyEjkl">Product</span>&gt; source);
+}</code></pre>
+
+<h3 data-page-node-id="rLhNgGsgbXEFGEeAK74XAN">6.9 HttpApi：暴露 REST 接口</h3>
+
+<pre data-page-node-id="SC9vNwkwPJhNBVhA3DR49F"><span class="path" data-page-node-id="1olbFl9pdElpGYQzhXmxjf">src/.../HttpApi/Products/ProductsController.cs</span><code data-page-node-id="DG3GPSW6ZUSSd2sgHO9qTB"><span class="k" data-page-node-id="8TXjOyib0Ea9vve4VGVKOv">using</span> <span class="t" data-page-node-id="rdTMnlDtAUmRBmhYmrS7SH">Microsoft.AspNetCore.Mvc</span>;
+<span class="k" data-page-node-id="eJrNhDzFyPVsLuGEceI2xr">using</span> <span class="t" data-page-node-id="daZ69TJ4GDT9aCrn4j4Dta">Volo.Abp</span>;
+<span class="k" data-page-node-id="l2AdKWwP9Rxdk04twqbxMd">using</span> <span class="t" data-page-node-id="kAQI742PRp5AGmZ8644pXN">Volo.Abp.Application.Dtos</span>;
+
+<span class="k" data-page-node-id="JlShp0IHXiXAnE6GRDOfIP">namespace</span> <span class="t" data-page-node-id="FcyjJ8a9HxG8DOiRbErHr1">MyCompanyName.MyProjectName.Products</span>;
+
+[<span class="t" data-page-node-id="THhsXycnGKd1zTbHpxgZqt">Area</span>(<span class="t" data-page-node-id="9CQCJQf9a2WJuFQh0xHxGk">MyProjectNameRemoteServiceConsts</span>.ModuleName)]
+[<span class="t" data-page-node-id="bED0jvRqpGC0Wz7iUg2Gga">RemoteService</span>(Name = <span class="t" data-page-node-id="xxuGefqimximrI5uVeYbZA">MyProjectNameRemoteServiceConsts</span>.RemoteServiceName)]
+[<span class="t" data-page-node-id="droUEtNbzJaTAIZDJgP3h4">Route</span>(<span class="s" data-page-node-id="qmndlv5vu9ax1I6WX78pcB">"api/my-project-name/products"</span>)]
+<span class="k" data-page-node-id="STZ3hwJgURi4J3fEMhPs3m">public class</span> <span class="t" data-page-node-id="fik0WOFHF3Z0Sg4P7SAdxs">ProductsController</span> : <span class="t" data-page-node-id="zmdMQbnYWImHMa8WaiinMJ">MyProjectNameController</span>, <span class="t" data-page-node-id="mQuVUhGQYUQh4QXnOFnqeD">IProductAppService</span>
+{
+    <span class="k" data-page-node-id="jYOYQVT9nRxL1GbS3PIBr1">private readonly</span> <span class="t" data-page-node-id="LBytKpOJSLWgma7knoyanI">IProductAppService</span> _service;
+
+    <span class="c" data-page-node-id="eyWSuoJcLeCYcVUsR3WVcb">// 注意：注入的是【接口】，不是 ProductAppService 实现类</span>
+    <span class="k" data-page-node-id="PRbMSzPqQRIF4L31IzOzWX">public</span> <span class="t" data-page-node-id="kB2ffNwizrPLaPJ6Jjx2QP">ProductsController</span>(<span class="t" data-page-node-id="4CxvEmjafFvQ08LC0AqAfr">IProductAppService</span> service) =&gt; _service = service;
+
+    [<span class="t" data-page-node-id="STTYw1iBolhsQ8GdH69Z5F">HttpGet</span>]
+    [<span class="t" data-page-node-id="SrHT1R19HS7fJzvmDRpfgf">Route</span>(<span class="s" data-page-node-id="69nnGEuOLYno39fsNRS9t6">"{id}"</span>)]
+    <span class="k" data-page-node-id="OMxnkWA5mpfxVvJEzEH3IP">public</span> <span class="t" data-page-node-id="1s8UrNgTadFuodEAwQHGDq">Task</span>&lt;<span class="t" data-page-node-id="FoDRDSObrwfIqHC4Srb558">ProductDto</span>&gt; <span class="t" data-page-node-id="EbNDaezGdr11Qh1T5IymWK">GetAsync</span>(<span class="k" data-page-node-id="jvwB3JUF6BCCzGIoFpTA2g">Guid</span> id) =&gt; _service.<span class="t" data-page-node-id="04iRLVtKSkZMZBdwvvpaM4">GetAsync</span>(id);
+
+    [<span class="t" data-page-node-id="UiJZZxGYf4iB9EKT4EWoHp">HttpGet</span>]
+    <span class="k" data-page-node-id="8Zh0GyZ52wjY5zkg4pV0YB">public</span> <span class="t" data-page-node-id="sx0wH7SbeGmEWh11r2m3u8">Task</span>&lt;<span class="t" data-page-node-id="HdPdRWnDwBMfqcsiYqm0bv">PagedResultDto</span>&lt;<span class="t" data-page-node-id="aQQnRnknl46pDujuSIFWcU">ProductDto</span>&gt;&gt; <span class="t" data-page-node-id="pJeKuJbmVdb9FD4P2V9rW8">GetListAsync</span>(<span class="t" data-page-node-id="nPlF22gQYX7CwmDOqHjf6w">GetProductListDto</span> input)
+        =&gt; _service.<span class="t" data-page-node-id="LN2fH6PdLYWb31IGBJaiyb">GetListAsync</span>(input);
+
+    [<span class="t" data-page-node-id="P9jSYJTK7y7JZxX4heaz9l">HttpPost</span>]
+    <span class="k" data-page-node-id="PiIGOw2TqQ09lHrRr9OSvm">public</span> <span class="t" data-page-node-id="ZvhuGCER6cZVUkN1yoJH4M">Task</span>&lt;<span class="t" data-page-node-id="ioGCguBWFXoA3rk39TJfQa">ProductDto</span>&gt; <span class="t" data-page-node-id="B2GJDdCHhd4ryz5kSvCAHH">CreateAsync</span>(<span class="t" data-page-node-id="yQ7m9GYyoAMGo741ldzk5I">CreateProductDto</span> input)
+        =&gt; _service.<span class="t" data-page-node-id="jvNKlwf7fXuar53XUoI7eP">CreateAsync</span>(input);
+
+    [<span class="t" data-page-node-id="HLazx0xbenVXPccbJA12jH">HttpPut</span>]
+    [<span class="t" data-page-node-id="Ts9DwXgKYvRRKpk3y4NgR5">Route</span>(<span class="s" data-page-node-id="4qq6U09pGWMhc8RAQqgB75">"{id}"</span>)]
+    <span class="k" data-page-node-id="WRdZlxBYrMNPSrb55zKtVr">public</span> <span class="t" data-page-node-id="EqUU0jqpwMOpbNKOalUxZJ">Task</span>&lt;<span class="t" data-page-node-id="YDRtPTyIyTSaEvBvi8v851">ProductDto</span>&gt; <span class="t" data-page-node-id="rsRniQtv5CsLgczhe3203E">UpdateAsync</span>(<span class="k" data-page-node-id="8Fo4OjIuLF5xp41ppuraQA">Guid</span> id, <span class="t" data-page-node-id="RdeogoodxkmBae0EAj6Lad">UpdateProductDto</span> input)
+        =&gt; _service.<span class="t" data-page-node-id="HWPKyjTQ7S9hJrclKBq30z">UpdateAsync</span>(id, input);
+
+    [<span class="t" data-page-node-id="rHjEGfuoJMfse2PjOEgtpH">HttpDelete</span>]
+    [<span class="t" data-page-node-id="JSsRKLrhyOXPCnX1KKPfnw">Route</span>(<span class="s" data-page-node-id="50fh601EuFmDpSuBuxbAuo">"{id}"</span>)]
+    <span class="k" data-page-node-id="xeC73fEneI9fAgeU5FARJz">public</span> <span class="t" data-page-node-id="WzHC3kU0ccHBiNu2NVf0Gs">Task</span> <span class="t" data-page-node-id="evIDoPzeDq6Rj61CmFfJQ4">DeleteAsync</span>(<span class="k" data-page-node-id="yCOI6bRdEpitmgCbPM3fII">Guid</span> id) =&gt; _service.<span class="t" data-page-node-id="PNhXw2wiPH2iBnOh2ruZGE">DeleteAsync</span>(id);
+}</code></pre>
+
+<div class="callout tip" data-page-node-id="DkSAzt2K6xpzqvlWynttXh">
+<p data-page-node-id="ndaKPd2gSygtaiBODnhdhv"><strong data-page-node-id="AYNXoeEEsJpneysMGUtK4g">控制器要"薄"。</strong>它只做三件事：声明 HTTP 动词与路由、接收参数、转发给应用服务。任何业务判断写在这里都是错的——因为业务逻辑要能被非 HTTP 场景（后台任务、gRPC）复用。另外，<strong data-page-node-id="EJDYKWHmRAvJvEt3ZkvFVA">控制器实现应用服务接口是 ABP 的惯用技巧</strong>：框架据此自动补齐路由约定与参数绑定。</p>
+</div>
+
+<h3 data-page-node-id="mqxgQRSTl1T6eYqAEwAQFP">6.10 最后一步：把新代码接进模块</h3>
+<p data-page-node-id="qN5jU1OEGlD3uSgNIn0KUO">大多数情况下<strong data-page-node-id="cxu1zl4Uj4q87LKrYhkhDv">无需改动</strong>——自动 DI 与约定会接上。但如果你加了新的项目引用（比如新建了一个 <code data-page-node-id="4QyMAyQowlRK7nc0fgnMKO">.Domain</code> 依赖的包），需要在对应的 <code data-page-node-id="XL3HqGWaOfUUvnhctWqLMT">*Module.cs</code> 的 <code data-page-node-id="4AVABAFKvwXuw9SDJux2S3">[DependsOn]</code> 里登记：</p>
+<pre data-page-node-id="YkSrV6gAV5P9gYK1VVUMLG"><span class="path" data-page-node-id="27adqhctYlWPFkZD2IDN1n">src/.../Application/MyProjectNameApplicationModule.cs</span><code data-page-node-id="bbPEtFInHhfdntcxo2wdBZ"><span class="n" data-page-node-id="sEslOizq84Db8HghrYBFs2">[DependsOn(
+    typeof(MyProjectNameDomainModule),
+    typeof(MyProjectNameApplicationContractsModule)
+)]</span>
+<span class="k" data-page-node-id="knUS7cKZhSEkA3ZejA5mJa">public class</span> <span class="t" data-page-node-id="JodC2pf3Y9BL70iws1eHir">MyProjectNameApplicationModule</span> : <span class="t" data-page-node-id="QDSDDfuFEXOGcdOI8Rn5Ri">AbpModule</span> { }</code></pre>
+
+<!-- ============================================ -->
+<h2 id="s7" data-page-node-id="OJCfFwxHcIKC5yEFt4kOkr"><span class="num" data-page-node-id="8YqDQ7PHIaWerV4HvO82Jk">07</span>前端：页面到底怎么写</h2>
+
+<h3 data-page-node-id="meEtP1gIfS8exjjqzE2L5n">7.1 先选 UI 形态</h3>
+<p data-page-node-id="uIGpLLOX2GwsiuKiCn5fHs">ABP 一个后端可以配四种前端。选型决定了「页面写在哪个目录」：</p>
+
+<table data-page-node-id="EV3w8uNqdOVwH0GA7uzETy">
+<thead data-page-node-id="quyrmJ2DZWMv1Kids0liOq"><tr data-page-node-id="LnPBCHf1DpnwuFtOi8uaAS"><th data-page-node-id="AnGxvGs5OeukPVtOvlJBDC">形态</th><th data-page-node-id="rF9a7x6ulel7a7wedaMkp4">模板目录</th><th data-page-node-id="a7ExBmu4NiIpCu6fpaIaPp">适合</th><th data-page-node-id="8wmxx0UmaGVefRmbfb19Hw">页面单位</th></tr></thead>
+<tbody data-page-node-id="KzSwShkvhlf3ARY5ELvQVg">
+<tr data-page-node-id="WfUveoBgXszL81TD3iK4Qg"><td data-page-node-id="d0f5jMHFunWnb0139CSVJ0"><span class="pill ui" data-page-node-id="AFhDJpeXHuhXqgrrwtfiYN">Angular</span></td><td data-page-node-id="uyDPm74m7b61jf50vb2iMg"><code data-page-node-id="ZSKV9yeCT2bqlxBJaHPCTD">templates/app/angular/</code></td><td data-page-node-id="s3L17TrPMFOa5dxfEaEk71">SPA、团队熟悉 TS、前后端分离部署</td><td data-page-node-id="TSTpnMyeZcgYnIFEzXI0LX"><code data-page-node-id="IdEdDwO7GHqrcTpPkeR9De">.component.ts/.html/.scss</code></td></tr>
+<tr data-page-node-id="1pddrw8j4uV1lDcFiw8nfu"><td data-page-node-id="MO9wGZoNS6G8CDiHNRFGGg"><span class="pill ui" data-page-node-id="ukeFTmH5Uj2rGoAzyvEMo4">Blazor</span></td><td data-page-node-id="15Ja7jZDE2t7Gh1V7y82RX"><code data-page-node-id="AMrMO5tn7iXGHcQkSAFmE1">*.Blazor.Server/</code>、<code data-page-node-id="SxFcEiJbQkoR5JzIsyRJwn">*.Blazor.Client/</code></td><td data-page-node-id="vM5D8EGjllhWogbXEPf7re">C# 全栈、组件化、WebAssembly/Server 任选</td><td data-page-node-id="jzpvF2jkK7tvR8yGxexpOh"><code data-page-node-id="xKDd0nTArXPdEAnCOyc6Yd">.razor</code> + <code data-page-node-id="OYBi4gci3jRCa7BbA2ixHN">.razor.cs</code></td></tr>
+<tr data-page-node-id="0keUpqYk6a6yHOrL1lHWDI"><td data-page-node-id="Y4Rt8wrsG6u6DDNMImXvD4"><span class="pill ui" data-page-node-id="OpVMbP6XYSow0bBpW4AdQc">MVC / Razor Pages</span></td><td data-page-node-id="1veSXbU8sa9zoDW3haRseE"><code data-page-node-id="aKv580PS8zKhEL46UFCl1U">*.Web/Pages/</code></td><td data-page-node-id="w3Tl9NNX04ShfEFzcADliH">传统服务端渲染、SEO、内部管理后台</td><td data-page-node-id="P7jJ16RtohsDZHrkWf84r8"><code data-page-node-id="KwuVmMdObdHDHKJxjL9toy">.cshtml</code> + <code data-page-node-id="qVow3bZsig9NtdBfk12BaB">.cshtml.cs</code></td></tr>
+<tr data-page-node-id="JnRCWIHnQGlazpRzQ3Dy5A"><td data-page-node-id="kborVTCnddVKmcDcjbfQSA"><span class="pill ui" data-page-node-id="7Ghcyr0rIjM9hWA6GmOURw">MAUI / WPF</span></td><td data-page-node-id="1y1ygOPqh4EnRGtHARXjJH"><code data-page-node-id="p1uNV1zFBNl2g2LcEB9O5l">templates/maui|wpf/</code></td><td data-page-node-id="oJxwxrlj05N4TiznluUsCS">桌面 / 移动原生</td><td data-page-node-id="QkyUBgYJonGdZXB9rrHXUm"><code data-page-node-id="fwvpRfieB8bgSOMtALQvkL">.xaml</code></td></tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="8RxihWeXpZR1OjN7yMuxmy">7.2 Angular：目录、路由、菜单、代理、页面</h3>
+
+<h4 data-page-node-id="JsLTA6LCKgV1AbJlVbAVZf">① 目录约定</h4>
+<pre data-page-node-id="6NHlKoZdW5z32SixCvQhML"><code data-page-node-id="toqzKEtCVcng2DS9uSzgLN">angular/src/app/
+├── app.routes.ts              <span class="c" data-page-node-id="jw6YeHSN1R3AsJKo5YObAB"># 根路由表（懒加载）</span>
+├── route.provider.ts          <span class="c" data-page-node-id="h2UKYHacDHBVJ18XPGQlBp"># 把菜单/路由注册进 ABP 的 RoutesService</span>
+├── app.config.ts              <span class="c" data-page-node-id="OOCS4LH5yh7Ax6WK9yS9GY"># 应用配置：注入各模块 provider</span>
+└── products/                  <span class="c" data-page-node-id="dQp4oMCElC9KbZ1GDqvdcx"># ← 你为「产品」功能新增的目录</span>
+    ├── products.routes.ts
+    ├── product.service.ts
+    ├── list/
+    │   ├── list.component.ts / .html / .scss
+    └── create-edit/
+        └── create-edit.component.ts / .html</code></pre>
+
+<h4 data-page-node-id="eV5LleHKDhhFWGpGmhmAgF">② 注册路由</h4>
+<p data-page-node-id="oy5c3VQI1xbBS8QGwAThxv">先在自己的功能目录里定义子路由，再挂到根路由表：</p>
+<pre data-page-node-id="F0jg5HDIIE1DgMeIgWgv9x"><span class="path" data-page-node-id="2wMhLXdGda0skEjupyOslI">angular/src/app/products/products.routes.ts</span><code data-page-node-id="A7QgANvRaFFCuXFbkyJ47G"><span class="k" data-page-node-id="7tpBYpVU0alRCTBvYWCmH3">import</span> { <span class="t" data-page-node-id="mLaobZmS1BgijGiNwEQRYq">Routes</span> } <span class="k" data-page-node-id="wLxJWc8zmnmC62InUxBSQx">from</span> <span class="s" data-page-node-id="SjUQEu668wL3H2rdAZ6FEC">'@angular/router'</span>;
+
+<span class="k" data-page-node-id="D3TgoN9y5ZZf7WLTVlkx4L">export const</span> productRoutes: <span class="t" data-page-node-id="sFrkDchMlyCjtALAVbAGsG">Routes</span> = [
+  {
+    path: <span class="s" data-page-node-id="hSxujyXmNTVbzA3dnsJ31D">''</span>,
+    loadComponent: () =&gt;
+      <span class="k" data-page-node-id="1LCuXnG7Kslw6RCSFpItzn">import</span>(<span class="s" data-page-node-id="1XJaaDeBf4ELhP5qJRApPi">'./list/list.component'</span>).<span class="t" data-page-node-id="QicljdtEO8M6ibZ7lrBHoC">then</span>(m =&gt; m.<span class="t" data-page-node-id="E3D49CiHvWd0qzJQKzJqF9">ListComponent</span>),
+  },
+];</code></pre>
+
+<pre data-page-node-id="BxWX6RlWzaM8yUuOm4s9nA"><span class="path" data-page-node-id="zUr4TsLzFOYwphzR5spgpz">angular/src/app/app.routes.ts（追加一项）</span><code data-page-node-id="JmmlcjvBwSr7zLXmDp8T6w"><span class="k" data-page-node-id="lBogqcPWGrFObV0edjOAWV">export const</span> appRoutes: <span class="t" data-page-node-id="bY8V3eBtRkt0ZcsYQhyqvE">Routes</span> = [
+  <span class="c" data-page-node-id="qH2WNleoBhLWh4ul560pLU">// … 已有的 account / identity / setting-management …</span>
+  {
+    path: <span class="s" data-page-node-id="b4LuE3DsFH7QxH2sXh5nCm">'products'</span>,
+    loadChildren: () =&gt;
+      <span class="k" data-page-node-id="2GJYydxVxBVcAYd5ODEAaH">import</span>(<span class="s" data-page-node-id="imNTCcIX6tSCadE4wGn4yO">'./products/products.routes'</span>).<span class="t" data-page-node-id="4cXCdCcGYhzHRqj9U26PFt">then</span>(m =&gt; m.<span class="t" data-page-node-id="cpFOlfP6GqCwdkzfUY0qG6">productRoutes</span>),
+  },
+];</code></pre>
+
+<h4 data-page-node-id="jAljyZpDwuG2LY1TjELfa8">③ 注册菜单（侧边栏才会出现入口）</h4>
+<pre data-page-node-id="wIggPFRLFM2I6tNGevsaQJ"><span class="path" data-page-node-id="wqM6IEA1sSpBVUCC6402FG">angular/src/app/route.provider.ts</span><code data-page-node-id="5GDQwYAFstTJzU0LJyKGNS"><span class="k" data-page-node-id="horv7sat50eyqPJqmpiKzG">import</span> { <span class="t" data-page-node-id="GaCSFQbMN32KkWCM8th3JC">RoutesService</span>, <span class="t" data-page-node-id="AXQJDousV0p63jpUuCBbBH">eLayoutType</span> } <span class="k" data-page-node-id="V4XNmRsRVFjeO8uROQ7sMt">from</span> <span class="s" data-page-node-id="sIXT7EDuGBVyXcNrnonaeX">'@abp/ng.core'</span>;
+<span class="k" data-page-node-id="tfG6ox8mgeNn6rvAHVcgKK">import</span> { <span class="t" data-page-node-id="2LhrRZFQgUhIidsHyREuL1">APP_INITIALIZER</span> } <span class="k" data-page-node-id="MierbODlKlnFdFhUz1qvxQ">from</span> <span class="s" data-page-node-id="O1KGBbPZDqIvllMBhwKuYZ">'@angular/core'</span>;
+
+<span class="k" data-page-node-id="L8uLOg4w3Z4SKBnrY4UV7Q">export const</span> APP_ROUTE_PROVIDER = [
+  { provide: <span class="t" data-page-node-id="kWfP3YLHpi5sFypGOQLuc8">APP_INITIALIZER</span>, useFactory: configureRoutes, deps: [<span class="t" data-page-node-id="ihgspB7tpvX4WMDZd7d6RD">RoutesService</span>], multi: <span class="k" data-page-node-id="aqEnBF2naD6CS1gsR8TWMf">true</span> },
+];
+
+<span class="k" data-page-node-id="YArYC24pA1HXw6Nn7mJTKJ">function</span> <span class="t" data-page-node-id="5fNwv9yYrTbPb3ofWrheWS">configureRoutes</span>(routesService: <span class="t" data-page-node-id="AzMmoBQArYASxFRs67irGU">RoutesService</span>) {
+  <span class="k" data-page-node-id="Z7KVHPHphBWgHCzTRoFqyT">return</span> () =&gt; {
+    routesService.<span class="t" data-page-node-id="oi2EAoLHzRiezrCECpGxvn">add</span>([
+      {
+        path: <span class="s" data-page-node-id="VFHLdceZYrrGFwYM8KQspg">'/products'</span>,
+        name: <span class="s" data-page-node-id="H1JNy6zOe690ge6hWOC1y2">'::Menu:Products'</span>,        <span class="c" data-page-node-id="L4M9DfS3qoB3kisqtORNiS">// :: 前缀 = 走本地化资源</span>
+        iconClass: <span class="s" data-page-node-id="wzfx0LEFddNB8fjokprOKO">'fas fa-box'</span>,
+        order: <span class="n" data-page-node-id="8Dlwl93fUjbPxwluLlfMUf">10</span>,
+        layout: <span class="t" data-page-node-id="QFtMcTUwmsyDD9wGxAahRv">eLayoutType</span>.application,
+        requiredPolicy: <span class="s" data-page-node-id="BJTjRj90nYptl7qF9PlQUQ">'MyProjectName.Products'</span>,  <span class="c" data-page-node-id="D2xXweDZNCBPy5DBwM39KA">// 权限控制：无权限则隐藏</span>
+      },
+    ]);
+  };
+}</code></pre>
+
+<h4 data-page-node-id="JkGzFKKsNbiWwGHFnhUxEF">④ 生成 API 代理（关键一步）</h4>
+<p data-page-node-id="rkw45snPWdDHKGBihzleTW">Angular 不需要手写 HTTP 调用。ABP CLI 会读取后端的 <code data-page-node-id="EjiE2BVWXkVfq5thzl3aQ0">Application.Contracts</code>，自动生成 TypeScript 服务：</p>
+<pre data-page-node-id="CH8hI8JpA1smmUCBnBFn2K"><code data-page-node-id="CXeILUJR38kFvH4EIKbp71">abp generate-proxy -t ng -m MyProjectName -u http://localhost:44300</code></pre>
+<p data-page-node-id="DtIIIgDMMc0yufdEnxmfZO">生成结果通常落在 <code data-page-node-id="tZgsRhpHjpwq1CslBIUA3X">src/app/proxy/</code>，包含 <code data-page-node-id="JgOqlHT20x6TruKvdCOHCQ">product.service.ts</code>（带完整类型定义）、<code data-page-node-id="mkzqRBpN1AC9RzXTGnYLmO">product.dto.ts</code>。此后你在页面里 <code data-page-node-id="wTrr5vnT2T507yESJDt9oh">inject(ProductService)</code> 即可直接调用后端。</p>
+
+<h4 data-page-node-id="Ig80cFlqcpIHqqrLJHQ7oQ">⑤ 一个列表页组件</h4>
+<pre data-page-node-id="6TefP7FDuhO60Jxrxp2vG7"><span class="path" data-page-node-id="Mvuf52muG5kudRxhIRi9AH">angular/src/app/products/list/list.component.ts</span><code data-page-node-id="A40bQwlk8SkUmrM0j41gpc"><span class="k" data-page-node-id="FdpWxAEaJprUJrqNZULW9Z">import</span> { <span class="t" data-page-node-id="Ktlq8mXWRp7jZK8D9d1UJb">Component</span>, <span class="t" data-page-node-id="0RRRADGTEUpCucQvXKxKbE">inject</span>, <span class="t" data-page-node-id="HT8LGSVwQJL4nWOe9aK77C">OnInit</span> } <span class="k" data-page-node-id="OLpyqblBt8JkS5VcbBBNmG">from</span> <span class="s" data-page-node-id="eOTXX0CoTHdV2jzsSnrIJB">'@angular/core'</span>;
+<span class="k" data-page-node-id="U8TwAfcnYqe4wUTFH3VChI">import</span> { <span class="t" data-page-node-id="yWL6IMrVmvKEvfiqX2w7OK">ListService</span>, <span class="t" data-page-node-id="wbqZPOTm11Jxge8GYAuwbw">PermissionService</span> } <span class="k" data-page-node-id="BPinEmt785wMa89dGiXToL">from</span> <span class="s" data-page-node-id="t1GZOPlKpNeerPAeva1O1v">'@abp/ng.core'</span>;
+<span class="k" data-page-node-id="H5y5SlR9Ow4VHRoeXDGtdE">import</span> { <span class="t" data-page-node-id="kcHc1XR8znXKMPHRfvXTCt">ConfirmationService</span>, <span class="t" data-page-node-id="Sykohz3oqFlHoDdUgeVRzR">ToasterService</span> } <span class="k" data-page-node-id="BqDyB9aANtm43UfdDYhEIT">from</span> <span class="s" data-page-node-id="yAP64AUXlgrW0190ORwnVf">'@abp/ng.theme.shared'</span>;
+<span class="k" data-page-node-id="aaZARM6rKjZ5hWZySGmhw4">import</span> { <span class="t" data-page-node-id="LQihpnPlHTQ9dw0F4QhwIX">ProductService</span> } <span class="k" data-page-node-id="BiGzp3tiDXnMgsvgV3LDGh">from</span> <span class="s" data-page-node-id="qXkDq5bQeARMcBkD8YDCmE">'../../proxy/products/product.service'</span>;
+
+<span class="t" data-page-node-id="DMgW4OyuvoOTFAGnAiKsXs">@Component</span>({
+  selector: <span class="s" data-page-node-id="aOsPq8ZJxjEIhOtBTJQrAh">'app-product-list'</span>,
+  templateUrl: <span class="s" data-page-node-id="C3WWXTTZ77ii33DPUbJAUe">'./list.component.html'</span>,
+})
+<span class="k" data-page-node-id="HWDzglay1EgaZ4sSE7TPeV">export class</span> <span class="t" data-page-node-id="nchUoPQh0hKsAXymfdaznF">ListComponent</span> <span class="k" data-page-node-id="AUx3nhzyinC8yczXDiNwpU">implements</span> <span class="t" data-page-node-id="HdAsivA0Jd3RGJgEukeYEZ">OnInit</span> {
+  <span class="k" data-page-node-id="BFpCn1sZEZwKnk184RLOnt">private readonly</span> productService = <span class="t" data-page-node-id="zUuyqEwjyqtEAIxQ7zliaK">inject</span>(<span class="t" data-page-node-id="i8OvDvopwgTDOoPGcqN8Ix">ProductService</span>);
+  <span class="k" data-page-node-id="OOfYbbuC1cyQvcKZK8tzFb">private readonly</span> list = <span class="t" data-page-node-id="0ZnLObwRFe9PvtdLecXvVJ">inject</span>(<span class="t" data-page-node-id="WTvZmQa7CAIThZn1dzWWBn">ListService</span>);
+  <span class="k" data-page-node-id="9SWdsJE2kyoYIHeO9LhD0V">private readonly</span> confirmation = <span class="t" data-page-node-id="plMG5HO6xQcxEmsCvnzSxv">inject</span>(<span class="t" data-page-node-id="KMCX1MV2p4nBHVcugltrXP">ConfirmationService</span>);
+  <span class="k" data-page-node-id="vzGwpN46xrbUqOLFZHWDBX">private readonly</span> toaster = <span class="t" data-page-node-id="U0ggBVEDP18cNM0AsDbyki">inject</span>(<span class="t" data-page-node-id="QkjxiVDLOkOV9n6rMG58ov">ToasterService</span>);
+  permissions = <span class="t" data-page-node-id="3lLFoSU3HvYGWBcljIxyWY">inject</span>(<span class="t" data-page-node-id="PCkaw50IF7C8VEz9SvDu6S">PermissionService</span>);
+
+  data: <span class="t" data-page-node-id="lEDYNqLkHMy6Qai05Ej2eU">PagedResultDto</span>&lt;<span class="t" data-page-node-id="0BJnEJF1TLclMBpNnHTQJu">ProductDto</span>&gt; = { items: [], totalCount: <span class="n" data-page-node-id="zACCjJ9AjXRAC7RjqaAEAy">0</span> };
+
+  <span class="k" data-page-node-id="PIUhypkFxF1WgJhuIZFPiD">ngOnInit</span>() { <span class="k" data-page-node-id="oWM24RyCqaORlGE6eQfpbF">this</span>.<span class="t" data-page-node-id="4DLAbpIG3sKiEmI96fNJkl">hookToQuery</span>(); }
+
+  <span class="c" data-page-node-id="62bGD6TsgDh84NlqEB8fxo">// ListService 自动把分页、排序、筛选的 query 变化推过来</span>
+  <span class="k" data-page-node-id="UfCPEnRRdqkijaY0d1n4zi">private</span> <span class="t" data-page-node-id="k3RSQVEUHFOfKLJg3Dz2kS">hookToQuery</span>() {
+    <span class="k" data-page-node-id="IHcs377sjzn7lnfP7cvaKe">this</span>.list.<span class="t" data-page-node-id="FIFSmXyCIEZnI3DyLWyPHH">hookToQuery</span>(<span class="s" data-page-node-id="2K2E96IRLpcKBT41fcC4Hn">'products'</span>)
+      .<span class="t" data-page-node-id="RUIekzNiPkcLBopuONriFP">subscribe</span>(query =&gt;
+        <span class="k" data-page-node-id="Gx0quymJQOT7bgNNg8Ltfk">this</span>.productService.<span class="t" data-page-node-id="zxziklNHtLjke9KWrmU1sc">getList</span>(query).<span class="t" data-page-node-id="y1BHxP91PEHTVEhQ3uWuJp">subscribe</span>(res =&gt; (<span class="k" data-page-node-id="o8SDFQQ700Zh1sGQEwEJLW">this</span>.data = res)));
+  }
+
+  <span class="k" data-page-node-id="MwJqDl1KL9co8bpGZMl2pk">delete</span>(id: <span class="k" data-page-node-id="1t90nYmbw1Vt0EIw6HSdg6">string</span>) {
+    <span class="k" data-page-node-id="lRzxt7PL3otGgZtgMb2y07">this</span>.confirmation
+      .<span class="t" data-page-node-id="yp8THtHXihHOCktQAsFzW0">warn</span>(<span class="s" data-page-node-id="tK43QSznNDQKFrX1C5Y0YA">'::AreYouSureToDelete'</span>, <span class="s" data-page-node-id="AoeGv1scaWDv602WYDUYPB">'::AreYouSure'</span>)
+      .<span class="t" data-page-node-id="nJ9CZLvL4nIwYcJZm6sys4">subscribe</span>(status =&gt; {
+        <span class="k" data-page-node-id="YGRBCDHPVWAqmWHq8NiDi6">if</span> (status === <span class="s" data-page-node-id="yVBbB7BGRvwbKHCpRk201H">'confirm'</span>) {
+          <span class="k" data-page-node-id="PlyxsPDhCOTIWRfQQb6Lon">this</span>.productService.<span class="t" data-page-node-id="EvsC3SfqT5rZBpaAlxTL51">delete</span>(id).<span class="t" data-page-node-id="8KMFCJeT3vJdKiN2xzhttz">subscribe</span>(() =&gt; {
+            <span class="k" data-page-node-id="cBVKYW0DXhIUszlEH1yLiW">this</span>.toaster.<span class="t" data-page-node-id="uM4IGUSJl9zOxGGNLAfVQp">success</span>(<span class="s" data-page-node-id="SieLHqJMermVBidjWAxHdx">'::DeletedSuccessfully'</span>);
+            <span class="k" data-page-node-id="zvkkp1BPmbRbPza69Pbwj5">this</span>.list.<span class="t" data-page-node-id="5yNxWDaRZQZHRG62Osl8B8">get</span>()
+          });
+        }
+      });
+  }
+}</code></pre>
+
+<pre data-page-node-id="h8NyVigMYMySIBW1JWgg5m"><span class="path" data-page-node-id="aRiICmOWeMOPpfznfo5f8q">angular/src/app/products/list/list.component.html</span><code data-page-node-id="Hnu4KJXD4Geq0ImRDEFCUo"><span class="c" data-page-node-id="nlvbJ59MiajED2cNlVp3Ge">&lt;!-- abpPermission 指令：无权限时自动隐藏按钮 --&gt;</span>
+&lt;<span class="t" data-page-node-id="Bocs43CkUTzsFwHmNmGPN0">abp-page</span> [<span class="t" data-page-node-id="CJfcIpUeGEaI4xfafU02J3">toolbar</span>]=<span class="s" data-page-node-id="qR6XHH2dKnvW70Q1yqv1Du">"toolbarTpl"</span>&gt;
+  &lt;<span class="k" data-page-node-id="b8HydbrSxJpWYBLUcaVcBm">ng-template</span> #toolbarTpl&gt;
+    &lt;<span class="t" data-page-node-id="HB433b8uo5r8HXJmB8PMCs">button</span> *<span class="t" data-page-node-id="64J2EoSF76tCfpY1pfzYMg">abpPermission</span>=<span class="s" data-page-node-id="Vme7z9oqqlyybdn0j2zUQK">"'MyProjectName.Products.Create'"</span>
+            <span class="k" data-page-node-id="aGnhgDooVdJg13qA1bEAJa">class</span>=<span class="s" data-page-node-id="b4KuP8tIBQy6SoD0tgch4I">"btn btn-primary"</span>&gt;{{ <span class="s" data-page-node-id="smCiHyofixbcIaav5MkHYY">'::NewProduct'</span> | <span class="t" data-page-node-id="woZ1TMB2z3BM97mtJiGUG0">abpLocalization</span> }}&lt;/<span class="t" data-page-node-id="sLB9qrB3AfCZPHb2roTruE">button</span>&gt;
+  &lt;/<span class="k" data-page-node-id="0Be8Rc5zDUySe6JT4MfDnj">ng-template</span>&gt;
+
+  &lt;<span class="t" data-page-node-id="tWkZ27qUXIF7VCHXJqyGHl">table</span> <span class="k" data-page-node-id="BtBwdo22EbF7hL1jF7l2Uk">class</span>=<span class="s" data-page-node-id="lR7AaeJUvIqVS5Y2LM3uYD">"table"</span>&gt;
+    &lt;<span class="t" data-page-node-id="qRDN2MaWHjSffuzPUJxyfk">thead</span>&gt;&lt;<span class="t" data-page-node-id="uVeeVJJs0TJNBr2ufPvzt3">tr</span>&gt;&lt;<span class="t" data-page-node-id="ynbTIoQladNfs3THly18dg">th</span>&gt;Code&lt;/<span class="t" data-page-node-id="O5hwcUsDCQAQ9y2TgcSyc3">th</span>&gt;&lt;<span class="t" data-page-node-id="OJwQ1NF29eI2DEXxRsH8U8">th</span>&gt;Name&lt;/<span class="t" data-page-node-id="klvCd8jotT4GYCtJL3bTm8">th</span>&gt;&lt;<span class="t" data-page-node-id="GCgWQpXwvjTKHd5US9fvx9">th</span>&gt;&lt;/<span class="t" data-page-node-id="SumLGUg8dOTROvAuibizsx">th</span>&gt;&lt;/<span class="t" data-page-node-id="cpbuhAMeiYWbnLCGEKcpbd">tr</span>&gt;&lt;/<span class="t" data-page-node-id="DfP71S0TZKINExUjhLXyCT">thead</span>&gt;
+    &lt;<span class="t" data-page-node-id="jNV3saQp7rP2KMQF8OUDQt">tbody</span>&gt;
+      &lt;<span class="t" data-page-node-id="VNaLqbKfGMRqjGK2KnfEkm">tr</span> *<span class="t" data-page-node-id="uGJK1wR9k0bMgVeh07nM2I">ngFor</span>=<span class="s" data-page-node-id="nZNW4GPmZTl952xfRRdD5l">"let item of data.items"</span>&gt;
+        &lt;<span class="t" data-page-node-id="Y3ZrmDUx61D3JGmXuIseBG">td</span>&gt;{{ item.code }}&lt;/<span class="t" data-page-node-id="HXEVpkGsxaPJrWe15K53HD">td</span>&gt;
+        &lt;<span class="t" data-page-node-id="D8trSPSSGqTp0x6xNkYjrh">td</span>&gt;{{ item.name }}&lt;/<span class="t" data-page-node-id="lpEyATjhsNYtSbSFlFfxuD">td</span>&gt;
+        &lt;<span class="t" data-page-node-id="7Bjv4skPdh7woaH7nKFYdQ">td</span>&gt;
+          &lt;<span class="t" data-page-node-id="hYWbq8GFCOJStkIEG5O2Ac">button</span> *<span class="t" data-page-node-id="7xKmJsDvUsOIEeNMg8H2OG">abpPermission</span>=<span class="s" data-page-node-id="kMsgYT5VM51Qf5KtjI1ZEv">"'MyProjectName.Products.Delete'"</span>
+                  (<span class="t" data-page-node-id="if59ow2y9Gd9GN1IhrDjZf">click</span>)=<span class="s" data-page-node-id="urALIspmUpa8dpDu5gFeHc">"delete(item.id)"</span>&gt;删除&lt;/<span class="t" data-page-node-id="PVocyOtAJiGFJQmpDcFeZa">button</span>&gt;
+        &lt;/<span class="t" data-page-node-id="T7ByD37JEmtJ7Mp6ADd5xJ">td</span>&gt;
+      &lt;/<span class="t" data-page-node-id="hBGQCjJ6J0JSjs6eCfGH9R">tr</span>&gt;
+    &lt;/<span class="t" data-page-node-id="nYp3l13bYAc8mbAK0EHNOL">tbody</span>&gt;
+  &lt;/<span class="t" data-page-node-id="eOBGkD8IJTB2hUlEu9mLyD">table</span>&gt;
+
+  <span class="c" data-page-node-id="IPnujJhsZGDxh43c0oadMY">&lt;!-- 分页器用 ABP 自带的 abp-pagination --&gt;</span>
+  &lt;<span class="t" data-page-node-id="53f32Cj9M54nSXHcw3Hic8">abp-pagination</span> [<span class="t" data-page-node-id="OYDh2Nc7YLD8A8CafEc9xo">totalCount</span>]=<span class="s" data-page-node-id="x9LAoJOQkVqKRCc7tvzgGA">"data.totalCount"</span> [<span class="t" data-page-node-id="6tzxEOltNKPOvULPpi9EE5">page</span>]=<span class="s" data-page-node-id="EVzXWgmFtnNYWmZhYjDP4k">"1"</span>&gt;&lt;/<span class="t" data-page-node-id="mf1hRRNkcgVVuVD3C5kMc3">abp-pagination</span>&gt;
+&lt;/<span class="t" data-page-node-id="gayp9kovAoNhJGcR4uQnZb">abp-page</span>&gt;</code></pre>
+
+<div class="callout" data-page-node-id="STpkAsH7PQkakG6VxqWwH7">
+<p data-page-node-id="E4dkZt6KklG1Yjv21I7gO5"><strong data-page-node-id="BG4iFi3ZDd3lfPrUHPPAeb">Angular 侧的三条约定，记住就够用：</strong>① <strong data-page-node-id="ASLc6RKOVqabXkWlAaVS4H">路由/菜单</strong>统一走 <code data-page-node-id="DH7gkzkrdL0hLMB5DGwTn4">RoutesService</code>，不手写 <code data-page-node-id="nIcnv8jUCDir2T2tJmdjwN">&lt;a routerLink&gt;</code> 拼侧边栏；② <strong data-page-node-id="curZLNvl7TFoTLyFhec3W5">接口调用</strong>全部来自 <code data-page-node-id="KkOVXGWPSVlZ9lDDtw86rL">abp generate-proxy</code> 生成的 <code data-page-node-id="988i2ieI50F8PkELyF4gkg">proxy/</code> 目录，别手写 HttpClient；③ <strong data-page-node-id="0uX0NEeuoiOCfqyQnHIAEU">权限与本地化</strong>用现成指令 <code data-page-node-id="w7bHxXobV9LR3RPRm3a4Yn">*abpPermission</code> 和管道 <code data-page-node-id="HXq3vvSbFciVNqyrX664c6">| abpLocalization</code>，与后端权限名一一对应。</p>
+</div>
+
+<h3 data-page-node-id="KFj6WSRQbxZ6ruHCZOqJAz">7.3 Blazor：C# 写页面</h3>
+<p data-page-node-id="eCJlfRSSEbNDffE9XtRSe6">Blazor 侧页面是 <code data-page-node-id="AVF4x2D10I36SUQwDj2rTb">.razor</code>（视图）+ <code data-page-node-id="yYEGDqCKJXOD8HnjPlEjrk">.razor.cs</code>（逻辑）成对出现。基类 <code data-page-node-id="B6R15iVXCjYhNj64V2X69u">MyProjectNameComponentBase</code> 已经帮你注入了本地化、权限等常用服务。</p>
+
+<pre data-page-node-id="yVdR9qaCAj8B4HHdAnyCbq"><span class="path" data-page-node-id="goFS8fzVL1XdjAxUedjlGT">*.Blazor.Client/Pages/Products/Products.razor</span><code data-page-node-id="DhzsfZzTDApEl608RZdBar"><span class="t" data-page-node-id="EulRJKdDeLmDC1Ow4prKOH">@page</span> <span class="s" data-page-node-id="gQDUdqfiPgZcbRDUqrwjdc">"/products"</span>
+<span class="t" data-page-node-id="DitF1yU2bw3EC3fluu9828">@using</span> <span class="t" data-page-node-id="T4NkPBteeaz9iGB0fj5a1L">MyCompanyName.MyProjectName.Products</span>
+<span class="t" data-page-node-id="oQhj8IcW0boEZjtgFupG4W">@attribute</span> [<span class="t" data-page-node-id="EZbYE13VdRc3F66rBoOt4G">Authorize</span>(<span class="t" data-page-node-id="7qKqrL4WrtAD9364ttEcCp">MyProjectNamePermissions</span>.Products.Default)]
+<span class="t" data-page-node-id="aor2vr1oVFHbAj3jRk0vkl">@inherits</span> <span class="t" data-page-node-id="SSZhbn9lFWPYoawXM6Bm41">MyProjectNameComponentBase</span>
+
+&lt;<span class="t" data-page-node-id="bav5r0I4nOY12BQfIJ3H4T">h1</span>&gt;<span class="t" data-page-node-id="X8MUbBWWgCNCO0EA21Ys4L">@L</span>[<span class="s" data-page-node-id="PIChwtziKMc0ZFz5umB7HE">"Products"</span>]&lt;/<span class="t" data-page-node-id="CRzu18rVdTrc92C5QIxpwQ">h1</span>&gt;
+
+&lt;<span class="t" data-page-node-id="S2cMSanzoOYYmZHrqzRLFs">AuthorizeView</span> <span class="t" data-page-node-id="inQyVS4GoQLYaoPm95hdZZ">Policy</span>=<span class="s" data-page-node-id="MABHsTC6sddG1fGaufAWno">"@MyProjectNamePermissions.Products.Create"</span>&gt;
+  &lt;<span class="t" data-page-node-id="hV3fmCR0a2A92Py5z2gQur">Button</span> <span class="t" data-page-node-id="dGz3srLCAmY8ASWChyhrFY">Color</span>=<span class="s" data-page-node-id="9yYnOJiaZWZmtpwBvIZoru">"Color.Primary"</span> <span class="t" data-page-node-id="SlChA3CeyFmsUiGCb3CbVz">Click</span>=<span class="s" data-page-node-id="55GaRcJMsIMXwAcWjJlQFq">"@CreateAsync"</span>&gt;
+    <span class="t" data-page-node-id="qrozpFLTroEXWqhrq1a4Br">@L</span>[<span class="s" data-page-node-id="k1VpkiRbyWUEmS9MDMPLbQ">"NewProduct"</span>]
+  &lt;/<span class="t" data-page-node-id="2L5qHICSSsx0zrArme1C39">Button</span>&gt;
+&lt;/<span class="t" data-page-node-id="fTmy1B9f1YENG6RziF5BDQ">AuthorizeView</span>&gt;</code></pre>
+
+<pre data-page-node-id="zUaAEUmEZ51QThKys6GALW"><span class="path" data-page-node-id="MkrsHa2HpF2SnnxUUf9xQ1">*.Blazor.Client/Pages/Products/Products.razor.cs</span><code data-page-node-id="9ElY0sHi0Zq7guqBC093GS"><span class="k" data-page-node-id="gieQkXjLnEznU8P74MRaKo">public partial class</span> <span class="t" data-page-node-id="VCLFcRB9ANHcKgEunZl4ku">Products</span>
+{
+    <span class="k" data-page-node-id="9XfgOwarQ59shmtmY8HQDC">private readonly</span> <span class="t" data-page-node-id="1A9BolS7ckOWOcIubO2YUE">IProductAppService</span> _productAppService;
+
+    <span class="c" data-page-node-id="JDy7QAg9zpgTKxpBFQmPHY">// 注入的是【应用服务接口】，Blazor 端框架会走 HttpClient 代理</span>
+    <span class="k" data-page-node-id="a16hzhLNyc8FiT4vs2Hlzc">public</span> <span class="t" data-page-node-id="eYUppGuDcQCvzKCSsGF26i">Products</span>(<span class="t" data-page-node-id="ADGqJW7KYLgMclafoHmzMs">IProductAppService</span> productAppService)
+        =&gt; _productAppService = productAppService;
+
+    <span class="k" data-page-node-id="ulnmLAYbM7fMvhxSieU5pt">protected override async</span> <span class="t" data-page-node-id="0HbDCCEcAHZ145GBgeUe66">Task</span> <span class="t" data-page-node-id="m51yRkXPgKzxlCLOen1r97">OnInitializedAsync</span>()
+    {
+        <span class="k" data-page-node-id="yWtq7GjAieAzWZ8PdVuULm">await</span> <span class="t" data-page-node-id="3yJH0HLsFfQyxzQLwOua7y">GetProductsAsync</span>();
+        <span class="k" data-page-node-id="4DzLTEepzhPqNDQmfQMF7B">await base</span>.<span class="t" data-page-node-id="BOUh2qM4cVNQUAndX1bX1Q">OnInitializedAsync</span>();
+    }
+
+    <span class="k" data-page-node-id="TLPOH6nbBszc1P0qKzWH8U">private async</span> <span class="t" data-page-node-id="1ppoMJ6QLNpxdbasUzRqcd">Task</span> <span class="t" data-page-node-id="5AWYkxDjbFH0w1cZ5MGAEX">GetProductsAsync</span>()
+    {
+        <span class="k" data-page-node-id="J018ijtOGuaf2bQTHPwK8z">var</span> result = <span class="k" data-page-node-id="7nw6sFz3XupS21yukhZ5yn">await</span> _productAppService.<span class="t" data-page-node-id="FU0TOegGoH4VmYk8m3EATK">GetListAsync</span>(<span class="k" data-page-node-id="97sX5hAeLc3zcG5GzEESQn">new</span> <span class="t" data-page-node-id="PJPoOEEF1dryGkH9viq0D6">GetProductListDto</span>());
+    }
+}</code></pre>
+
+<pre data-page-node-id="V2ZtdNXOGACgJbln4rDrwb"><span class="path" data-page-node-id="gwhTaCVALPpchpTkG68Wl8">*.Blazor.Client/Menus/MyProjectNameMenuContributor.cs</span><code data-page-node-id="y80PtEBMC9YHOsw0cX5Mca"><span class="c" data-page-node-id="EKd4XNA8dJq7MUBEfnWz8d">// Blazor 侧菜单同样走 IMenuContributor</span>
+context.Menu.<span class="t" data-page-node-id="jBHkU4sW6L9TpC5aELxdUl">AddItem</span>(
+    <span class="k" data-page-node-id="mrZFMjlMxXDR3SdOoDmbbo">new</span> <span class="t" data-page-node-id="dgSB17JrjewvOQgvJghC3w">ApplicationMenuItem</span>(
+        <span class="s" data-page-node-id="mHKslVUn7MzfbFO4nNimw4">"Products"</span>, l[<span class="s" data-page-node-id="mWKBfd7cfin0XBNta1E2Yb">"Menu:Products"</span>], <span class="s" data-page-node-id="mwfzI21vkgkhasdkNB6r3j">"/products"</span>,
+        icon: <span class="s" data-page-node-id="8ifLXzgGFl9VFkasmL6dyV">"fa fa-box"</span>)
+    .<span class="t" data-page-node-id="15dXMJhv89zb0lHRnTWxs0">RequirePermissions</span>(<span class="t" data-page-node-id="uDgGhmeXwlcR6nnEpHiCqw">MyProjectNamePermissions</span>.Products.Default));</code></pre>
+
+<h3 data-page-node-id="UAT831JMENhvBYDqEmNii6">7.4 MVC / Razor Pages</h3>
+<p data-page-node-id="UxCuLeBeXSIfjEAanMM8fZ">最朴素的形态：<code data-page-node-id="txLHuJ0qjrUIPAztT8eexN">.cshtml.cs</code>（PageModel）拿数据，<code data-page-node-id="SRCAPfSoduFXtpqYenknil">.cshtml</code> 渲染。PageModel 基类 <code data-page-node-id="KBk8adC6VDKljFH2zxGwPm">MyProjectNamePageModel</code> 已注入本地化等能力。</p>
+
+<pre data-page-node-id="qd8locOuim7QHki84QDgcX"><span class="path" data-page-node-id="aMyaiKPyIiD4T6FpEzK3Uu">*.Web/Pages/Products/Index.cshtml.cs</span><code data-page-node-id="ET9PZtlnr5ptKhdYO3VVHX"><span class="k" data-page-node-id="iueOoEUvZJxxMbDJxYCCeS">public class</span> <span class="t" data-page-node-id="h2dGJTrJlH34urMcfApLrd">IndexModel</span> : <span class="t" data-page-node-id="UC8BbC3cpq9D0cq42Zqlje">MyProjectNamePageModel</span>
+{
+    <span class="k" data-page-node-id="uEaEKEAIB1uG1CuNvljG10">private readonly</span> <span class="t" data-page-node-id="ByrFTNcKzSvPW68RVjVQ5V">IProductAppService</span> _productAppService;
+
+    <span class="k" data-page-node-id="iDWcmrcM32lWlXu8x9aLCF">public</span> <span class="t" data-page-node-id="DY42B7DZUtxZ7Hbt0Yxb0G">IndexModel</span>(<span class="t" data-page-node-id="g5AURJupF77DCqqlLcmb1m">IProductAppService</span> productAppService)
+        =&gt; _productAppService = productAppService;
+
+    <span class="k" data-page-node-id="OPos8EoeZPlij3xlIPqc3P">public</span> <span class="t" data-page-node-id="1A9PgF4ILtiaZVASnAYr1O">IReadOnlyList</span>&lt;<span class="t" data-page-node-id="IqacpEzIuhlZOycZIbZUqU">ProductDto</span>&gt; Products { <span class="k" data-page-node-id="tJiM262blHn5RZDTSvZtE8">get</span>; <span class="k" data-page-node-id="VXd9y8aTfWhCKA8VtPr0ZX">set</span>; }
+
+    <span class="k" data-page-node-id="HyPDgZyKiij3RMoR2fKgYD">public async</span> <span class="t" data-page-node-id="4YXyouk7YqGOvyk8K35Z2m">Task</span> <span class="t" data-page-node-id="gL1Ji36Ar7OKc6nQcHCTOP">OnGetAsync</span>()
+    {
+        <span class="k" data-page-node-id="LzNwcu9doL0QOAsP7pOqAd">var</span> result = <span class="k" data-page-node-id="Gd86FVcZnLrbHqwJ5uHrMR">await</span> _productAppService.<span class="t" data-page-node-id="y1mmnUSHShDIvi8ah0yal7">GetListAsync</span>(<span class="k" data-page-node-id="tfwBpEouzv6eKLR7YbYWMT">new</span> <span class="t" data-page-node-id="KlU2AjRFowMXrdX0DcfsIW">GetProductListDto</span>());
+        Products = result.Items;
+    }
+}</code></pre>
+
+<pre data-page-node-id="hcTpiXpdNIbP0PpipH33Mx"><span class="path" data-page-node-id="EwoAfvlUxFulbD1Fsp1rHo">*.Web/Pages/Products/Index.cshtml</span><code data-page-node-id="edFHbwzaNKOjkL7xG7XXbM"><span class="t" data-page-node-id="wxN8tlgAjY4DL1lMNwWQan">@page</span>
+<span class="t" data-page-node-id="cTngt0NrBMFJGfbMPNVfj8">@model</span> <span class="t" data-page-node-id="wfhFVKSRmba5PECDn3XFFr">MyCompanyName.MyProjectName.Web.Pages.Products.IndexModel</span>
+<span class="t" data-page-node-id="hpcngy6eTACxV7LB0naC4x">@using</span> <span class="t" data-page-node-id="sAqqlWoZKMSAKaoP7Qaw1K">Microsoft.AspNetCore.Authorization</span>
+<span class="t" data-page-node-id="oyVhzWbO3idEWqp1Uq9f1H">@attribute</span> [<span class="t" data-page-node-id="Besdg5exAcm9SY3Sg8Vup5">Authorize</span>(<span class="t" data-page-node-id="6lqCsyHaTApzeSDvdOPoOE">MyProjectNamePermissions</span>.Products.Default)]
+
+&lt;<span class="t" data-page-node-id="7T9mwUjWmEYpQDtRubTsiq">abp-page-title</span>&gt;<span class="t" data-page-node-id="SSfbYOT0yNLXFKlRhhT99g">@L</span>[<span class="s" data-page-node-id="C07p38GOb2EkyTXzz3ROke">"Products"</span>]&lt;/<span class="t" data-page-node-id="crz5v2KJVBGTHT4WJyH8xo">abp-page-title</span>&gt;
+
+&lt;<span class="t" data-page-node-id="bsJEGMQSYTCRnOEmVEtimx">table</span> <span class="k" data-page-node-id="S4NfUs1hP92oqrUH8JHVHR">class</span>=<span class="s" data-page-node-id="rfCubhs5cglr5wndJhtGkY">"table"</span>&gt;
+  &lt;<span class="t" data-page-node-id="14nD4EPxa7ADL6ACwWSDHA">tbody</span>&gt;
+    <span class="t" data-page-node-id="DxAfVQetk3Gl8d8TOGhBg8">@foreach</span> (<span class="k" data-page-node-id="rhHKUMYZu2FhbrytH8FHdM">var</span> item <span class="k" data-page-node-id="LUuU0kSWdcZeqvx9lCXWzj">in</span> <span class="t" data-page-node-id="aEmLgbRUPD2cmS7BDYf2ga">Model</span>.Products)
+    {
+      &lt;<span class="t" data-page-node-id="AtPSiYxSkei1Ulp6zcsKx7">tr</span>&gt;&lt;<span class="t" data-page-node-id="3JQqdB9myqyUyRFZmuw8kA">td</span>&gt;<span class="t" data-page-node-id="xYrfLVHCC2FG8o7Sixp6m4">@item</span>.Code&lt;/<span class="t" data-page-node-id="SqnlD4xWAt8YRiEpnGkWU2">td</span>&gt;&lt;<span class="t" data-page-node-id="8hsGBxP3jlBqpVX1RRGS1T">td</span>&gt;<span class="t" data-page-node-id="erE8KVMBsOYASK8aNeHzaL">@item</span>.Name&lt;/<span class="t" data-page-node-id="ZV3o0nx9nJK4d6604rwakn">td</span>&gt;&lt;/<span class="t" data-page-node-id="di6xkZ44CGG1duStyTGKuZ">tr</span>&gt;
+    }
+  &lt;/<span class="t" data-page-node-id="CnMd1ToNtOBwK8uiVd7EGs">tbody</span>&gt;
+&lt;/<span class="t" data-page-node-id="1VQ74xUGlTygTzVCROM4sk">table</span>&gt;</code></pre>
+
+<h3 data-page-node-id="fZaycb39rjNHcl79e6qzMj">7.5 前端的通用规律（无论哪种形态）</h3>
+<ul data-page-node-id="y75Y9t6XQtq79qlJbs6nbH">
+<li data-page-node-id="KzvC21EIqjiBo4UrGgCttn"><strong data-page-node-id="GsxVZLWRU2A0Y6k9ECnHBN">页面 = 薄壳</strong>：负责展示与交互，业务规则一律在后端应用服务里。前端不重复实现校验逻辑，但要用上 DTO 上带下来的元数据做即时反馈。</li>
+<li data-page-node-id="2w2Kn8qrlxnkVVX6nZuWMI"><strong data-page-node-id="lfcDcEr2gSxZ7HiJqTHGAj">菜单与权限绑定</strong>：菜单项的 <code data-page-node-id="Xr4DFFlhM4HTzWJBPG7MHp">requiredPolicy</code> / <code data-page-node-id="KetINFe7Mzo1UpGgIapIsh">RequirePermissions</code> 必须与后端权限常量同名，否则会出现「看得见点不动」或「有权限没入口」。</li>
+<li data-page-node-id="whuamDwhAcPrd5DXUdDJ0M"><strong data-page-node-id="6hmM5q7cv7pOiSaRFHYTqp">本地化 key 复用后端资源</strong>：<code data-page-node-id="IMyUxkBB8NgHoB3E3F2SOF">::Menu:Products</code> 这类 key 最终读的还是后端 <code data-page-node-id="tPvsj7bc2RQHzPfP4OYtEO">Localization/*.json</code> 或前端 <code data-page-node-id="WrBXc5V8vSER8SsHpd9jmM">src/assets/i18n/*.json</code>，保持同一份文案来源。</li>
+<li data-page-node-id="F2qNGy3r35FlMMj29peaoE"><strong data-page-node-id="U4WgsQasQcwssX0LshKnU4">OpenAPI 是第一公民</strong>：后端一改 <code data-page-node-id="fHkoxqTZrmbDnm0bBwRkHH">Application.Contracts</code>，前端重新跑一次 <code data-page-node-id="9M6QjUNEwMMAwvOxi9K1dx">generate-proxy</code> 即可。契约层就是前后端的唯一接口。</li>
+</ul>
+
+<!-- ============================================ -->
+<h2 id="s8" data-page-node-id="rcjDvJEFgoZSnAxJAEXZEd"><span class="num" data-page-node-id="MzuJunyh0pmOMw0Wz5aImr">08</span>命名与编码约定速查</h2>
+
+<p data-page-node-id="Eh6j92ICmVeRUWHNx6pywI">以下全部摘自仓库 <code data-page-node-id="OlUMeieKbCCgzK6adw5AIG">.cursorrules</code>，是 ABP 官方的硬性规范。写代码时对着自检。</p>
+
+<table data-page-node-id="RPQH9dSumcOGBlUegYfNRL">
+<thead data-page-node-id="cxmnGTqieX6fvmCWwKPaQK"><tr data-page-node-id="rK1rcTuZQ6RSgvYsugMeCt"><th data-page-node-id="98M8PwAO5DvxHINqPAKHmm">类别</th><th data-page-node-id="72eFyM7uGH6IuMiRfV1ZhH">约定</th></tr></thead>
+<tbody data-page-node-id="fEcJsXVDBznAyHSNle4LBY">
+<tr data-page-node-id="LMiZI3Ss4dnd5ga4JarI8U"><td data-page-node-id="H0yD3u3rwMJhmNkgCGHrql">模块类</td><td data-page-node-id="grrmWwAflnsljDWDfa3sO2">每程序集恰好一个 <code data-page-node-id="LivVaEHUV8PRiyBx5OltQS">AbpModule</code>，命名 <code data-page-node-id="JSU1Lza5vAjTzDplXoMgI1">Abp[模块][层]Module</code>，用 <code data-page-node-id="wrHa7fOLXKeoDiu1cpRdT8">[DependsOn]</code> 声明依赖</td></tr>
+<tr data-page-node-id="xqLMByHEkCzdGpFhQychYA"><td data-page-node-id="AASpOOzhDumVbhqKAM6b0v">实体</td><td data-page-node-id="tXIZmEFV0mOODm0AoD6jL2">聚合根单一 <code data-page-node-id="IPzBHE8mSpUINPyrhoFgpQ">Id</code>，优先 Guid；<code data-page-node-id="GZckFmDyOaOsNigJ6dB5hw">protected</code> 无参构造器给 ORM；带参构造器强制不变量；<strong data-page-node-id="x5ZilFwoqtlLgBnsdM0p8Q">Id 不在构造器内生成</strong>；成员尽量 <code data-page-node-id="roqd90IwrrlPIRHB4zmZnF">virtual</code></td></tr>
+<tr data-page-node-id="prN7d7lP0aRliBDdcG2WHN"><td data-page-node-id="T6QMlqdu176BmKgd1dgSBs">聚合边界</td><td data-page-node-id="jJjxtvHK8970PccmdiP1Hy">保持小而精；引用其他聚合<strong data-page-node-id="M02k1WHEDccwElturV0bxH">只存 Id</strong>，不加导航属性</td></tr>
+<tr data-page-node-id="zSGZe7d72KmfrCiNxYHjhd"><td data-page-node-id="Vm57455PERk12ZeHc5BmwM">仓储</td><td data-page-node-id="sP6XHDY7EZ9O5Xj9qCTzX5">每个聚合根一个专属仓储；接口继承 <code data-page-node-id="irjUsei0cwz8Vw3lCTwPgL">IBasicRepository</code>；全异步 + <code data-page-node-id="zoNUbFaDcHsFcDNQv4iNDd">CancellationToken</code>；单条查询带 <code data-page-node-id="yBaeVlX6UPQxxy5bPJmDUw">includeDetails=true</code>，列表带 <code data-page-node-id="1CuWe6gT9OnxhBQkThrvVU">=false</code>；<strong data-page-node-id="OYHw8d6OHdHTRVvIE7C65g">对外不暴露 IQueryable</strong></td></tr>
+<tr data-page-node-id="eglPYEyn2tDvYPRwXCm2ar"><td data-page-node-id="roqdlDfr8hRhfzB0kXqYz0">领域服务</td><td data-page-node-id="ri4YYPxpHKLygdWVVRx9XK">命名 <code data-page-node-id="JAyX42CrK0h6WKUeIhHt7J">*Manager</code>；默认不建接口；只收领域对象，不收 DTO；违反规则抛 <code data-page-node-id="DzZeJ3DaCPPosOyb6kIOyn">BusinessException</code> + 命名空间错误码</td></tr>
+<tr data-page-node-id="AeQo3V2OAAP8yIZ9D3pecy"><td data-page-node-id="W7AYe197T7BdDATJLaKAoq">应用服务</td><td data-page-node-id="nUt3OtA72M1LBvFhAHyTQh">接口 <code data-page-node-id="LEFNAYmHoCaNMkABWvpskI">I*AppService</code> 继承 <code data-page-node-id="PBdrbCKEHkFrVVYCAWTdix">IApplicationService</code>；方法名不重复实体名（<code data-page-node-id="3fZ3DveEhjMrguXfzEuG88">GetAsync</code>）；<code data-page-node-id="lxzyA06AgtINcE1Bf8ebzC">GetListAsync(QueryDto)</code>；<code data-page-node-id="bEc1hC4UAzmvZNM1mSWadx">UpdateAsync(id, dto)</code>——<strong data-page-node-id="UhYGgNcDxVxdQrlC9IFmme">Id 不进 DTO</strong>；实现类方法全部 <code data-page-node-id="9RkyTs4Irf2mQWaxq3DLVw">virtual</code>；不用泛型仓储；LINQ 查询留在仓储而不在应用服务</td></tr>
+<tr data-page-node-id="dB56BgFCGKwYvIjx9qFXTM"><td data-page-node-id="iUCzpPdeaHETx8EM2BTMan">DTO</td><td data-page-node-id="wvUXWCXOZY12Z2WppSb67Y">放 <code data-page-node-id="fjhynRz3HaYqNWC4wT564F">.Contracts</code>；输入 DTO 不复用、不继承；用 DataAnnotations + 复用 <code data-page-node-id="An2T4AHCBxG4ES593dbvJb">Domain.Shared</code> 常量；输出分 Basic / Detailed 两档；<strong data-page-node-id="Rr2MTkDgRNvpBg5xDPZdo2">禁止 <code data-page-node-id="ZGy0gFOfXOEA7UQWO4vebu">[Serializable]</code></strong></td></tr>
+<tr data-page-node-id="EFnz23sNzQrHT7CkXGqBWl"><td data-page-node-id="X5ijyZKJqclNbbE7NzEMk1">EF Core</td><td data-page-node-id="lk2q5Fq1ASCXXFkUptpQjQ">每模块独立 DbContext 接口 + 实现；<strong data-page-node-id="ecnmkzaliO4FXNJGDI5PHe">禁用懒加载</strong>；DbSet 只暴露聚合根；实体配置写在 <code data-page-node-id="o0cdqaPAcG44J3l7RF4jkp">ModelBuilder</code> 扩展方法里，不写进 <code data-page-node-id="3nZh5i0vIl5vDCRnSMSuGX">OnModelCreating</code>；每个实体调 <code data-page-node-id="5uOMIFWfKQr2RC0KVdDDAE">ConfigureByConvention()</code></td></tr>
+<tr data-page-node-id="7dRdmklIWwOXUZaxVdLfvQ"><td data-page-node-id="pNlFQ7qmyCzRIHAMlCyPQO">权限</td><td data-page-node-id="qkPwJ7KHCnAJbI58ttmtum">定义在 <code data-page-node-id="04FFPeVCftcmZxhGsBUiH2">.Contracts/Permissions</code>；命名 <code data-page-node-id="CwHBjmngNiZLRoQzAV55fr">[模块].[权限]</code>；用常量不用裸字符串</td></tr>
+<tr data-page-node-id="iPSkTFcWcPUafPOQLW3tOa"><td data-page-node-id="z7qw71sPJMgEYpohLBGY33">本地化</td><td data-page-node-id="4ORWZNJwZrRfcwOWT0Mv6V">资源放 <code data-page-node-id="DdA7mi9Kn9RDO3RgC2FakS">Domain.Shared/Localization/</code>；类名 <code data-page-node-id="BNZnbHdNgy7qkTVF3aTjTl">[模块]Resource</code>；错误码命名 <code data-page-node-id="Ts2mi05Qtg9s6ZC00E8Jgh">模块:错误名</code>；用户可见文案一律本地化</td></tr>
+<tr data-page-node-id="D7JIkQI1ObdOBDhitmIFYm"><td data-page-node-id="DjvxU9cgl8fr5a61bh9aDK">事件</td><td data-page-node-id="Gvnazo6JC5mnDKm7MmGtxw">同进程用 <code data-page-node-id="pDntxtG2K3g4aB6sjSiG5Y">ILocalEventBus</code>，跨服务用 <code data-page-node-id="buNrAvY46FHan52VoXosPB">IDistributedEventBus</code>；ETO 放 <code data-page-node-id="KaPBYN0PWehxR6t7HzrQ6s">Domain.Shared</code>，命名 <code data-page-node-id="W8ZjjuF0lRvoIn0btKY0jJ">[实体][动作]Eto</code>；处理器放 Application 层</td></tr>
+<tr data-page-node-id="Slwoc6p04i8LC12DxdAis7"><td data-page-node-id="GWYzFHkwueLtGK3KfLN5QQ">测试</td><td data-page-node-id="nYmMNDdl6uyZ3bDaoP61e5">基类 <code data-page-node-id="bogWMyMU1OaKjBqay05PG1">AbpIntegratedTest&lt;T&gt;</code> / <code data-page-node-id="pw0gQaMH4bzkOWrDizgffK">AbpApplicationTestBase&lt;T&gt;</code>；断言用 <code data-page-node-id="Na83qCiTfCWA1EGrg3qv8D">Shouldly</code>；方法名 <code data-page-node-id="XI4qbmy0pkE3P4uAxMGKQh">Method_Scenario_Expected</code></td></tr>
+</tbody>
+</table>
+
+<!-- ============================================ -->
+<h2 id="s9" data-page-node-id="qh1qziKlLjLmFbm5MMQdnb"><span class="num" data-page-node-id="YN3KY2aLVIB9oZ5FjRisq6">09</span>CLI 命令与落地清单</h2>
+
+<h3 data-page-node-id="NhuwCKGQRZCaNahWwwt8hC">常用命令</h3>
+<table data-page-node-id="T4uGoMvnYTTDyCMTb0E6my">
+<thead data-page-node-id="8nDw32BGI0E3K7n9mv2p1A"><tr data-page-node-id="KsENX4V5ANXo83MtpBIf1U"><th data-page-node-id="uG0kTuqM8FCrxQnhoiiOqe">目的</th><th data-page-node-id="Oy4YMlYcz5mQGEBUDelQH0">命令</th></tr></thead>
+<tbody data-page-node-id="HzD2vf7WLz4zDu6vmitlQe">
+<tr data-page-node-id="N606DLfEMKIQKvlyWSosi3"><td data-page-node-id="xZe2PtALnivupItDlLWtcF">安装 / 更新 CLI</td><td data-page-node-id="E7hSB6pmByNmYOM4L0NsRD"><code data-page-node-id="vkAOQbUOnVCdDsPFy8wzDm">dotnet tool install -g Volo.Abp.Studio.Cli</code></td></tr>
+<tr data-page-node-id="nNd6afmTAFLfE6IGJk8U2T"><td data-page-node-id="S5i6yCddOLC7I21JMgmFJv">创建新解决方案</td><td data-page-node-id="0j2FaWaTgdyMnU9EpsaGFA"><code data-page-node-id="9mdzyAXs8MqrS1U2V3mPy1">abp new Acme.BookStore -t app</code></td></tr>
+<tr data-page-node-id="GmhuqWhcnMfJeTxRzjVpyn"><td data-page-node-id="ykPHxuoqWsZyTezbPNXr3m">创建可复用模块</td><td data-page-node-id="qwMExk7GmW43LXvjiNFpiX"><code data-page-node-id="E8Nsjz14cdEyswTelykOix">abp new Acme.IssueTracking -t module</code></td></tr>
+<tr data-page-node-id="JWnw8884LrPYVnj3k9q5zW"><td data-page-node-id="l7wFobxHUHBhrpptUQxlrm">添加模块依赖</td><td data-page-node-id="BmINYBZIMLfmP2uUFgvtDZ"><code data-page-node-id="flCDleT6vdztuCiksEiitk">abp add-package Volo.Abp.Identity.Domain</code></td></tr>
+<tr data-page-node-id="FC1GlKjh10BWhYzQXAJDpd"><td data-page-node-id="AG8GQv6ZWzm7caWxxFALzn">添加 EF 迁移</td><td data-page-node-id="FVtx16OJ7cA7e8lEqIAwF1"><code data-page-node-id="b6OuYvqBjtaNkTCDfMmEso">dotnet ef migrations add Added_Product</code></td></tr>
+<tr data-page-node-id="kpPkYaj8SpLDK9Mv3Y31OH"><td data-page-node-id="yo2t8nq5gQCb1vNVD4GOWC">更新数据库</td><td data-page-node-id="NtJnAH5wHc6kvBPDYLxCHT"><code data-page-node-id="u8kPDVNnZbCgpEUEEEEApt">dotnet ef database update</code></td></tr>
+<tr data-page-node-id="yiUvTMR8JIe8JU1zfzqtfL"><td data-page-node-id="BcXLqPXrP9hQIDTi0OHiUf">生成 Angular 代理</td><td data-page-node-id="dMvQAbmkoAedMtvt0zj8Wa"><code data-page-node-id="nDSuCnYRXH26liCoWGyOMO">abp generate-proxy -t ng -u &lt;API地址&gt;</code></td></tr>
+<tr data-page-node-id="G2oQq45QgrX84nHODL76AQ"><td data-page-node-id="gF9su1tGTDc3D6kkzZl9D6">生成 C# 客户端代理</td><td data-page-node-id="FUHqYacBgb3mLzAfmzF3CC"><code data-page-node-id="RfoGvqO6FJbxBiKIWIyi2P">abp generate-proxy -t csharp -u &lt;API地址&gt;</code></td></tr>
+</tbody>
+</table>
+
+<h3 data-page-node-id="ONNpWU29yF6z7H4O53LAAX">新增一个业务功能的落地清单</h3>
+<ol class="steps" data-page-node-id="icPOfza3pe06ddyDwtb2nI">
+<li data-page-node-id="XfBlFbA8F8qK3aa0cwxrC4"><div class="st" data-page-node-id="gBjXvVwP6NgmSBPiXUD9UU">Domain.Shared</div><div class="sd" data-page-node-id="bK8q6VgPJyf2O4qM8FlU2n">□ <code data-page-node-id="nbC4IhTISO0UJLh5WgQTDT">XxxConsts.cs</code> 常量　□ 错误码入 <code data-page-node-id="1z7856fnNcXRYrZ1IPd6TK">*DomainErrorCodes</code>　□ 多语言 JSON 补文案</div></li>
+<li data-page-node-id="rQEgFx1JD2XaXAxkPDvhXB"><div class="st" data-page-node-id="Z6AHD7oZ0nWWumNGWn1494">Domain</div><div class="sd" data-page-node-id="rccKhI1gKgZnhgodOVWSnE">□ 聚合根实体（带参 + protected 无参构造器）　□ <code data-page-node-id="n29NgV87f7wJ06e6GwGVr1">IXxxRepository</code> 接口　□（可选）<code data-page-node-id="pIcHDxGCBO5tfENlVifpR3">XxxManager</code> 领域服务</div></li>
+<li data-page-node-id="1eQn1h1hBUfhQXGYo968da"><div class="st" data-page-node-id="PEwiDalZlLxzcwskJuGMME">EntityFrameworkCore</div><div class="sd" data-page-node-id="XSTFjmPpzUlwWA3ZIU3jTw">□ DbContext 加 <code data-page-node-id="P2m2LFIm7vkuNyRfkbLnwf">DbSet</code>　□ <code data-page-node-id="JBQapet0YeVsXEpkDaX1rM">ConfigureXxx()</code> 配映射与索引　□ <code data-page-node-id="btzDjJjwh78Dw7asurfjsS">EfCoreXxxRepository</code> 实现　□ 生成并应用迁移</div></li>
+<li data-page-node-id="vMFxpaNA6lWPgal1rd8UbJ"><div class="st" data-page-node-id="D7tiCn2JXRt9LHqdiaaOhO">Application.Contracts</div><div class="sd" data-page-node-id="WZOdLMT51DMX136aV0jF3K">□ <code data-page-node-id="vXZVH47qu8Da5zxY2OAdeK">XxxDto</code> / <code data-page-node-id="iaPiAJwqdWbYDkuNdfkvZC">CreateXxxDto</code> / <code data-page-node-id="JArBFGK8IhNzPTXiW30e9D">UpdateXxxDto</code> / <code data-page-node-id="xCEcXUn4RIeNozQHlG3NtZ">GetXxxListDto</code>　□ <code data-page-node-id="TzIjXJaU5G7BOjk0qFfxDp">IXxxAppService</code>　□ 权限常量与 <code data-page-node-id="wCwOmqstH73DcTheTzzkzq">PermissionDefinitionProvider</code></div></li>
+<li data-page-node-id="ApIt8WVgiHqIXrwlnNEEje"><div class="st" data-page-node-id="jnRCqRbPgedosRVVaPBarB">Application</div><div class="sd" data-page-node-id="CRJxkb1QXCdY05GHsEdJJg">□ <code data-page-node-id="eoaUoflzNKMXXW3HvVclLe">XxxAppService</code> 实现　□ Mapper 映射配置　□ 需要时加权限校验 / 业务异常 / 事件发布</div></li>
+<li data-page-node-id="MSQfVMVPKGxVqAbd02cC0P"><div class="st" data-page-node-id="3yCjQ7SaEQF9uJhDiEexON">HttpApi</div><div class="sd" data-page-node-id="jZBQTWIgdT5encxSt96v4J">□ <code data-page-node-id="9tvkAfxMS2LKRBi4TbF6Dd">XxxController</code>（薄适配器，注入接口）</div></li>
+<li data-page-node-id="ccDmX6MJqxjkVDA5UZsBeB"><div class="st" data-page-node-id="4pXiDxDnHARiPIy4JWZBte">前端</div><div class="sd" data-page-node-id="C0QwJKVcB0bIXzX9zhiBru">□ 跑 <code data-page-node-id="WGx5qUI5JFGTM41kREKVWc">generate-proxy</code>　□ 建页面目录与组件　□ 注册路由与菜单（带权限）　□ 写列表 / 编辑交互</div></li>
+<li data-page-node-id="w00txRBwEtL4wZwnKR4DSk"><div class="st" data-page-node-id="iNknYVjxIgGK5yQXSWgnmC">测试与收尾</div><div class="sd" data-page-node-id="K9ZyAF1mZ8eOTTxmURWYWD">□ 为应用服务补集成测试　□ 检查分层依赖未越界　□ 本地化文案完整</div></li>
+</ol>
+
+<div class="callout tip" data-page-node-id="tF0HJldFH1gzigR20naqzf">
+<p data-page-node-id="gQGHNPqiEQrjeX0nVlF8xk"><strong data-page-node-id="a5mhI4NdutoEg7CTyWnLPz">想快速验证自己是否理解到位：</strong>拿框架自带的 <code data-page-node-id="lroZXMF1aDXtuQ3EPjU6Lm">modules/blogging</code> 模块对照第 6 节读一遍——<code data-page-node-id="HxuWsdLA1MKzeei7Da7UW4">Post.cs</code>（实体）→ <code data-page-node-id="XLkyA4rDpONqFFZHhhUfVR">IPostRepository</code> → <code data-page-node-id="M2YWlpE92sjm241TB5WLjg">EfCorePostRepository</code> → <code data-page-node-id="G6F7X1vsuvmmlD8iLXoEBd">PostWithDetailsDto</code> → <code data-page-node-id="WsaTuSGQOGIrZrvf7BbjvQ">IPostAppService</code> → <code data-page-node-id="mQPzhy3zdJgbSgwvHzdBF1">PostAppService</code> → <code data-page-node-id="HDp9CTTvSeAbXgE17rtKFd">PostsController</code>，这是一条完整的教科书级链路。</p>
+</div>
+
+<div class="foot" data-page-node-id="Nm9LbmFPR4kHtFHZADr4vZ">
+本文基于仓库 <code data-page-node-id="w3vEHNSzuxsA7mkV0RrAP5">ABP-Framework-rel-10.6</code> 源码实地读取生成。所有代码片段均为按框架真实约定的可编译范式，路径规律与 <code data-page-node-id="1eDsU650yr18RxxTByzvdr">templates/</code>、<code data-page-node-id="kezHClRY8THzkvbi5OTC8A">modules/blogging</code>、<code data-page-node-id="EpH866IOXpIxeoFlC7SlBL">.cursorrules</code> 一一对应。
+</div>
+
+</div>
+</body>
+</html>

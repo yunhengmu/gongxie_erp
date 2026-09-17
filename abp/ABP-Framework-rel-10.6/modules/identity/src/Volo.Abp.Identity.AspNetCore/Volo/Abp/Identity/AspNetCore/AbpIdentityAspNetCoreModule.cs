@@ -1,0 +1,73 @@
+using System;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Volo.Abp.Modularity;
+using static Volo.Abp.Identity.AspNetCore.AbpSecurityStampValidatorCallback;
+
+namespace Volo.Abp.Identity.AspNetCore;
+
+[DependsOn(
+    typeof(AbpIdentityDomainModule)
+    )]
+public class AbpIdentityAspNetCoreModule : AbpModule
+{
+    public override void PreConfigureServices(ServiceConfigurationContext context)
+    {
+        PreConfigure<IdentityBuilder>(builder =>
+        {
+            builder
+                .AddDefaultTokenProviders()
+                .AddTokenProvider<AbpDefaultTokenProvider>(TokenOptions.DefaultProvider)
+                .AddTokenProvider<LinkUserTokenProvider>(LinkUserTokenProviderConsts.LinkUserTokenProviderName)
+                .AddTokenProvider<AbpPasswordResetTokenProvider>(AbpPasswordResetTokenProvider.ProviderName)
+                .AddTokenProvider<AbpEmailConfirmationTokenProvider>(AbpEmailConfirmationTokenProvider.ProviderName)
+                .AddTokenProvider<AbpChangeEmailTokenProvider>(AbpChangeEmailTokenProvider.ProviderName)
+                .AddTokenProvider<AbpEmailTwoFactorTokenProvider>(TokenOptions.DefaultEmailProvider)
+                .AddTokenProvider<AbpPhoneNumberTwoFactorTokenProvider>(TokenOptions.DefaultPhoneProvider)
+                .AddSignInManager<AbpSignInManager>()
+                .AddUserValidator<AbpIdentityUserValidator>();
+        });
+    }
+
+    public override void ConfigureServices(ServiceConfigurationContext context)
+    {
+        Configure<IdentityOptions>(options =>
+        {
+            options.Tokens.PasswordResetTokenProvider = AbpPasswordResetTokenProvider.ProviderName;
+            options.Tokens.EmailConfirmationTokenProvider = AbpEmailConfirmationTokenProvider.ProviderName;
+            options.Tokens.ChangeEmailTokenProvider = AbpChangeEmailTokenProvider.ProviderName;
+        });
+
+        //(TODO: Extract an extension method like IdentityBuilder.AddAbpSecurityStampValidator())
+        context.Services.AddScoped<AbpSecurityStampValidator>();
+        context.Services.AddScoped(typeof(SecurityStampValidator<IdentityUser>), provider => provider.GetService(typeof(AbpSecurityStampValidator)));
+        context.Services.AddScoped(typeof(ISecurityStampValidator), provider => provider.GetService(typeof(AbpSecurityStampValidator)));
+
+        var options = context.Services.ExecutePreConfiguredActions(new AbpIdentityAspNetCoreOptions());
+
+        if (options.ConfigureAuthentication)
+        {
+            context.Services
+                .AddAuthentication(o =>
+                {
+                    o.DefaultScheme = IdentityConstants.ApplicationScheme;
+                    o.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+                })
+                .AddIdentityCookies();
+        }
+    }
+
+    public override void PostConfigureServices(ServiceConfigurationContext context)
+    {
+        // Replace the default UserValidator with AbpIdentityUserValidator
+        context.Services.RemoveAll(x => x.ServiceType == typeof(IUserValidator<IdentityUser>) && x.ImplementationType == typeof(UserValidator<IdentityUser>));
+        context.Services.AddAbpOptions<SecurityStampValidatorOptions>()
+            .Configure<IServiceProvider>((securityStampValidatorOptions, serviceProvider) =>
+            {
+                var abpRefreshingPrincipalOptions = serviceProvider.GetRequiredService<IOptions<AbpRefreshingPrincipalOptions>>().Value;
+                securityStampValidatorOptions.UpdatePrincipal(abpRefreshingPrincipalOptions);
+            });
+    }
+}

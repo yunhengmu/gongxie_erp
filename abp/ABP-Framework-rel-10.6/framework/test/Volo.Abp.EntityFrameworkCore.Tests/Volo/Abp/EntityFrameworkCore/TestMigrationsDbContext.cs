@@ -1,0 +1,178 @@
+using System;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Volo.Abp.EntityFrameworkCore.Modeling;
+using Volo.Abp.EntityFrameworkCore.TestApp.SecondContext;
+using Volo.Abp.EntityFrameworkCore.TestApp.ThirdDbContext;
+using Volo.Abp.TestApp.Domain;
+using Volo.Abp.TestApp.Testing;
+
+namespace Volo.Abp.EntityFrameworkCore;
+
+public class TestMigrationsDbContext : AbpDbContext<TestMigrationsDbContext>
+{
+    public DbSet<Person> People { get; set; }
+
+    public DbSet<City> Cities { get; set; }
+
+    public DbSet<ThirdDbContextDummyEntity> DummyEntities { get; set; }
+
+    public DbSet<BookInSecondDbContext> Books { get; set; }
+
+    public DbSet<EntityWithIntPk> EntityWithIntPks { get; set; }
+
+    public DbSet<Author> Author { get; set; }
+
+    public DbSet<Product> Products { get; set; }
+
+    public DbSet<Category> Categories { get; set; }
+
+    public DbSet<EntityWithCustomSoftDeleteColumn> EntityWithCustomSoftDeleteColumns { get; set; }
+
+    public DbSet<EntityWithCustomTenantIdColumn> EntityWithCustomTenantIdColumns { get; set; }
+
+    public DbSet<EntityWithIntSoftDelete> EntityWithIntSoftDeletes { get; set; }
+
+    public DbSet<AppEntityWithNavigations> AppEntityWithNavigations { get; set; }
+    public DbSet<AppEntityWithNavigationChildOneToMany> AppEntityWithNavigationChildOneToMany { get; set; }
+
+    public DbSet<AppEntityWithNavigationsForeign> AppEntityWithNavigationsForeign { get; set; }
+
+    public DbSet<Blog> Blogs { get; set; }
+    public DbSet<BlogPost> BlogPosts { get; set; }
+
+    public DbSet<TestSharedEntity> TestSharedEntity => Set<TestSharedEntity>("TestSharedEntity1");
+    public DbSet<TestSharedEntity> TestSharedEntity2 => Set<TestSharedEntity>("TestSharedEntity2");
+
+    public TestMigrationsDbContext(DbContextOptions<TestMigrationsDbContext> options)
+        : base(options)
+    {
+
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // Owned and SharedTypeEntity should be configured before the base OnModelCreating call
+
+        modelBuilder.Owned<District>();
+
+        Action<EntityTypeBuilder<TestSharedEntity>> sharedEntityBuildAction = b =>
+        {
+            b.ConfigureByConvention();
+            b.Property(x => x.Id);
+            b.Property(x => x.TenantId);
+            b.Property(x => x.IsDeleted);
+            b.Property(x => x.Name);
+            b.Property(x => x.Age);
+            b.Property(x => x.Birthday);
+
+            b.Property<string>("DynamicProperty");
+        };
+        modelBuilder.SharedTypeEntity("TestSharedEntity1", sharedEntityBuildAction);
+        modelBuilder.SharedTypeEntity("TestSharedEntity2", sharedEntityBuildAction);
+
+        base.OnModelCreating(modelBuilder);
+
+        // Mirror the column renames in TestAppDbContext so the generated SQLite schema matches.
+        modelBuilder.Entity<EntityWithCustomSoftDeleteColumn>(b =>
+        {
+            b.Property(x => x.IsDeleted).HasColumnName(EntityWithCustomSoftDeleteColumn.IsDeletedColumnName);
+        });
+
+        modelBuilder.Entity<EntityWithCustomTenantIdColumn>(b =>
+        {
+            b.Property(x => x.TenantId).HasColumnName(EntityWithCustomTenantIdColumn.TenantIdColumnName);
+        });
+
+        modelBuilder.Entity<Phone>(b =>
+        {
+            b.HasKey(p => new { p.PersonId, p.Number });
+        });
+
+        modelBuilder.Entity<Person>(b =>
+        {
+            b.Property(x => x.LastActiveTime).ValueGeneratedOnAddOrUpdate().HasDefaultValue(DateTime.Now);
+            b.Property(x => x.HasDefaultValue).HasDefaultValue(DateTime.Now);
+            b.Property(x => x.TenantId).HasColumnName("Tenant_Id");
+            b.Property(x => x.IsDeleted).HasColumnName("Is_Deleted");
+            b.ComplexProperty(x => x.ContactInformation, cb =>
+            {
+                cb.Property(x => x.Street).IsRequired();
+                cb.ComplexProperty(x => x.Location, locationBuilder =>
+                {
+                    locationBuilder.Property(x => x.City).IsRequired();
+                });
+            });
+        });
+
+        modelBuilder.Entity<City>(b =>
+        {
+            b.OwnsMany(c => c.Districts, d =>
+            {
+                d.WithOwner().HasForeignKey(x => x.CityId);
+                d.HasKey(x => new { x.CityId, x.Name });
+            });
+        });
+
+        modelBuilder.Entity<Product>();
+
+        modelBuilder.Entity<Category>(b =>
+        {
+            b.HasAbpQueryFilter(e => e.Name.StartsWith("abp"));
+        });
+
+        modelBuilder.Entity<EntityWithIntSoftDelete>(b =>
+        {
+            b.Property(x => x.IsDeleted)
+                .HasColumnName(EntityWithIntSoftDelete.IsDeletedColumnName)
+                .HasConversion(
+                    v => v ? EntityWithIntSoftDelete.DeletedProviderValue : EntityWithIntSoftDelete.NotDeletedProviderValue,
+                    i => i == EntityWithIntSoftDelete.DeletedProviderValue);
+        });
+
+        modelBuilder.Entity<AppEntityWithNavigations>(b =>
+        {
+            b.ConfigureByConvention();
+            b.OwnsOne(x => x.AppEntityWithValueObjectAddress);
+            b.HasOne(x => x.OneToOne).WithOne().HasForeignKey<AppEntityWithNavigationChildOneToOne>(x => x.Id);
+            b.HasMany(x => x.OneToMany).WithOne().HasForeignKey(x => x.AppEntityWithNavigationId);
+            b.HasMany(x => x.ManyToMany).WithMany(x => x.ManyToMany).UsingEntity<AppEntityWithNavigationsAndAppEntityWithNavigationChildManyToMany>();
+        });
+
+        modelBuilder.Entity<AppEntityWithNavigationsForeign>(b =>
+        {
+            b.ConfigureByConvention();
+            b.HasMany(x => x.OneToMany).WithOne().HasForeignKey(x => x.AppEntityWithNavigationForeignId);
+        });
+
+        modelBuilder.Entity<AppEntityWithNavigationChildOneToOne>(b =>
+        {
+            b.ConfigureByConvention();
+            b.HasOne(x => x.OneToOne).WithOne().HasForeignKey<AppEntityWithNavigationChildOneToOneAndOneToOne>(x => x.Id);
+        });
+
+        modelBuilder.Entity<AppEntityWithNavigationChildOneToMany>(b =>
+        {
+            b.ConfigureByConvention();
+            b.HasMany(x => x.OneToMany).WithOne().HasForeignKey(x => x.AppEntityWithNavigationChildOneToManyId);
+        });
+
+        modelBuilder.Entity<AppEntityWithNavigationsForeign>(b =>
+        {
+            b.ConfigureByConvention();
+        });
+
+        modelBuilder.Entity<Blog>(b =>
+        {
+            b.ConfigureByConvention();
+            b.HasMany(bp => bp.BlogPosts)
+                .WithOne(bp => bp.Blog)
+                .HasForeignKey(bp => bp.BlogId);
+        });
+
+        modelBuilder.Entity<BlogPost>(b =>
+        {
+            b.ConfigureByConvention();
+        });
+    }
+}

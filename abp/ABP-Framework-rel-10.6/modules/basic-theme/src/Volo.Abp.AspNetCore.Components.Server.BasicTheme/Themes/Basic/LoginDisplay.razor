@@ -1,0 +1,47 @@
+﻿@namespace Volo.Abp.AspNetCore.Components.Server.BasicTheme.Themes.Basic
+@using Volo.Abp.Users
+@using Volo.Abp.MultiTenancy
+@using Volo.Abp.UI.Navigation
+@using Microsoft.Extensions.Localization
+@using global::Localization.Resources.AbpUi
+@inject ICurrentUser CurrentUser
+@inject ICurrentTenant CurrentTenant
+@inject IJSRuntime JsRuntime
+@inject NavigationManager Navigation
+@inject IStringLocalizer<AbpUiResource> L
+<AuthorizeView>
+    <Authorized>
+        <Dropdown EndAligned="true">
+            <DropdownToggle Color="Color.Default">
+                @if (CurrentTenant.Name != null)
+                {
+                    <span><i>@CurrentTenant.Name</i>\@CurrentUser.UserName</span>
+                }
+                else
+                {
+                    <span>@CurrentUser.UserName</span>
+                }
+            </DropdownToggle>
+            <DropdownMenu>
+                @if (Menu != null)
+                {
+                    @foreach (var menuItem in Menu.Items)
+                    {
+                        var componentType = menuItem.GetComponentTypeOrDefault();
+                        if (componentType != null)
+                        {
+                            <DynamicComponent Type="@componentType" />
+                        }
+                        else
+                        {
+                            <a class="dropdown-item" href="@menuItem.Url?.TrimStart('/', '~')" target="@menuItem.Target">@menuItem.DisplayName</a>
+                        }
+                    }
+                }
+            </DropdownMenu>
+        </Dropdown>
+    </Authorized>
+    <NotAuthorized>
+        <a class="nav-link" href="@GetLoginUrl()">@L["Login"]</a>
+    </NotAuthorized>
+</AuthorizeView>

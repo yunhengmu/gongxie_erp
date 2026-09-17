@@ -1,0 +1,64 @@
+import {ChangeDetectorRef, Component, inject, input, ChangeDetectionStrategy,} from '@angular/core';
+import { ControlValueAccessor } from '@angular/forms';
+
+// Not an abstract class on purpose. Do not change!
+@Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: '',
+})
+export class AbstractNgModelComponent<T = any, U = T> implements ControlValueAccessor {
+  protected _value!: T;
+  protected cdRef = inject(ChangeDetectorRef);
+  onChange?: (value: T) => void;
+  onTouched?: () => void;
+
+  // Note: disabled needs to remain as a regular property because setDisabledState assigns to it
+  disabled?: boolean;
+
+  readonly readonly = input<boolean | undefined>(undefined);
+
+  readonly valueFn = input<(value: U, previousValue?: T) => T>(value => value as any as T);
+
+  readonly valueLimitFn = input<(value: T, previousValue?: T) => any>(value => false);
+
+  // Note: value needs getter/setter for ControlValueAccessor and two-way binding
+  set value(value: T) {
+    value = this.valueFn()(value as any as U, this._value);
+
+    if (this.valueLimitFn()(value, this._value) !== false || this.readonly()) return;
+
+    this._value = value;
+    this.notifyValueChange();
+  }
+
+  get value(): T {
+    return this._value || this.defaultValue;
+  }
+
+  get defaultValue(): T {
+    return this._value;
+  }
+
+  notifyValueChange(): void {
+    if (this.onChange) {
+      this.onChange(this.value);
+    }
+  }
+
+  writeValue(value: T): void {
+    this._value = this.valueLimitFn()(value, this._value) || value;
+    this.cdRef.markForCheck();
+  }
+
+  registerOnChange(fn: any): void {
+    this.onChange = fn;
+  }
+
+  registerOnTouched(fn: any): void {
+    this.onTouched = fn;
+  }
+
+  setDisabledState(isDisabled: boolean): void {
+    this.disabled = isDisabled;
+  }
+}

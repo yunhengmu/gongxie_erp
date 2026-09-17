@@ -1,0 +1,23 @@
+<Solution>
+    <Configurations>
+        <Platform Name="Any CPU" />
+    </Configurations>
+    <Folder Name="/src/">
+        <Project Path="src/Acme.Learn.Domain/Acme.Learn.Domain.csproj" />
+        <Project Path="src/Acme.Learn.Application/Acme.Learn.Application.csproj" />
+        <Project Path="src/Acme.Learn.EntityFrameworkCore/Acme.Learn.EntityFrameworkCore.csproj" />
+        <Project Path="src/Acme.Learn.Domain.Shared/Acme.Learn.Domain.Shared.csproj" />
+        <Project Path="src/Acme.Learn.Application.Contracts/Acme.Learn.Application.Contracts.csproj" />
+        <Project Path="src/Acme.Learn.HttpApi/Acme.Learn.HttpApi.csproj" />
+        <Project Path="src/Acme.Learn.HttpApi.Client/Acme.Learn.HttpApi.Client.csproj" />
+        <Project Path="src/Acme.Learn.HttpApi.Host/Acme.Learn.HttpApi.Host.csproj" />
+        <Project Path="src/Acme.Learn.DbMigrator/Acme.Learn.DbMigrator.csproj" />
+    </Folder>
+    <Folder Name="/test/">
+        <Project Path="test/Acme.Learn.Application.Tests/Acme.Learn.Application.Tests.csproj" />
+        <Project Path="test/Acme.Learn.EntityFrameworkCore.Tests/Acme.Learn.EntityFrameworkCore.Tests.csproj" />
+        <Project Path="test/Acme.Learn.TestBase/Acme.Learn.TestBase.csproj" />
+        <Project Path="test/Acme.Learn.Domain.Tests/Acme.Learn.Domain.Tests.csproj" />
+        <Project Path="test/Acme.Learn.HttpApi.Client.ConsoleTestApp/Acme.Learn.HttpApi.Client.ConsoleTestApp.csproj" />
+    </Folder>
+</Solution>

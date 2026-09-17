@@ -1,0 +1,63 @@
+.card-body img {
+    max-width: 100%;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+.badge.badge-light {
+    color: #757575;
+    background: #f2f2f2;
+}
+
+.reaction-in-comment span.area-title {
+    display: none;
+}
+
+span.area-title {
+    font-weight: 600;
+    padding: 3px;
+    display: block;
+}
+.popover {
+    min-width: 276px;
+}
+
+.card-img-ratio {
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+}
+
+#scroll-index {
+    position: sticky;
+    top: 20px;
+}
+
+#scroll-index .scroll-top-btn.showup{
+    display: block;
+}
+
+#scroll-index .scroll-top-btn{
+    display: none;
+    font-size: .85em;
+    color: #aaa;
+    text-decoration: none;
+    padding-left: 18px;
+}
+
+.blockquote, blockquote{
+    display: block;
+    padding: 1em 1.5em;
+    border-radius: 8px;
+    background: rgba(58, 130, 246, 0.1);
+    font-size: 1.125rem;
+}
+
+code.hljs{
+    border-radius: 8px;
+    background: rgba(247, 37, 133, 0.1);
+}
+
+pre code.hljs{
+    background: rgba(0, 0, 0, 0.1);
+    padding: 1em 1.5em;
+}

@@ -1,0 +1,45 @@
+﻿@page "/cmskit/page"
+
+@addTagHelper *, Volo.Abp.AspNetCore.Mvc.UI.Bootstrap
+@using Volo.Abp.AspNetCore.Mvc.UI.Theming
+@using Volo.CmsKit.Contents
+@using Volo.CmsKit.Public.Web.Pages.CmsKit.Shared.Layouts
+@using Volo.CmsKit.Web.Pages.CmsKit.Components.Contents
+@model Volo.CmsKit.Public.Web.Pages.Public.CmsKit.Pages.IndexModel
+@inject ITheme ThemeManager
+
+@{
+    Layout = ThemeManager.GetLayoutByKey(Model.ViewModel.LayoutName);
+}
+
+@section styles{
+    
+    <abp-style src="/Pages/Public/CmsKit/Pages/index.css" />
+    @if (!Model.ViewModel.Style.IsNullOrEmpty())
+    {
+        <style>
+            @Html.Raw(Model.ViewModel.Style)
+        </style>
+    }
+}
+
+@section scripts{
+    @if (!Model.ViewModel.Script.IsNullOrEmpty())
+    {
+        <script>
+            @Html.Raw(Model.ViewModel.Script)
+        </script>
+    }
+}
+
+<abp-card>
+    <abp-card-body>
+        @(await Component.InvokeAsync(typeof(ContentFragmentViewComponent), new DefaultContentDto
+        {
+            ContentFragments = Model.ViewModel.ContentFragments,
+            PreventXSS = false,
+            AllowHtmlTags = true,
+        }))
+    </abp-card-body>
+</abp-card>
+

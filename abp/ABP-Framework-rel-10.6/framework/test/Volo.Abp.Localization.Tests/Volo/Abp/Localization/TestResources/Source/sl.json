@@ -1,0 +1,16 @@
+{
+  "culture": "sl",
+  "texts": {
+    "Hello <b>{0}</b>.": "Pozdravljeni, <b>{0}</b>.",
+    "Car": "Avto",
+    "CarPlural": "Avtomobili",
+    "MaxLenghtErrorMessage": "Dolžina tega polja je lahko največ »{0}« znakov",
+    "Universe": "Vesolje",
+    "FortyTwo": "42",
+    "Enum:BookType.Undefined": "Nedoločeno",
+    "Enum:BookType.0": "Nedefinirano z vrednostjo 0",
+    "BookType.Adventure": "Pustolovščina",
+    "BookType.1": "Pustolovščina z vrednostjo 1",
+    "Biography": "Biografija"
+  }
+}

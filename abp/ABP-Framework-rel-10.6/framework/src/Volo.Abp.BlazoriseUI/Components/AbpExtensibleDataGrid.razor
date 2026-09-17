@@ -1,0 +1,163 @@
+﻿@typeparam TItem
+@using Blazorise.DataGrid;
+@using Volo.Abp.Data
+
+<DataGrid TItem="TItem"
+          Data="@Data"
+          ReadData="@ReadData"
+          TotalItems="@TotalItems"
+          ShowPager="@ShowPager"
+          Page="@CurrentPage"
+          PageSize="@PageSize"
+          Responsive="@Responsive"
+          Striped
+          Class="@Class">
+    <LoadingTemplate>
+        <Row Class="w-100 align-items-center" Style="height: 150px;">
+            <Column>
+               <RadarSpinner />
+            </Column>
+        </Row>
+    </LoadingTemplate>
+    <EmptyTemplate>
+        <Row Class="w-100 align-items-center" Style="height: 150px;">
+            <Column>
+                <Heading Size="HeadingSize.Is4" TextAlignment="TextAlignment.Center">@UiLocalizer["NoDataAvailableInDatatable"]</Heading>
+            </Column>
+        </Row>
+    </EmptyTemplate>
+    <DataGridColumns>
+        @if (Columns != null)
+        {
+            @foreach (var column in Columns)
+            {
+                if (column.Actions.Any())
+                {
+                    var entityActionType = column.Actions.Count == 1 ? ActionType.Button : ActionType.Dropdown;
+                    <DataGridEntityActionsColumn TItem="TItem" @ref="ActionColumns[column.Title]" Caption="@column.Title">
+                        <DisplayTemplate>
+                            <EntityActions Type="entityActionType" TItem="TItem" EntityActionsColumn="ActionColumns[column.Title]">
+                                @foreach (var action in column.Actions)
+                                {
+                                    if (action.ConfirmationMessage != null)
+                                    {
+                                        <EntityAction TItem="TItem"
+                                                      Color="@(action.Color != null ? (Blazorise.Color)action.Color : Blazorise.Color.Primary)"
+                                                      Icon="@action.Icon"
+                                                      Clicked="async () => await action.Clicked(context.Item!)"
+                                                      ConfirmationMessage="() => action.ConfirmationMessage.Invoke(context.Item!)"
+                                                      Visible="@(action.Visible != null ? action.Visible(context.Item!) : true)"
+                                                      Text="@action.Text"
+                                                      Disabled="@action.Disabled">
+                                        </EntityAction>
+                                    }
+                                    else
+                                    {
+                                        <EntityAction TItem="TItem"
+                                                      Clicked="async () => await action.Clicked(context.Item!)"
+                                                      Color="@(action.Color != null ? (Blazorise.Color)action.Color : Blazorise.Color.Primary)"
+                                                      Icon="@action.Icon"
+                                                      Visible="@(action.Visible != null ? action.Visible(context.Item!) : true)"
+                                                      Text="@action.Text"
+                                                      Disabled="@action.Disabled">
+                                        </EntityAction>
+                                    }
+                                }
+                            </EntityActions>
+                        </DisplayTemplate>
+                    </DataGridEntityActionsColumn>
+                }
+                else
+                {
+                    @if (column.Component != null)
+                    {
+                        @if (column.ValueConverter == null)
+                        {
+                            <DataGridColumn TItem="TItem" Field="@column.Data" Width="@BlazoriseFluentSizingParse.Parse(column.Width, SizingType.Width)" Caption="@column.Title" Sortable="@column.Sortable" DisplayFormat="@column.DisplayFormat" DisplayFormatProvider="@column.DisplayFormatProvider" Displayable="column.Visible" >
+                                <DisplayTemplate>
+                                    @RenderCustomTableColumnComponent(column.Component, context.Item!)
+                                </DisplayTemplate>
+                            </DataGridColumn>
+                        }
+                        else
+                        {
+                            <DataGridColumn TItem="TItem" Field="@column.Data" Width="@BlazoriseFluentSizingParse.Parse(column.Width, SizingType.Width)"  Caption="@column.Title" Sortable="@column.Sortable" Displayable="column.Visible">
+                                <DisplayTemplate>
+                                    @RenderCustomTableColumnComponent(column.Component, context.Item!)
+                                </DisplayTemplate>
+                            </DataGridColumn>
+                        }
+                    }
+                    else
+                    {
+                        if (!ExtensionPropertiesRegex.IsMatch(column.Data))
+                        {
+                            @if (column.ValueConverter == null && !IsDateTimeColumn(column))
+                            {
+                                <DataGridColumn TItem="TItem"
+                                                Field="@column.Data"
+                                                Width="@BlazoriseFluentSizingParse.Parse(column.Width, SizingType.Width)"
+                                                Caption="@column.Title"
+                                                Sortable="@column.Sortable"
+                                                DisplayFormat="@column.DisplayFormat"
+                                                DisplayFormatProvider="@column.DisplayFormatProvider"
+                                                Displayable="column.Visible"/>
+                            }
+                            else
+                            {
+                                <DataGridColumn TItem="TItem"
+                                                Field="@column.Data"
+                                                Width="@BlazoriseFluentSizingParse.Parse(column.Width, SizingType.Width)"
+                                                Caption="@column.Title"
+                                                Sortable="@column.Sortable"
+                                                Displayable="column.Visible">
+                                    <DisplayTemplate>
+                                        @((MarkupString)GetConvertedFieldValue(context.Item, column))
+                                    </DisplayTemplate>
+                                </DataGridColumn>
+                            }
+                        }
+                        else
+                        {
+                            <DataGridColumn TItem="TItem" Field="@nameof(IHasExtraProperties.ExtraProperties)" SortField="@column.PropertyName" Width="@BlazoriseFluentSizingParse.Parse(column.Width, SizingType.Width)" Caption="@column.Title" Displayable="column.Visible" Sortable="@column.Sortable">
+                                <DisplayTemplate Context="rowContext">
+                                    @{
+                                        var entity = rowContext.Item as IHasExtraProperties;
+                                        var propertyName = ExtensionPropertiesRegex.Match(column.Data).Groups[1].Value;
+                                        var propertyValue = entity?.GetProperty(propertyName);
+                                        if (propertyValue != null && propertyValue.GetType() == typeof(bool))
+                                        {
+                                            if ((bool) propertyValue)
+                                            {
+                                                <Icon class="text-success" Name="IconName.Check"/>
+                                            }
+                                            else
+                                            {
+                                                <Icon class="text-danger" Name="IconName.Times"/>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if (column.ValueConverter != null)
+                                            {
+                                                @((MarkupString)GetConvertedFieldValue(rowContext.Item, column))
+                                            }
+                                            else
+                                            {
+                                                @((MarkupString)GetConvertedFieldValue(propertyValue, column))
+                                            }
+                                        }
+                                    }
+                                </DisplayTemplate>
+                            </DataGridColumn>
+                        }
+                    }
+                }
+            }
+        }
+        @if (!AutoGenerateColumns)
+        {
+            <DataGridColumn Displayable="false"/>
+        }
+    </DataGridColumns>
+</DataGrid>

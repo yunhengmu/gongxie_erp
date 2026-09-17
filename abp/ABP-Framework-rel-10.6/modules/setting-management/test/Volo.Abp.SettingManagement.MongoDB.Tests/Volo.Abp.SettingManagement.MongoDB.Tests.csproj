@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Volo.Abp.SettingManagement.MongoDB.Tests</AssemblyName>
+    <PackageId>Volo.Abp.SettingManagement.MongoDB.Tests</PackageId>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+    <RootNamespace />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Volo.Abp.SettingManagement.MongoDB\Volo.Abp.SettingManagement.MongoDB.csproj" />
+    <ProjectReference Include="..\Volo.Abp.SettingManagement.TestBase\Volo.Abp.SettingManagement.TestBase.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="MongoSandbox.Core" />
+    <PackageReference Include="MongoSandbox8.runtime.linux-x64" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
+    <PackageReference Include="MongoSandbox8.runtime.osx-arm64" Condition="$([MSBuild]::IsOSPlatform('OSX'))" />
+    <PackageReference Include="MongoSandbox8.runtime.win-x64" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+  </ItemGroup>
+
+</Project>

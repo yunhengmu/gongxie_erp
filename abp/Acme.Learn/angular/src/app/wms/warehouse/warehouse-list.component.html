@@ -1,0 +1,59 @@
+<!-- 页面根容器：Bootstrap 的卡片。LeptonX 主题就是 Bootstrap，.card 直接有样式 -->
+<div class="card">
+
+  <!-- 卡片头部：左边标题，右边按钮。d-flex/justify-content-between 是 Bootstrap 的弹性布局工具类，
+       等价于 CSS 的 display:flex + justify-content:space-between -->
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h5 class="mb-0">仓库列表</h5>
+    <button class="btn btn-primary btn-sm" type="button">
+      <!-- fa-plus 是 FontAwesome 图标，直接写成 class 就行 -->
+      <i class="fas fa-plus me-1"></i>新建
+    </button>
+  </div>
+
+  <!-- 卡片主体 -->
+  <div class="card-body">
+    <!-- table-hover：鼠标悬停行高亮 -->
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>编码</th>
+          <th>名称</th>
+          <th>状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- @for 是 Angular 17+ 的新循环语法，等价于 Vue 的 v-for
+             track w.id 是必需的：告诉 Angular 用哪个字段当身份标识，等价于 Vue 的 :key="w.id"
+             写法是 @for (项 of 数组; track 唯一标识) { ... } -->
+        @for (w of warehouses; track w.id) {
+          <tr>
+            <!-- {{ }} 是插值，把组件里的属性值渲染到页面上，和 Vue 的 {{ }} 完全一样 -->
+            <td>{{ w.code }}</td>
+            <td>{{ w.name }}</td>
+            <td>
+              <!-- @if / @else 是条件渲染，等价于 Vue 的 v-if / v-else -->
+              @if (w.isActive) {
+                <span class="badge bg-success">启用</span>
+              } @else {
+                <span class="badge bg-secondary">停用</span>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <!-- @empty 是 @for 的配套分支：数组长度为 0 时显示这里的内容。
+               等价于 Vue 里 v-for 配 v-if="list.length === 0" 的写法 -->
+          <tr>
+            <!-- colspan=3 让这一格横跨 3 列，否则表格线会断 -->
+            <td colspan="3" class="text-center text-muted py-4">暂无数据</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 卡片底部：显示总条数 -->
+  <div class="card-footer text-muted">
+    共 {{ totalCount }} 条
+  </div>
+</div>

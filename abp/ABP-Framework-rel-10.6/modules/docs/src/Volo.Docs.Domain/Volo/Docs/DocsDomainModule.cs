@@ -1,0 +1,103 @@
+﻿using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Volo.Abp;
+using Volo.Abp.Mapperly;
+using Volo.Abp.BlobStoring;
+using Volo.Abp.Caching;
+using Volo.Abp.Domain;
+using Volo.Abp.Domain.Entities.Events.Distributed;
+using Volo.Abp.Localization;
+using Volo.Abp.Modularity;
+using Volo.Abp.Threading;
+using Volo.Abp.VirtualFileSystem;
+using Volo.Docs.Documents;
+using Volo.Docs.Documents.FullSearch.Elastic;
+using Volo.Docs.FileSystem.Documents;
+using Volo.Docs.GitHub;
+using Volo.Docs.GitHub.Documents;
+using Volo.Docs.HtmlConverting;
+using Volo.Docs.Localization;
+using Volo.Docs.Projects;
+using Volo.Docs.Projects.Pdf.Markdig;
+
+namespace Volo.Docs
+{
+    [DependsOn(
+        typeof(DocsDomainSharedModule),
+        typeof(AbpDddDomainModule),
+        typeof(AbpMapperlyModule),
+        typeof(AbpBlobStoringModule),
+        typeof(AbpCachingModule)
+        )]
+    public class DocsDomainModule : AbpModule
+    {
+        public override void ConfigureServices(ServiceConfigurationContext context)
+        {
+            context.Services.AddMapperlyObjectMapper<DocsDomainModule>();
+            
+            Configure<AbpDistributedEntityEventOptions>(options =>
+            {
+                options.EtoMappings.Add<Document, DocumentEto>(typeof(DocsDomainModule));
+                options.EtoMappings.Add<Project, ProjectEto>(typeof(DocsDomainModule));
+            });
+
+            Configure<AbpVirtualFileSystemOptions>(options =>
+            {
+                options.FileSets
+                    .AddEmbedded<DocsDomainModule>();
+            });
+
+            Configure<AbpLocalizationOptions>(options =>
+            {
+                options.Resources
+                    .Get<DocsResource>()
+                    .AddVirtualJson("/Volo/Docs/Localization/Domain");
+            });
+
+            Configure<DocumentSourceOptions>(options =>
+            {
+                options.Sources[GithubDocumentSource.Type] = typeof(GithubDocumentSource);
+                options.Sources[FileSystemDocumentSource.Type] = typeof(FileSystemDocumentSource);
+            });
+            
+            Configure<DocsGithubLanguageOptions>(options =>
+            {
+                options.DefaultLanguage = new LanguageConfigElement 
+                {
+                    Code = "en", 
+                    DisplayName = "English", 
+                    IsDefault = true
+                };
+            });
+
+            context.Services.AddHttpClient(GithubRepositoryManager.HttpClientName, client =>
+            {
+                client.Timeout = TimeSpan.FromMilliseconds(15000);
+            });
+            
+            Configure<DocumentToHtmlConverterOptions>(options =>
+            {
+                options.Converters[DocsDomainConsts.PdfDocumentToHtmlConverterPrefix + MarkdigPdfDocumentToHtmlConverter.Type] = typeof(MarkdigPdfDocumentToHtmlConverter);
+            });
+        }
+
+        public async override Task OnApplicationInitializationAsync(ApplicationInitializationContext context)
+        {
+            using (var scope = context.ServiceProvider.CreateScope())
+            {
+                if (scope.ServiceProvider.GetRequiredService<IOptions<DocsElasticSearchOptions>>().Value.Enable)
+                {
+                    var documentFullSearch = scope.ServiceProvider.GetRequiredService<IDocumentFullSearch>();
+                    await documentFullSearch.CreateIndexIfNeededAsync();
+                }
+            }
+        }
+
+        public override void OnApplicationInitialization(ApplicationInitializationContext context)
+        {
+            AsyncHelper.RunSync(() => OnApplicationInitializationAsync(context));
+        }
+    }
+}

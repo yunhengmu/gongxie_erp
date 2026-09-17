@@ -1,0 +1,8 @@
+﻿@model Volo.Abp.Ui.LayoutHooks.LayoutHookViewModel
+@if (Model.Hooks.Any())
+{
+    foreach (var hook in Model.Hooks)
+    {
+        <text>@await Component.InvokeAsync(hook.ComponentType, new { layout = Model.Layout })</text>
+    }
+}

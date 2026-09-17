@@ -1,0 +1,21 @@
+﻿@typeparam TEntity
+@typeparam TResourceType
+@using Abp.Localization
+@inherits ExtensionPropertyComponentBase<TEntity, TResourceType>
+
+<Validation Validator="@Validate" MessageLocalizer="@LH.Localize">
+    <Field>
+        <FieldLabel>@PropertyInfo.GetLocalizedDisplayName(StringLocalizerFactory)</FieldLabel>
+        <Select @bind-Value="@SelectedValue">
+            <ChildContent>
+                @foreach (var item in SelectItems)
+                {
+                    <SelectItem Value="@item.Value" Disabled="IsReadonlyField">@item.Text</SelectItem>
+                }
+            </ChildContent>
+            <Feedback>
+                <ValidationError/>
+            </Feedback>
+        </Select>
+    </Field>
+</Validation>

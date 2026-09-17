@@ -1,0 +1,354 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Volo.Abp.Collections;
+using Volo.Abp.DynamicProxy;
+using Volo.Abp.EventBus.Distributed;
+using Volo.Abp.Json;
+using Volo.Abp.MultiTenancy;
+using Volo.Abp.Reflection;
+using Volo.Abp.Uow;
+
+namespace Volo.Abp.EventBus;
+
+public abstract class EventBusBase : IEventBus
+{
+    protected IServiceScopeFactory ServiceScopeFactory { get; }
+
+    protected ICurrentTenant CurrentTenant { get; }
+
+    protected IUnitOfWorkManager UnitOfWorkManager { get; }
+
+    protected IEventHandlerInvoker EventHandlerInvoker { get; }
+
+    protected EventBusBase(
+        IServiceScopeFactory serviceScopeFactory,
+        ICurrentTenant currentTenant,
+        IUnitOfWorkManager unitOfWorkManager,
+        IEventHandlerInvoker eventHandlerInvoker)
+    {
+        ServiceScopeFactory = serviceScopeFactory;
+        CurrentTenant = currentTenant;
+        UnitOfWorkManager = unitOfWorkManager;
+        EventHandlerInvoker = eventHandlerInvoker;
+    }
+
+    /// <inheritdoc/>
+    public virtual IDisposable Subscribe<TEvent>(Func<TEvent, Task> action) where TEvent : class
+    {
+        return Subscribe(typeof(TEvent), new ActionEventHandler<TEvent>(action));
+    }
+
+    /// <inheritdoc/>
+    public virtual IDisposable Subscribe<TEvent, THandler>()
+        where TEvent : class
+        where THandler : IEventHandler, new()
+    {
+        return Subscribe(typeof(TEvent), new TransientEventHandlerFactory<THandler>());
+    }
+
+    /// <inheritdoc/>
+    public virtual IDisposable Subscribe(Type eventType, IEventHandler handler)
+    {
+        return Subscribe(eventType, new SingleInstanceHandlerFactory(handler));
+    }
+
+    /// <inheritdoc/>
+    public virtual IDisposable Subscribe(string eventName, IEventHandler handler)
+    {
+        return Subscribe(eventName, new SingleInstanceHandlerFactory(handler));
+    }
+
+    /// <inheritdoc/>
+    public abstract IDisposable Subscribe(string eventName, IEventHandlerFactory handler);
+
+    /// <inheritdoc/>
+    public virtual IDisposable Subscribe<TEvent>(IEventHandlerFactory factory) where TEvent : class
+    {
+        return Subscribe(typeof(TEvent), factory);
+    }
+
+    public abstract IDisposable Subscribe(Type eventType, IEventHandlerFactory factory);
+
+    public abstract void Unsubscribe<TEvent>(Func<TEvent, Task> action) where TEvent : class;
+
+    /// <inheritdoc/>
+    public virtual void Unsubscribe<TEvent>(ILocalEventHandler<TEvent> handler) where TEvent : class
+    {
+        Unsubscribe(typeof(TEvent), handler);
+    }
+
+    public abstract void Unsubscribe(Type eventType, IEventHandler handler);
+
+    /// <inheritdoc/>
+    public virtual void Unsubscribe<TEvent>(IEventHandlerFactory factory) where TEvent : class
+    {
+        Unsubscribe(typeof(TEvent), factory);
+    }
+
+    public abstract void Unsubscribe(Type eventType, IEventHandlerFactory factory);
+
+    /// <inheritdoc/>
+    public abstract void Unsubscribe(string eventName, IEventHandlerFactory factory);
+
+    /// <inheritdoc/>
+    public abstract void Unsubscribe(string eventName, IEventHandler handler);
+
+    /// <inheritdoc/>
+    public virtual void UnsubscribeAll<TEvent>() where TEvent : class
+    {
+        UnsubscribeAll(typeof(TEvent));
+    }
+
+    /// <inheritdoc/>
+    public abstract void UnsubscribeAll(Type eventType);
+
+    /// <inheritdoc/>
+    public abstract void UnsubscribeAll(string eventName);
+
+    /// <inheritdoc/>
+    public Task PublishAsync<TEvent>(TEvent eventData, bool onUnitOfWorkComplete = true)
+        where TEvent : class
+    {
+        return PublishAsync(typeof(TEvent), eventData, onUnitOfWorkComplete);
+    }
+
+    /// <inheritdoc/>
+    public virtual async Task PublishAsync(
+        Type eventType,
+        object eventData,
+        bool onUnitOfWorkComplete = true)
+    {
+        if (onUnitOfWorkComplete && UnitOfWorkManager.Current != null)
+        {
+            AddToUnitOfWork(
+                UnitOfWorkManager.Current,
+                new UnitOfWorkEventRecord(eventType, eventData, EventOrderGenerator.GetNext())
+            );
+            return;
+        }
+
+        await PublishToEventBusAsync(eventType, eventData);
+    }
+
+    /// <inheritdoc/>
+    public abstract Task PublishAsync(string eventName, object eventData, bool onUnitOfWorkComplete = true);
+
+    protected abstract Task PublishToEventBusAsync(Type eventType, object eventData);
+
+    protected abstract void AddToUnitOfWork(IUnitOfWork unitOfWork, UnitOfWorkEventRecord eventRecord);
+
+    public virtual async Task TriggerHandlersAsync(Type eventType, object eventData)
+    {
+        var exceptions = new List<Exception>();
+
+        await TriggerHandlersAsync(eventType, eventData, exceptions);
+
+        if (exceptions.Any())
+        {
+            ThrowOriginalExceptions(eventType, exceptions);
+        }
+    }
+
+    protected virtual async Task TriggerHandlersAsync(Type eventType, object eventData, List<Exception> exceptions, InboxConfig? inboxConfig = null)
+    {
+        await new SynchronizationContextRemover();
+
+        var (handlerFactoriesList, actualEventType) = ResolveHandlerFactories(eventType, eventData);
+
+        foreach (var handlerFactories in handlerFactoriesList)
+        {
+            foreach (var handlerFactory in handlerFactories.EventHandlerFactories.ToList())
+            {
+                var resolvedEventData = ResolveEventDataForHandler(eventData, eventType, handlerFactories.EventType);
+                await TriggerHandlerAsync(handlerFactory, handlerFactories.EventType, resolvedEventData, exceptions, inboxConfig);
+            }
+        }
+
+        if (actualEventType != null &&
+            actualEventType.GetTypeInfo().IsGenericType &&
+            actualEventType.GetGenericArguments().Length == 1 &&
+            typeof(IEventDataWithInheritableGenericArgument).IsAssignableFrom(actualEventType))
+        {
+            var resolvedEventData = eventData is DynamicEventData aed
+                ? ConvertDynamicEventData(aed.Data, actualEventType)
+                : eventData;
+
+            var genericArg = actualEventType.GetGenericArguments()[0];
+            var baseArg = genericArg.GetTypeInfo().BaseType;
+            if (baseArg != null)
+            {
+                var baseEventType = actualEventType.GetGenericTypeDefinition().MakeGenericType(baseArg);
+                var constructorArgs = ((IEventDataWithInheritableGenericArgument)resolvedEventData).GetConstructorArgs();
+                var baseEventData = Activator.CreateInstance(baseEventType, constructorArgs)!;
+                await PublishToEventBusAsync(baseEventType, baseEventData);
+            }
+        }
+    }
+
+    protected virtual (List<EventTypeWithEventHandlerFactories> Factories, Type? ActualEventType) ResolveHandlerFactories(
+        Type eventType,
+        object eventData)
+    {
+        if (eventData is DynamicEventData dynamicEventData)
+        {
+            return (
+                GetDynamicHandlerFactories(dynamicEventData.EventName).ToList(),
+                GetEventTypeByEventName(dynamicEventData.EventName)
+            );
+        }
+
+        return (GetHandlerFactories(eventType).ToList(), eventType);
+    }
+
+    protected virtual object ResolveEventDataForHandler(object eventData, Type sourceEventType, Type handlerEventType)
+    {
+        if (eventData is DynamicEventData dynamicEventData && handlerEventType != typeof(DynamicEventData))
+        {
+            return ConvertDynamicEventData(dynamicEventData.Data, handlerEventType);
+        }
+
+        if (handlerEventType == typeof(DynamicEventData) && eventData is not DynamicEventData)
+        {
+            return new DynamicEventData(EventNameAttribute.GetNameOrDefault(sourceEventType), eventData);
+        }
+
+        return eventData;
+    }
+
+    protected virtual object ConvertDynamicEventData(object data, Type targetType)
+    {
+        if (targetType.IsInstanceOfType(data))
+        {
+            return data;
+        }
+
+        using var scope = ServiceScopeFactory.CreateScope();
+        var jsonSerializer = scope.ServiceProvider.GetRequiredService<IJsonSerializer>();
+        var json = jsonSerializer.Serialize(data);
+        return jsonSerializer.Deserialize(targetType, json);
+    }
+
+    protected void ThrowOriginalExceptions(Type eventType, List<Exception> exceptions)
+    {
+        if (exceptions.Count == 1)
+        {
+            exceptions[0].ReThrow();
+        }
+
+        throw new AggregateException(
+            "More than one error has occurred while triggering the event: " + eventType,
+            exceptions
+        );
+    }
+
+    protected virtual void SubscribeHandlers(ITypeList<IEventHandler> handlers)
+    {
+        foreach (var handler in handlers)
+        {
+            var interfaces = handler.GetInterfaces();
+            foreach (var @interface in interfaces)
+            {
+                if (!typeof(IEventHandler).GetTypeInfo().IsAssignableFrom(@interface))
+                {
+                    continue;
+                }
+
+                var genericArgs = @interface.GetGenericArguments();
+                if (genericArgs.Length == 1)
+                {
+                    Subscribe(genericArgs[0], new IocEventHandlerFactory(ServiceScopeFactory, handler));
+                }
+            }
+        }
+    }
+
+    protected abstract IEnumerable<EventTypeWithEventHandlerFactories> GetHandlerFactories(Type eventType);
+
+    protected abstract IEnumerable<EventTypeWithEventHandlerFactories> GetDynamicHandlerFactories(string eventName);
+
+    protected abstract Type? GetEventTypeByEventName(string eventName);
+
+    protected virtual async Task TriggerHandlerAsync(IEventHandlerFactory asyncHandlerFactory, Type eventType,
+        object eventData, List<Exception> exceptions, InboxConfig? inboxConfig = null)
+    {
+        using (var eventHandlerWrapper = asyncHandlerFactory.GetHandler())
+        {
+            try
+            {
+                var handlerType = ProxyHelper.GetUnProxiedType(eventHandlerWrapper.EventHandler);
+
+                if (inboxConfig?.HandlerSelector != null &&
+                    !inboxConfig.HandlerSelector(handlerType))
+                {
+                    return;
+                }
+
+                using (CurrentTenant.Change(GetEventDataTenantId(eventData)))
+                {
+                    await InvokeEventHandlerAsync(eventHandlerWrapper.EventHandler, eventData, eventType);
+                }
+            }
+            catch (TargetInvocationException ex)
+            {
+                exceptions.Add(ex.InnerException!);
+            }
+            catch (Exception ex)
+            {
+                exceptions.Add(ex);
+            }
+        }
+    }
+
+    protected virtual Task InvokeEventHandlerAsync(IEventHandler eventHandler, object eventData, Type eventType)
+    {
+        return EventHandlerInvoker.InvokeAsync(eventHandler, eventData, eventType);
+    }
+
+    protected virtual Guid? GetEventDataTenantId(object eventData)
+    {
+        return eventData switch
+        {
+            IMultiTenant multiTenantEventData => multiTenantEventData.TenantId,
+            IEventDataMayHaveTenantId eventDataMayHaveTenantId when eventDataMayHaveTenantId.IsMultiTenant(out var tenantId) => tenantId,
+            _ => CurrentTenant.Id
+        };
+    }
+
+    // Reference from
+    // https://blogs.msdn.microsoft.com/benwilli/2017/02/09/an-alternative-to-configureawaitfalse-everywhere/
+    protected struct SynchronizationContextRemover : INotifyCompletion
+    {
+        public bool IsCompleted {
+            get { return SynchronizationContext.Current == null; }
+        }
+
+        public void OnCompleted(Action continuation)
+        {
+            var prevContext = SynchronizationContext.Current;
+            try
+            {
+                SynchronizationContext.SetSynchronizationContext(null);
+                continuation();
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(prevContext);
+            }
+        }
+
+        public SynchronizationContextRemover GetAwaiter()
+        {
+            return this;
+        }
+
+        public void GetResult()
+        {
+        }
+    }
+}

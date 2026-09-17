@@ -1,0 +1,42 @@
+﻿using System;
+using Volo.Abp.Domain.Entities;
+
+namespace Volo.Docs.Documents
+{
+    public class DocumentContributor : Entity
+    {
+        public virtual Guid DocumentId { get; set; }
+
+        public virtual string Username { get; set; }
+
+        public virtual int CommitCount { get; set; }
+
+        public virtual string UserProfileUrl { get; set; }
+
+        public virtual string AvatarUrl { get; set; }
+
+        protected DocumentContributor()
+        {
+
+        }
+
+        public virtual bool Equals(Guid documentId, string username)
+        {
+            return DocumentId == documentId && Username == username;
+        }
+
+        public DocumentContributor(Guid documentId, string username, string userProfileUrl, string avatarUrl, int commitCount = 1)
+        {
+            DocumentId = documentId;
+            Username = username;
+            UserProfileUrl = userProfileUrl;
+            AvatarUrl = avatarUrl;
+            CommitCount = commitCount;
+        }
+
+        public override object[] GetKeys()
+        {
+            return new object[] { DocumentId, Username };
+        }
+    }
+}

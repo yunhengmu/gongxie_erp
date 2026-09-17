@@ -1,0 +1,15 @@
+import {Component, input, ChangeDetectionStrategy,} from '@angular/core';
+
+@Component({
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  selector: 'abp-card',
+  template: ` <div class="card" [class]="cardClass()" [style]="cardStyle()">
+    <ng-content></ng-content>
+  </div>`,
+  imports: [],
+})
+export class CardComponent {
+  readonly cardClass = input<string>(undefined);
+
+  readonly cardStyle = input<string>(undefined);
+}

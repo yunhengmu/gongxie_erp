@@ -1,0 +1,208 @@
+﻿@page
+@using Microsoft.AspNetCore.Authorization
+@using Volo.Abp.AspNetCore.Mvc.UI.Layout
+@using Volo.Docs.Admin
+@using Volo.Docs.Admin.Navigation
+@using Microsoft.AspNetCore.Mvc.Localization
+@using Volo.Docs.Localization
+@model Volo.Docs.Admin.Pages.Docs.Admin.Documents.IndexModel
+@inject IHtmlLocalizer<DocsResource> L
+@inject IAuthorizationService Authorization
+@{
+    ViewBag.PageTitle = L["Menu:Documents"];
+}
+@inject IPageLayout PageLayout
+@{
+    PageLayout.Content.Title = L["Documents"].Value;
+    PageLayout.Content.BreadCrumb.Add(L["Menu:DocumentManagement"].Value);
+    PageLayout.Content.MenuItemName = DocsMenuNames.Documents;
+}
+
+@section scripts {
+    <abp-script src="/client-proxies/docs-admin-proxy.js" />
+    <abp-script src="/Pages/Docs/Admin/Documents/index.js" />
+}
+
+@section styles {
+    <abp-style src="/Pages/Docs/Admin/Documents/index.min.css" />
+}
+
+<div id="DocumentsContainer">
+    <abp-card>
+        <abp-card-body>
+            <form autocomplete="off" id="FilterForm">
+
+                <abp-row>
+
+                    <abp-column size="Auto">
+                        <div class="input-group mb-2">
+                            <div class="input-group-text">@L["Project"].Value</div>
+
+                            <select
+                                id="ProjectId"
+                                name="ProjectId"
+                                class="form-select">
+                                <option></option>
+                                @foreach (var project in Model.Projects)
+                                {
+                                    <option value="@project.Id">@project.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </abp-column>
+
+                    <abp-column size="Auto">
+                        <div class="input-group mb-2">
+                            <div class="input-group-text">@L["Version"].Value</div>
+
+                            <select
+                                id="Version"
+                                name="Version"
+                                class="form-select">
+                            </select>
+                        </div>
+                    </abp-column>
+                    
+                    <abp-column size="Auto">
+                        <div class="input-group mb-2">
+                            <div class="input-group-text">@L["Name"].Value</div>
+
+                            <input type="text"
+                               id="Name"
+                               name="Name"
+                               class="form-control">
+                        </div>
+                    </abp-column>
+
+                    <abp-column size="Auto">
+                        <div class="input-group mb-2">
+                            <div class="input-group-text">@L["LanguageCode"].Value</div>
+
+                            <select
+                                id="LanguageCode"
+                                name="LanguageCode"
+                                class="form-select">
+                            </select>
+                        </div>
+                    </abp-column>
+                    <abp-column size="Auto">
+                        <abp-button button-type="Primary" icon="search" id="SearchButton" text="@L["Search"].Value"></abp-button>
+                    </abp-column>
+                    <abp-row class="mt-3 mb-3">
+                        <abp-column size-md="_12">
+                            <a href="javascript:;" id="AdvancedFilterSectionToggler" class="text-decoration-none">@L["AdvancedFilters"]</a>
+                        </abp-column>
+                    </abp-row>
+                    <abp-row id="AdvancedFilterSection" style="display: none;">
+
+                        <abp-column size="_4">
+                            <div class="input-group mb-2">
+                                <div class="input-group-text">@L["CreationTime"].Value</div>
+
+                                    <input type="text"
+                                       id="CreationTimeMin"
+                                       name="CreationTimeMin"
+                                       class="form-control singledatepicker"
+                                       placeholder="@L["StartDate"].Value">
+                                    
+                                    <input type="text"
+                                       id="CreationTimeMax"
+                                       name="CreationTimeMax"
+                                       placeholder="@L["EndDate"].Value"
+                                       class="form-control singledatepicker">
+                            </div>
+                        </abp-column>
+
+                        <abp-column size="_4">
+                            <div class="input-group mb-2">
+                                <div class="input-group-text">@L["LastUpdateTime"].Value</div>
+                                    <input type="text"
+                                       id="LastUpdatedTimeMin"
+                                       name="LastUpdatedTimeMin"
+                                       class="form-control singledatepicker"
+                                       placeholder="@L["StartDate"].Value">
+
+                                    <input type="text"
+
+                                       id="LastUpdatedTimeMax"
+                                       name="LastUpdatedTimeMax"
+                                       placeholder="@L["EndDate"].Value"
+                                       class="form-control singledatepicker">
+                            </div>
+                        </abp-column>
+
+                        <abp-column size="_4">
+                            <div class="input-group mb-2">
+                                <div class="input-group-text">@L["LastCachedTime"].Value</div>
+
+                                    <input type="text"
+                                       id="LastCachedTimeMin"
+                                       name="LastCachedTimeMin"
+                                       class="form-control singledatepicker"
+                                       placeholder="@L["StartDate"].Value">
+                                       
+                                    <input type="text"
+                                       id="LastCachedTimeMax"
+                                       name="LastCachedTimeMax"
+                                       placeholder="@L["EndDate"].Value"
+                                       class="form-control singledatepicker">
+                            </div>
+                        </abp-column>
+                        
+                        <abp-column size="_3">
+                            <div class="input-group mb-2">
+                                <div class="input-group-text">@L["Format"].Value</div>
+
+                                <select
+                                    id="Format"
+                                    name="Format"
+                                    class="form-select">
+                                </select>
+                            </div>
+                        </abp-column>
+
+                          <abp-column size="Auto">
+                            <div class="input-group mb-2">
+                                <div class="input-group-text">@L["LastSignificantUpdateTime"].Value</div>
+
+                                    <input type="text"
+                                       id="LastSignificantUpdateTimeMin"
+                                       name="LastSignificantUpdateTimeMin"
+                                       class="form-control singledatepicker"
+                                       placeholder="@L["StartDate"].Value">
+                                       
+                                    <input type="text"
+                                       id="LastSignificantUpdateTimeMax"
+                                       name="LastSignificantUpdateTimeMax"
+                                       placeholder="@L["EndDate"].Value"
+                                       class="form-control singledatepicker">
+                            </div>
+                        </abp-column>
+                        
+                    </abp-row>
+                </abp-row>
+            </form>
+        </abp-card-body>
+        </abp-card>
+        <abp-card>
+        <abp-card-body>
+            <abp-table  id="DocumentsTable" class="nowrap">
+                <thead>
+                    <tr>
+                        <th>@L["Actions"]</th>
+                        <th>@L["ProjectName"]</th>
+                        <th>@L["Name"]</th>
+                        <th>@L["Version"]</th>
+                        <th>@L["LanguageCode"]</th>
+                        <th>@L["FileName"]</th>
+                        <th>@L["Format"]</th>
+                        <th>@L["CreationTime"]</th>
+                        <th>@L["LastUpdateTime"]</th>
+                        <th>@L["LastSignificantUpdateTime"]</th>
+                        <th>@L["LastCachedTime"]</th>
+                    </tr>
+                </thead>
+            </abp-table>
+        </abp-card-body>
+    </abp-card>
+</div>

@@ -1,0 +1,3091 @@
+{
+  "items": [
+    {
+      "text": "Get Started",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "get-started",
+          "isIndex": true
+        },
+        {
+          "text": "Single Layer Web Application",
+          "path": "get-started/single-layer-web-application.md"
+        },
+        {
+          "text": "Layered Web Application",
+          "path": "get-started/layered-web-application.md"
+        },
+        {
+          "text": "Microservice Solution",
+          "path": "get-started/microservice.md"
+        },
+        {
+          "text": "Others",
+          "items": [
+            {
+              "text": "Empty ASP.NET Core Application",
+              "path": "get-started/empty-aspnet-core-application.md"
+            },
+            {
+              "text": "MAUI Application",
+              "path": "get-started/maui.md"
+            },
+            {
+              "text": "WPF Application",
+              "path": "get-started/wpf.md"
+            },
+            {
+              "text": "Console Application",
+              "path": "get-started/console.md"
+            }
+          ]
+        },
+        {
+          "text": "Pre-Requirements",
+          "path": "get-started/pre-requirements.md"
+        }
+      ]
+    },
+    {
+      "text": "Tutorials",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "tutorials",
+          "isIndex": true
+        },
+        {
+          "text": "TODO Application",
+          "isLazyExpandable": true,
+          "path": "tutorials/todo",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "tutorials/todo",
+              "isIndex": true
+            },
+            {
+              "text": "Single-Layer Solution",
+              "path": "tutorials/todo/single-layer"
+            },
+            {
+              "text": "Layered Solution",
+              "path": "tutorials/todo/layered"
+            }
+          ]
+        },
+        {
+          "text": "Book Store Application",
+          "isLazyExpandable": true,
+          "path": "tutorials/book-store",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "tutorials/book-store",
+              "isIndex": true,
+              "isInSeries": true
+            },
+            {
+              "text": "1: Creating the Server Side",
+              "path": "tutorials/book-store/part-01.md",
+              "isInSeries": true
+              
+            },
+            {
+              "text": "2: The Book List Page",
+              "path": "tutorials/book-store/part-02.md",
+              "isInSeries": true
+            },
+            {
+              "text": "3: Creating, Updating and Deleting Books",
+              "path": "tutorials/book-store/part-03.md",
+              "isInSeries": true
+            },
+            {
+              "text": "4: Integration Tests",
+              "path": "tutorials/book-store/part-04.md",
+              "isInSeries": true
+            },
+            {
+              "text": "5: Authorization",
+              "path": "tutorials/book-store/part-05.md",
+              "isInSeries": true
+            },
+            {
+              "text": "6: Authors: Domain Layer",
+              "path": "tutorials/book-store/part-06.md",
+              "isInSeries": true
+            },
+            {
+              "text": "7: Authors: Database Integration",
+              "path": "tutorials/book-store/part-07.md",
+              "isInSeries": true
+            },
+            {
+              "text": "8: Authors: Application Layer",
+              "path": "tutorials/book-store/part-08.md",
+              "isInSeries": true
+            },
+            {
+              "text": "9: Authors: User Interface",
+              "path": "tutorials/book-store/part-09.md",
+              "isInSeries": true
+            },
+            {
+              "text": "10: Book to Author Relation",
+              "path": "tutorials/book-store/part-10.md",
+              "isInSeries": true
+            }
+          ]
+        },
+        {
+          "text": "Book Store Application (with ABP Suite)",
+          "isLazyExpandable": true,
+          "path": "tutorials/book-store-with-abp-suite",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "tutorials/book-store-with-abp-suite",
+              "isIndex": true,
+              "isInSeries": true
+            },
+            {
+              "text": "1: Creating the Solution",
+              "path": "tutorials/book-store-with-abp-suite/part-01.md",
+              "isInSeries": true
+            },
+            {
+              "text": "2: Creating the Books",
+              "path": "tutorials/book-store-with-abp-suite/part-02.md",
+              "isInSeries": true
+            },
+            {
+              "text": "3: Creating the Authors",
+              "path": "tutorials/book-store-with-abp-suite/part-03.md",
+              "isInSeries": true
+            },
+            {
+              "text": "4: Book to Author Relation",
+              "path": "tutorials/book-store-with-abp-suite/part-04.md",
+              "isInSeries": true
+            },
+            {
+              "text": "5: Customizing the Generated Code",
+              "path": "tutorials/book-store-with-abp-suite/part-05.md",
+              "isInSeries": true
+            }               
+          ]
+        },        
+        {
+          "text": "Modular Monolith Application",
+          "isLazyExpandable": true,
+          "path": "tutorials/modular-crm",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "tutorials/modular-crm",
+              "isIndex": true
+            },
+            {
+              "text": "1: Creating the Initial Solution",
+              "path": "tutorials/modular-crm/part-01.md"
+            },
+            {
+              "text": "2: Setting Up the Catalog Module",
+              "path": "tutorials/modular-crm/part-02.md"
+            },
+            {
+              "text": "3: Building the Catalog Module",
+              "path": "tutorials/modular-crm/part-03.md"
+            },
+            {
+              "text": "4: Creating the Initial Ordering Module",
+              "path": "tutorials/modular-crm/part-04.md"
+            },
+            {
+              "text": "5: Building the Ordering Module",
+              "path": "tutorials/modular-crm/part-05.md"
+            },
+            {
+              "text": "6: Integrating the Modules: Implementing Integration Services",
+              "path": "tutorials/modular-crm/part-06.md"
+            },
+            {
+              "text": "7: Integrating the Modules: Communication via Messages (Events)",
+              "path": "tutorials/modular-crm/part-07.md"
+            },
+            {
+              "text": "8: Integrating the Modules: Joining the Products and Orders Data",
+              "path": "tutorials/modular-crm/part-08.md"
+            }
+          ]
+        },
+        {
+          "text": "Microservice Solution",
+          "isLazyExpandable": true,
+          "path": "tutorials/microservice",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "tutorials/microservice",
+              "isIndex": true
+            },
+            {
+              "text": "1: Creating the initial solution",
+              "path": "tutorials/microservice/part-01.md"
+            },
+            {
+              "text": "2: Creating the initial Catalog service",
+              "path": "tutorials/microservice/part-02.md"
+            },
+            {
+              "text": "3: Building the Catalog service",
+              "path": "tutorials/microservice/part-03.md"
+            },
+            {
+              "text": "4: Creating the initial Ordering service",
+              "path": "tutorials/microservice/part-04.md"
+            },
+            {
+              "text": "5: Building the Ordering service",
+              "path": "tutorials/microservice/part-05.md"
+            },
+            {
+              "text": "6: Integrating the services: HTTP API Calls",
+              "path": "tutorials/microservice/part-06.md"
+            },
+            {
+              "text": "7: Integrating the services: Using Distributed Events",
+              "path": "tutorials/microservice/part-07.md"
+            }
+          ]
+        },
+        {
+          "text": "Mobile Application Development",
+          "isLazyExpandable": true,
+          "path": "tutorials/mobile",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "tutorials/mobile"
+            },
+            {
+              "text": "MAUI",
+              "path": "tutorials/mobile/maui"
+            },
+            {
+              "text": "React Native",
+              "path": "tutorials/mobile/react-native"
+            }
+          ]
+        },
+        {
+          "text": "Community Articles",
+          "path": "https://abp.io/community"
+        }
+      ]
+    },
+    {
+      "text": "Tools",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "tools.md",
+          "isIndex": true
+        },
+        {
+          "text": "ABP CLI",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "cli",
+              "isIndex": true
+            },
+            {
+              "text": "New Solution Sample Commands",
+              "path": "cli/new-command-samples.md"
+            }
+          ]
+        },
+        {
+          "text": "ABP Studio",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "studio",
+              "isIndex": true
+            },
+            {
+              "text": "Installation",
+              "path": "studio/installation.md"
+            },
+            {
+              "text": "Fundamentals",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "studio/overview.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Solution Explorer",
+                  "path": "studio/solution-explorer.md"
+                },
+                {
+                  "text": "Solution Runner",
+                  "path": "studio/running-applications.md"
+                },
+                {
+                  "text": "Monitoring Applications",
+                  "path": "studio/monitoring-applications.md"
+                },
+                {
+                  "text": "Working with Kubernetes",
+                  "path": "studio/kubernetes.md"
+                },
+                {
+                  "text": "Working with ABP Suite",
+                  "path": "studio/working-with-suite.md"
+                },
+                {
+                  "text": "Custom Commands",
+                  "path": "studio/custom-commands.md"
+                }
+              ]
+            },
+            {
+              "text": "AI Agent",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "studio/ai-agent.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Configuration",
+                  "path": "studio/ai-agent-configuration.md"
+                },
+                {
+                  "text": "Workflows",
+                  "path": "studio/ai-agent-workflows.md"
+                },
+                {
+                  "text": "Built-in Capabilities",
+                  "path": "studio/ai-agent-built-in-capabilities.md"
+                },
+                {
+                  "text": "Git Integration",
+                  "path": "studio/ai-agent-git-integration.md"
+                },
+                {
+                  "text": "Coding with AI Agent",
+                  "path": "studio/coding-with-ai-agent.md"
+                }
+              ]
+            },
+            {
+              "text": "Concepts",
+              "path": "studio/concepts.md"
+            },
+            {
+              "text": "Version Mapping",
+              "path": "studio/version-mapping.md"
+            },
+            {
+              "text": "Release Notes",
+              "path": "studio/release-notes.md"
+            }
+          ]
+        },
+        {
+          "text": "ABP Suite",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "suite",
+              "isIndex": true
+            },
+            {
+              "text": "How to Install",
+              "path": "suite/how-to-install.md"
+            },
+            {
+              "text": "How to Start",
+              "path": "suite/how-to-start.md"
+            },
+            {
+              "text": "Adding Existing ABP Solution",
+              "path": "suite/add-solution.md"
+            },
+            {
+              "text": "Creating New ABP Solution",
+              "path": "suite/create-solution.md"
+            },
+            {
+              "text": "Generating CRUD Page",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "suite/generating-crud-page.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Creating Many-To-Many Relationship",
+                  "path": "suite/creating-many-to-many-relationship.md"
+                },
+                {
+                  "text": "Generating From an Existing Database",
+                  "path": "suite/generating-entities-from-an-existing-database-table.md"
+                },
+                {
+                  "text": "Creating Master Detail Relationship",
+                  "path": "suite/creating-master-detail-relationship.md"
+                }
+              ]
+            },
+            {
+              "text": "Customizing the Generated Code",
+              "path": "suite/customizing-the-generated-code.md"
+            },
+            {
+              "text": "Accessing Source Code of Modules",
+              "path": "suite/source-code.md"
+            },
+            {
+              "text": "Updating Packages",
+              "path": "suite/updating-packages.md"
+            },
+            {
+              "text": "Configuration",
+              "path": "suite/configuration.md"
+            },
+            {
+              "text": "Editing Templates",
+              "path": "suite/editing-templates.md"
+            },
+            {
+              "text": "How to Uninstall",
+              "path": "suite/how-to-uninstall.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "Framework",
+      "items": [
+        {
+          "text": "Fundamentals",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "framework/fundamentals",
+              "isIndex": true
+            },
+            {
+              "text": "Application Startup",
+              "path": "framework/fundamentals/application-startup.md"
+            },
+            {
+              "text": "Authorization",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/fundamentals/authorization/index.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Dynamic Claims",
+                  "path": "framework/fundamentals/dynamic-claims.md"
+                },
+                {
+                  "text": "Resource Based Authorization",
+                  "path": "framework/fundamentals/authorization/resource-based-authorization.md"
+                }
+              ]
+            },
+            {
+              "text": "Distributed Caching",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/fundamentals/caching.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Redis Cache",
+                  "path": "framework/fundamentals/redis-cache.md"
+                }
+              ]
+            },
+            {
+              "text": "Configuration",
+              "path": "framework/fundamentals/configuration.md"
+            },
+            {
+              "text": "Connection Strings",
+              "path": "framework/fundamentals/connection-strings.md"
+            },
+            {
+              "text": "Dependency Injection",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/fundamentals/dependency-injection.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "AutoFac Integration",
+                  "path": "framework/fundamentals/autofac-integration.md"
+                }
+              ]
+            },
+            {
+              "text": "Exception Handling",
+              "path": "framework/fundamentals/exception-handling.md",
+              "keywords": ["Error"]
+            },
+            {
+              "text": "Localization",
+              "path": "framework/fundamentals/localization.md"
+            },
+            {
+              "text": "Logging",
+              "path": "framework/fundamentals/logging.md"
+            },
+            {
+              "text": "Object Extensions",
+              "path": "framework/fundamentals/object-extensions.md"
+            },
+            {
+              "text": "Options",
+              "path": "framework/fundamentals/options.md"
+            },
+            {
+              "text": "Validation",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/fundamentals/validation.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "FluentValidation Integration",
+                  "path": "framework/fundamentals/fluent-validation.md"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Infrastructure",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "framework/infrastructure",
+              "isIndex": true
+            },
+            {
+              "text": "Audit Logging",
+              "path": "framework/infrastructure/audit-logging.md"
+            },
+            {
+              "text": "Artificial Intelligence",
+              "items":[
+                {
+                  "text": "Overview",
+                  "path": "framework/infrastructure/artificial-intelligence/index.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Microsoft.Extensions.AI",
+                  "path": "framework/infrastructure/artificial-intelligence/microsoft-extensions-ai.md"
+                },
+                {
+                  "text": "Agent Framework",
+                  "path": "framework/infrastructure/artificial-intelligence/microsoft-agent-framework.md"
+                },               
+                {
+                  "text": "Semantic Kernel",
+                  "path": "framework/infrastructure/artificial-intelligence/microsoft-semantic-kernel.md"
+                }
+              ]
+            },
+            {
+              "text": "Application URLs",
+              "path": "framework/infrastructure/app-urls.md"
+            },
+            {
+              "text": "Background Jobs",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/infrastructure/background-jobs",
+                  "isIndex": true
+                },
+                {
+                  "text": "Hangfire Integration",
+                  "path": "framework/infrastructure/background-jobs/hangfire.md"
+                },
+                {
+                  "text": "RabbitMQ Integration",
+                  "path": "framework/infrastructure/background-jobs/rabbitmq.md"
+                },
+                {
+                  "text": "Quartz Integration",
+                  "path": "framework/infrastructure/background-jobs/quartz.md"
+                },
+                {
+                  "text": "TickerQ Integration",
+                  "path": "framework/infrastructure/background-jobs/tickerq.md"
+                }
+              ]
+            },
+            {
+              "text": "Background Workers",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/infrastructure/background-workers",
+                  "isIndex": true
+                },
+                {
+                  "text": "Quartz Integration",
+                  "path": "framework/infrastructure/background-workers/quartz.md"
+                },
+                {
+                  "text": "Hangfire Integration",
+                  "path": "framework/infrastructure/background-workers/hangfire.md"
+                },
+                {
+                  "text": "TickerQ Integration",
+                  "path": "framework/infrastructure/background-workers/tickerq.md"
+                }
+              ]
+            },
+            {
+              "text": "BLOB Storing",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/infrastructure/blob-storing",
+                  "isIndex": true
+                },
+                {
+                  "text": "Storage Providers",
+                  "items": [
+                    {
+                      "text": "Memory Provider",
+                      "path": "framework/infrastructure/blob-storing/memory.md"
+                    },
+                    {
+                      "text": "File System Provider",
+                      "path": "framework/infrastructure/blob-storing/file-system.md"
+                    },
+                    {
+                      "text": "Database Provider",
+                      "path": "framework/infrastructure/blob-storing/database.md"
+                    },
+                    {
+                      "text": "Azure Provider",
+                      "path": "framework/infrastructure/blob-storing/azure.md"
+                    },
+                    {
+                      "text": "Aliyun Provider",
+                      "path": "framework/infrastructure/blob-storing/aliyun.md"
+                    },
+                    {
+                      "text": "Minio Provider",
+                      "path": "framework/infrastructure/blob-storing/minio.md"
+                    },
+                    {
+                      "text": "AWS Provider",
+                      "path": "framework/infrastructure/blob-storing/aws.md"
+                    },
+                    {
+                      "text": "Google Cloud Storage Provider",
+                      "path": "framework/infrastructure/blob-storing/google.md"
+                    },
+                    {
+                      "text": "Bunny.Net Provider",
+                      "path": "framework/infrastructure/blob-storing/bunny.md"
+                    },
+                    {
+                      "text": "Create a Custom Provider",
+                      "path": "framework/infrastructure/blob-storing/custom-provider.md"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Cancellation Token Provider",
+              "path": "framework/infrastructure/cancellation-token-provider.md"
+            },
+            {
+              "text": "CSRF/XSRF & Anti Forgery",
+              "path": "framework/infrastructure/csrf-anti-forgery.md"
+            },
+            {
+              "text": "Concurrency Check",
+              "path": "framework/infrastructure/concurrency-check.md"
+            },
+            {
+              "text": "Correlation ID",
+              "path": "framework/infrastructure/correlation-id.md"
+            },
+            {
+              "text": "Current User",
+              "path": "framework/infrastructure/current-user.md"
+            },
+            {
+              "text": "Data Filtering",
+              "path": "framework/infrastructure/data-filtering.md"
+            },
+            {
+              "text": "Data Seeding",
+              "path": "framework/infrastructure/data-seeding.md"
+            },
+            {
+              "text": "Distributed Locking",
+              "path": "framework/infrastructure/distributed-locking.md"
+            },
+            {
+              "text": "Email Sending",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/infrastructure/emailing.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "MailKit Integration",
+                  "path": "framework/infrastructure/mail-kit.md"
+                }
+              ]
+            },
+            {
+              "text": "Entity Cache",
+              "path": "framework/infrastructure/entity-cache.md"
+            },
+            {
+              "text": "Event Bus",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/infrastructure/event-bus",
+                  "isIndex": true
+                },
+                {
+                  "text": "Local Event Bus",
+                  "path": "framework/infrastructure/event-bus/local"
+                },
+                {
+                  "text": "Distributed Event Bus",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/infrastructure/event-bus/distributed",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Azure Service Bus Integration",
+                      "path": "framework/infrastructure/event-bus/distributed/azure.md"
+                    },
+                    {
+                      "text": "RabbitMQ Integration",
+                      "path": "framework/infrastructure/event-bus/distributed/rabbitmq.md"
+                    },
+                    {
+                      "text": "Kafka Integration",
+                      "path": "framework/infrastructure/event-bus/distributed/kafka.md"
+                    },
+                    {
+                      "text": "Rebus Integration",
+                      "path": "framework/infrastructure/event-bus/distributed/rebus.md"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Features",
+              "path": "framework/infrastructure/features.md"
+            },
+            {
+              "text": "Global Features",
+              "path": "framework/infrastructure/global-features.md"
+            },
+            {
+              "text": "GUID Generation",
+              "path": "framework/infrastructure/guid-generation.md"
+            },
+            {
+              "text": "Image Manipulation",
+              "path": "framework/infrastructure/image-manipulation.md"
+            },
+            {
+              "text": "Interceptors",
+              "path": "framework/infrastructure/interceptors.md"
+            },
+            {
+              "text": "JSON",
+              "path": "framework/infrastructure/json.md"
+            },
+            {
+              "text": "Object to Object Mapping",
+              "path": "framework/infrastructure/object-to-object-mapping.md"
+            },
+            {
+              "text": "Settings",
+              "path": "framework/infrastructure/settings.md"
+            },
+            {
+              "text": "Simple State Checker",
+              "path": "framework/infrastructure/simple-state-checker.md"
+            },
+            {
+              "text": "SMS Sending",
+              "path": "framework/infrastructure/sms-sending.md"
+            },
+            {
+              "text": "String Encryption",
+              "path": "framework/infrastructure/string-encryption.md"
+            },
+            {
+              "text": "Text Templating",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/infrastructure/text-templating",
+                  "isIndex": true
+                },
+                {
+                  "text": "Razor Integration",
+                  "path": "framework/infrastructure/text-templating/razor.md"
+                },
+                {
+                  "text": "Scriban Integration",
+                  "path": "framework/infrastructure/text-templating/scriban.md"
+                }
+              ]
+            },
+            {
+              "text": "Timing",
+              "path": "framework/infrastructure/timing.md"
+            },
+            {
+              "text": "Virtual File System",
+              "path": "framework/infrastructure/virtual-file-system.md"
+            }
+          ]
+        },
+        {
+          "text": "Architecture",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "framework/architecture",
+              "isIndex": true
+            },
+            {
+              "text": "Modularity",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/architecture/modularity/basics.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Plug-In Modules",
+                  "path": "framework/architecture/modularity/plugin-modules.md"
+                },
+                {
+                  "text": "Customizing/Extending Modules",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/architecture/modularity/extending/customizing-application-modules-guide.md",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Module Entity Extension System",
+                      "path": "framework/architecture/modularity/extending/module-entity-extensions.md"
+                    },
+                    {
+                      "text": "Customizing/Extending Entities",
+                      "path": "framework/architecture/modularity/extending/customizing-application-modules-extending-entities.md"
+                    },
+                    {
+                      "text": "Customizing/Overriding Services",
+                      "path": "framework/architecture/modularity/extending/customizing-application-modules-overriding-services.md"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Domain Driven Design",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/architecture/domain-driven-design",
+                  "isIndex": true
+                },
+                {
+                  "text": "Domain Layer",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/architecture/domain-driven-design/domain-layer.md",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Entities & Aggregate Roots",
+                      "path": "framework/architecture/domain-driven-design/entities.md"
+                    },
+                    {
+                      "text": "Value Objects",
+                      "path": "framework/architecture/domain-driven-design/value-objects.md"
+                    },
+                    {
+                      "text": "Repositories",
+                      "path": "framework/architecture/domain-driven-design/repositories.md"
+                    },
+                    {
+                      "text": "Domain Services",
+                      "path": "framework/architecture/domain-driven-design/domain-services.md"
+                    },
+                    {
+                      "text": "Specifications",
+                      "path": "framework/architecture/domain-driven-design/specifications.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Application Layer",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/architecture/domain-driven-design/application-layer.md",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Application Services",
+                      "path": "framework/architecture/domain-driven-design/application-services.md"
+                    },
+                    {
+                      "text": "Data Transfer Objects",
+                      "path": "framework/architecture/domain-driven-design/data-transfer-objects.md"
+                    },
+                    {
+                      "text": "Unit Of Work",
+                      "path": "framework/architecture/domain-driven-design/unit-of-work.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "E-Book: Implementing DDD",
+                  "path": "https://abp.io/books/implementing-domain-driven-design"
+                }
+              ]
+            },
+            {
+              "text": "Multi Tenancy",
+              "path": "framework/architecture/multi-tenancy"
+            },
+            {
+              "text": "Microservices",
+              "path": "framework/architecture/microservices"
+            },
+            {
+              "text": "Module Development Best Practices",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/architecture/best-practices",
+                  "isIndex": true
+                },
+                {
+                  "text": "Module Architecture",
+                  "path": "framework/architecture/best-practices/module-architecture.md"
+                },
+                {
+                  "text": "Domain Layer",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/architecture/best-practices/domain-layer-overview.md",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Entities",
+                      "path": "framework/architecture/best-practices/entities.md"
+                    },
+                    {
+                      "text": "Repositories",
+                      "path": "framework/architecture/best-practices/repositories.md"
+                    },
+                    {
+                      "text": "Domain Services",
+                      "path": "framework/architecture/best-practices/domain-services.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Application Layer",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/architecture/best-practices/application-layer-overview.md",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Application Services",
+                      "path": "framework/architecture/best-practices/application-services.md"
+                    },
+                    {
+                      "text": "Data Transfer Objects",
+                      "path": "framework/architecture/best-practices/data-transfer-objects.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Data Access",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/architecture/best-practices/data-access-overview.md",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Entity Framework Core Integration",
+                      "path": "framework/architecture/best-practices/entity-framework-core-integration.md"
+                    },
+                    {
+                      "text": "MongoDB Integration",
+                      "path": "framework/architecture/best-practices/mongodb-integration.md"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "text": "API Development",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "framework/api-development",
+              "isIndex": true
+            },
+            {
+              "text": "ABP Endpoints",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/api-development/standard-apis",
+                  "isIndex": true
+                },
+                {
+                  "text": "Application Configuration",
+                  "path": "framework/api-development/standard-apis/configuration.md"
+                },
+                {
+                  "text": "Application Localization",
+                  "path": "framework/api-development/standard-apis/localization.md"
+                }
+              ]
+            },
+            {
+              "text": "API Versioning",
+              "path": "framework/api-development/versioning.md"
+            },
+            {
+              "text": "Auto API Controllers",
+              "path": "framework/api-development/auto-controllers.md"
+            },
+            {
+              "text": "Dynamic C# API Clients",
+              "path": "framework/api-development/dynamic-csharp-clients.md"
+            },
+            {
+              "text": "IdentityModel Clients",
+              "path": "framework/api-development/identitymodel-clients.md"
+            },
+            {
+              "text": "Integration Services",
+              "path": "framework/api-development/integration-services.md"
+            },
+            {
+              "text": "Static C# API Clients",
+              "path": "framework/api-development/static-csharp-clients.md"
+            },
+            {
+              "text": "Swagger Integration",
+              "path": "framework/api-development/swagger.md"
+            }
+          ]
+        },
+        {
+          "text": "User Interface",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "framework/ui",
+              "isIndex": true
+            },
+            {
+              "text": "MVC / Razor Pages",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/ui/mvc-razor-pages/overall.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Navigation / Menus",
+                  "path": "framework/ui/mvc-razor-pages/navigation-menu.md"
+                },
+                {
+                  "text": "Forms & Validation",
+                  "path": "framework/ui/mvc-razor-pages/forms-validation.md"
+                },
+                {
+                  "text": "Modals",
+                  "path": "framework/ui/mvc-razor-pages/modals.md"
+                },
+                {
+                  "text": "Data Tables",
+                  "path": "framework/ui/mvc-razor-pages/data-tables.md"
+                },
+                {
+                  "text": "Auto-Complete Select",
+                  "path": "framework/ui/mvc-razor-pages/auto-complete-select.md"
+                },
+                {
+                  "text": "Page Alerts",
+                  "path": "framework/ui/mvc-razor-pages/page-alerts.md"
+                },
+                {
+                  "text": "Dynamic JavaScript API Client Proxies",
+                  "path": "framework/ui/mvc-razor-pages/dynamic-javascript-proxies.md"
+                },
+                {
+                  "text": "Static JavaScript API Client Proxies",
+                  "path": "framework/ui/mvc-razor-pages/static-javascript-proxies.md"
+                },
+                {
+                  "text": "Client Side Package Management",
+                  "path": "framework/ui/mvc-razor-pages/client-side-package-management.md"
+                },
+                {
+                  "text": "Bundling & Minification",
+                  "path": "framework/ui/mvc-razor-pages/bundling-minification.md"
+                },
+                {
+                  "text": "Tag Helpers",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/ui/mvc-razor-pages/tag-helpers",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Components",
+                      "items": [
+                        {
+                          "text": "Alerts",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/alerts.md"
+                        },
+                        {
+                          "text": "Badges",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/badges.md"
+                        },
+                        {
+                          "text": "Blockquote",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/blockquote.md"
+                        },
+                        {
+                          "text": "Borders",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/borders.md"
+                        },
+                        {
+                          "text": "Breadcrumbs",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/breadcrumbs.md"
+                        },
+                        {
+                          "text": "Button Groups",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/button-groups.md"
+                        },
+                        {
+                          "text": "Buttons",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/buttons.md"
+                        },
+                        {
+                          "text": "Cards",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/cards.md"
+                        },
+                        {
+                          "text": "Carousel",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/carousel.md"
+                        },
+                        {
+                          "text": "Collapse",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/collapse.md"
+                        },
+                        {
+                          "text": "Dropdowns",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/dropdowns.md"
+                        },
+                        {
+                          "text": "Figure",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/figure.md"
+                        },
+                        {
+                          "text": "Grids",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/grids.md"
+                        },
+                        {
+                          "text": "List Groups",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/list-groups.md"
+                        },
+                        {
+                          "text": "Modals",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/modals.md"
+                        },
+                        {
+                          "text": "Navs",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/navs.md"
+                        },
+                        {
+                          "text": "Paginator",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/paginator.md"
+                        },
+                        {
+                          "text": "Popovers",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/popovers.md"
+                        },
+                        {
+                          "text": "Progress Bars",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/progress-bars.md"
+                        },
+                        {
+                          "text": "Tables",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/tables.md"
+                        },
+                        {
+                          "text": "Tabs",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/tabs.md"
+                        },
+                        {
+                          "text": "Tooltips",
+                          "path": "framework/ui/mvc-razor-pages/tag-helpers/tooltips.md"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Form Elements",
+                      "path": "framework/ui/mvc-razor-pages/tag-helpers/form-elements.md"
+                    },
+                    {
+                      "text": "Dynamic Forms",
+                      "path": "framework/ui/mvc-razor-pages/tag-helpers/dynamic-forms.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Widgets",
+                  "path": "framework/ui/mvc-razor-pages/widgets.md"
+                },
+                {
+                  "text": "Toolbars",
+                  "path": "framework/ui/mvc-razor-pages/toolbars.md"
+                },
+                {
+                  "text": "Page Header",
+                  "path": "framework/ui/mvc-razor-pages/page-header.md"
+                },
+                {
+                  "text": "Branding",
+                  "path": "framework/ui/mvc-razor-pages/branding.md"
+                },
+                {
+                  "text": "Layout Hooks",
+                  "path": "framework/ui/mvc-razor-pages/layout-hooks.md"
+                },
+                {
+                  "text": "Testing",
+                  "path": "framework/ui/mvc-razor-pages/testing.md"
+                },
+                {
+                  "text": "Theming",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/ui/mvc-razor-pages/theming.md",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "The Basic Theme",
+                      "path": "framework/ui/mvc-razor-pages/basic-theme.md"
+                    },
+                    {
+                      "text": "LeptonX Lite",
+                      "path": "ui-themes/lepton-x-lite/asp-net-core.md"
+                    },
+                    {
+                      "text": "LeptonX",
+                      "path": "ui-themes/lepton-x/mvc.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "JavaScript API",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Localization",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/localization.md"
+                    },
+                    {
+                      "text": "Auth",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/auth.md"
+                    },
+                    {
+                      "text": "Clock",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/clock.md"
+                    },
+                    {
+                      "text": "Current User",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/current-user.md"
+                    },
+                    {
+                      "text": "Settings",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/settings.md"
+                    },
+                    {
+                      "text": "Features",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/features.md"
+                    },
+                    {
+                      "text": "AJAX",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/ajax.md"
+                    },
+                    {
+                      "text": "Message",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/message.md"
+                    },
+                    {
+                      "text": "Notify",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/notify.md"
+                    },
+                    {
+                      "text": "Block/Busy",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/block-busy.md"
+                    },
+                    {
+                      "text": "Events",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/events.md"
+                    },
+                    {
+                      "text": "DOM",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/dom.md"
+                    },
+                    {
+                      "text": "Logging",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/logging.md"
+                    },
+                    {
+                      "text": "Resource Loader",
+                      "path": "framework/ui/mvc-razor-pages/javascript-api/resource-loader.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Customize/Extend the UI",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/ui/mvc-razor-pages/customization-user-interface.md",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "Entity Action Extensions",
+                      "path": "framework/ui/mvc-razor-pages/entity-action-extensions.md"
+                    },
+                    {
+                      "text": "Data Table Column Extensions",
+                      "path": "framework/ui/mvc-razor-pages/data-table-column-extensions.md"
+                    },
+                    {
+                      "text": "Page Toolbar Extensions",
+                      "path": "framework/ui/mvc-razor-pages/page-toolbar-extensions.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Security",
+                  "items": [
+                    {
+                      "text": "Security Headers",
+                      "path": "framework/ui/mvc-razor-pages/security-headers.md"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "Blazor",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/ui/blazor/overall.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Navigation / Menu",
+                  "path": "framework/ui/blazor/navigation-menu.md"
+                },
+                {
+                  "text": "Forms & Validation",
+                  "path": "framework/ui/blazor/forms-validation.md"
+                },
+                {
+                  "text": "Localization",
+                  "path": "framework/ui/blazor/localization.md"
+                },
+                {
+                  "text": "Theming",
+                  "items": [
+                    {
+                      "text": "Overview",
+                      "path": "framework/ui/blazor/theming.md",
+                      "isIndex": true
+                    },
+                    {
+                      "text": "The Basic Theme",
+                      "path": "framework/ui/blazor/basic-theme.md"
+                    },
+                    {
+                      "text": "LeptonX Lite",
+                      "path": "ui-themes/lepton-x-lite/blazor.md"
+                    },
+                    {
+                      "text": "LeptonX",
+                      "path": "ui-themes/lepton-x/blazor.md"
+                    },
+                    {
+                      "text": "Branding",
+                      "path": "framework/ui/blazor/branding.md"
+                    },
+                    {
+                      "text": "Page Header",
+                      "path": "framework/ui/blazor/page-header.md"
+                    },
+                    {
+                      "text": "Page Layout",
+                      "path": "framework/ui/blazor/page-layout.md"
+                    },
+                    {
+                      "text": "Toolbars",
+                      "path": "framework/ui/blazor/toolbars.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Security",
+                  "items": [
+                    {
+                      "text": "Authentication",
+                      "path": "framework/ui/blazor/authentication.md"
+                    },
+                    {
+                      "text": "Authorization",
+                      "path": "framework/ui/blazor/authorization.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Services",
+                  "items": [
+                    {
+                      "text": "Current User",
+                      "path": "framework/ui/blazor/current-user.md"
+                    },
+                    {
+                      "text": "Current Tenant",
+                      "path": "framework/ui/blazor/current-tenant.md"
+                    },
+                    {
+                      "text": "Notification",
+                      "path": "framework/ui/blazor/notification.md"
+                    },
+                    {
+                      "text": "Message",
+                      "path": "framework/ui/blazor/message.md"
+                    },
+                    {
+                      "text": "Page Alerts",
+                      "path": "framework/ui/blazor/page-alerts.md"
+                    },
+                    {
+                      "text": "Page Progress",
+                      "path": "framework/ui/blazor/page-progress.md"
+                    },
+                    {
+                      "text": "Block/Busy",
+                      "path": "framework/ui/blazor/block-busy.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Other Components",
+                  "items": [
+                    {
+                      "text": "SubmitButton Component",
+                      "path": "framework/ui/blazor/components/submit-button.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Settings",
+                  "path": "framework/ui/blazor/settings.md"
+                },
+                {
+                  "text": "Error Handling",
+                  "path": "framework/ui/blazor/error-handling.md"
+                },
+                {
+                  "text": "Customization / Overriding Components",
+                  "path": "framework/ui/blazor/customization-overriding-components.md"
+                },
+                {
+                  "text": "Global Scripts & Styles",
+                  "path": "framework/ui/blazor/global-scripts-styles.md"
+                },
+                {
+                  "text": "Global Features",
+                  "path": "framework/ui/blazor/global-features.md"
+                },
+                {
+                  "text": "Routing",
+                  "path": "framework/ui/blazor/routing.md"
+                },
+                {
+                  "text": "PWA Configuration",
+                  "path": "framework/ui/blazor/pwa-configuration.md"
+                },
+                {
+                  "text": "Layout Hooks",
+                  "path": "framework/ui/blazor/layout-hooks.md"
+                }
+              ]
+            },
+            {
+              "text": "Angular",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/ui/angular/overview.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Quick Start",
+                  "path": "framework/ui/angular/quick-start.md"
+                },
+                {
+                  "text": "Development",
+                  "items": [
+                    {
+                      "text": "Environment Variables",
+                      "path": "framework/ui/angular/environment.md"
+                    },
+                    {
+                      "text": "About Feature Libraries",
+                      "path": "framework/ui/angular/feature-libraries.md"
+                    },
+                    {
+                      "text": "Service Proxies",
+                      "path": "framework/ui/angular/service-proxies.md"
+                    },
+                    {
+                      "text": "SSR Configuration",
+                      "path": "framework/ui/angular/ssr-configuration.md"
+                    },
+                    {
+                      "text": "AI Tools Configuration",
+                      "path": "framework/ui/angular/ai-config.md"
+                    },
+                    {
+                      "text": "PWA Configuration",
+                      "path": "framework/ui/angular/pwa-configuration.md"
+                    },
+                    {
+                      "text": "Unit Testing",
+                      "path": "framework/ui/angular/testing.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Core Functionality",
+                  "items": [
+                    {
+                      "text": "Config State Service",
+                      "path": "framework/ui/angular/config-state-service.md"
+                    },
+                    {
+                      "text": "Authorization",
+                      "path": "framework/ui/angular/authorization.md"
+                    },
+                    {
+                      "text": "Current User",
+                      "path": "framework/ui/angular/current-user.md"
+                    },
+                    {
+                      "text": "HTTP Requests",
+                      "items": [
+                        {
+                          "text": "How to Make HTTP Requests",
+                          "path": "framework/ui/angular/http-requests.md"
+                        },
+                        {
+                          "text": "Error Handling",
+                          "path": "framework/ui/angular/http-error-handling.md"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Localization",
+                      "path": "framework/ui/angular/localization.md"
+                    },
+                    {
+                      "text": "Document Title Strategy",
+                      "path": "framework/ui/angular/title-strategy.md"
+                    },
+                    {
+                      "text": "Hybrid Localization",
+                      "path": "framework/ui/angular/hybrid-localization.md"
+                    },
+                    {
+                      "text": "Form Validation",
+                      "path": "framework/ui/angular/form-validation.md"
+                    },
+                    {
+                      "text": "Settings",
+                      "path": "framework/ui/angular/settings.md"
+                    },
+                    {
+                      "text": "Features",
+                      "path": "framework/ui/angular/features.md"
+                    },
+                    {
+                      "text": "Global Features",
+                      "path": "framework/ui/angular/global-features.md"
+                    },
+                    {
+                      "text": "Permission Management",
+                      "path": "framework/ui/angular/permission-management.md"
+                    },
+                    {
+                      "text": "Multi Tenancy",
+                      "path": "framework/ui/angular/multi-tenancy.md"
+                    },
+                    {
+                      "text": "Account Module",
+                      "path": "framework/ui/angular/account-module.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Utilities",
+                  "items": [
+                    {
+                      "text": "Managing RxJS Subscriptions",
+                      "path": "framework/ui/angular/subscription-service.md"
+                    },
+                    {
+                      "text": "Working with Lists",
+                      "path": "framework/ui/angular/list-service.md"
+                    },
+                    {
+                      "text": "Easy @for() track",
+                      "path": "framework/ui/angular/track-by-service.md"
+                    },
+                    {
+                      "text": "Router Events",
+                      "path": "framework/ui/angular/router-events.md"
+                    },
+                    {
+                      "text": "Inserting Scripts & Styles to DOM",
+                      "path": "framework/ui/angular/dom-insertion-service.md"
+                    },
+                    {
+                      "text": "Lazy Loading Scripts & Styles",
+                      "path": "framework/ui/angular/lazy-load-service.md"
+                    },
+                    {
+                      "text": "Projecting Angular Content",
+                      "path": "framework/ui/angular/content-projection-service.md"
+                    },
+                    {
+                      "text": "Modal",
+                      "path": "framework/ui/angular/modal.md"
+                    },
+                    {
+                      "text": "Confirmation Popup",
+                      "path": "framework/ui/angular/confirmation-service.md"
+                    },
+                    {
+                      "text": "Loading Directive",
+                      "path": "framework/ui/angular/loading-directive.md"
+                    },
+                    {
+                      "text": "Show Password Directive",
+                      "path": "framework/ui/angular/show-password-directive.md"
+                    },
+                    {
+                      "text": "Caps Lock Directive",
+                      "path": "framework/ui/angular/caps-lock-directive.md"
+                    },
+                    {
+                      "text": "Toast Overlay",
+                      "path": "framework/ui/angular/toaster-service.md"
+                    },
+                    {
+                      "text": "Page Alerts",
+                      "path": "framework/ui/angular/page-alerts.md"
+                    },
+                    {
+                      "text": "Ellipsis",
+                      "path": "framework/ui/angular/ellipsis-directive.md"
+                    },
+                    {
+                      "text": "Context Strategy",
+                      "path": "framework/ui/angular/context-strategy.md"
+                    },
+                    {
+                      "text": "Cross Origin Strategy",
+                      "path": "framework/ui/angular/cross-origin-strategy.md"
+                    },
+                    {
+                      "text": "Dom Strategy",
+                      "path": "framework/ui/angular/dom-strategy.md"
+                    },
+                    {
+                      "text": "Container Strategy",
+                      "path": "framework/ui/angular/container-strategy.md"
+                    },
+                    {
+                      "text": "Content Security Strategy",
+                      "path": "framework/ui/angular/content-security-strategy.md"
+                    },
+                    {
+                      "text": "Abp Window Service",
+                      "path": "framework/ui/angular/abp-window-service.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Customization",
+                  "items": [
+                    {
+                      "text": "Customization Guide",
+                      "path": "framework/ui/angular/customization-user-interface.md"
+                    },
+                    {
+                      "text": "Theming",
+                      "items": [
+                        {
+                          "text": "Overview",
+                          "path": "framework/ui/angular/theming.md",
+                          "isIndex": true
+                        },
+                        {
+                          "text": "Configuration",
+                          "path": "framework/ui/angular/theme-configurations.md"
+                        },
+                        {
+                          "text": "The Basic Theme",
+                          "path": "framework/ui/angular/basic-theme.md"
+                        },
+                        {
+                          "text": "LeptonX Lite",
+                          "path": "ui-themes/lepton-x-lite/angular.md"
+                        },
+                        {
+                          "text": "LeptonX",
+                          "path": "ui-themes/lepton-x/angular.md"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "Modifying the Menu",
+                      "path": "framework/ui/angular/modifying-the-menu.md"
+                    },
+                    {
+                      "text": "Manage Profile Page Tabs",
+                      "path": "framework/ui/angular/manage-profile-page-tabs.md"
+                    },
+                    {
+                      "text": "Sorting Navigation Elements",
+                      "path": "framework/ui/angular/sorting-navigation-elements.md"
+                    },
+                    {
+                      "text": "Component Replacement",
+                      "path": "framework/ui/angular/component-replacement.md"
+                    },
+                    {
+                      "text": "Extensions",
+                      "items": [
+                        {
+                          "text": "Overview",
+                          "path": "framework/ui/angular/extensions-overall.md",
+                          "isIndex": true
+                        },
+                        {
+                          "text": "Entity Action Extensions",
+                          "path": "framework/ui/angular/entity-action-extensions.md"
+                        },
+                        {
+                          "text": "Data Table Column Extensions",
+                          "path": "framework/ui/angular/data-table-column-extensions.md"
+                        },
+                        {
+                          "text": "Page Toolbar Extensions",
+                          "path": "framework/ui/angular/page-toolbar-extensions.md"
+                        },
+                        {
+                          "text": "Dynamic Form Extensions",
+                          "path": "framework/ui/angular/dynamic-form-extensions.md"
+                        },
+                        {
+                          "text": "Date, time and datetime format pipes",
+                          "path": "framework/ui/angular/datetime-format-pipe.md"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "text": "Components",
+                  "items": [
+                    {
+                      "text": "Page",
+                      "path": "framework/ui/angular/page-component.md"
+                    },
+                    {
+                      "text": "Chart",
+                      "path": "framework/ui/angular/chart-component.md"
+                    },
+                    {
+                      "text": "Card",
+                      "path": "framework/ui/angular/card-component.md"
+                    },
+                    {
+                      "text": "Tree",
+                      "path": "framework/ui/angular/tree-component.md"
+                    },
+                    {
+                      "text": "Lookup Search",
+                      "path": "framework/ui/angular/lookup-search-component.md"
+                    },
+                    {
+                      "text": "Dynamic Forms",
+                      "path": "framework/ui/angular/dynamic-form-module.md"
+                    },
+                    {
+                      "text": "Password Complexity Indicator",
+                      "path": "framework/ui/angular/password-complexity-indicator-component.md"
+                    },
+                    {
+                      "text": "Commercial UI Components (Pro)",
+                      "path": "framework/ui/angular/commercial-ui.md"
+                    },
+                    {
+                      "text": "Lookup Components(Pro)",
+                      "path": "framework/ui/angular/lookup-components.md"
+                    },
+                    {
+                      "text": "Entity Filters(Pro)",
+                      "path": "framework/ui/angular/entity-filters.md"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "React",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/ui/react/index.md",
+                  "isIndex": true
+                },
+                {
+                  "text": "Configuration and Development",
+                  "items": [
+                    {
+                      "text": "Environment Variables",
+                      "path": "framework/ui/react/environment-variables.md"
+                    },
+                    {
+                      "text": "Unit Testing",
+                      "path": "framework/ui/react/unit-testing.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Core Features",
+                  "items": [
+                    {
+                      "text": "Authorization",
+                      "path": "framework/ui/react/authorization.md"
+                    },
+                    {
+                      "text": "Localization",
+                      "path": "framework/ui/react/localization.md"
+                    },
+                    {
+                      "text": "Permission Management",
+                      "path": "framework/ui/react/permission-management.md"
+                    },
+                    {
+                      "text": "HTTP Requests",
+                      "path": "framework/ui/react/http-requests.md"
+                    }
+                  ]
+                },
+                {
+                  "text": "Customization and Components",
+                  "items": [
+                    {
+                      "text": "Customization",
+                      "path": "framework/ui/react/customization.md"
+                    },
+                    {
+                      "text": "Components",
+                      "path": "framework/ui/react/components/index.md",
+                      "isIndex": true
+                    }
+                  ]
+                },
+                {
+                  "text": "Admin Console",
+                  "path": "framework/ui/react/admin-console.md"
+                }
+              ]
+            },
+            {
+              "text": "React Native",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/ui/react-native",
+                  "isIndex": true
+                },
+                {
+                  "text": "Running on Web",
+                  "path": "framework/ui/react-native/running-on-web.md"
+                },
+                {
+                  "text": "Running on Device",
+                  "path": "framework/ui/react-native/running-on-device.md"
+                },
+                {
+                  "text": "Manual Backend Configuration",
+                  "path": "framework/ui/react-native/manual-backend-configuration.md"
+                },
+                {
+                  "text": "Android Emulator Setup",
+                  "path": "framework/ui/react-native/setting-up-android-emulator.md"
+                },
+                {
+                  "text": "Styling with NativeWind",
+                  "path": "framework/ui/react-native/styling-with-nativewind.md"
+                }
+              ]
+            },
+            {
+              "text": "MAUI",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/ui/maui",
+                  "isIndex": true
+                }
+              ]
+            },
+            {
+              "text": "Common",
+              "items": [
+                {
+                  "text": "Overriding the User Interface",
+                  "path": "framework/architecture/modularity/extending/overriding-user-interface.md"
+                },
+                {
+                  "text": "How to Override LeptonX CSS Variables",
+                  "path": "framework/ui/common/leptonx-css-variables.md"
+                },
+                {
+                  "text": "Utilities",
+                  "items": [
+                    {
+                      "text": "Linked List (Doubly)",
+                      "path": "framework/ui/common/utils/linked-list.md"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Data Access",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "framework/data",
+              "isIndex": true
+            },
+            {
+              "text": "Entity Framework Core",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "framework/data/entity-framework-core",
+                  "isIndex": true
+                },
+                {
+                  "text": "Database Migrations",
+                  "path": "framework/data/entity-framework-core/migrations.md"
+                },
+                {
+                  "text": "Switch DBMS",
+                  "path": "framework/data/entity-framework-core/other-dbms.md",
+                  "items": [
+                    {
+                      "text": "To MySQL",
+                      "path": "framework/data/entity-framework-core/mysql.md"
+                    },
+                    {
+                      "text": "To PostgreSQL",
+                      "path": "framework/data/entity-framework-core/postgresql.md"
+                    },
+                    {
+                      "text": "To Oracle",
+                      "path": "framework/data/entity-framework-core/oracle.md",
+                      "items": [
+                        {
+                          "text": "Oracle (Official)",
+                          "path": "framework/data/entity-framework-core/oracle-official.md"
+                        },
+                        {
+                          "text": "Oracle (Devart)",
+                          "path": "framework/data/entity-framework-core/oracle-devart.md"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "To SQLite",
+                      "path": "framework/data/entity-framework-core/sqlite.md"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "text": "MongoDB",
+              "path": "framework/data/mongodb"
+            },
+            {
+              "text": "In-Memory Database",
+              "path": "framework/data/memorydb"
+            },
+            {
+              "text": "Dapper",
+              "path": "framework/data/dapper"
+            }
+          ]
+        },
+        {
+          "text": "Real Time",
+          "items": [
+            {
+              "text": "SignalR Integration",
+              "path": "framework/real-time/signalr.md"
+            }
+          ]
+        },
+        {
+          "text": "Dapr Integration",
+          "path": "framework/dapr"
+        }
+      ]
+    },
+    {
+      "text": "Low-Code System",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "low-code",
+          "isIndex": true
+        },
+        {
+          "text": "Low-Code Designer",
+          "path": "low-code/designer.md"
+        },
+        {
+          "text": "React Runtime",
+          "path": "low-code/react-runtime.md"
+        },
+        {
+          "text": "Health",
+          "path": "low-code/health.md"
+        },
+        {
+          "text": "Dashboards",
+          "path": "low-code/dashboards.md"
+        },
+        {
+          "text": "Page Groups",
+          "path": "low-code/page-groups.md"
+        },
+        {
+          "text": "MCP Integration",
+          "path": "low-code/mcp.md"
+        },
+        {
+          "text": "Attributes & Fluent API",
+          "path": "low-code/fluent-api.md"
+        },
+        {
+          "text": "Model Descriptor Files",
+          "path": "low-code/model-json.md"
+        },
+        {
+          "text": "Reference Entities",
+          "path": "low-code/reference-entities.md"
+        },
+        {
+          "text": "Code Integration",
+          "path": "low-code/code-integration.md"
+        },
+        {
+          "text": "Foreign Access",
+          "path": "low-code/foreign-access.md"
+        },
+        {
+          "text": "Interceptors",
+          "path": "low-code/interceptors.md"
+        },
+        {
+          "text": "Custom Endpoints",
+          "path": "low-code/custom-endpoints.md"
+        },
+        {
+          "text": "Script Actions",
+          "path": "low-code/script-actions.md"
+        },
+        {
+          "text": "Scripting API",
+          "path": "low-code/scripting-api.md"
+        }
+      ]
+    },
+    {
+      "text": "Solution Templates",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "solution-templates",
+          "isIndex": true
+        },
+        {
+          "text": "Template Guide",
+          "path": "solution-templates/guide.md"
+        },
+        {
+          "text": "Modern vs Classic Templates",
+          "path": "solution-templates/modern-vs-classic.md"
+        },
+        {
+          "text": "Single-Layer Solution",
+          "isLazyExpandable": true,
+          "path": "solution-templates/single-layer-web-application",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "solution-templates/single-layer-web-application/overview.md"
+            },
+            {
+              "text": "Solution Structure",
+              "path": "solution-templates/single-layer-web-application/solution-structure.md"
+            },
+            {
+              "text": "Main Components",
+              "isLazyExpandable": true,
+              "path": "solution-templates/single-layer-web-application/main-components.md",
+              "items": [
+                {
+                  "text": "Web Applications",
+                  "path": "solution-templates/single-layer-web-application/web-applications.md"
+                },
+                {
+                  "text": "Db Migrator",
+                  "path": "solution-templates/single-layer-web-application/db-migrator.md"
+                }
+              ]
+            },
+            {
+              "text": "Built-In Features",
+              "isLazyExpandable": true,
+              "path": "solution-templates/single-layer-web-application/built-in-features.md",
+              "items": [
+                {
+                  "text": "Authentication",
+                  "path": "solution-templates/single-layer-web-application/authentication.md"
+                },
+                {
+                  "text": "Database configurations",
+                  "path": "solution-templates/single-layer-web-application/database-configurations.md"
+                },
+                {
+                  "text": "Logging (with Serilog)",
+                  "path": "solution-templates/single-layer-web-application/logging.md"
+                },
+                {
+                  "text": "Swagger integration",
+                  "path": "solution-templates/single-layer-web-application/swagger-integration.md"
+                },
+                {
+                  "text": "Multi-Tenancy",
+                  "path": "solution-templates/single-layer-web-application/multi-tenancy.md"
+                },
+                {
+                  "text": "BLOB Storing",
+                  "path": "solution-templates/single-layer-web-application/blob-storing.md"
+                },
+                {
+                  "text": "CORS configuration",
+                  "path": "solution-templates/single-layer-web-application/cors-configuration.md"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Layered Solution",
+          "isLazyExpandable": true,
+          "path": "solution-templates/layered-web-application",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "solution-templates/layered-web-application/overview.md"
+            },
+            {
+              "text": "Solution Structure",
+              "path": "solution-templates/layered-web-application/solution-structure.md"
+            },
+            {
+              "text": "Main Components",
+              "isLazyExpandable": true,
+              "path": "solution-templates/layered-web-application/main-components.md",
+              "items": [
+                {
+                  "text": "Web Applications",
+                  "path": "solution-templates/layered-web-application/web-applications.md"
+                },
+                {
+                  "text": "Db Migrator",
+                  "path": "solution-templates/layered-web-application/db-migrator.md"
+                },
+                {
+                  "text": "Mobile Applications",
+                  "path": "solution-templates/layered-web-application/mobile-applications.md"
+                }
+              ]
+            },
+            {
+              "text": "Built-In Features",
+              "isLazyExpandable": true,
+              "path": "solution-templates/layered-web-application/built-in-features.md",
+              "items": [
+                {
+                  "text": "Authentication",
+                  "path": "solution-templates/layered-web-application/authentication.md"
+                },
+                {
+                  "text": "Database configurations",
+                  "path": "solution-templates/layered-web-application/database-configurations.md"
+                },
+                {
+                  "text": "Logging (with Serilog)",
+                  "path": "solution-templates/layered-web-application/logging.md"
+                },
+                {
+                  "text": "Swagger integration",
+                  "path": "solution-templates/layered-web-application/swagger-integration.md"
+                },
+                {
+                  "text": "Background Jobs",
+                  "path": "solution-templates/layered-web-application/background-jobs.md"
+                },
+                {
+                  "text": "Background Workers",
+                  "path": "solution-templates/layered-web-application/background-workers.md"
+                },
+                {
+                  "text": "Distributed Locking",
+                  "path": "solution-templates/layered-web-application/distributed-locking.md"
+                },
+                {
+                  "text": "Multi-Tenancy",
+                  "path": "solution-templates/layered-web-application/multi-tenancy.md"
+                },
+                {
+                  "text": "BLOB Storing",
+                  "path": "solution-templates/layered-web-application/blob-storing.md"
+                },
+                {
+                  "text": "CORS configuration",
+                  "path": "solution-templates/layered-web-application/cors-configuration.md"
+                }
+              ]
+            },
+            {
+              "text": "Helm Charts and Kubernetes",
+              "path": "solution-templates/layered-web-application/helm-charts-and-kubernetes.md"
+            },
+            {
+              "text": "Deployment",
+              "path": "solution-templates/layered-web-application/deployment",
+              "items": [
+                {
+                  "text": "Docker Deployment",
+                  "path": "solution-templates/layered-web-application/deployment/deployment-docker-compose.md"
+                },
+                {
+                  "text": "Azure Deployment",
+                  "items": [
+                    {
+                      "text": "Deploy to Azure Web App Service",
+                      "path": "solution-templates/layered-web-application/deployment/azure-deployment/azure-deployment.md",
+                      "isInSeries": true
+                    },
+                    {
+                      "text": "Creating an Azure Web App Service Environment",
+                      "path": "solution-templates/layered-web-application/deployment/azure-deployment/step1-create-azure-resources.md",
+                      "isInSeries": true
+                    },
+                    {
+                      "text": "Customizing the Configuration of Your ABP Application",
+                      "path": "solution-templates/layered-web-application/deployment/azure-deployment/step2-configuration-application.md",
+                      "isInSeries": true
+                    },
+                    {
+                      "text": "Deploying Application With GitHub Actions",
+                      "path": "solution-templates/layered-web-application/deployment/azure-deployment/step3-deployment-github-action.md",
+                      "isInSeries": true
+                    }
+                  ]
+                },
+                {
+                  "text": "IIS Deployment",
+                  "path": "solution-templates/layered-web-application/deployment/deployment-iis.md"
+                },
+                {
+                  "text": "IdentityServer Deployment",
+                  "path": "solution-templates/layered-web-application/deployment/identityserver-deployment.md"
+                },
+                {
+                  "text": "OpenIddict Deployment",
+                  "path": "solution-templates/layered-web-application/deployment/openiddict-deployment.md"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Modular Monolith",
+          "path": "solution-templates/modular-monolith"
+        },
+        {
+          "text": "Microservice Solution",
+          "isLazyExpandable": true,
+          "path": "solution-templates/microservice/index.md",
+          "items":[
+            {
+              "text": "Overview",
+              "path": "solution-templates/microservice/overview.md"
+            },
+            {
+              "text": "Solution Structure",
+              "path": "solution-templates/microservice/solution-structure.md"
+            },
+            {
+              "text": "Main Components",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "solution-templates/microservice/main-components"
+                },
+                {
+                  "text": "Microservices",
+                  "path": "solution-templates/microservice/microservices.md"
+                },
+                {
+                  "text": "API Gateways",
+                  "path": "solution-templates/microservice/api-gateways.md"
+                },
+                {
+                  "text": "Web Applications",
+                  "path": "solution-templates/microservice/web-applications.md" 
+                },
+                {
+                  "text": "Mobile Applications",
+                  "path": "solution-templates/microservice/mobile-applications.md"
+                }
+              ]
+            },
+            {
+              "text": "Built-In Features",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "solution-templates/microservice/built-in-features.md"
+                },
+                {
+                  "text": "Authentication",
+                  "path": "solution-templates/microservice/authentication.md"
+                },
+                {
+                  "text": "Database configurations",
+                  "path": "solution-templates/microservice/database-configurations.md"
+                },
+                {
+                  "text": "Logging (with Serilog and Elasticsearch)",
+                  "path": "solution-templates/microservice/logging.md"
+                },
+                {
+                  "text": "Monitoring (with Prometheus and Grafana)",
+                  "path": "solution-templates/microservice/monitoring.md"
+                },
+                {
+                  "text": "Swagger integration",
+                  "path": "solution-templates/microservice/swagger-integration.md"
+                },
+                {
+                  "text": "Permission management",
+                  "path": "solution-templates/microservice/permission-management.md"
+                },
+                {
+                  "text": "Feature management",
+                  "path": "solution-templates/microservice/feature-management.md"
+                },
+                {
+                  "text": "Localization system",
+                  "path": "solution-templates/microservice/localization-system.md"
+                },
+                {
+                  "text": "Background Jobs",
+                  "path": "solution-templates/microservice/background-jobs.md"
+                },
+                {
+                  "text": "Background Workers",
+                  "path": "solution-templates/microservice/background-workers.md"
+                },
+                {
+                  "text": "Distributed Locking",
+                  "path": "solution-templates/microservice/distributed-locking.md"
+                },
+                {
+                  "text": "Distributed Cache",
+                  "path": "solution-templates/microservice/distributed-cache.md"
+                },
+                {
+                  "text": "Multi-Tenancy",
+                  "path": "solution-templates/microservice/multi-tenancy.md"
+                },
+                {
+                  "text": "BLOB Storing",
+                  "path": "solution-templates/microservice/blob-storing.md"
+                },
+                {
+                  "text": "CORS configuration",
+                  "path": "solution-templates/microservice/cors-configuration.md"
+                }
+              ]
+            },
+            {
+              "text": "Communication",
+              "items":[
+                {
+                  "text": "Overview",
+                  "path": "solution-templates/microservice/communication.md"
+                },
+                {
+                  "text": "HTTP API Calls",
+                  "path": "solution-templates/microservice/http-api-calls.md"
+                },
+                {
+                  "text": "gRPC Calls",
+                  "path": "solution-templates/microservice/grpc-calls.md"
+                },
+                {
+                  "text": "Distributed Events",
+                  "path": "solution-templates/microservice/distributed-events.md"
+                }
+              ]
+            },
+            {
+              "text": "Helm Charts and Kubernetes",
+              "path": "solution-templates/microservice/helm-charts-and-kubernetes.md"
+            },
+            {
+              "text": ".NET Aspire Integration",
+              "path": "solution-templates/microservice/aspire-integration.md"
+            },
+            {
+              "text": "Guides",
+              "items": [
+                {
+                  "text": "Overview",
+                  "path": "solution-templates/microservice/guides.md"
+                },
+                {
+                  "text": "Adding new microservices",
+                  "path": "solution-templates/microservice/adding-new-microservices.md"
+                },
+                {
+                  "text": "Adding new applications",
+                  "path": "solution-templates/microservice/adding-new-applications.md"
+                },
+                {
+                  "text": "Adding new API gateways",
+                  "path": "solution-templates/microservice/adding-new-api-gateways.md"
+                },
+                {
+                  "text": "Mono-repo vs multiple repository approaches",
+                  "path": "solution-templates/microservice/mono-repo-vs-multiple-repository-approaches.md"
+                },
+                {
+                  "text": "Authoring unit and integration tests",
+                  "path": "solution-templates/microservice/authoring-unit-and-integration-tests.md"
+                },
+                {
+                  "text": "How to use with ABP Suite",
+                  "path": "solution-templates/microservice/how-to-use-with-abp-suite.md"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "text": "Application Module",
+          "path": "solution-templates/application-module"
+        }
+      ]
+    },
+    {
+      "text": "Application Modules",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "modules",
+          "isIndex": true
+        },
+        {
+          "text": "Account",
+          "path": "modules/account.md"
+        },
+        {
+          "text": "Account (Pro)",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "modules/account-pro.md",
+              "isIndex": true
+            },
+            {
+              "text": "Idle Session Timeout",
+              "path": "modules/account/idle-session-timeout.md"
+            },
+            {
+              "text": "Tenant impersonation & User impersonation",
+              "path": "modules/account/impersonation.md"
+            },
+            {
+              "text": "Web Authentication API (WebAuthn) passkeys",
+              "path": "modules/account/passkey.md"
+            }
+          ]
+        },
+        {
+          "text": "AI Management (Pro)",
+          "path": "modules/ai-management/index.md"
+        },
+        {
+          "text": "Audit Logging",
+          "path": "modules/audit-logging.md"
+        },
+        {
+          "text": "Audit Logging (Pro)",
+          "path": "modules/audit-logging-pro.md"
+        },
+        {
+          "text": "Background Jobs",
+          "path": "modules/background-jobs.md"
+        },
+        {
+          "text": "Blogging",
+          "path": "modules/blogging.md"
+        },
+        {
+          "text": "Chat (Pro)",
+          "path": "modules/chat.md"
+        },
+        {
+          "text": "CMS Kit",
+          "isLazyExpandable": true,
+          "path": "modules/cms-kit",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "modules/cms-kit.md",
+              "isIndex": true
+            },
+            {
+              "text": "Pages",
+              "path": "modules/cms-kit/pages.md"
+            },
+            {
+              "text": "Blogging",
+              "path": "modules/cms-kit/blogging.md"
+            },
+            {
+              "text": "Tag Management",
+              "path": "modules/cms-kit/tags.md"
+            },
+            {
+              "text": "Comments",
+              "path": "modules/cms-kit/comments.md"
+            },
+            {
+              "text": "Reaction System",
+              "path": "modules/cms-kit/reactions.md"
+            },
+            {
+              "text": "Rating System",
+              "path": "modules/cms-kit/ratings.md"
+            },
+            {
+              "text": "Menus",
+              "path": "modules/cms-kit/menus.md"
+            },
+            {
+              "text": "Global Resources",
+              "path": "modules/cms-kit/global-resources.md"
+            },
+            {
+              "text": "Dynamic Widget",
+              "path": "modules/cms-kit/dynamic-widget.md"
+            },
+            {
+              "text": "Marked Item System",
+              "path": "modules/cms-kit/marked-items.md"
+            }
+          ]
+        },
+        {
+          "text": "CMS Kit (Pro)",
+          "isLazyExpandable": true,
+          "path": "modules/cms-kit-pro",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "modules/cms-kit-pro.md",
+              "isIndex": true
+            },
+            {
+              "text": "Newsletter System",
+              "path": "modules/cms-kit-pro/newsletter.md"
+            },
+            {
+              "text": "Contact Management",
+              "path": "modules/cms-kit-pro/contact-form.md"
+            },
+            {
+              "text": "URL Forwarding System",
+              "path": "modules/cms-kit-pro/url-forwarding.md"
+            },
+            {
+              "text": "Poll System",
+              "path": "modules/cms-kit-pro/poll.md"
+            },
+            {
+              "text": "Page Feedback System",
+              "path": "modules/cms-kit-pro/page-feedback.md"
+            },
+            {
+              "text": "FAQ System",
+              "path": "modules/cms-kit-pro/faq.md"
+            }
+          ]
+        },
+        {
+          "text": "Docs",
+          "path": "modules/docs.md"
+        },
+        {
+          "text": "Elsa (Pro)",
+          "path": "modules/elsa-pro.md"
+        },
+        {
+          "text": "Feature Management",
+          "path": "modules/feature-management.md"
+        },
+        {
+          "text": "File Management (Pro)",
+          "path": "modules/file-management.md"
+        },
+        {
+          "text": "Forms (Pro)",
+          "path": "modules/forms.md"
+        },
+        {
+          "text": "GDPR (Pro)",
+          "path": "modules/gdpr.md"
+        },
+        {
+          "text": "Identity",
+          "isLazyExpandable": true,
+          "path": "modules/identity.md",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "modules/identity.md",
+              "isIndex": true
+            },
+            {
+              "text": "User Lookup and Synchronization",
+              "path": "modules/identity/user-synchronization.md"
+            }
+          ]
+        },
+        {
+          "text": "Identity (Pro)",
+          "path": "modules/identity-pro.md"
+        },
+        {
+          "text": "IdentityServer",
+          "isLazyExpandable": true,
+          "path": "modules/identity-server.md",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "modules/identity-server.md",
+              "isIndex": true
+            },
+            {
+              "text": "IdentityServer Migration Guide",
+              "path": "release-info/migration-guides/identityserver4-step-by-step.md"
+            }
+          ]
+        },
+        {
+          "text": "IdentityServer (Pro)",
+          "path": "modules/identity-server-pro.md"
+        },
+        {
+          "text": "Language Management (Pro)",
+          "path": "modules/language-management.md"
+        },
+        {
+          "text": "Operation Rate Limiting (Pro)",
+          "path": "modules/operation-rate-limiting.md"
+        },
+        {
+          "text": "OpenIddict",
+          "isLazyExpandable": true,
+          "path": "modules/openiddict.md",
+          "items": [
+            {
+              "text": "Overview",
+              "path": "modules/openiddict.md",
+              "isIndex": true
+            },
+            {
+              "text": "OpenIddict Migration Guide",
+              "path": "release-info/migration-guides/openiddict-step-by-step.md"
+            }
+          ]
+        },
+        {
+          "text": "OpenIddict (Pro)",
+          "path": "modules/openiddict-pro.md"
+        },
+        {
+          "text": "Payment (Pro)",
+          "path": "modules/payment.md"
+        },
+        {
+          "text": "Permission Management",
+          "path": "modules/permission-management.md"
+        },
+        {
+          "text": "SaaS (Pro)",
+          "path": "modules/saas.md"
+        },
+        {
+          "text": "Setting Management",
+          "path": "modules/setting-management.md"
+        },
+        {
+          "text": "Tenant Management",
+          "path": "modules/tenant-management.md"
+        },
+        {
+          "text": "Text template management (Pro)",
+          "path": "modules/text-template-management.md"
+        },
+        {
+          "text": "Twilio SMS (Pro)",
+          "path": "modules/twilio-sms.md"
+        },
+        {
+          "text": "Virtual File Explorer",
+          "path": "modules/virtual-file-explorer.md"
+        },
+        {
+          "text": "Common",
+          "items": [
+            {
+              "text": "Database Tables",
+              "path": "modules/database-tables.md"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "UI Themes",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "ui-themes",
+          "isIndex": true
+        },
+        {
+          "text": "The Basic Theme",
+          "path": "ui-themes/basic-theme"
+        },
+        {
+          "text": "LeptonX Lite",
+          "path": "ui-themes/lepton-x-lite"
+        },
+        {
+          "text": "LeptonX Theme",
+          "path": "ui-themes/lepton-x"
+        }
+      ]
+    },
+    {
+      "text": "Testing",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "testing/overall.md",
+          "isIndex": true
+        },
+        {
+          "text": "Unit tests",
+          "path": "testing/unit-tests.md"
+        },
+        {
+          "text": "Integration tests",
+          "path": "testing/integration-tests.md"
+        },
+        {
+          "text": "UI tests",
+          "path": "testing/ui-tests.md"
+        }
+      ]
+    },
+    {
+      "text": "Deployment",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "deployment",
+          "isIndex": true
+        },
+        {
+          "text": "Configuring SSL certificate(HTTPS)",
+          "path": "deployment/ssl.md"
+        },
+        {
+          "text": "Configuring OpenIddict",
+          "path": "deployment/configuring-openiddict.md"
+        },
+        {
+          "text": "Configuring for Production",
+          "path": "deployment/configuring-production.md"
+        },
+        {
+          "text": "Deploying to a Clustered Environment",
+          "path": "deployment/clustered-environment.md"
+        },
+        {
+          "text": "Distributed / Microservice Solutions",
+          "path": "deployment/distributed-microservice.md"
+        },
+        {
+          "text": "Optimizing for Production",
+          "path": "deployment/optimizing-production.md"
+        },
+        {
+          "text": "Configuring Forwarded Headers for Reverse Proxies",
+          "path": "deployment/forwarded-headers.md"
+        }
+      ]
+    },
+    {
+      "text": "Samples",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "samples",
+          "isIndex": true
+        },
+        {
+          "text": "EventHub",
+          "path": "https://github.com/abpframework/eventhub"
+        },
+        {
+          "text": "eShopOnAbp",
+          "path": "https://github.com/abpframework/eShopOnAbp"
+        },
+        {
+          "text": "CMS Kit Demo",
+          "path": "https://github.com/abpframework/cms-kit-demo"
+        },
+        {
+          "text": "Easy CRM",
+          "path": "samples/easy-crm.md"
+        },
+        {
+          "text": "Elsa Workflows Demo",
+          "path": "samples/elsa-workflows-demo.md"
+        }
+      ]
+    },
+    {
+      "text": "Books",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "https://abp.io/books",
+          "isIndex": true
+        },
+        {
+          "text": "Mastering ABP Framework",
+          "path": "https://abp.io/books/mastering-abp-framework"
+        },
+        {
+          "text": "Implementing Domain Driven Design",
+          "path": "https://abp.io/books/implementing-domain-driven-design"
+        }
+      ]
+    },
+    {
+      "text": "Release Information",
+      "items": [
+        {
+          "text": "Overview",
+          "path": "release-info",
+          "isIndex": true
+        },
+        {
+          "text": "Release Notes",
+          "path": "release-info/release-notes.md"
+        },
+        {
+          "text": "Migration Guides",
+          "path": "release-info/migration-guides"
+        },
+        {
+          "text": "Road Map",
+          "path": "release-info/road-map.md"
+        },
+        {
+          "text": "Upgrading",
+          "path": "release-info/upgrading.md"
+        },
+        {
+          "text": "Preview Releases",
+          "path": "release-info/previews.md"
+        },
+        {
+          "text": "Nightly Builds",
+          "path": "release-info/nightly-builds.md"
+        },
+        {
+          "text": "Official Packages",
+          "path": "https://abp.io/packages"
+        }
+      ]
+    },
+    {
+      "text": "Others",
+      "items": [
+        {
+          "text": "API Documentation",
+          "path": "{ApiDocumentationUrl}"
+        },
+        {
+          "text": "Contribution Guide",
+          "path": "contribution"
+        },
+        {
+          "text": "Why ABP Platform?",
+          "path": "others/why-abp-platform.md"
+        },
+        {
+          "text": "Free (Open Source) License vs Commercial (Pro) Licenses",
+          "path": "others/free-licenses-vs-pro-licenses.md"
+        },
+        {
+          "text": "Knowledge Base",
+          "path": "kb"
+        },
+        {
+          "text": "Penetration Test Report",
+          "path": "others/penetration-test-report.md"
+        },
+        {
+          "text": "ABP vs ASP.NET Zero",
+          "path": "others/aspnet-zero-vs-abp.md"
+        },
+        {
+          "text": "Migrating from Open Source Templates",
+          "path": "guides/migrating-from-open-source.md"
+        },
+        {
+          "text": "Migrating from IdentityServer to OpenIddict",
+          "path": "release-info/migration-guides/openiddict-step-by-step.md"
+        },
+        {
+          "text": "Migrating from the ASP.NET Boilerplate",
+          "path": "others/aspnet-boilerplate-migration-guide.md"
+        }
+      ]
+    }
+  ]
+}
