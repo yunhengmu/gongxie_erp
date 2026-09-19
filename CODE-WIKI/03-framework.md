@@ -33,7 +33,7 @@ yudao-framework/
 | [ServerException](../yudao-framework/yudao-common/src/main/java/cn/iocoder/yudao/framework/common/exception/ServerException.java) | 服务端内部异常 |
 | [ServiceExceptionUtil](../yudao-framework/yudao-common/src/main/java/cn/iocoder/yudao/framework/common/exception/util/ServiceExceptionUtil.java) | 快速抛出 `ServiceException` 的工厂工具 |
 | [GlobalErrorCodeConstants](../yudao-framework/yudao-common/src/main/java/cn/iocoder/yudao/framework/common/exception/enums/GlobalErrorCodeConstants.java) | 全局错误码常量（成功/参数错误/未登录/无权限/系统异常等） |
-| [ServiceErrorCodeRange](../yudao-framework/yudao-common/src/main/java/cn/iocoder/yudao/framework/common/exception/enums/ServiceErrorCodeRange.java) | 各模块错误码段分配（避免冲突，如 bpm/300xxxx） |
+| [ServiceErrorCodeRange](../yudao-framework/yudao-common/src/main/java/cn/iocoder/yudao/framework/common/exception/enums/ServiceErrorCodeRange.java) | 各模块错误码段分配（避免冲突，各模块固定区间） |
 
 ### 1.3 通用枚举
 

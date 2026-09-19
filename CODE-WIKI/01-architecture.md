@@ -2,7 +2,7 @@
 
 ## 1. 平台定位
 
-**芋道（Yudao）** 是以开发者为中心打造的中国一流快速开发平台，本项目为其 **Spring Cloud 微服务完整版**（`yudao-cloud`）。相比单体的 `ruoyi-vue-pro`，它在后端采用微服务拆分；相比 `yudao-cloud-mini` 精简版，它额外包含会员、报表、工作流、商城、营销、CRM、ERP、WMS、MES、HRM、FMS、IM、AI、IoT 等业务功能。
+**芋道（Yudao）** 是以开发者为中心打造的中国一流快速开发平台，本项目为其 **Spring Cloud 微服务完整版**（`yudao-cloud`）。相比单体的 `ruoyi-vue-pro`，它在后端采用微服务拆分；相比 `yudao-cloud-mini` 精简版，它额外包含会员、商城、营销、CRM、ERP、WMS、MES、IM、AI、IoT 等业务功能。
 
 - 开源协议：MIT（个人与企业可 100% 免费使用，无需保留版权信息）。
 - 当前分支：`master-jdk25`（JDK 25 + Spring Boot 4.x）。
@@ -63,7 +63,6 @@
 | ORM | MyBatis Plus / Dynamic Datasource / Druid | 3.5.16 / 4.5.0 / 1.2.28 |
 | 缓存 | Redis + Redisson | 5.0~7.0 / 4.6.1 |
 | 消息队列 | Redis Stream / RocketMQ / Kafka / RabbitMQ（可选） | 5.3.1 |
-| 工作流 | Flowable | 8.0.0 |
 | 接口文档 | Knife4j（Swagger 增强） | 4.5.0 |
 | 链路/监控 | SkyWalking / Spring Boot Admin | 9.6.0 / 4.1.1 |
 | Bean 转换 | MapStruct + Lombok | 1.6.3 / 1.18.46 |

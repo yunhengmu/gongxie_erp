@@ -35,6 +35,16 @@ public class AiUtils {
 
     public static final String TOOL_CONTEXT_LOGIN_USER = "LOGIN_USER";
     public static final String TOOL_CONTEXT_TENANT_ID = "TENANT_ID";
+    /**
+     * 撤回单元：用户消息编号，关联 ai_chat_message.id
+     *
+     * 供可撤回操作账本（@Reversible）把账本帧挂到具体消息上
+     */
+    public static final String TOOL_CONTEXT_MESSAGE_ID = "MESSAGE_ID";
+    /**
+     * 对话编号，关联 ai_chat_conversation.id
+     */
+    public static final String TOOL_CONTEXT_CONVERSATION_ID = "CONVERSATION_ID";
 
     /**
      * 解析 DB 等动态配置里的 Spring 占位符，例如 ${OPENAI_API_KEY}
@@ -153,10 +163,15 @@ public class AiUtils {
         throw new IllegalArgumentException(StrUtil.format("未知消息类型({})", type));
     }
 
-    public static Map<String, Object> buildCommonToolContext() {
+    public static Map<String, Object> buildCommonToolContext(Long messageId, Long conversationId) {
         Map<String, Object> context = new HashMap<>();
         context.put(TOOL_CONTEXT_LOGIN_USER, SecurityFrameworkUtils.getLoginUser());
         context.put(TOOL_CONTEXT_TENANT_ID, TenantContextHolder.getTenantId());
+        // 可撤回操作所需：撤回单元与归属，供 ReversibleLedgerAspect 落账本帧
+        // 注意：这里必须走 ToolContext 而不是 ThreadLocal——流式场景下工具执行在 Flux 线程，
+        // TenantContextHolder 是 TransmittableThreadLocal，不会自动继承调用线程的值
+        context.put(TOOL_CONTEXT_MESSAGE_ID, messageId);
+        context.put(TOOL_CONTEXT_CONVERSATION_ID, conversationId);
         return context;
     }
 

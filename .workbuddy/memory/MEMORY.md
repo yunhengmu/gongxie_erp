@@ -13,3 +13,7 @@
 - MCP transport 默认用 Streamable HTTP（`/mcp`），SSE 已被规范弃用。
 - module-agent 的对话记忆 = LangGraph `checkpointer`（短时/按 thread_id）+ `store`（长时），重启持久化需切 `AsyncPostgresSaver`。
 - **`core/tool/memory_tools.py`（全局版）已于 2026-09-01 删除**（用户授权）：namespace 写死 `("users",)` 全局共享，多租户下跨租户可读写，且读写不出 Python 进程、Java 三层隔离管不到。`core/agent.py` 已移除挂载，三个 prompt 模板（research/rag/code_review.md）已删除 Long-term Memory 段，README 已同步。租户安全替代 = CODE-WIKI/13 文件 2 的 `make_memory_tools(tenant_id, user_id)` 闭包工厂。注意：`AI应用开发笔记.md` 里仍有旧代码引用（用户的历史笔记，未动）。
+
+- **术语约定（2026-09-17 用户纠正）**：撤回机制一律用 **messageId**，不要用设计文档原文里的 "turnId"。
+  系统内只有 `ai_chat_message.id` 一个消息 ID，不存在第二个 turn 编号。我混用两个词让用户以为存在两套 ID 而提出质疑。
+  唯一需区分处：前端可能传 assistant 行 id，需归一化到其 `reply_id`（= user 行 id）后再用。

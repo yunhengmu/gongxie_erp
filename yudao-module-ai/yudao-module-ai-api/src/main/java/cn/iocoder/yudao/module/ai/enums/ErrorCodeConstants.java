@@ -66,4 +66,13 @@ public interface ErrorCodeConstants {
     ErrorCode WORKFLOW_NOT_EXISTS = new ErrorCode(1_040_011_000, "工作流不存在");
     ErrorCode WORKFLOW_CODE_EXISTS = new ErrorCode(1_040_011_001, "工作流标识已存在");
 
+    // ========== 可撤回操作 1-040-012-000 ==========
+    ErrorCode REVERSIBLE_MESSAGE_NOT_EXISTS = new ErrorCode(1_040_012_000, "消息不存在!");
+    ErrorCode REVERSIBLE_NOT_OWNER = new ErrorCode(1_040_012_001, "无权撤回他人的消息!");
+    ErrorCode REVERSIBLE_TURN_NOT_CLOSED = new ErrorCode(1_040_012_002, "操作进行中，暂不可撤回");
+    ErrorCode REVERSIBLE_EXPIRED = new ErrorCode(1_040_012_003, "已超过可撤回时间");
+    ErrorCode REVERSIBLE_STATUS_INVALID = new ErrorCode(1_040_012_004, "该消息的操作已冲账或正在冲账，不可重复撤回");
+    ErrorCode REVERSIBLE_HAS_LATER = new ErrorCode(1_040_012_005, "存在更晚的未撤回操作，请先撤回更晚的消息");
+    ErrorCode REVERSIBLE_PARTIAL_FAILED = new ErrorCode(1_040_012_006, "撤回遇到问题，已停止并转人工处理");
+
 }

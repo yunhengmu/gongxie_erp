@@ -169,7 +169,8 @@ public class AiChatMessageServiceImpl implements AiChatMessageService {
                 knowledgeSegments, null, webSearchResponse);
 
         // 4.2 创建 chat 需要的 Prompt
-        Prompt prompt = buildPrompt(conversation, historyMessages, knowledgeSegments, webSearchResponse, model, sendReqVO);
+        Prompt prompt = buildPrompt(conversation, historyMessages, knowledgeSegments, webSearchResponse, model, sendReqVO,
+                userMessage.getId());
         ChatResponse chatResponse = chatModel.call(prompt);
 
         // 4.3 更新响应内容
@@ -226,7 +227,8 @@ public class AiChatMessageServiceImpl implements AiChatMessageService {
                 knowledgeSegments, null, webSearchResponse);
 
         // 4.2 构建 Prompt，并进行调用
-        Prompt prompt = buildPrompt(conversation, historyMessages, knowledgeSegments, webSearchResponse, model, sendReqVO);
+        Prompt prompt = buildPrompt(conversation, historyMessages, knowledgeSegments, webSearchResponse, model, sendReqVO,
+                userMessage.getId());
         Flux<ChatResponse> streamResponse = chatModel.stream(prompt);
 
         // 4.3 流式返回
@@ -324,7 +326,7 @@ public class AiChatMessageServiceImpl implements AiChatMessageService {
     private Prompt buildPrompt(AiChatConversationDO conversation, List<AiChatMessageDO> messages,
                                List<AiKnowledgeSegmentSearchRespBO> knowledgeSegments,
                                AiWebSearchResponse webSearchResponse,
-                               AiModelDO model, AiChatMessageSendReqVO sendReqVO) {
+                               AiModelDO model, AiChatMessageSendReqVO sendReqVO, Long messageId) {
         List<Message> chatMessages = new ArrayList<>();
         // 1.1 System Context 角色设定
         if (StrUtil.isNotBlank(conversation.getSystemMessage())) {
@@ -376,8 +378,8 @@ public class AiChatMessageServiceImpl implements AiChatMessageService {
 
         // 2.1 查询 tool 工具
         List<ToolCallback> toolCallbacks = getToolCallbackListByRoleId(conversation.getRoleId());
-        Map<String,Object> toolContext = CollUtil.isNotEmpty(toolCallbacks) ? AiUtils.buildCommonToolContext()
-                : Map.of();
+        Map<String,Object> toolContext = CollUtil.isNotEmpty(toolCallbacks)
+                ? AiUtils.buildCommonToolContext(messageId, conversation.getId()) : Map.of();
         // 2.2 构建 ChatOptions 对象
         AiPlatformEnum platform = AiPlatformEnum.validatePlatform(model.getPlatform());
         ChatOptions chatOptions = AiUtils.buildChatOptions(platform, model.getModel(),

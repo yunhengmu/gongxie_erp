@@ -20,6 +20,7 @@ import cn.iocoder.yudao.module.ai.service.chat.AiChatMessageService;
 import cn.iocoder.yudao.module.ai.service.knowledge.AiKnowledgeDocumentService;
 import cn.iocoder.yudao.module.ai.service.knowledge.AiKnowledgeSegmentService;
 import cn.iocoder.yudao.module.ai.service.model.AiChatRoleService;
+import cn.iocoder.yudao.module.ai.service.reversible.ReversibleUndoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -55,6 +56,8 @@ public class AiChatMessageController {
     private AiKnowledgeSegmentService knowledgeSegmentService;
     @Resource
     private AiKnowledgeDocumentService knowledgeDocumentService;
+    @Resource
+    private ReversibleUndoService reversibleUndoService;
 
     @Operation(summary = "发送消息（段式）", description = "一次性返回，响应较慢")
     @PostMapping("/send")
@@ -109,6 +112,15 @@ public class AiChatMessageController {
             }));
         }
         return success(messageVOList);
+    }
+
+    @Operation(summary = "撤回消息触发的全部操作", description = "冲账式撤回：不删除原操作记录，只追加反向分录；撤回后该消息不再进入后续对话上下文")
+    @PostMapping("/undo")
+    @Parameter(name = "messageId", required = true, description = "消息编号（user 消息或其 assistant 回复均可）", example = "1024")
+    public CommonResult<Boolean> undoChatMessage(@RequestParam("messageId") Long messageId,
+                                                 @RequestParam(value = "reason", required = false) String reason) {
+        reversibleUndoService.undo(messageId, getLoginUserId(), reason);
+        return success(true);
     }
 
     @Operation(summary = "删除消息")

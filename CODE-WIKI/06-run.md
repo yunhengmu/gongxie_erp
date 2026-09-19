@@ -28,7 +28,7 @@
    - `yudao-gateway` → [GatewayServerApplication](../yudao-gateway/src/main/java/cn/iocoder/yudao/gateway/GatewayServerApplication.java)（端口 48080）
    - `yudao-module-system-server` → [SystemServerApplication](../yudao-module-system/yudao-module-system-server/src/main/java/cn/iocoder/yudao/module/system/SystemServerApplication.java)
    - `yudao-module-infra-server` → [InfraServerApplication](../yudao-module-infra/yudao-module-infra-server/src/main/java/cn/iocoder/yudao/module/infra/InfraServerApplication.java)
-   - 按需启动其他业务 `-server`（bpm/pay/member/...）
+   - 按需启动其他业务 `-server`（pay/member/...）
 4. 通过网关统一入口访问：`http://localhost:48080/admin-api/...`。
 
 ### 各服务端口约定

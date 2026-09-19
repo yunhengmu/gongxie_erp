@@ -38,19 +38,6 @@
 <!--            <artifactId>yudao-module-member-server</artifactId>-->
 <!--            <version>${revision}</version>-->
 <!--        </dependency>-->
-
-        <!-- 数据报表。默认注释，保证编译速度 -->
-<!--        <dependency>-->
-<!--            <groupId>cn.iocoder.cloud</groupId>-->
-<!--            <artifactId>yudao-module-report-server</artifactId>-->
-<!--            <version>${revision}</version>-->
-<!--        </dependency>-->
-        <!-- 工作流。默认注释，保证编译速度 -->
-<!--        <dependency>-->
-<!--            <groupId>cn.iocoder.cloud</groupId>-->
-<!--            <artifactId>yudao-module-bpm-server</artifactId>-->
-<!--            <version>${revision}</version>-->
-<!--        </dependency>-->
         <!-- 支付服务。默认注释，保证编译速度 -->
 <!--        <dependency>-->
 <!--            <groupId>cn.iocoder.cloud</groupId>-->
@@ -133,20 +120,6 @@
 <!--        <dependency>-->
 <!--            <groupId>cn.iocoder.cloud</groupId>-->
 <!--            <artifactId>yudao-module-im-server</artifactId>-->
-<!--            <version>${revision}</version>-->
-<!--        </dependency>-->
-
-        <!-- HRM 人力资源管理模块。默认注释，按需启用 -->
-<!--        <dependency>-->
-<!--            <groupId>cn.iocoder.cloud</groupId>-->
-<!--            <artifactId>yudao-module-hrm-server</artifactId>-->
-<!--            <version>${revision}</version>-->
-<!--        </dependency>-->
-
-        <!-- FMS 财务管理模块。默认注释，按需启用 -->
-<!--        <dependency>-->
-<!--            <groupId>cn.iocoder.cloud</groupId>-->
-<!--            <artifactId>yudao-module-fms-server</artifactId>-->
 <!--            <version>${revision}</version>-->
 <!--        </dependency>-->
 

@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.ai.tool.method;
 
+import cn.iocoder.yudao.module.ai.framework.reversible.core.annotation.Reversible;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;

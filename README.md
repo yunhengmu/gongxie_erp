@@ -31,8 +31,8 @@
 | 【完整版】[yudao-cloud](https://gitee.com/zhijiantianya/yudao-cloud)       | [`master`](https://gitee.com/zhijiantianya/yudao-cloud/tree/master/) 分支  | [`master-jdk17`](https://gitee.com/zhijiantianya/yudao-cloud/tree/master-jdk17/) 分支  | [`master-jdk25`](https://gitee.com/zhijiantianya/yudao-cloud/tree/master-jdk25/) 分支  |
 | 【精简版】[yudao-cloud-mini](https://gitee.com/yudaocode/yudao-cloud-mini) | [`master`](https://gitee.com/yudaocode/yudao-cloud-mini/tree/master/) 分支 | [`master-jdk17`](https://gitee.com/yudaocode/yudao-cloud-mini/tree/master-jdk17/) 分支 | [`master-jdk25`](https://gitee.com/yudaocode/yudao-cloud-mini/tree/master-jdk25/) 分支 |
 
-* 【完整版】：包括系统功能、基础设施、会员中心、数据报表、工作流程、商城系统、微信公众号、CRM、ERP、WMS、MES、HRM、FMS、IM 即时通讯、AI 大模型、IoT 物联网等功能
-* 【精简版】：只包括系统功能、基础设施功能，不包括会员中心、数据报表、工作流程、商城系统、微信公众号、CRM、ERP、WMS、MES、HRM、FMS、IM 即时通讯、AI 大模型、IoT 物联网等功能
+* 【完整版】：包括系统功能、基础设施、会员中心、数据报表、工作流程、商城系统、微信公众号、CRM、ERP、WMS、MES、FMS、IM 即时通讯、AI 大模型、IoT 物联网等功能
+* 【精简版】：只包括系统功能、基础设施功能，不包括会员中心、数据报表、工作流程、商城系统、微信公众号、CRM、ERP、WMS、MES、FMS、IM 即时通讯、AI 大模型、IoT 物联网等功能
 
 可参考 [《迁移文档》](https://cloud.iocoder.cn/migrate-module/) ，只需要 5-10 分钟，即可将【完整版】按需迁移到【精简版】
 
@@ -105,7 +105,7 @@
 
 团队包含专业的项目经理、架构师、前端工程师、后端工程师、测试工程师、运维工程师，可以提供全流程的外包服务。
 
-项目可以是商城、SCRM 系统、OA 系统、物流系统、ERP 系统、HRM 人力资源系统、FMS 财务系统、CMS 系统、HIS 系统、支付系统、IM 即时通讯、微信公众号、微信小程序等等。
+项目可以是商城、SCRM 系统、OA 系统、物流系统、ERP 系统、FMS 财务系统、CMS 系统、HIS 系统、支付系统、IM 即时通讯、微信公众号、微信小程序等等。
 
 ## 🐼 内置功能
 
@@ -294,14 +294,6 @@
 ![功能图](/.image/common/mes-feature.png)
 
 ![功能图](/.image/common/mes-preview.png)
-
-### HRM 人力资源管理系统
-
-演示地址：<https://cloud.iocoder.cn/hrm-preview/>
-
-![功能图](/.image/common/hrm-feature.png)
-
-![预览图](/.image/common/hrm-preview.png)
 
 ### FMS 财务管理系统
 

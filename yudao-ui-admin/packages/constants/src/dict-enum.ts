@@ -39,19 +39,6 @@ const INFRA_DICT = {
   INFRA_OPERATE_TYPE: 'infra_operate_type',
 } as const;
 
-/** ========== BPM - 工作流模块 ========== */
-const BPM_DICT = {
-  BPM_MODEL_FORM_TYPE: 'bpm_model_form_type', // BPM 模型表单类型
-  BPM_MODEL_TYPE: 'bpm_model_type', // BPM 模型类型
-  BPM_OA_LEAVE_TYPE: 'bpm_oa_leave_type', // BPM OA 请假类型
-  BPM_PROCESS_INSTANCE_STATUS: 'bpm_process_instance_status', // BPM 流程实例状态
-  BPM_PROCESS_LISTENER_TYPE: 'bpm_process_listener_type', // BPM 流程监听器类型
-  BPM_PROCESS_LISTENER_VALUE_TYPE: 'bpm_process_listener_value_type', // BPM 流程监听器值类型
-  BPM_COMMENT_TYPE: 'bpm_comment_type', // BPM 评论类型
-  BPM_TASK_CANDIDATE_STRATEGY: 'bpm_task_candidate_strategy', // BPM 任务候选人策略
-  BPM_TASK_STATUS: 'bpm_task_status', // BPM 任务状态
-} as const;
-
 /** ========== PAY - 支付模块 ========== */
 const PAY_DICT = {
   PAY_CHANNEL_CODE: 'pay_channel_code', // 支付渠道编码类型
@@ -132,27 +119,6 @@ const ERP_DICT = {
   ERP_STOCK_RECORD_BIZ_TYPE: 'erp_stock_record_biz_type', // 库存明细的业务类型
 } as const;
 
-/** ========== FMS - 财务管理模块 ========== */
-const FMS_DICT = {
-  FMS_ACCOUNT_USER_LEVEL: 'fms_account_user_level', // FMS 账套用户权限级别
-  FMS_SUBJECT_CATEGORY: 'fms_subject_category', // FMS 科目类别
-  FMS_DEBIT_CREDIT_DIRECTION: 'fms_debit_credit_direction', // FMS 借贷方向
-  FMS_FINANCE_INDICATOR_TYPE: 'fms_finance_indicator_type', // FMS 财务指标取数报表类型
-  FMS_SUBJECT_TYPE: 'fms_subject_type', // FMS 科目类型
-  FMS_AUXILIARY_TYPE: 'fms_auxiliary_type', // FMS 辅助核算类别
-  FMS_VOUCHER_STATUS: 'fms_voucher_status', // FMS 凭证状态
-  FMS_VOUCHER_TIDY_TYPE: 'fms_voucher_tidy_type', // FMS 凭证整理方式
-  FMS_FORMULA_RULE: 'fms_formula_rule', // FMS 报表公式取数规则
-  FMS_REPORT_TYPE: 'fms_report_type', // FMS 财务报表类型
-  FMS_REPORT_PERIOD_TYPE: 'fms_report_period_type', // FMS 财务报表期间类型
-  FMS_LEDGER_BALANCE_MODE: 'fms_ledger_balance_mode', // FMS 账簿余额方向模式
-  FMS_ACCOUNTING_STANDARD: 'fms_accounting_standard', // FMS 会计制度
-  FMS_CLOSING_TYPE: 'fms_closing_type', // FMS 结账方案类型
-  FMS_CLOSING_TIME_TYPE: 'fms_closing_time_type', // FMS 结账取数期间
-  FMS_CLOSING_VOUCHER_TYPE: 'fms_closing_voucher_type', // FMS 结账凭证类型
-  FMS_CLOSING_TEMPLATE_CATEGORY: 'fms_closing_template_category', // FMS 结账模板分类
-} as const;
-
 /** ========== AI - 人工智能模块 ========== */
 const AI_DICT = {
   AI_GENERATE_MODE: 'ai_generate_mode', // AI 生成模式
@@ -195,54 +161,6 @@ const IOT_DICT = {
   IOT_VALIDATE_TYPE: 'iot_validate_type', // IOT 数据校验级别
   IOT_MODBUS_MODE: 'iot_modbus_mode', // IoT Modbus 工作模式
   IOT_MODBUS_FRAME_FORMAT: 'iot_modbus_frame_format', // IoT Modbus 帧格式
-} as const;
-
-/** ========== HRM - 人力资源模块 ========== */
-const HRM_DICT = {
-  HRM_EMPLOYEE_ENTRY_STATUS: 'hrm_employee_entry_status', // HRM 员工入职状态
-  HRM_EMPLOYEE_STATUS: 'hrm_employee_status', // HRM 员工状态
-  HRM_EMPLOYEE_TYPE: 'hrm_employee_type', // HRM 聘用形式
-  HRM_EMPLOYEE_EDUCATION: 'hrm_employee_education', // HRM 员工学历
-  HRM_SALARY_CHANGE_REASON: 'hrm_salary_change_reason', // HRM 薪资调整原因
-  HRM_SALARY_CHANGE_TYPE: 'hrm_salary_change_type', // HRM 薪资档案状态
-  HRM_SALARY_CHANGE_RECORD_STATUS: 'hrm_salary_change_record_status', // HRM 调薪记录状态
-  HRM_SALARY_SLIP_READ_STATUS: 'hrm_salary_slip_read_status', // HRM 工资条查看状态
-  HRM_SALARY_TAX_TYPE: 'hrm_salary_tax_type', // HRM 薪资计税类型
-  HRM_SALARY_YES_NO: 'hrm_salary_yes_no', // HRM 薪资是否
-  HRM_SALARY_OPTION_TYPE: 'hrm_salary_option_type', // HRM 薪资项加减类型
-  HRM_INSURANCE_PROJECT_TYPE: 'hrm_insurance_project_type', // HRM 社保项目类型
-  HRM_INSURANCE_SCHEME_TYPE: 'hrm_insurance_scheme_type', // HRM 社保方案类型
-  HRM_INSURANCE_EMP_STATUS: 'hrm_insurance_emp_status', // HRM 员工参保状态
-  HRM_ATTENDANCE_HOLIDAY_TYPE: 'hrm_attendance_holiday_type', // HRM 考勤节假日类型
-  HRM_RECRUIT_CANDIDATE_STATUS: 'hrm_recruit_candidate_status', // HRM 招聘候选人状态
-  HRM_RECRUIT_CANDIDATE_EDUCATION: 'hrm_recruit_candidate_education', // HRM 招聘候选人学历
-  HRM_RECRUIT_INTERVIEW_TYPE: 'hrm_recruit_interview_type', // HRM 招聘面试方式
-  HRM_RECRUIT_INTERVIEW_RESULT: 'hrm_recruit_interview_result', // HRM 招聘面试结果
-  HRM_RECRUIT_POST_STATUS: 'hrm_recruit_post_status', // HRM 招聘职位状态
-  HRM_RECRUIT_JOB_NATURE: 'hrm_recruit_job_nature', // HRM 招聘工作性质
-  HRM_RECRUIT_WORK_TIME: 'hrm_recruit_work_time', // HRM 招聘工作经验
-  HRM_RECRUIT_POST_EDUCATION: 'hrm_recruit_post_education', // HRM 招聘职位学历要求
-  HRM_RECRUIT_SALARY_UNIT: 'hrm_recruit_salary_unit', // HRM 招聘薪资单位
-  HRM_RECRUIT_EMERGENCY_LEVEL: 'hrm_recruit_emergency_level', // HRM 招聘紧急程度
-  HRM_ATTENDANCE_CLOCK_TYPE: 'hrm_attendance_clock_type', // HRM 打卡类型
-  HRM_ATTENDANCE_CLOCK_SOURCE: 'hrm_attendance_clock_source', // HRM 打卡来源
-  HRM_ATTENDANCE_CLOCK_STATUS: 'hrm_attendance_clock_status', // HRM 打卡状态
-  HRM_ATTENDANCE_LEAVE_TYPE: 'hrm_attendance_leave_type', // HRM 请假类型
-  HRM_ATTENDANCE_YES_NO: 'hrm_attendance_yes_no', // HRM 考勤是否
-  HRM_ATTENDANCE_LATE_EARLY_DEDUCT_METHOD:
-    'hrm_attendance_late_early_deduct_method', // HRM 迟到早退扣款方式
-  HRM_ATTENDANCE_ABSENTEEISM_DEDUCT_METHOD:
-    'hrm_attendance_absenteeism_deduct_method', // HRM 旷工扣款方式
-  HRM_ATTENDANCE_MISSCARD_DEDUCT_METHOD:
-    'hrm_attendance_misscard_deduct_method', // HRM 缺卡扣款方式
-  HRM_PERFORMANCE_PLAN_STATUS: 'hrm_performance_plan_status', // HRM 绩效计划状态
-  HRM_PERFORMANCE_STAGE_STATUS: 'hrm_performance_stage_status', // HRM 绩效阶段状态
-  HRM_PERFORMANCE_ASSESSMENT_STAGE_STATUS:
-    'hrm_performance_assessment_stage_status', // HRM 绩效考核阶段处理状态
-  HRM_PERFORMANCE_APPEAL_STATUS: 'hrm_performance_appeal_status', // HRM 绩效申诉状态
-  HRM_PERFORMANCE_SCORE_CALCULATION: 'hrm_performance_score_calculation', // HRM 绩效计分方式
-  HRM_PERFORMANCE_UPPER_LIMIT_TYPE: 'hrm_performance_upper_limit_type', // HRM 绩效上限类型
-  HRM_PERFORMANCE_YES_NO: 'hrm_performance_yes_no', // HRM 绩效是否
 } as const;
 
 /** ========== IM - 即时通讯模块 ========== */
@@ -352,14 +270,11 @@ const WMS_DICT = {
 /** 字典类型枚举 - 统一导出 */
 const DICT_TYPE = {
   ...AI_DICT,
-  ...BPM_DICT,
   ...CRM_DICT,
   ...ERP_DICT,
-  ...FMS_DICT,
   ...INFRA_DICT,
   ...IM_DICT,
   ...IOT_DICT,
-  ...HRM_DICT,
   ...MES_DICT,
   ...WMS_DICT,
   ...MEMBER_DICT,

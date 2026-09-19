@@ -67,9 +67,7 @@
 
 | 模块 | 职责 |
 |------|------|
-| `yudao-module-bpm` | **工作流**：基于 Flowable 8，流程建模、仿钉钉/飞书+ BPMN 双设计器、审批（会签/或签/驳回/转办/委派/加签…）、流程表单、抄送、父子流程等 |
 | `yudao-module-pay` | **支付系统**：商户应用、支付/退款订单、回调通知、支付宝/微信等渠道接入 |
-| `yudao-module-report` | **数据报表与大屏**：报表设计器、大屏设计器 |
 | `yudao-module-member` | **会员中心**：会员管理、等级、分组、标签、积分签到 |
 
 ### 业务系统（按需）
@@ -82,8 +80,6 @@
 | `yudao-module-erp` | **ERP** 企业资源计划 |
 | `yudao-module-wms` | **WMS** 仓库管理 |
 | `yudao-module-mes` | **MES** 制造执行 |
-| `yudao-module-hrm` | **HRM** 人力资源 |
-| `yudao-module-fms` | **FMS** 财务管理 |
 | `yudao-module-im` | **IM** 即时通讯 |
 | `yudao-module-ai` | **AI 大模型平台** |
 | `yudao-module-iot` | **IoT 物联网**：拆分为 `iot-core`（核心总线/通用 API）、`iot-gateway`（设备网关：接入设备消息、编解码）、`iot-server`（业务：产品/设备/协议管理） |

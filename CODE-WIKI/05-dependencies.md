@@ -41,7 +41,6 @@ yudao (根, cn.iocoder.cloud, 版本 ${revision})
 |--------------|---------------------|
 | `system-server` | `system-api`、`infra-api`（用系统能力 + 调用文件等基础设施） |
 | `infra-server` | `infra-api` |
-| `bpm-server` | `bpm-api`、`system-api` |
 | `pay-server` | `pay-api`、`system-api` |
 | `mp-server` | `mp-api`、`system-api`、`infra-api` |
 | `product-server` | `product-api`、`member-api` |
