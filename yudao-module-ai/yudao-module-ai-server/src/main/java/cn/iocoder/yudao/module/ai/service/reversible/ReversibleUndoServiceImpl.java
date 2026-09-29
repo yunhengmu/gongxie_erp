@@ -8,18 +8,22 @@ import cn.iocoder.yudao.module.ai.dal.dataobject.chat.AiChatMessageDO;
 import cn.iocoder.yudao.module.ai.dal.dataobject.reversible.ReversibleLedgerDO;
 import cn.iocoder.yudao.module.ai.dal.mysql.reversible.ReversibleLedgerMapper;
 import cn.iocoder.yudao.module.ai.framework.reversible.core.ReversibleTool;
+import cn.iocoder.yudao.module.ai.framework.reversible.core.ReverseFunctionRef;
 import cn.iocoder.yudao.module.ai.framework.reversible.core.context.ReversibleContext;
 import cn.iocoder.yudao.module.ai.framework.reversible.core.enums.ReversibleStatusEnum;
 import cn.iocoder.yudao.module.ai.service.chat.AiChatMessageService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.MessageType;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -68,13 +72,13 @@ public class ReversibleUndoServiceImpl implements ReversibleUndoService {
         Long turnMessageId = userMessage.getId();
         Long conversationId = userMessage.getConversationId();
 
-        // ========== 闸门 2：归属 ==========
+        // ========== 闸门 1：归属 ==========
         if (ObjUtil.notEqual(userMessage.getUserId(), userId)) {
             log.warn("[undo][用户({}) 尝试撤回他人消息({})，已记录]", userId, turnMessageId);
             throw exception(REVERSIBLE_NOT_OWNER);
         }
 
-        // ========== 闸门 3：闭合判定 + 时间窗口 ==========
+        // ========== 闸门 2：闭合判定 + 时间窗口 ==========
         List<AiChatMessageDO> messages = chatMessageService.getChatMessageListByConversationId(conversationId);
         AiChatMessageDO assistantMessage = messages.stream()
                 .filter(message -> turnMessageId.equals(message.getReplyId()))
@@ -97,7 +101,7 @@ public class ReversibleUndoServiceImpl implements ReversibleUndoService {
             throw exception(REVERSIBLE_EXPIRED);
         }
 
-        // ========== 闸门 1：声明。没有账本帧 = 该消息只产生了对话，降级为「仅清记忆」 ==========
+        // ========== 闸门 3：声明。没有账本帧 = 该消息只产生了对话，降级为「仅清记忆」 ==========
         if (CollUtil.isEmpty(ledgers)) {
             deleteMessagePair(userMessage, assistantMessage, userId);
             log.info("[undo][消息({}) 无账本帧，仅清理对话记忆]", turnMessageId);
@@ -125,8 +129,7 @@ public class ReversibleUndoServiceImpl implements ReversibleUndoService {
             }
             try {
                 String reversedVoucher = reverseTransactionTemplate.execute(status ->
-                        applicationContext.getBean(ledger.getReverseBean(), ReversibleTool.class)
-                                .reverse(buildContext(ledger, userId, safeReason)));
+                        invokeReverseFunction(ledger, buildContext(ledger, userId, safeReason)));
                 ledgerMapper.updateById(new ReversibleLedgerDO().setId(ledger.getId())
                         .setStatus(ReversibleStatusEnum.REVERSED.getStatus())
                         .setReversedVoucher(reversedVoucher)
@@ -168,6 +171,35 @@ public class ReversibleUndoServiceImpl implements ReversibleUndoService {
             throw exception(REVERSIBLE_MESSAGE_NOT_EXISTS);
         }
         return message;
+    }
+
+    /**
+     * 执行单帧冲账：Bean 级走 {@link ReversibleTool#reverse}，方法级反射调用指定 public 方法
+     */
+    private String invokeReverseFunction(ReversibleLedgerDO ledger, ReversibleContext context) {
+        ReverseFunctionRef ref = ReverseFunctionRef.parse(ledger.getReverseBeanName());
+        Object bean = applicationContext.getBean(ref.beanName());
+        if (!ref.isMethodLevel()) {
+            return ((ReversibleTool) bean).reverse(context);
+        }
+        try {
+            Method method = AopUtils.getTargetClass(bean).getMethod(ref.methodName(), ReversibleContext.class);
+            return (String) method.invoke(bean, context);
+        } catch (NoSuchMethodException | IllegalAccessException e) {
+            // 入账时已校验，走到这里说明账本被改动或类结构变更
+            throw new IllegalStateException(StrUtil.format(
+                    "[invokeReverseFunction][账本帧({}) 的冲账方法({}#{}) 调用失败]",
+                    ledger.getId(), ref.beanName(), ref.methodName()), e);
+        } catch (InvocationTargetException e) {
+            // 解包反射包装，保留真实业务异常类型，便于外层记录失败原因
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new IllegalStateException(StrUtil.format(
+                    "[invokeReverseFunction][账本帧({}) 的冲账方法({}#{}) 执行异常]",
+                    ledger.getId(), ref.beanName(), ref.methodName()), cause);
+        }
     }
 
     private ReversibleContext buildContext(ReversibleLedgerDO ledger, Long userId, String reason) {

@@ -17,3 +17,14 @@
 - **术语约定（2026-09-17 用户纠正）**：撤回机制一律用 **messageId**，不要用设计文档原文里的 "turnId"。
   系统内只有 `ai_chat_message.id` 一个消息 ID，不存在第二个 turn 编号。我混用两个词让用户以为存在两套 ID 而提出质疑。
   唯一需区分处：前端可能传 assistant 行 id，需归一化到其 `reply_id`（= user 行 id）后再用。
+
+- **术语约定（2026-09-22 用户纠正）**：**禁止使用「薄壳」**。这不是 Spring 术语，也不是任何规范术语，
+  是我写 CODE-WIKI/15 时自己造的口语化叫法（对应 thin adapter），且已被我自己污染进 16/18 号文档、
+  工作记忆和 `ReversibleLedgerAspect` 的报错字符串。统一改用 **「冲账适配器」/ `XxxReversibleAdapter`**（GoF 的 Adapter）。
+  用户对「无出处的词」会直接质疑，凡是术语必须能指到官方文档 / 规范 / 具体类名。
+
+- **代码归属边界（2026-09-22 用户确认）**：`module-ai-server/.../ai/framework/reversible/core` 下 8 个文件是**用户自己写的**；
+  `framework` 下其余 `ai/`（含 `config`、`core/model/*`、`core/webserch`）、`rpc/`、`security/` 是**芋道原生代码，禁止改动**。
+- **注释约定（2026-09-22 用户要求，已全量执行）**：自己的代码里「描述性注释」一律不写。
+  类/接口/枚举/record 头部只留 `/** @author hengmu */`；字段、方法的 javadoc（含 `@param`/`@return`）和所有 `//` 行内注释全部删除。
+  作者统一 `hengmu`。立码时不要再往这些文件里补注释。

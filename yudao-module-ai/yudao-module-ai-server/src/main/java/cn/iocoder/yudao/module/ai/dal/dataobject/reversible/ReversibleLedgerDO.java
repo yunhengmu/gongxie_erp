@@ -64,9 +64,15 @@ public class ReversibleLedgerDO extends TenantBaseDO {
     private String bizVoucher;
 
     /**
-     * 冲账函数 Bean 名
+     * 冲账目标：Bean 名，或 {@code Bean名#方法名}
+     *
+     * 含 {@code #} 时为方法级绑定，冲账时反射调用该 Bean 上
+     * 签名 {@code String method(ReversibleContext)} 的 public 方法；
+     * 否则为 Bean 级，冲账时调用该 Bean（实现 {@link cn.iocoder.yudao.module.ai.framework.reversible.core.ReversibleTool}）的 {@code reverse()}。
+     *
+     * @see cn.iocoder.yudao.module.ai.framework.reversible.core.ReverseFunctionRef
      */
-    private String reverseBean;
+    private String reverseBeanName;
 
     /**
      * 状态

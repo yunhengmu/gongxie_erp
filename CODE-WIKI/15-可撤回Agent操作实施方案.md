@@ -71,7 +71,7 @@ CREATE TABLE `ai_reversible_ledger` (
   `tool_name` varchar(128) NOT NULL COMMENT '正函数 Bean 名',
   `tool_input` json NULL COMMENT '入参快照',
   `biz_voucher` varchar(128) NULL COMMENT '业务凭证号',
-  `reverse_bean` varchar(128) NOT NULL COMMENT '冲账函数 Bean 名',
+  `reverse_bean_name`  varchar(128) NOT NULL COMMENT '冲账目标：Bean 名，或 Bean名#方法名',
   `status` tinyint NOT NULL DEFAULT 0 COMMENT '0=POSTED 10=REVERSING 20=REVERSED 30=FAILED',
   `window_minutes` int NULL DEFAULT NULL COMMENT '可撤回窗口（分钟），入账时固化',
   `reversed_voucher` varchar(128) NULL COMMENT '冲账凭证号',
@@ -115,8 +115,11 @@ CREATE TABLE `ai_reversible_ledger` (
 @Documented
 public @interface Reversible {
 
-    /** 冲账函数所在 Bean 名。留空 = 冲账函数与正函数在同一个 Bean（按类型反查，要求容器内唯一） */
-    String reverseBean() default "";
+    /** 冲账目标 Bean 名。留空会在入账时抛异常——切面不做「按正函数所在类反查」的回落猜测 */
+    String reverseBeanName() default "";
+
+    /** 冲账方法名（可空）。填了就在该 Bean 内反射调用它，留空则要求该 Bean 实现 ReversibleTool */
+    String reverseMethodName() default "";
 
     /** 可撤回窗口（分钟）。0 表示使用全局配置 yudao.ai.undo.window-minutes */
     int windowMinutes() default 0;
@@ -124,7 +127,8 @@ public @interface Reversible {
 }
 ```
 
-注解上没有「冲账方法名」——因为冲账统一走 `ReversibleTool.reverse()`，方法名恒定，写死在注解里没有意义（这是相对源文档的一处简化）。
+Java 注解语法表达不了「必填」，所以 `reverseBeanName` 虽然写了 `default ""`，实际由切面在入账时校验非空。
+它的值会原样写进账本列 `reverse_bean_name`，必须是注解里**明确声明**的冲账目标。
 
 **必须加在实现类的方法上，不能加在接口上**——Spring AOP 的 `@annotation` 切点不匹配接口注解，加了会静默失效。
 
@@ -169,7 +173,7 @@ public interface ReversibleTool {
 }
 ```
 
-**冲账函数必须实现此接口**。`UndoService` 用 `applicationContext.getBean(reverseBean, ReversibleTool.class)` 取，容器返回的必然是代理，事务与切面天然生效，且 JDK / CGLIB 两种代理都能取到方法。不要赌 `spring.aop.proxy-target-class` 的默认值。
+**冲账函数必须实现此接口**。`UndoService` 用 `applicationContext.getBean(reverseBeanName, ReversibleTool.class)` 取，容器返回的必然是代理，事务与切面天然生效，且 JDK / CGLIB 两种代理都能取到方法。不要赌 `spring.aop.proxy-target-class` 的默认值。
 
 ### 4.4 `VoucherAware`（可选）
 
@@ -203,7 +207,7 @@ public interface VoucherAware {
 3. **不得吞异常**。不能用 `try-catch` 包住业务后返回"操作失败"字符串，否则失败会被当成成功入账。
    反例参考：`yudao-module-agent/core/tool/api_tools.py`（全量 try-except 返回字符串）。
 4. **只读工具不加 `@Reversible`**（`directory_list`、`weather_query`、`user_profile_query` 均属此列，天然不进账本）。
-5. 冲账方法 `implements ReversibleTool`，并显式用 `@Reversible(reverseBean = "...")` 指过来
+5. 冲账方法 `implements ReversibleTool`，并显式用 `@Reversible(reverseBeanName = "...")` 指过来
    —— 因为冲账逻辑通常在业务层、与正函数不在同一个 Bean。
 
 **两个注解位置约束**（两种写法都适用）：必须是 `public` 方法；必须标在实现类方法上，不能标接口方法上。
@@ -222,7 +226,7 @@ public interface VoucherAware {
 
 > 一句话概括：**冲账是「被正函数定义的一次业务回退」，不是「一个 AI 工具」**。它借用了 `ReversibleTool` 这个接口，但那只是技术外壳。
 
-#### 推荐形态：拆成「业务动作」+「技术薄壳」两层
+#### 推荐形态：拆成「业务动作」+「冲账适配器」两层
 
 **第一层 —— 业务动作**（真正的领域逻辑，放在正函数所在的 Service 里）：
 
@@ -234,7 +238,7 @@ public class WmsReceiveService {
     @Resource private WmsReverseRecordMapper reverseRecordMapper;
     @Resource private WmsStockService stockService;          // ← 可以调其他 Service
 
-    @Reversible(reverseBean = "wmsReceiveReversibleAdapter")
+    @Reversible(reverseBeanName = "wmsReceiveReversibleAdapter")
     public Long createReceive(WmsReceiveCreateReqDTO req) {   // 单个 DTO：多参会让冲账函数取不到原始入参
         // 正业务
     }
@@ -262,7 +266,7 @@ public class WmsReceiveService {
 }
 ```
 
-**第二层 —— 技术薄壳**（只做 `ReversibleContext` ⇄ 业务参数 的翻译，无业务逻辑）：
+**第二层 —— 冲账适配器**（只做 `ReversibleContext` ⇄ 业务参数 的翻译，无业务逻辑）：
 
 ```java
 @Component("wmsReceiveReversibleAdapter")
@@ -280,35 +284,34 @@ public class WmsReceiveReversibleAdapter implements ReversibleTool {
 }
 ```
 
-**为什么薄壳要独立成类**：一个类只能有一个 `reverse()`。若正函数所在 Service 有多个可撤方法
-（`createReceive`、`cancelReceive`…），薄壳必须分开写，各指各的业务动作。
+**为什么冲账适配器要独立成类**：一个类只能有一个 `reverse()`。若正函数所在 Service 有多个可撤方法
+（`createReceive`、`cancelReceive`…），冲账适配器必须分开写，各指各的业务动作。
 
-**包结构**（薄壳与正函数同包，配对关系一眼可见）：
+**包结构**（冲账适配器与正函数同包，配对关系一眼可见）：
 
 ```
 service/wms/
   WmsReceiveService.java                  ← 正函数 + 冲账业务动作
-  WmsReceiveReversibleAdapter.java        ← 薄壳
+  WmsReceiveReversibleAdapter.java        ← 冲账适配器
 ```
 
 **形态选择**：
 
 | 情况 | 怎么写 |
 |---|---|
-| Service 只有 1 个可撤方法，冲账逻辑简单 | 让 Service 直接 `implements ReversibleTool`，`@Reversible` 不写 `reverseBean`（**同 Bean 模式，最省事**） |
-| Service 有多个可撤方法 | 每个配一个独立的 Adapter 类，用 `reverseBean` 指过去（**推荐**） |
+| Service 只有 1 个可撤方法，冲账逻辑简单 | 让 Service 直接 `implements ReversibleTool`，`@Reversible(reverseBeanName = "wmsReceiveService")` 指回自己（**同 Bean 模式**） |
+| Service 有多个可撤方法 | 每个配一个独立的 Adapter 类，用 `reverseBeanName` 指过去（**推荐**） |
 | 冲账逻辑复杂、涉及多领域 | Adapter 只做翻译；业务动作可以进一步抽成领域服务 |
 
-> ⚠️ **标在业务方法上，`reverseBean` 必须显式写。**
-> 业务 Service 通常不实现 `ReversibleTool`（薄壳是独立的 Adapter），留空会让
-> `resolveBeanName` 反查出业务 Service 的 Bean 名，而它并非 `ReversibleTool`。
+> ⚠️ **`reverseBeanName` 必填，切面不做任何回落猜测。**
+> 它的值会原样写进账本列 `reverse_bean_name`，而账本是 append-only、帧一旦写入永不修改 ——
+> 所以必须是注解里**明确声明**的冲账目标。一旦允许「留空就按正函数所在类反查」，
+> 一次漏写就会把**错误的冲账目标永久固化**，事后翻账本完全看不出异常。
 >
-> 这个配置错误原本会**拖到用户点撤回时才爆**：入账时毫无异常（`resolveBeanName` 只查 Bean 名不查类型），
-> 撤回时 `getBean(name, ReversibleTool.class)` 抛 `BeanNotOfRequiredTypeException`，
-> 而那一帧已被 CAS 改成 `REVERSING`、随后标 `FAILED` —— **永久不可再撤**。
->
-> 已加 fail-fast 修掉：`ReversibleLedgerAspect.validateReverseBean(reverseBean, joinPoint)`
-> 在**入账时**就校验 Bean 存在且 `isTypeMatch(.., ReversibleTool.class)`，有问题当场抛异常。
+> 代价是同 Bean 模式也要写自己的 Bean 名（`WmsReceiveService` → `wmsReceiveService`）。
+> 收益是 Bean 名只剩一个来源（注解），写错会在**入账时**就被 `ReversibleLedgerAspect.validateReverseFunction`
+> 拦住（`Bean 不存在` / `未实现 ReversibleTool` / `方法不存在`），而不是拖到用户点撤回时才爆 ——
+> 那时帧已被 CAS 改成 `REVERSING`、随后标 `FAILED`，**永久不可再撤**。
 
 #### 六条硬性注意事项
 
@@ -441,7 +444,7 @@ sequenceDiagram
     loop 每帧
         S->>DB: UPDATE status='REVERSING' WHERE id=? AND status='POSTED'
         Note over S,DB: 影响行数=1 才算抢到（占位防并发）
-        S->>R: getBean(reverseBean, ReversibleTool).reverse(ctx)
+        S->>R: getBean(reverseBeanName, ReversibleTool).reverse(ctx)
         R->>R: REQUIRES_NEW 事务内写反向分录
         R-->>S: 冲账凭证号
         S->>DB: UPDATE status='REVERSED', 回填凭证号
@@ -521,10 +524,10 @@ AI 工具方法（持 ToolContext）
     → ReversibleLedgerAspect 从 Holder 读上下文，写账本帧
 ```
 
-`ReversibleLedgerAspect.resolveContext()` 因此改成**两级来源**：
+`ReversibleLedgerAspect.resolveContext()` 因此改成**单一来源**：只从 `ReversibleContextHolder` 快照取上下文。
 
-1. 方法参数里的 `ToolContext`（注解标在工具方法上，兼容旧写法，优先级更高）
-2. `ReversibleContextHolder`（注解标在业务方法上）
+> 说明：`@Reversible` 标在「带 `ToolContext` 参数的工具方法」上时，`ReversibleBridgeAspect` 同样会命中并把上下文写进快照，
+> 所以「从方法参数里直接摘 `ToolContext`」的旧分支是死代码（它和快照读的是同一份数据），已删除。
 
 **关键点：ThreadLocal 在这里是可靠的。** 写入点是「工具方法入口」—— 那里既拿得到 `ToolContext`、
 又已经处于工具执行线程上；业务方法是被**同线程**的普通 Java 方法调用触发的。
