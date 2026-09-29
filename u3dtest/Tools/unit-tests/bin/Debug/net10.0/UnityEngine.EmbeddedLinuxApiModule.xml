@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<doc>
+  <members>
+    <assembly>
+      <name>UnityEngine.EmbeddedLinuxApiModule</name>
+    </assembly>
+    <member name="A:UnityEngine.EmbeddedLinuxApiModule">
+      <summary>
+        <para>EmbeddedLinuxApiModule module allows you to call embeddedlinux platform specified code.</para>
+      </summary>
+    </member>
+  </members>
+</doc>

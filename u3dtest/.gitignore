@@ -1,0 +1,59 @@
+# Unity 官方 .gitignore 模板（https://github.com/github/gitignore/blob/main/Unity.gitignore）
+# 本文件位于 u3dtest/ 子目录，规则对本子树生效
+
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# 不要忽略 Asset 的 .meta（Unity 靠 .meta 里的 GUID 串引用）
+!/[Aa]ssets/**/*.meta
+
+# JetBrains Rider 插件（自动生成）
+/[Aa]ssets/Plugins/Editor/JetBrains*
+
+# IDE 缓存
+.vs/
+.gradle/
+
+# IDE 自动生成的解决方案/工程文件
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity 崩溃报告
+sysinfo.txt
+
+# 构建产物
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Crashlytics
+crashlytics-build.properties
+
+# Addressables
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+
+# Android 自动生成的临时资产
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*

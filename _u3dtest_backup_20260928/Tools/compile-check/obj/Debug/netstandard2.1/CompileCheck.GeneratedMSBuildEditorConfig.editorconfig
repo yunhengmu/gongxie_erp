@@ -1,0 +1,8 @@
+is_global = true
+build_property.RootNamespace = CompileCheck
+build_property.ProjectDir = D:\yudao\u3dtest\Tools\compile-check\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.CsWinRTUseWindowsUIXamlProjections = false
+build_property.EffectiveAnalysisLevelStyle = 
+build_property.EnableCodeStyleSeverity = 

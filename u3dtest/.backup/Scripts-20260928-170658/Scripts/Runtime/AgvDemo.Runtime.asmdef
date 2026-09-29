@@ -1,0 +1,22 @@
+{
+    "name": "AgvDemo.Runtime",
+    "rootNamespace": "AgvDemo.Runtime",
+    "references": [
+        "VContainer",
+        "MessagePipe",
+        "MessagePipe.VContainer",
+        "UniTask"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "S7.Net.dll",
+        "MQTTnet.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

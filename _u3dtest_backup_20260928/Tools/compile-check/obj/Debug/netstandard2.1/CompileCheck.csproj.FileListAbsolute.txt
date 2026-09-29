@@ -1,0 +1,9 @@
+D:\yudao\u3dtest\Tools\compile-check\bin\Debug\netstandard2.1\AgvDemoCompileCheck.deps.json
+D:\yudao\u3dtest\Tools\compile-check\bin\Debug\netstandard2.1\AgvDemoCompileCheck.dll
+D:\yudao\u3dtest\Tools\compile-check\bin\Debug\netstandard2.1\AgvDemoCompileCheck.pdb
+D:\yudao\u3dtest\Tools\compile-check\obj\Debug\netstandard2.1\CompileCheck.csproj.AssemblyReference.cache
+D:\yudao\u3dtest\Tools\compile-check\obj\Debug\netstandard2.1\CompileCheck.GeneratedMSBuildEditorConfig.editorconfig
+D:\yudao\u3dtest\Tools\compile-check\obj\Debug\netstandard2.1\CompileCheck.csproj.CoreCompileInputs.cache
+D:\yudao\u3dtest\Tools\compile-check\obj\Debug\netstandard2.1\CompileCheck.sourcelink.json
+D:\yudao\u3dtest\Tools\compile-check\obj\Debug\netstandard2.1\AgvDemoCompileCheck.dll
+D:\yudao\u3dtest\Tools\compile-check\obj\Debug\netstandard2.1\AgvDemoCompileCheck.pdb

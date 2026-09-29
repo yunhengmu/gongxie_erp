@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<doc>
+  <members>
+    <assembly>
+      <name>UnityEngine.AndroidAppViewModule</name>
+    </assembly>
+    <member name="T:UnityEngine.Experimental.Android.AppView.AndroidAppViewController">
+      <summary>
+        <para>Controller for Android App View.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewController.displayHeight">
+      <summary>
+        <para>Height of display.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewController.displayWidth">
+      <summary>
+        <para>Width of display.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewController.renderInterval">
+      <summary>
+        <para>Control the render interval of Android App View.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.AndroidAppViewController.IsPresenting">
+      <summary>
+        <para>Whether the status of display is presenting.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.AndroidAppViewController.NewObject(UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings)">
+      <summary>
+        <para>New object of Android App View Controller.</para>
+      </summary>
+      <param name="setting">Settings.</param>
+      <returns>
+        <para>Return new object.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.AndroidAppViewController.PausePresentation">
+      <summary>
+        <para>Pause the presentation of the display.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.AndroidAppViewController.ResumePresentation">
+      <summary>
+        <para>Resume the presentation of the display.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.AndroidAppViewController.StartPresentation">
+      <summary>
+        <para>Start the presentation of the display.</para>
+      </summary>
+      <returns>
+        <para>Status when starting presentation.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.AndroidAppViewController.StopPresentation">
+      <summary>
+        <para>Stop the presentation of the display.</para>
+      </summary>
+    </member>
+    <member name="T:UnityEngine.Experimental.Android.AppView.AndroidAppViewManager">
+      <summary>
+        <para>Manager of Android App View.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewManager.launchAsSystemApp">
+      <summary>
+        <para>Whether the Android app is launched as a system app.</para>
+      </summary>
+    </member>
+    <member name="?:UnityEngine.Experimental.Android.AppView.AndroidAppViewManager.onClientHideViewCallback(System.Action`1&lt;System.String&gt;)">
+      <summary>
+        <para>Whether the client hides the presentation of the view.</para>
+      </summary>
+      <param name="value"></param>
+    </member>
+    <member name="?:UnityEngine.Experimental.Android.AppView.AndroidAppViewManager.onClientShowViewCallback(System.Action`1&lt;System.String&gt;)">
+      <summary>
+        <para>Whether the client shows the presentation of the view.</para>
+      </summary>
+      <param name="value"></param>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.AndroidAppViewManager.RegisterEventCallback(System.String,UnityEngine.Experimental.Android.AppView.IAndroidAppViewEventCallback)">
+      <summary>
+        <para>Register IAndroidAppViewEventCallback in AndroidAppViewManager.</para>
+      </summary>
+      <param name="appPackageName">External Android App Package Name.</param>
+      <param name="callback">EventCallback.</param>
+      <param name="presentationToken"></param>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.AndroidAppViewManager.UnregisterEventCallback(System.String,UnityEngine.Experimental.Android.AppView.IAndroidAppViewEventCallback)">
+      <summary>
+        <para>Unregister IAndroidAppViewEventCallback in AndroidAppViewManager.</para>
+      </summary>
+      <param name="appPackageName">External Android App Package Name.</param>
+      <param name="callback">EventCallback.</param>
+      <param name="presentationToken"></param>
+    </member>
+    <member name="T:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings">
+      <summary>
+        <para>Android App View Settings for external app.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.autoStartPresentation">
+      <summary>
+        <para>Launch App On Awake.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.delayForTextureReadySec">
+      <summary>
+        <para>Delay calling TargetTextureAvailable to prevent showing an unready texture, measured in seconds.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.displayHeight">
+      <summary>
+        <para>Height of display.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.displayWidth">
+      <summary>
+        <para>Width of display.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.nativeColorIsPreMultiplyAlpha">
+      <summary>
+        <para>Is native output rgb channel preMultiply alpha.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.nativeColorIsSRGB">
+      <summary>
+        <para>Is native output in SRGB color space.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.presentationToken">
+      <summary>
+        <para>Returns the package name of Android App or the token of Android View, depending on presentation type.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.presentationType">
+      <summary>
+        <para>Type of presentation, including Android App and Android View.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.targetAppPackageName">
+      <summary>
+        <para>Package name of Android App, please make sure there is only one package with the same name in a project.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.targetTexture2D">
+      <summary>
+        <para>Target texture2d.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.Experimental.Android.AppView.AndroidAppViewSettings.targetViewToken">
+      <summary>
+        <para>Token of Android View, make sure that the value is the same as the value set by the client.</para>
+      </summary>
+    </member>
+    <member name="T:UnityEngine.Experimental.Android.AppView.AndroidAppViewTouchEvent">
+      <summary>
+        <para>Touch Event passed to external app.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.AndroidAppViewTouchEvent.touchID">
+      <summary>
+        <para>TouchID, index of this touch.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.AndroidAppViewTouchEvent.touchPhase">
+      <summary>
+        <para>Touch phase.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.AndroidAppViewTouchEvent.touchUV">
+      <summary>
+        <para>Touch UV, values 0-1.</para>
+      </summary>
+    </member>
+    <member name="?:UnityEngine.Experimental.Android.AppView.IAndroidAppViewEventCallback">
+      <summary>
+        <para>Handling callbacks for display and input in AndroidAppView, you can register it in AndroidAppViewManager.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.IAndroidAppViewEventCallback.OnProcessTouchInputEvents">
+      <summary>
+        <para>Callback when Android App View to process touch input.</para>
+      </summary>
+      <returns>
+        <para>Touch input data.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.Experimental.Android.AppView.IAndroidAppViewEventCallback.TargetTextureAvailableChanged(System.Boolean)">
+      <summary>
+        <para>Callback when target texture is available.</para>
+      </summary>
+      <param name="avail">Is texture available.</param>
+    </member>
+    <member name="T:UnityEngine.Experimental.Android.AppView.PresentationType">
+      <summary>
+        <para>Type of presentation, including Android App and Android View.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.PresentationType.AndroidApp">
+      <summary>
+        <para>In this type, the content of the android app will be presented.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.PresentationType.AndroidView">
+      <summary>
+        <para>In this type, the content of the android view will be presented.</para>
+      </summary>
+    </member>
+    <member name="T:UnityEngine.Experimental.Android.AppView.StartPresentationStatus">
+      <summary>
+        <para>Status returned at start presentation.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.StartPresentationStatus.NotInstallApp">
+      <summary>
+        <para>The app cannot be found based on the app package name.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.StartPresentationStatus.NotShowView">
+      <summary>
+        <para>The view cannot be found based on the view token.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.StartPresentationStatus.OtherError">
+      <summary>
+        <para>Other errors were encountered.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.StartPresentationStatus.PreparingContext">
+      <summary>
+        <para>Preparing context at first frame, usually returns it in c# awake function.</para>
+      </summary>
+    </member>
+    <member name="F:UnityEngine.Experimental.Android.AppView.StartPresentationStatus.Success">
+      <summary>
+        <para>Successfully start presentation.</para>
+      </summary>
+    </member>
+    <member name="A:UnityEngine.AndroidAppViewModule">
+      <summary>
+        <para>AndroidAppView module provides the basic functionality of the AndroidAppView package.</para>
+      </summary>
+    </member>
+  </members>
+</doc>

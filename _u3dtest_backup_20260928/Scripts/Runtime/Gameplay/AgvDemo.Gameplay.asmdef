@@ -1,0 +1,20 @@
+{
+    "name": "AgvDemo.Gameplay",
+    "rootNamespace": "AgvDemo.Gameplay",
+    "references": [
+        "AgvDemo.Core",
+        "AgvDemo.Devices",
+        "AgvDemo.Warehouse.Domain",
+        "AgvDemo.Warehouse.Application",
+        "AgvDemo.Warehouse.Infrastructure"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

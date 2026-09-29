@@ -1,0 +1,27 @@
+{
+  "name": "com.cysharp.messagepipe",
+  "displayName": "MessagePipe",
+  "author": {
+    "name": "Cysharp, Inc.",
+    "url": "https://cysharp.co.jp/en/"
+  },
+  "version": "1.8.2",
+  "unity": "2018.4",
+  "description": "High performance messaging pipeline.",
+  "keywords": [
+    "pubsub",
+    "event",
+    "Scripting",
+    "DI"
+  ],
+  "license": "MIT",
+  "category": "Scripting",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Cysharp/MessagePipe",
+    "revision": "58516c36d4465a7b6396b7850a4ad7e03326998c"
+  },
+  "publishConfig": {
+    "registry": "https://package.openupm.com"
+  }
+}

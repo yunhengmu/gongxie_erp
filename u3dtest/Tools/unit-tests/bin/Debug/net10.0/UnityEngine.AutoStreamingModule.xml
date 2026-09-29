@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<doc>
+  <members>
+    <assembly>
+      <name>UnityEngine.AutoStreamingModule</name>
+    </assembly>
+    <member name="T:UnityEngine.AutoStreaming">
+      <summary>
+        <para>API for auto streaming feature.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.AutoStreaming.autoStreaming">
+      <summary>
+        <para>Whether enable the auto streaming feature.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.AutoStreaming.CustomCloudAssetsRoot">
+      <summary>
+        <para>The custom CDN url root.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.AutoStreaming.PreDownloadAsAssetAsync(UnityEngine.GameObject)">
+      <summary>
+        <para>Asynchronously predownloads autostreaming assets in go and checks if loaded.</para>
+      </summary>
+      <param name="go"></param>
+    </member>
+    <member name="A:UnityEngine.AutoStreamingModule">
+      <summary>
+        <para>The AutoStreaming module implements the resource auto-streaming feature in Unity.</para>
+      </summary>
+    </member>
+  </members>
+</doc>

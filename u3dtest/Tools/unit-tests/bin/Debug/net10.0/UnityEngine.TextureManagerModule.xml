@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<doc>
+  <members>
+    <assembly>
+      <name>UnityEngine.TextureManagerModule</name>
+    </assembly>
+    <member name="T:UnityEngine.TextureManager">
+      <summary>
+        <para>Texture Manger for managing texture lifetime on WebGL Platform.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.TextureManager.GenerateMultiPlatformWebStreamingDataInternal(System.String[],System.Boolean)">
+      <summary>
+        <para>generate multi platform web streaming data.</para>
+      </summary>
+      <param name="guids">The input is the GUID array of the target texture to be generated.</param>
+      <param name="doCleanup">Whether to cleanup unnecessary data in the dest dir while generating texture data.</param>
+    </member>
+    <member name="M:UnityEngine.TextureManager.GetAllPlatformOperationNames">
+      <summary>
+        <para>Get all multi format platform operation names.</para>
+      </summary>
+      <returns>
+        <para>Returns all operation names defined by user in the multi-format settings.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.TextureManager.GetCurrentMemory">
+      <summary>
+        <para>Get the memory consumption of uploaded textures managed by the texturemnager system.</para>
+      </summary>
+      <returns>
+        <para>Texture memory consumption (byte).</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.TextureManager.GetPlatformOperationGroupName(System.Int32)">
+      <summary>
+        <para>Get multi format platform operation name at index, will return empty string if index is not valid.</para>
+      </summary>
+      <param name="index">List sequence of user-defined settings in the multi-format settings interface. Range is 0 to Texturemanager.GetPlatformOperationGroupSettingsSize().</param>
+      <returns>
+        <para>Returns the operation name corresponding to the specified index.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.TextureManager.GetPlatformOperationGroupSettings(System.Int32)">
+      <summary>
+        <para>This API is used to get texture format with index.</para>
+      </summary>
+      <param name="index">List sequence of user-defined settings in the multi-format settings interface. Range is 0 to Texturemanager.GetPlatformOperationGroupSettingsSize().</param>
+      <returns>
+        <para>Returns the texture format corresponding to the specified index.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.TextureManager.GetPlatformOperationGroupSettingsSize">
+      <summary>
+        <para>List sequence count of user-defined settings in the multi-format settings interface.</para>
+      </summary>
+      <returns>
+        <para>Returns the total list count set by the multi-format interface user.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.TextureManager.GetTexturesInUse">
+      <summary>
+        <para>Get the list of textures in use.</para>
+      </summary>
+      <returns>
+        <para>Returns the texture array in use.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.TextureManager.GetUrlRoot">
+      <summary>
+        <para>Get the CDN link used for texture management.</para>
+      </summary>
+      <returns>
+        <para>Returns the currently used cdn url.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.TextureManager.PreDownloadTextureAsync(UnityEngine.GameObject)">
+      <summary>
+        <para>Asynchronously predownload textures in GameObject and check if finished</para>
+      </summary>
+      <param name="go">The GameObject containing the textures that need to be pre-downloaded</param>
+    </member>
+    <member name="M:UnityEngine.TextureManager.SetSupportTextureFromat(System.String)">
+      <summary>
+        <para>Set the texture format used by the current running platform.</para>
+      </summary>
+      <param name="supporttextureformat">The input is the alias set by the user in the multi-format editing interface.</param>
+    </member>
+    <member name="A:UnityEngine.TextureManagerModule">
+      <summary>
+        <para>Texture Manger module for managing texture lifetime.</para>
+      </summary>
+    </member>
+  </members>
+</doc>

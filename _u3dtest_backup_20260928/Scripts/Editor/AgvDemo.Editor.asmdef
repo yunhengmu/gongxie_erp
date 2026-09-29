@@ -1,0 +1,23 @@
+{
+    "name": "AgvDemo.Editor",
+    "rootNamespace": "AgvDemo.EditorTools",
+    "references": [
+        "AgvDemo.Core",
+        "AgvDemo.Devices",
+        "AgvDemo.Warehouse.Domain",
+        "AgvDemo.Warehouse.Application",
+        "AgvDemo.Warehouse.Infrastructure",
+        "AgvDemo.Gameplay"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

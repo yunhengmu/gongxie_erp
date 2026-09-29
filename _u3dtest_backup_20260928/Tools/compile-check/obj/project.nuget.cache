@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "GCYKR3qvwh4=",
+  "success": true,
+  "projectFilePath": "D:\\yudao\\u3dtest\\Tools\\compile-check\\CompileCheck.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Administrator\\.nuget\\packages\\netstandard.library.ref\\2.1.0\\netstandard.library.ref.2.1.0.nupkg.sha512"
+  ],
+  "logs": []
+}

@@ -1,0 +1,16 @@
+{
+    "name": "AgvDemo.Warehouse.Infrastructure",
+    "rootNamespace": "AgvDemo.Warehouse.Infrastructure",
+    "references": [
+        "AgvDemo.Warehouse.Application"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,18 @@
+{
+  "name": "AgvDemo.UI",
+  "rootNamespace": "AgvDemo.UI",
+  "references": [
+    "AgvDemo.Core",
+    "VContainer",
+    "MessagePipe"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

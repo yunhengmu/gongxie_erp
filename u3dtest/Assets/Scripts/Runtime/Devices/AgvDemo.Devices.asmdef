@@ -1,0 +1,17 @@
+{
+  "name": "AgvDemo.Devices",
+  "rootNamespace": "AgvDemo.Devices",
+  "references": [
+    "AgvDemo.Core",
+    "MessagePipe"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

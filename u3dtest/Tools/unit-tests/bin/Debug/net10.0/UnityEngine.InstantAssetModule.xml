@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<doc>
+  <members>
+    <assembly>
+      <name>UnityEngine.InstantAssetModule</name>
+    </assembly>
+    <member name="T:UnityEngine.InstantAsset">
+      <summary>
+        <para>InstantAsset for loading resource async by reading artifact files from folder Libarary or Asset.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.AddFallbackPath(System.String)">
+      <summary>
+        <para>Add a fallback folder path for instant asset. Fallback paths are used when the asset is not found in the main path.</para>
+      </summary>
+      <param name="path">The fallback folder path to add.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.ClearFallbackPaths">
+      <summary>
+        <para>Clear all fallback folder paths for instant asset.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.GetFallbackPaths">
+      <summary>
+        <para>Get all fallback folder paths of instant asset.</para>
+      </summary>
+      <returns>
+        <para>An array of fallback folder paths used when the asset is not found in the main path.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.GetInstantAssetRootPath">
+      <summary>
+        <para>Set file paths in instant asset are specified relative to the root folder path.</para>
+      </summary>
+      <returns>
+        <para>The root folder path where to load asset for instant asset.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.GetMainPath">
+      <summary>
+        <para>Get the main folder path of instant asset.</para>
+      </summary>
+      <returns>
+        <para>The main folder path where to load asset for instant asset.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.LoadAsync(System.String)">
+      <summary>
+        <para>Asynchronously loads an asset stored at path in a Resources folder.</para>
+      </summary>
+      <param name="path">Pathname of the resource to load.</param>
+      <param name="type">Type of resource to load.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.LoadAsync(System.String,System.Type)">
+      <summary>
+        <para>Asynchronously loads an asset stored at path in a Resources folder.</para>
+      </summary>
+      <param name="path">Pathname of the resource to load.</param>
+      <param name="type">Type of resource to load.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.LoadAsync(System.String)">
+      <summary>
+        <para>Asynchronously loads an asset stored at path in a Resources folder.</para>
+      </summary>
+      <param name="path">Pathname of the resource to load.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.ReadAssetTable(System.String)">
+      <summary>
+        <para>Read the object of InstantAssetTable.</para>
+      </summary>
+      <param name="path">The path of file which contains "InstantAssetTable" object.</param>
+      <returns>
+        <para>Loaded object of InstantAssetTable.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.SetBundleRootPath(System.String,System.String[])">
+      <summary>
+        <para>Set the bundle root path with a main path and optional fallback paths for instant asset.</para>
+      </summary>
+      <param name="mainPath">The primary folder path where to load asset for instant asset.</param>
+      <param name="fallbackPaths">Optional fallback folder paths used when the asset is not found in the main path.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.SetCacheServerCDN(System.String)">
+      <summary>
+        <para>Update CacheServer's URL.</para>
+      </summary>
+      <param name="url">The url of  CacheServer.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.SetCacheServerProjectName(System.String,System.String)">
+      <summary>
+        <para>Update CacheServer's project name this is combined with namespace and targetplatform.</para>
+      </summary>
+      <param name="nameSpace">The namespace of project in cache server.</param>
+      <param name="targetPlatform">The target platform of project in cache server.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.SetInstantAssetRootPath(System.String)">
+      <summary>
+        <para>Set the root folder path where to load asset for instant asset.</para>
+      </summary>
+      <param name="path">Asset file paths in instant asset are specified relative to the root folder path.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.SetMainPath(System.String)">
+      <summary>
+        <para>Set the main folder path where to load asset for instant asset.</para>
+      </summary>
+      <param name="path">The primary folder path for instant asset bundle loading.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAsset.UnloadAssetTable(System.String)">
+      <summary>
+        <para>Unload an InstantAssetTable.</para>
+      </summary>
+      <param name="path">The file path of loaded InstantAssetTable object.</param>
+      <returns>
+        <para>Return true if unload is successful, return false if unload fails.</para>
+      </returns>
+    </member>
+    <member name="T:UnityEngine.InstantAssetRequest">
+      <summary>
+        <para>Asynchronous load request from the InstantAssetTable.</para>
+      </summary>
+    </member>
+    <member name="P:UnityEngine.InstantAssetRequest.asset">
+      <summary>
+        <para>Asset object being loaded (Read Only).</para>
+      </summary>
+    </member>
+    <member name="T:UnityEngine.InstantAssetTable">
+      <summary>
+        <para>API for accessing the content of instant asset files.</para>
+      </summary>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.GetAllAssetsPath">
+      <summary>
+        <para>Get paths of assets which can be loaded from the target InstantAssetTable.</para>
+      </summary>
+      <returns>
+        <para>Asset Paths.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.GetAssetDependencies(System.String)">
+      <summary>
+        <para>Retrieves a list of file dependencies for a specific asset path.</para>
+      </summary>
+      <param name="path">The asset path to query dependencies for. Pass empty string ("") to get all dependencies in the table.</param>
+      <returns>
+        <para>String[] - Array of file paths representing the asset's dependencies.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.GetBundleDependencies">
+      <summary>
+        <para>Get all bundle names that the all assets managed by InstantAssetTable (or specified asset managed by InstantAssetTable) depends on.</para>
+      </summary>
+      <param name="path">The specified asset path, relative to the Assets directory in Editor, for example, Assetsmaterialtest.mat.</param>
+      <returns>
+        <para>Array of bundle file names that the assets depend on.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.GetBundleDependencies(System.String)">
+      <summary>
+        <para>Get all bundle names that the all assets managed by InstantAssetTable (or specified asset managed by InstantAssetTable) depends on.</para>
+      </summary>
+      <param name="path">The specified asset path, relative to the Assets directory in Editor, for example, Assetsmaterialtest.mat.</param>
+      <returns>
+        <para>Array of bundle file names that the assets depend on.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.LoadAsset(System.String,System.Type)">
+      <summary>
+        <para>Synchronously loads an Asset from the InstantAssetTable with specific type.</para>
+      </summary>
+      <param name="path">Path of the Asset. The path is a relative path based on the Assets folder in the Editor, for example, "Assetsmaterialtest.mat".</param>
+      <param name="type">Type of Asset.</param>
+      <returns>
+        <para>Loaded asset object.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.LoadAsset(System.String)">
+      <summary>
+        <para>Synchronously loads an Asset from the InstantAssetTable.</para>
+      </summary>
+      <param name="path">Path of the Asset. The path is a relative path based on the Assets folder in the Editor, for example, "Assetsmaterialtest.mat".</param>
+      <returns>
+        <para>Loaded asset object.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.LoadAsset(System.String)">
+      <summary>
+        <para>Synchronously loads an Asset from the InstantAssetTable with specific type.</para>
+      </summary>
+      <param name="path">Path of the Asset. The path is a relative path based on the Assets folder in the Editor, for example, "Assetsmaterialtest.mat".</param>
+      <returns>
+        <para>Loaded asset object.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.LoadAssetAsync(System.String)">
+      <summary>
+        <para>Asynchronously loads an Asset from the InstantAssetTable.</para>
+      </summary>
+      <param name="path">Path of the Asset. The path is a relative path based on the Assets folder in the Editor, for example, "Assetsmaterialtest.mat".</param>
+      <param name="type">Type of Asset.</param>
+      <returns>
+        <para>Asynchronous load request. Use InstantAssetRequest.asset to get asset object.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.LoadAssetAsync(System.String)">
+      <summary>
+        <para>Asynchronously loads an Asset from the InstantAssetTable.</para>
+      </summary>
+      <param name="path">Path of the Asset. The path is a relative path based on the Assets folder in the Editor, for example, "Assetsmaterialtest.mat".</param>
+      <param name="type">Type of Asset.</param>
+      <returns>
+        <para>Asynchronous load request. Use InstantAssetRequest.asset to get asset object.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.LoadAssetAsync(System.String,System.Type)">
+      <summary>
+        <para>Asynchronously loads an Asset from the InstantAssetTable.</para>
+      </summary>
+      <param name="path">Path of the Asset. The path is a relative path based on the Assets folder in the Editor, for example, "Assetsmaterialtest.mat".</param>
+      <param name="type">Type of Asset.</param>
+      <returns>
+        <para>Asynchronous load request. Use InstantAssetRequest.asset to get asset object.</para>
+      </returns>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.MergeFrom(UnityEngine.InstantAssetTable)">
+      <summary>
+        <para>Merges all asset entries and their metadata from another InstantAssetTable into this table.</para>
+      </summary>
+      <param name="sourceTable">The source table whose contents will be merged into this table.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.Subtract(UnityEngine.InstantAssetTable)">
+      <summary>
+        <para>Removes all asset entries and their metadata that exist in another InstantAssetTable from this table.</para>
+      </summary>
+      <param name="sourceTable">The source table containing assets to be removed from this table.</param>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.UnloadAsset(System.String)">
+      <summary>
+        <para>Synchronously unlloads an Asset from the InstantAssetTable.</para>
+      </summary>
+      <param name="assetToUnload">Loaded asset object.</param>
+      <param name="path">Path of the Asset. The path is a relative path based on the Assets folder in the Editor, for example, "Assetsmaterialtest.mat".</param>
+    </member>
+    <member name="M:UnityEngine.InstantAssetTable.UnloadAsset(UnityEngine.Object)">
+      <summary>
+        <para>Synchronously unlloads an Asset from the InstantAssetTable.</para>
+      </summary>
+      <param name="assetToUnload">Loaded asset object.</param>
+      <param name="path">Path of the Asset. The path is a relative path based on the Assets folder in the Editor, for example, "Assetsmaterialtest.mat".</param>
+    </member>
+    <member name="A:UnityEngine.InstantAssetModule">
+      <summary>
+        <para>The InstantAsset module implements the InstantAssetTable class and related APIs to load data from InstantAssetTable.</para>
+      </summary>
+    </member>
+  </members>
+</doc>
