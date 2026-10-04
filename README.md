@@ -225,6 +225,6 @@ RuoYi-Vue-Plus/ruoyi-modules/ruoyi-ai/target/site/jacoco/jacoco.csv   # 机器�
 
 ## 版权
 
-Copyright © 2026 AI架构师张磊 All Rights Reserved.
+Copyright © 2026 [AI架构师张磊](https://space.bilibili.com/482393709) All Rights Reserved.
 
 后端底座源自 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus)（MIT License），本仓库在其基础上进行 BizBuddy 平台化改造。
