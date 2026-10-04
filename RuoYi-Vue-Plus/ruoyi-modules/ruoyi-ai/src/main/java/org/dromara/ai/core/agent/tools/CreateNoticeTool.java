@@ -42,7 +42,8 @@ public class CreateNoticeTool extends ToolBase {
     /**
      * 工具描述
      */
-    private static final String DESCRIPTION = "在平台内发布一条系统公告，并向在线用户广播。属于写入类操作，执行前需要用户确认。";
+    private static final String DESCRIPTION = "在平台内发布一条系统公告，并向在线用户广播。属于写入类操作："
+        + "调用时平台会自动弹出人工确认卡，你直接调用即可，不要在回答中另行征求用户确认。";
 
     /**
      * 公告标题长度上限（与 SysNoticeBo 校验保持一致）

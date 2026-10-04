@@ -86,16 +86,22 @@ class RouteDecisionTool extends ToolBase {
                 .error("本轮为整合轮，禁止再路由；请直接输出最终回答。")
                 .withIdAndName(id, name));
         }
-        // 本轮编排已因「需确认」暂停：不再接受新的路由请求，等用户确认后由恢复段续跑
+        // 本轮编排已因「需确认」暂停：不再接受新的路由请求，等用户确认后由恢复段续跑。
+        // 终止口径（2026-10-04 修正）：护栏必须给出**可收敛的动作**——模型返回不带工具调用的纯文本
+        // 才会结束 ReAct 循环；若只说「不要输出任何内容」，模型无终止动作可做，会反复调用本工具
+        // 直到 maxIters（实测：同一轮重复调用十余次、整轮耗时 ~50s）。
         if (route.pendingResume != null) {
             return Mono.just(ToolResultBlock
-                .text("本轮编排已暂停，正在等待用户确认；请不要再次调用本工具。")
+                .text("本轮编排已暂停，正在等待用户确认。请立即停止调用工具，"
+                    + "输出一句极简说明（如「已提交，等待你确认」）即可。")
                 .withIdAndName(id, name));
         }
-        // 专家直答已接管（REQ-AI-30 直答修订）：专家正文已展示给用户，不允许再发起一次编排
+        // 专家直答已接管（REQ-AI-30 直答修订）：专家正文已展示给用户，不允许再发起一次编排。
+        // 同样给出终止动作：让模型返回纯文本以结束本轮循环（该结束语由平台抑制，不展示给用户）。
         if (route.handoff) {
             return Mono.just(ToolResultBlock
-                .text("专家已回答用户，本轮不要再路由，也不要再输出任何内容。")
+                .text("专家已直接回答用户，本轮任务已完成。请立即停止调用工具，"
+                    + "直接输出一句极简结束语（如「（已由专家回答）」）即可，不要复述专家内容。")
                 .withIdAndName(id, name));
         }
         Map<String, Object> input = param.getInput() == null ? Map.of() : param.getInput();
