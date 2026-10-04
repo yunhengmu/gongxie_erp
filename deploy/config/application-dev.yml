@@ -1,0 +1,51 @@
+# ==========================================================================================
+# BizBuddy 容器化部署的**最小覆盖配置**（挂载到 /ruoyi/server/config/application-dev.yml）
+#
+# 为什么用外置 config 文件而不是纯环境变量：
+#   本项目主数据源走 dynamic-datasource，其连接项位于 `spring.datasource.dynamic.datasource.master.*`
+#   这样的 Map 结构，纯环境变量对 Map key 的大小写映射并不稳定；外置同 profile 配置文件由
+#   `file:./config/` 提供，优先级高于 jar 内 classpath 的同名文件，可**逐键**覆盖，最稳妥。
+#
+# 这里只写「连接坐标」，其余属性（连接池、Sa-Token、加解密、MCP、AI 策略等）
+# 仍沿用 jar 内 classpath 的 application-dev.yml，避免与源码配置产生两份真相。
+#
+# 变量来源：docker-compose.yml 传给容器的环境变量（见该文件 x-java-env）。
+# ==========================================================================================
+
+spring:
+  datasource:
+    dynamic:
+      datasource:
+        master:
+          url: jdbc:postgresql://${POSTGRES_HOST:postgres}:${POSTGRES_PORT_INNER:5432}/${POSTGRES_DB:biz_buddy}?useUnicode=true&characterEncoding=utf8&useSSL=false&autoReconnect=true&reWriteBatchedInserts=true
+          username: ${POSTGRES_USER:postgres}
+          password: ${POSTGRES_PASSWORD:Zl@2026}
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT_INNER:6379}
+      password: ${REDIS_PASSWORD:Zl@2026}
+
+# 定时任务的调度服务端地址（容器名），客户端端口随主端口漂移为 2${server.port}
+snail-job:
+  namespace: ${SNAIL_JOB_NAMESPACE:dev}
+  enabled: true
+  server:
+    host: ${SNAILJOB_HOST:snailjob-server}
+    port: ${SNAILJOB_PORT_INNER:17888}
+
+# 容器内不输出完整 SQL，避免日志刷屏
+mybatis-plus:
+  sql-log:
+    enabled: false
+
+# 本编排未部署 ruoyi-monitor-admin
+spring.boot.admin.client:
+  enabled: false
+
+bizbuddy:
+  ai:
+    milvus:
+      uri: http://${MILVUS_HOST:milvus}:19530
+      username: ${MILVUS_USERNAME:root}
+      password: ${MILVUS_PASSWORD:Milvus}
