@@ -35,8 +35,6 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 | [`plus-ui-Vue/`](plus-ui-Vue) | **前端工程**：Vue 3 + TypeScript + Element Plus + Vite，包管理 pnpm |
 | [`RuoYi-Vue-Plus/docs/`](RuoYi-Vue-Plus/docs) | 平台功能说明（含 9 张运行界面截图） |
 
-> 本仓库是 BizBuddy 的**唯一代码来源**；设计文档与参考资料在配套的工作区仓库 `bizbuddy-workspace`（<https://gitee.com/zl3624/bizbuddy-workspace>）。
-
 ## 功能说明
 
 平台完整功能说明见 **[RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md)**，按真实菜单与代码梳理，涵盖：
@@ -224,7 +222,6 @@ RuoYi-Vue-Plus/ruoyi-modules/ruoyi-ai/target/site/jacoco/jacoco.csv   # 机器�
 |---|---|
 | 平台功能说明（含界面截图） | [`RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md`](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md) |
 | 前端工程说明 | [`plus-ui-Vue/README.md`](plus-ui-Vue/README.md) |
-| 需求 / 详细设计 / 数据库设计 / 页面与接口清单 / 实施记录 | 工作区仓库 `bizbuddy-workspace` 的 `docs/`（<https://gitee.com/zl3624/bizbuddy-workspace>） |
 
 ## 版权
 
