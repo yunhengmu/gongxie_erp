@@ -1,0 +1,2 @@
+org.dromara.common.mcp.config.McpAutoConfiguration
+org.dromara.common.mcp.config.McpServerAutoConfiguration

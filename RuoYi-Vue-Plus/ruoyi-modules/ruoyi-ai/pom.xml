@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <groupId>org.dromara</groupId>
+        <artifactId>ruoyi-modules</artifactId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+    <packaging>jar</packaging>
+    <artifactId>ruoyi-ai</artifactId>
+
+    <description>
+        ai模块
+    </description>
+
+    <dependencies>
+
+        <!-- 核心模块 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-core</artifactId>
+        </dependency>
+        <!-- api模块 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-api</artifactId>
+        </dependency>
+        <!-- satoken -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-satoken</artifactId>
+        </dependency>
+        <!-- web服务 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-web</artifactId>
+        </dependency>
+        <!-- 数据加解密：模型密钥密文存储 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-encrypt</artifactId>
+        </dependency>
+        <!-- 数据库服务：ai_* 业务表 CRUD -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-mybatis</artifactId>
+        </dependency>
+        <!-- 日志记录：AI 管理接口审计 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-log</artifactId>
+        </dependency>
+        <!--
+          MCP 出口（REQ-AI-15）：注入 ruoyi-common-mcp 的 McpStatelessSyncServer Bean，
+          以 addTool / removeTool 热维护对外暴露的工具清单，并注册 /mcp 访问口令 Filter。
+          MCP SDK（mcp-core 0.17.2）亦由该模块传递引入，与 AgentScope 的 MCP 客户端共用同一版本。
+        -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-mcp</artifactId>
+        </dependency>
+        <!-- 任务调度：定时 Agent 任务的派发执行器（SnailJob，见决策 D7） -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-job</artifactId>
+        </dependency>
+        <!--
+          技能仓库（REQ-AI-10）：技能的持久化由 PostgreSQL 技能仓库实现提供。
+          本项目用 Builder 定制为 public schema 的 ai_skill / ai_skill_resource，
+          并由 script/sql 自建表（createIfNotExist=false）、只读（writeable=false）——
+          写入统一走本项目的 MyBatis 服务，以保留审计列与生效范围治理。
+        -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-skill-postgresql-repository</artifactId>
+        </dependency>
+        <!-- Excel 导出：会话管理页导出留档 -->
+        <dependency>
+            <groupId>org.dromara</groupId>
+            <artifactId>ruoyi-common-excel</artifactId>
+        </dependency>
+        <!-- 文档解析：Office（docx/xlsx/pptx），版本与 fesod 传递引入的 POI 保持一致 -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.5.1</version>
+        </dependency>
+        <!-- 文档解析：PDF -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.7</version>
+        </dependency>
+
+        <!-- 智能体内核：AgentScope Harness（Phase 0 引入，版本见根 pom 的 agentscope.version） -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-harness</artifactId>
+        </dependency>
+        <!--
+          RAG：知识库向量化与检索。
+          本模块只使用其中的 MilvusStore（仅依赖 milvus-sdk-java + gson + agentscope-core），
+          故排除全部无关传递依赖，避免引入 ES 客户端（与本项目 7.17.x 互斥）、PG 驱动、
+          Qdrant、Tika/POI/PDFBox（本模块已按需单独声明）与厂商模型 SDK（向量调用走自建 OpenAI 兼容 HTTP 客户端）。
+        -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-rag-simple</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.alibaba</groupId>
+                    <artifactId>dashscope-sdk-java</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.agentscope</groupId>
+                    <artifactId>agentscope-extensions-model-dashscope</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.agentscope</groupId>
+                    <artifactId>agentscope-extensions-model-ollama</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.openai</groupId>
+                    <artifactId>openai-java</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.qdrant</groupId>
+                    <artifactId>client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>co.elastic.clients</groupId>
+                    <artifactId>elasticsearch-java</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.postgresql</groupId>
+                    <artifactId>postgresql</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.pgvector</groupId>
+                    <artifactId>pgvector</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.pdfbox</groupId>
+                    <artifactId>pdfbox</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.poi</groupId>
+                    <artifactId>poi-ooxml</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.tika</groupId>
+                    <artifactId>tika-core</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.tika</groupId>
+                    <artifactId>tika-parsers-standard-package</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- AgentScope 分布式状态存储：复用现有 Redis（Redisson），排除用不到的 jedis / lettuce -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-redis</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>redis.clients</groupId>
+                    <artifactId>jedis</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.lettuce</groupId>
+                    <artifactId>lettuce-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!--
+          对话模型：官方 OpenAI 兼容扩展。
+          覆盖 DashScope compatible-mode / DeepSeek / GLM / Ollama 等任意 OpenAI 兼容端点，
+          版本与 harness 对齐（agentscope.version），传递依赖已全部在 classpath，无新增足迹。
+        -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-model-openai</artifactId>
+        </dependency>
+        <!--
+          渠道接入（REQ-AI-24）：复用官方 channel 适配器的回调验签 / 加解密、入站报文解析与出站发送，
+          以及通用保障（IdempotencyStore 消息幂等、BotLoopGuard 防机器人自环）。
+          已接入飞书 / 企业微信 / GitHub（Webhook）与钉钉（长连接 DingTalk Stream）；
+          各构件仅相互依赖，无新增传递依赖
+          （jackson / reactor-core / spring-webflux 均为 provided，由本模块显式提供）。
+          执行链路仍走本项目无人值守通道，**不使用**框架的 Channel / HarnessGateway。
+        -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-channel-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-channel-feishu</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-channel-wecom</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-channel-github</artifactId>
+        </dependency>
+        <!-- 钉钉：长连接（DingTalk Stream / WebSocket）适配器，由应用主动建连、无回调地址 -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-channel-dingtalk</artifactId>
+        </dependency>
+        <!--
+          spring-webflux：仅用于提供官方 channel 出站客户端依赖的 WebClient。
+          本项目为 Servlet 应用，不引入 spring-boot-starter-webflux；连接器由框架自动回退到
+          JDK HttpClient（spring-web 的 JdkClientHttpConnector），无额外网络栈依赖。
+        -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webflux</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              覆盖父 pom 中固定写死的 surefire argLine：用 @{argLine} 承接 JaCoCo 注入的
+              -javaagent，否则 JaCoCo 探针不会生效（父 pom 的 <argLine> 会整体覆盖该属性）。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>@{argLine} -Dfile.encoding=UTF-8</argLine>
+                </configuration>
+            </plugin>
+            <!--
+              单元测试覆盖率：mvn test 后生成 target/site/jacoco/index.html 与 jacoco.csv。
+              仅本模块启用，不影响其它模块构建。
+            -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.13</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+

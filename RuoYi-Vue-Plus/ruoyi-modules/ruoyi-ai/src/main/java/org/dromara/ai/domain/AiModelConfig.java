@@ -1,0 +1,103 @@
+package org.dromara.ai.domain;
+
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import org.dromara.common.mybatis.core.domain.BaseEntity;
+
+import java.io.Serial;
+import java.math.BigDecimal;
+
+/**
+ * AI 模型配置对象 ai_model_config
+ *
+ * @author BizBuddy
+ */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@TableName("ai_model_config")
+public class AiModelConfig extends BaseEntity {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * 主键
+     */
+    @TableId(value = "id")
+    private Long id;
+
+    /**
+     * 配置名称
+     */
+    private String configName;
+
+    /**
+     * 提供商
+     */
+    private String provider;
+
+    /**
+     * 模型类型（chat 对话 / embedding 向量）
+     */
+    private String modelType;
+
+    /**
+     * 模型标识
+     */
+    private String modelCode;
+
+    /**
+     * 服务地址（OpenAI 兼容根地址）
+     */
+    private String baseUrl;
+
+    /**
+     * API 密钥（AES 密文）
+     */
+    private String apiKey;
+
+    /**
+     * 向量维度（embedding 模型必填）
+     */
+    private Integer dimension;
+
+    /**
+     * 超时时间（秒）
+     */
+    private Integer timeoutSeconds;
+
+    /**
+     * 失败重试次数
+     */
+    private Integer maxRetries;
+
+    /**
+     * 输入单价（元 / 千 Token），用于用量费用估算；为空按 0 计
+     */
+    private BigDecimal inputPrice;
+
+    /**
+     * 输出单价（元 / 千 Token），用于用量费用估算；为空按 0 计
+     */
+    private BigDecimal outputPrice;
+
+    /**
+     * 状态（0正常 1停用）
+     */
+    private String status;
+
+    /**
+     * 备注
+     */
+    private String remark;
+
+    /**
+     * 删除标志（0存在 1删除）
+     */
+    @TableLogic
+    private String delFlag;
+
+}
