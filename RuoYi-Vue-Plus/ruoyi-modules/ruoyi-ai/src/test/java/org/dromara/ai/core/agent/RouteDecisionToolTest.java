@@ -82,14 +82,17 @@ class RouteDecisionToolTest {
     }
 
     @Test
-    @DisplayName("专家直答接管后不再路由")
+    @DisplayName("专家直答接管后不再路由，并给出可收敛的终止动作")
     void shouldRejectWhenHandoff() {
         AiRouteContext route = newRoute();
         route.handoff = true;
         ToolResultBlock result =
             tool.callAsync(param(RouteDecisionTool.TOOL_NAME, Map.of(), routeContext(route))).block();
         assertFalse(isError(result));
-        assertTrue(text(result).contains("专家已回答用户"));
+        // 护栏必须同时给出「停止路由」与「输出纯文本以结束循环」两个信号：
+        // 只说「不要再输出任何内容」会让模型无终止动作可做，从而反复调用本工具直到 maxIters
+        assertTrue(text(result).contains("已直接回答用户"));
+        assertTrue(text(result).contains("停止调用工具"));
     }
 
     @Test
