@@ -16,7 +16,7 @@
 | 改智能体装配 / 路由 / 权限 | `ruoyi-ai` 的 `core/agent`（先读 [architecture.md](architecture.md)） |
 | 改对话交互 / 前端页面 | `plus-ui-Vue`（对话工作台：`src/views/ai/agent/chat`） |
 | 调整模型 / 压缩 / 记忆等运行策略 | [configuration.md](configuration.md) |
-| 部署到服务器 | [../deploy/docker-compose.yml](../deploy/docker-compose.yml) |
+| 部署到服务器 | [../deploy/README.md](../deploy/README.md)（含构建前置与已知坑） |
 
 ## 常用命令
 

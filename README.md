@@ -134,9 +134,11 @@ RuoYi-Vue-Plus
 ```
 postgres_ry_vue.sql        # 框架基础表 + 系统管理数据（含菜单、字典、初始账号）
 postgres_ry_workflow.sql   # 工作流（Warm-Flow）表
+postgres_ry_job.sql        # 调度任务（SnailJob）表：sj_*
 postgres_ry_ai.sql         # AI 平台表（ai_* 表结构 + 种子数据）
-postgres_ry_job.sql        # 调度任务（SnailJob）表
 ```
+
+> 顺序要求：`postgres_ry_ai.sql` **依赖** `postgres_ry_job.sql` —— 它末尾要向 `sj_job` 登记「定时 Agent 任务派发」。若先执行 AI 脚本会报 `relation "sj_job" does not exist`。
 
 > 仓库同时保留了 MySQL / Oracle / SQLServer 方言的历史脚本，但**本项目当前只维护并使用 PostgreSQL**。
 

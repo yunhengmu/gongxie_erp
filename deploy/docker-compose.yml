@@ -59,7 +59,10 @@ x-java-env: &java-env
   REDIS_HOST: redis
   REDIS_PORT_INNER: "6379"
   REDIS_PASSWORD: ${REDIS_PASSWORD:-Zl@2026}
-  SNAILJOB_HOST: snailjob-server
+  # 注意变量名：`SNAILJOB_SERVER_HOST` 才对应 `snail-job.server.host`（服务端地址）。
+  # 不能用 `SNAILJOB_HOST`——按 Spring 松散绑定它会落到 `snail-job.host`（**客户端自己的 IP**），
+  # 导致客户端把自己的 IP 注册成服务端主机名，调度回连执行器全部失败。
+  SNAILJOB_SERVER_HOST: snailjob-server
   SNAILJOB_PORT_INNER: "17888"
   MILVUS_HOST: milvus
   MILVUS_USERNAME: ${MILVUS_USERNAME:-root}
@@ -84,11 +87,16 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       # 初始化脚本按**文件名排序**执行，故用数字前缀保证依赖顺序：
-      # 框架与系统管理（含 sys_user 初始账号）→ 工作流 → BizBuddy AI（含 ai_* 种子）→ 调度
+      # 框架与系统管理（含 sys_user 初始账号）→ 工作流 → 调度（sj_*）→ BizBuddy AI
+      #
+      # 注意顺序：AI 脚本**依赖调度脚本**——其末尾要向 sj_job 登记「定时 Agent 任务派发」，
+      # 故 postgres_ry_job.sql 必须早于 postgres_ry_ai.sql（脚本头部第 4 条亦声明该依赖）。
+      # 若顺序颠倒，会报 relation "sj_job" does not exist；且容器仍会 healthy ——
+      # 因为 initdb 期间单条语句失败不会阻断启动，故障是**静默**的，务必核对初始化日志。
       - ../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_vue.sql:/docker-entrypoint-initdb.d/10-framework-system.sql:ro
       - ../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_workflow.sql:/docker-entrypoint-initdb.d/20-workflow.sql:ro
-      - ../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_ai.sql:/docker-entrypoint-initdb.d/30-bizbuddy-ai.sql:ro
-      - ../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_job.sql:/docker-entrypoint-initdb.d/40-snailjob.sql:ro
+      - ../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_job.sql:/docker-entrypoint-initdb.d/30-snailjob.sql:ro
+      - ../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_ai.sql:/docker-entrypoint-initdb.d/40-bizbuddy-ai.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-biz_buddy}"]
       interval: 10s
@@ -135,7 +143,12 @@ services:
       retries: 5
 
   milvus-minio:
-    image: minio/minio:RELEASE.2024-05-28T17-19-04Z
+    # Milvus standalone 的对象存储。注意：MinIO 官方已停止通过 Docker Hub 发布镜像，
+    # Milvus 官方 standalone 编排里钉的旧 tag（RELEASE.2024-05-28T17-19-04Z）在 docker.io 上
+    # **已不存在**（拉取会报 not found）。这里默认改用一个仍可拉取的 release；
+    # 若你的网络/镜像源不同，用 MINIO_IMAGE 覆盖即可，例如社区维护的 fork：
+    #   MINIO_IMAGE=pgsty/minio:RELEASE.2026-04-17T00-00-00Z
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2024-12-18T13-15-44Z}
     container_name: bizbuddy-milvus-minio
     restart: unless-stopped
     environment:
@@ -185,8 +198,11 @@ services:
   # ------------------------------------------------------------------ 应用
   snailjob-server:
     build:
-      context: ../RuoYi-Vue-Plus
-      dockerfile: ruoyi-extend/ruoyi-snailjob-server/Dockerfile
+      # 注意：项目的 Dockerfile 用的是 `ADD ./target/xxx.jar ./app.jar`，
+      # 即以**模块目录**为构建上下文（上游 compose 直接用成品镜像，未暴露这点）。
+      # 若把上下文设成仓库根，`./target/*.jar` 解析不到，报 not found。
+      context: ../RuoYi-Vue-Plus/ruoyi-extend/ruoyi-snailjob-server
+      dockerfile: Dockerfile
     container_name: bizbuddy-snailjob-server
     restart: unless-stopped
     environment:
@@ -208,8 +224,9 @@ services:
 
   ruoyi-admin:
     build:
-      context: ../RuoYi-Vue-Plus
-      dockerfile: ruoyi-admin/Dockerfile
+      # 同上：上下文必须是模块目录，jar 由 `./target/ruoyi-admin.jar` 取用
+      context: ../RuoYi-Vue-Plus/ruoyi-admin
+      dockerfile: Dockerfile
     container_name: bizbuddy-admin
     restart: unless-stopped
     environment:
