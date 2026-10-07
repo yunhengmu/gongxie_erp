@@ -67,14 +67,20 @@
             <artifactId>ruoyi-common-job</artifactId>
         </dependency>
         <!--
-          技能仓库（REQ-AI-10）：技能的持久化由 PostgreSQL 技能仓库实现提供。
-          本项目用 Builder 定制为 public schema 的 ai_skill / ai_skill_resource，
-          并由 script/sql 自建表（createIfNotExist=false）、只读（writeable=false）——
+          技能仓库（REQ-AI-10）：技能的持久化由 AgentScope 官方技能仓库实现提供——
+          PostgreSQL 版（默认）与 MySQL 版各一，运行时按数据源类型二选一装配
+          （见 AgentScopeConfig#aiSkillRepository）。
+          两版均用 Builder 定制为本项目的 ai_skill / ai_skill_resource，
+          且自建表（createIfNotExist=false）、只读（writeable=false）——
           写入统一走本项目的 MyBatis 服务，以保留审计列与生效范围治理。
         -->
         <dependency>
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-extensions-skill-postgresql-repository</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-skill-mysql-repository</artifactId>
         </dependency>
         <!-- Excel 导出：会话管理页导出留档 -->
         <dependency>

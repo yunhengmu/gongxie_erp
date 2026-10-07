@@ -8,6 +8,7 @@
 [![JDK](https://img.shields.io/badge/JDK-21-green.svg)]()
 [![AgentScope](https://img.shields.io/badge/AgentScope-2.0.3-blue.svg)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791.svg)]()
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1.svg)]()
 [![Vue](https://img.shields.io/badge/Frontend-Vue%203-42b883.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -122,14 +123,16 @@ RuoYi-Vue-Plus
 |---|---|
 | JDK | 21（推荐 OpenJDK，**不要使用 OracleJDK**） |
 | Maven | ≥ 3.8.x（仓库自带 `mvnw` / `mvnw.cmd`） |
-| PostgreSQL | 14，库名 `biz_buddy` |
+| 关系库 | PostgreSQL 14（默认）或 MySQL 8.0，库名均为 `biz_buddy` |
 | Redis | ≥ 6.x（缓存、分布式锁、AgentScope 分布式状态） |
 | Milvus | v2.6.13，gRPC `19530`（知识库向量检索） |
 | Node / pnpm | Node ≥ 20.19.0，pnpm ≥ 10 |
 
 ### 2. 初始化数据库
 
-先在 PostgreSQL 中创建库 `biz_buddy`，再按顺序导入 `RuoYi-Vue-Plus/script/sql/postgres/` 下的脚本：
+先建库 `biz_buddy`，再按顺序导入对应方言的脚本（**PostgreSQL 为默认，MySQL 8.0 为并列支持**）：
+
+PostgreSQL（`RuoYi-Vue-Plus/script/sql/postgres/`）：
 
 ```
 postgres_ry_vue.sql        # 框架基础表 + 系统管理数据（含菜单、字典、初始账号）
@@ -138,9 +141,19 @@ postgres_ry_job.sql        # 调度任务（SnailJob）表：sj_*
 postgres_ry_ai.sql         # AI 平台表（ai_* 表结构 + 种子数据）
 ```
 
-> 顺序要求：`postgres_ry_ai.sql` **依赖** `postgres_ry_job.sql` —— 它末尾要向 `sj_job` 登记「定时 Agent 任务派发」。若先执行 AI 脚本会报 `relation "sj_job" does not exist`。
+MySQL 8.0（`RuoYi-Vue-Plus/script/sql/`）：
 
-> 仓库同时保留了 MySQL / Oracle / SQLServer 方言的历史脚本，但**本项目当前只维护并使用 PostgreSQL**。
+```
+ry_vue.sql        # 框架基础表 + 系统管理数据（含菜单、字典、初始账号）
+ry_workflow.sql   # 工作流（Warm-Flow）表
+ry_job.sql        # 调度任务（SnailJob）表：sj_*
+ry_ai.sql         # AI 平台表（ai_* 表结构 + 种子数据）
+```
+
+> 顺序要求：`*_ry_ai.sql` **依赖** `*_ry_job.sql` —— 它末尾要向 `sj_job` 登记「定时 Agent 任务派发」。若先执行 AI 脚本会报 `relation "sj_job" does not exist`（PostgreSQL）/ `Table 'sj_job' doesn't exist`（MySQL）。
+
+> Oracle / SQLServer 方言的历史脚本仍保留在仓库中，但**不维护**。两套编排见 [`deploy/`](deploy)（PostgreSQL 版）与 [`deploy-mysql/`](deploy-mysql)（MySQL 8.0 版），可按需二选一或同时运行（端口已错开）。
+> 数据库差异只影响两处，均已在代码内按数据源自动处理，无需改配置：① JDBC 驱动（`postgresql` / `mysql-connector-j` 均在位）；② 技能持久化仓库（`PostgresSkillRepository` / `MysqlSkillRepository`，见 `AgentScopeConfig#aiSkillRepository`）。
 
 ### 3. 启动后端
 
@@ -185,11 +198,13 @@ spring:
     dynamic:
       datasource:
         master:
-          driverClassName: org.postgresql.Driver
+          # 不声明驱动：Hikari 依 JDBC URL 自动匹配 classpath 中的驱动
           url: jdbc:postgresql://localhost:5432/biz_buddy?...
           username: postgres
           password: <你的密码>
 ```
+
+> 换 MySQL 8.0 只需把 `url` 换成 `jdbc:mysql://localhost:3306/biz_buddy?...`（带 `allowPublicKeyRetrieval=true&useSSL=false`），无需改驱动声明。
 
 AI 平台配置前缀为 `bizbuddy.ai`（见 [`AiProperties`](RuoYi-Vue-Plus/ruoyi-modules/ruoyi-ai/src/main/java/org/dromara/ai/config/AiProperties.java)）：模型密钥加密 Key、Milvus 连接、对话迭代上限、专家调用超时与 Token / 墙钟预算、写工具去重、上下文压缩、工作区与长期记忆开关、MCP 出口口令等。
 
