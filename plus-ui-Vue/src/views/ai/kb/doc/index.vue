@@ -51,6 +51,7 @@
               :show-file-list="false"
               :on-success="handleUploadSuccess"
               :on-error="handleUploadError"
+              :on-exceed="handleUploadExceed"
               :before-upload="handleBeforeUpload"
             >
               <el-button v-hasPermi="['ai:kb:doc:upload']" type="primary" plain icon="Upload" :disabled="!queryParams.kbId">
@@ -254,6 +255,11 @@ const { loading, withLoading } = useLoading(true);
 const { showSearch } = useSearchToggle();
 const total = ref(0);
 const queryFormRef = ref<ElFormInstance>();
+/**
+ * 上传组件实例。``limit=1`` 时必须在校验失败 / 上传结束（成功或失败）后清空已选文件，
+ * 否则 el-upload 会一直认为"已达上限"，后续选择文件被静默忽略（表现为点击后毫无反应、请求不发出）。
+ */
+const uploadRef = ref();
 
 const data = reactive<PageData<any, DocumentQuery>>({
   form: {},
@@ -380,6 +386,7 @@ const { resetQuery } = useSearchReset({
 /** 上传前校验 */
 const handleBeforeUpload = () => {
   if (!queryParams.value.kbId) {
+    uploadRef.value?.clearFiles();
     modal.msgWarning('请先选择知识库');
     return false;
   }
@@ -390,12 +397,21 @@ const handleBeforeUpload = () => {
 /** 上传失败 */
 const handleUploadError = () => {
   modal.closeLoading();
+  uploadRef.value?.clearFiles();
   modal.msgError('文件上传失败');
+};
+
+/** 超出数量上限（limit=1）：清空占位并提示重新选择，避免"静默无响应" */
+const handleUploadExceed = () => {
+  uploadRef.value?.clearFiles();
+  modal.msgWarning('一次只能上传一个文件，已清空上一次选择，请重新选择文件');
 };
 
 /** 上传成功：登记文档并提示解析 */
 const handleUploadSuccess = async (res: any, file: any) => {
   modal.closeLoading();
+  // 同失败分支：先释放 limit=1 的占位，保证可以连续上传多个文件
+  uploadRef.value?.clearFiles();
   if (res.code !== 200) {
     modal.msgError(res.msg || '文件上传失败');
     return;
