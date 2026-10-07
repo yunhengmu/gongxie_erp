@@ -107,7 +107,7 @@
 | `application.yml` | `security.excludes` | 免鉴权路径；渠道入站回调 `/ai/channel/callback/**` 在此放开（安全靠验签/口令） |
 | `application.yml` | `api-decrypt` | 接口加解密开关与 RSA 密钥对；**生产必须替换**，需与前端 `.env.*` 成对更换 |
 | `application.yml` | `sa-token` | 认证：token 名、并发登录、JWT 秘钥（**生产必须替换** `jwt-secret-key`） |
-| `application-dev.yml` | `spring.datasource.dynamic.datasource.master.*` | PostgreSQL 连接（dynamic-datasource，主数据源） |
+| `application-dev.yml` | `spring.datasource.dynamic.datasource.master.*` | 主数据源连接（dynamic-datasource）：PostgreSQL 14 或 MySQL 8.0，仅 JDBC URL 不同（驱动由 Hikari 按 URL 自动匹配，不在配置中声明） |
 | `application-dev.yml` | `spring.data.redis.*` / `redisson.*` | Redis 连接与 Redisson 连接池；dev 配置**要求必须设置 Redis 密码** |
 | `application-dev.yml` | `snail-job.*` | 调度客户端：`enabled`、`group`、`token`、`namespace`、服务端地址 |
 

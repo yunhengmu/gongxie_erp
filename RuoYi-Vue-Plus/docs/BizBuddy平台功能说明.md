@@ -54,7 +54,7 @@ BizBuddy 是构建在 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-V
 | Web 容器 | Jetty（基于 Netty） | 随 Boot |
 | **智能体内核** | **AgentScope Harness** | **2.0.3** |
 | MCP 底座 | 官方 MCP Java SDK | 0.17.2 |
-| 关系库 | PostgreSQL | 14，库名 `biz_buddy` |
+| 关系库 | PostgreSQL 14（默认）/ MySQL 8.0 | 库名均为 `biz_buddy` |
 | 缓存 / 分布式状态 | Redis | ≥ 6.x |
 | 向量库 | Milvus | v2.6.13（gRPC 19530） |
 | 权限认证 | Sa-Token | 1.46.0 |
@@ -394,7 +394,7 @@ AI 能力全部落在后端模块 `ruoyi-ai`（包 `org.dromara.ai`），前端�
 
 | 组件 | 说明 |
 |---|---|
-| PostgreSQL 14 | 库 `biz_buddy`，导入 `script/sql/postgres/` 下四个脚本 |
+| 关系库（二选一） | PostgreSQL 14：库 `biz_buddy`，导入 `script/sql/postgres/` 下四个脚本；MySQL 8.0：库 `biz_buddy`，导入 `script/sql/` 下四个脚本（含 `ry_ai.sql`）。技能仓库按数据源类型自动装配，无需改配置 |
 | Redis ≥ 6 | 缓存、分布式锁、AgentScope 分布式状态 |
 | Milvus v2.6.13 | 知识库向量存储与检索（gRPC `19530`） |
 | SnailJob | 定时任务调度承载（`ruoyi-extend/ruoyi-snailjob-server`，未启动只影响定时触发） |

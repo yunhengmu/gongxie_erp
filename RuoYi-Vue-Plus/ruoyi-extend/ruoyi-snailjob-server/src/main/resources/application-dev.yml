@@ -1,7 +1,8 @@
 spring:
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
-    driver-class-name: org.postgresql.Driver
+    # 不写 driver-class-name：由 Hikari 依 JDBC URL 从 classpath 驱动中自动匹配，
+    # 使同一份配置同时服务 PostgreSQL 与 MySQL（两种驱动均在位）。
     url: jdbc:postgresql://localhost:5432/biz_buddy?useUnicode=true&characterEncoding=utf8&useSSL=false&autoReconnect=true&reWriteBatchedInserts=true
     username: postgres
     password: Zl@2026

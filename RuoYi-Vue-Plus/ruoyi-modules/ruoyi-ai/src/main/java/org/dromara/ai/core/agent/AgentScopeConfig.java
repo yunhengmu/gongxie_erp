@@ -1,6 +1,7 @@
 package org.dromara.ai.core.agent;
 
 import io.agentscope.core.skill.repository.AgentSkillRepository;
+import io.agentscope.core.skill.repository.mysql.MysqlSkillRepository;
 import io.agentscope.core.skill.repository.postgresql.PostgresSkillRepository;
 import io.agentscope.core.state.AgentStateStore;
 import io.agentscope.extensions.redis.state.RedisAgentStateStore;
@@ -9,6 +10,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.SQLException;
+import java.util.Locale;
 
 /**
  * AgentScope 装配所需的基础 Bean。
@@ -58,16 +63,41 @@ public class AgentScopeConfig {
     }
 
     /**
-     * 技能仓库（REQ-AI-10）：技能的持久化由 AgentScope 的 PostgreSQL 技能仓库实现提供，
-     * 但**表名与 schema 定制为本项目的 {@code public.ai_skill} / {@code public.ai_skill_resource}**，
-     * 且 {@code createIfNotExist=false} + {@code writeable=false} ——
+     * 技能仓库（REQ-AI-10）：技能的持久化由 AgentScope 官方技能仓库实现提供，
+     * 本项目同时支持 PostgreSQL（默认）与 MySQL 8.0：运行时按数据源的数据库产品名二选一装配，
+     * 两端都把表名定制为本项目的 {@code ai_skill} / {@code ai_skill_resource}，且
+     * {@code createIfNotExist=false} + {@code writeable=false} ——
      * 建表与写入统一由本项目的 SQL 脚本与 Service 负责，从而保留审计列与生效范围治理列。
+     *
+     * <p>注意两者的「库名」语义不同：PostgreSQL 用 schema（{@code public}），MySQL 用 database
+     * （即当前连接的 catalog，形如 {@code biz_buddy}）——后者由连接动态读取，避免把库名写死。</p>
      *
      * @param dataSource 项目数据源
      * @return 技能仓库 Bean（只读）
      */
     @Bean
     public AgentSkillRepository aiSkillRepository(DataSource dataSource) {
+        String productName;
+        String catalog;
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseMetaData metaData = connection.getMetaData();
+            productName = metaData.getDatabaseProductName();
+            // MySQL 的 database 即 JDBC catalog；PostgreSQL 的 catalog 是库名、schema 才是 public
+            catalog = connection.getCatalog();
+        } catch (SQLException e) {
+            throw new IllegalStateException("无法探测数据源类型以装配技能仓库", e);
+        }
+
+        if (productName != null && productName.toLowerCase(Locale.ROOT).contains("mysql")) {
+            return MysqlSkillRepository.builder(dataSource)
+                .databaseName(catalog)
+                .skillsTableName(SKILL_TABLE)
+                .resourcesTableName(SKILL_RESOURCE_TABLE)
+                .createIfNotExist(false)
+                .writeable(false)
+                .build();
+        }
+
         return PostgresSkillRepository.builder(dataSource)
             .schemaName(SKILL_SCHEMA)
             .skillsTableName(SKILL_TABLE)

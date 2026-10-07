@@ -329,6 +329,12 @@
                 <artifactId>agentscope-extensions-skill-postgresql-repository</artifactId>
                 <version>${agentscope.version}</version>
             </dependency>
+            <!-- AgentScope 技能仓库（MySQL）：与 PostgreSQL 版并行的官方实现，仅改数据源类型时装配 -->
+            <dependency>
+                <groupId>io.agentscope</groupId>
+                <artifactId>agentscope-extensions-skill-mysql-repository</artifactId>
+                <version>${agentscope.version}</version>
+            </dependency>
             <!-- AgentScope 渠道接入（REQ-AI-24）：飞书 / 企业微信 / GitHub Webhook 适配器与通用保障 -->
             <dependency>
                 <groupId>io.agentscope</groupId>

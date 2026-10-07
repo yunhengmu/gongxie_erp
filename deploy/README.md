@@ -4,6 +4,8 @@
 
 > 与 `RuoYi-Vue-Plus/script/docker/docker-compose.yml` 的区别：那个是上游 RuoYi 模板（MySQL、无 Milvus、直接用成品镜像）；本目录针对本项目的**真实技术栈**，并把建库脚本按依赖顺序挂进 PostgreSQL 的初始化目录，`up` 完即是「有表、有数据、可登录」的环境。
 
+> 需要 **MySQL 8.0** 时，用并列的 [`deploy-mysql/`](../deploy-mysql)（组件一致，仅数据库 / JDBC 驱动 / 技能仓库实现不同；项目按数据源自动装配，无需改配置）。两套编排的项目名与端口已错开，可同时运行。
+
 ## 1. 前置：先构建两个产物
 
 项目自带的 Dockerfile 用的是 `ADD ./target/xxx.jar`，即**镜像里只有 jar，不在镜像内编译**。所以启动前必须先在宿主机构建：
@@ -38,15 +40,22 @@ docker compose up -d --build
 | 调度控制台 | <http://localhost:8800/snail-job> |
 | 初始账号 | `admin / admin123`（另：`test / 666666`、`test1 / 666666`） |
 
-## 3. 首次启动后必做：配置模型
+## 3. 首次启动后必做：配置模型密钥
 
-建库脚本**不含 `ai_model_config` 种子**（种子里的 `model_id` 是原环境的值）。所以干净库起来后 AI 对话不可用：
+建库脚本已预置两个**示例模型**（提供商：阿里云百炼 / DashScope，走 OpenAI 兼容协议），但 **`api_key` 一律留空**，需自行补齐：
 
-1. 登录 →「模型配置」新增一个**对话模型**（OpenAI 兼容地址 + API Key）；
-2. 到「小Z 配置」「专家配置」把模型槽位指向它；
-3. 要用知识库检索，再配一个 **embedding 模型**。
+| 配置名称 | 类型 | 说明 |
+|---|---|---|
+| `deepseek-v4.1-flash` | 对话 | 大语言模型 |
+| `qwen3.7-text-embedding` | 向量 | 维度按 `1024` 预置，须与模型实际输出一致 |
 
-## 4. 实测结论（2026-10-07，WSL2 + Docker 29.3 / Compose v5.1.1）
+1. 登录 →「模型配置」把这两个模型（或你另行新建的模型）的 **API Key** 换成自己的阿里云百炼密钥 —— 换完即可用，无需其它配置；
+2. 内置智能体（小Z 与两个专家）的模型槽位**已指向** `deepseek-v4.1-flash`；若要换模型，到「小Z 配置」「专家配置」改指即可；
+3. 要用知识库检索，向量模型须选上表中的 embedding 模型（维度与知识库一致）。
+
+> 智能体只绑定了模型，未绑知识库 / 技能；若要换用其它厂商或模型，在「模型配置」页新建即可（提供商选对应项，`base_url` 填其 OpenAI 兼容根地址）。
+
+## 4. 实测结论（2026-10-08，WSL2 + Docker 29.3 / Compose v5.1.1）
 
 `docker compose up -d --build` 后：
 
@@ -67,7 +76,7 @@ docker compose up -d --build
 | `GET http://localhost:8800/snail-job/`（调度控制台） | 200 |
 | 后端数据源 | HikariPool 初始化成功 |
 | 后端 Redis | Redisson 已连接 `redis:6379` |
-| 建库结果 | 94 张基础表（`ai_*` 36 / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 等）；`admin` 等初始账号在位；`ai_tool` 25、入口小Z 1、专家 2；`sj_job` 已有派发任务 |
+| 建库结果 | 94 张基础表（`ai_*` 36 / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 等）；`admin` 等初始账号在位；`ai_tool` 25、入口小Z 1、专家 2、`ai_model_config` 2（`api_key` 留空）；`sj_job` 已有派发任务 |
 
 ## 5. 已知坑（都踩过，按此排查）
 
@@ -129,6 +138,8 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 ```
 
 > 建库脚本**只在数据卷为空时执行**。改了口令/库名等变量要生效，需 `down -v` 重建。
+
+> 启动/恢复请用**不带服务名**的 `docker compose up -d`：只 `up` 某一个服务不会补齐其它缺失的容器，容易留下「前端能打开、上传却失败」这类半残状态（典型如平台 MinIO 容器缺失 → 上传报 `UnknownHostException: minio`）。用 `docker compose ps` 对照 compose 文件核对服务是否齐全。
 
 ## 7. 变量
 
