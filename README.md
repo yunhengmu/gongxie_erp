@@ -220,6 +220,7 @@ RuoYi-Vue-Plus/ruoyi-modules/ruoyi-ai/target/site/jacoco/jacoco.csv   # 机器�
 
 | 文档 | 位置 |
 |---|---|
+| **开发者文档**（架构 / 二次开发 / 配置） | [`docs/README.md`](docs/README.md) |
 | 平台功能说明（含界面截图） | [`RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md`](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md) |
 | 前端工程说明 | [`plus-ui-Vue/README.md`](plus-ui-Vue/README.md) |
 
