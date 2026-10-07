@@ -103,6 +103,20 @@ docker logs bizbuddy-postgres 2>&1 | grep -E 'docker-entrypoint-initdb.d|ERROR'
 原因：Spring 松散绑定下 `SNAILJOB_HOST` 落到 **`snail-job.host`（客户端自己的 IP）**，而服务端地址是 `snail-job.server.host`（对应 `SNAILJOB_SERVER_HOST`）。
 处置：本目录已改用 `SNAILJOB_SERVER_HOST`。正确时应看到 `客户端IP为: 172.22.0.x`（容器真实 IP），且调度端 ERROR 归零。
 
+**⑥ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
+现象：上传文档失败，后端日志 `S3StorageException: Unable to execute HTTP request: Connection refused: /127.0.0.1:9000`。
+原因：**平台文件存储（OSS）的坐标不在 yaml 里，而在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。容器里 `127.0.0.1` 是容器自身，自然连不上。
+处置：本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9000/9001；注意与 Milvus 自用的 `milvus-minio` 是两套，互不共用）；② 一次性初始化 `minio-init` 建桶并设为可公开读（对应 `sys_oss_config.access_policy=1`，且**框架不会自动建桶**）。建桶复用 `minio` 镜像**自带的 `mc`**——`minio/mc` 独立镜像在部分镜像源上拉不到（403）。
+另外 `deploy/sql/50-oss-endpoint.sql` 会在首次建库时把 `sys_oss_config` 的端点改成 `minio:9000`；**已初始化过的数据卷不会重跑**，需手动补一次：
+
+```bash
+docker exec -i bizbuddy-postgres psql -U postgres -d biz_buddy < deploy/sql/50-oss-endpoint.sql
+docker compose restart ruoyi-admin      # 让 OSS 配置重新加载
+```
+
+MinIO 控制台：<http://localhost:9001>（`ruoyi` / `ruoyi123`）。
+> 上传成功还只是第一步：知识库文档随后要**向量化**，需先在「模型配置」配好 **embedding 模型**，否则会在向量化阶段再报错。
+
 ## 6. 运维命令
 
 ```bash

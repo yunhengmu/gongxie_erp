@@ -97,6 +97,8 @@ services:
       - ../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_workflow.sql:/docker-entrypoint-initdb.d/20-workflow.sql:ro
       - ../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_job.sql:/docker-entrypoint-initdb.d/30-snailjob.sql:ro
       - ../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_ai.sql:/docker-entrypoint-initdb.d/40-bizbuddy-ai.sql:ro
+      # 5 号脚本（最后执行）：把 sys_oss_config 的端点从 127.0.0.1 改为容器服务名 minio:9000
+      - ./sql/50-oss-endpoint.sql:/docker-entrypoint-initdb.d/50-oss-endpoint.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-biz_buddy}"]
       interval: 10s
@@ -120,6 +122,42 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+
+  # 平台自用的对象存储（OSS）：RuoYi 的文件上传与知识库文档都存这里（配置在 sys_oss_config 表）。
+  # 注意与下面的 milvus-minio 区分：那个是 Milvus 的内部对象存储，两者互不共用。
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2024-12-18T13-15-44Z}
+    container_name: bizbuddy-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${OSS_ACCESS_KEY:-ruoyi}
+      MINIO_ROOT_PASSWORD: ${OSS_SECRET_KEY:-ruoyi123}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    command: minio server /data --console-address ":9001"
+
+  # 一次性初始化：建桶并设为可公开读（对应 sys_oss_config.access_policy=1）。
+  # 复用 minio 镜像本身——它自带 mc 与 sh，故无需额外镜像
+  # （minio/mc 在部分镜像源上取不到：403 Forbidden）。
+  minio-init:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2024-12-18T13-15-44Z}
+    container_name: bizbuddy-minio-init
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        until mc alias set local http://minio:9000 ${OSS_ACCESS_KEY:-ruoyi} ${OSS_SECRET_KEY:-ruoyi123} >/dev/null 2>&1; do
+          echo "等待 MinIO 就绪..."; sleep 2;
+        done
+        mc mb -p local/${OSS_BUCKET:-ruoyi} || true
+        mc anonymous set download local/${OSS_BUCKET:-ruoyi} || true
+        echo "MinIO 桶已就绪：${OSS_BUCKET:-ruoyi}"
+    restart: "no"
 
   # Milvus standalone 依赖 etcd（元数据）与 minio（对象存储），三者构成一个整体。
   # 取自 Milvus 官方 standalone 编排；仅对外暴露 19530（gRPC），etcd / minio 不发布端口，
@@ -274,6 +312,7 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  minio-data:
   milvus-etcd-data:
   milvus-minio-data:
   milvus-data:
