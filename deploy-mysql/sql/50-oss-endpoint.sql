@@ -10,3 +10,10 @@
 -- ==========================================================================================
 
 update sys_oss_config set endpoint = 'minio:9000' where config_key in ('minio', 'image');
+
+-- 对外访问地址（返回给前端的 URL）：endpoint 的 `minio:9000` 只在容器网络内可达，浏览器解析不了，
+-- 会导致图片 / 文档在线预览失败（后端读图与解析正常、前端却加载不出来）。
+-- 这里给出**宿主机可达**的地址：本栈平台 MinIO 映射在宿主机 **9002**（`MINIO_API_PORT`，与 PG 栈的 9000 错开），
+-- 后端返回给前端的 URL 即以此为准。若改了 `MINIO_API_PORT` 或需从其它机器 / 公网访问，
+-- 请同步把下面的端口 / 主机改成实际可达值（改完需重启 ruoyi-admin 让其重载 OSS 配置）。
+update sys_oss_config set domain_url = 'http://localhost:9002' where config_key in ('minio', 'image');
