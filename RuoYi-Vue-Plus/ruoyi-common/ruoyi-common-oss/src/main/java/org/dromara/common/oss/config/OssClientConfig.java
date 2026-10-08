@@ -233,6 +233,37 @@ public class OssClientConfig implements Config<OssClientConfig, OssClientConfig.
     }
 
     /**
+     * 获取基于访问端点（endpoint）的桶URL地址，忽略自定义域名。
+     * <p>
+     * 用于服务端读写场景（如容器内部下载、解析文件）：此时必须使用容器可达的地址
+     * （endpoint，容器部署通常为 minio:9000），而不能使用仅对外可达的自定义域名
+     * （domain_url，容器内部往往解析失败）。默认为当前客户端配置的默认桶。
+     *
+     * @return 基于访问端点的桶URL地址
+     */
+    public String getEndpointBucketUrl() {
+        String bucket = bucket()
+            .filter(s -> !s.isBlank())
+            .orElseThrow(() -> S3StorageException.form("bucket is not configured."));
+        return getEndpointBucketUrl(bucket);
+    }
+
+    /**
+     * 获取基于访问端点（endpoint）的桶URL地址，忽略自定义域名。
+     * <p>
+     * 与 {@link #getBucketUrl(String)} 采用相同的路径风格/站点风格逻辑，
+     * 但一律基于 {@link #getEndpoint()} 生成，不会使用自定义域名。
+     *
+     * @param bucket 存储桶名称
+     * @return 基于访问端点的桶URL地址
+     */
+    public String getEndpointBucketUrl(String bucket) {
+        String url = getEndpoint();
+        // 根据是否使用路径风格配置项决定存储桶的URL风格
+        return usePathStyleAccess ? BucketUrlUtil.getPathStyleBucketUrl(useHttps, url, bucket) : BucketUrlUtil.getSiteStyleBucketUrl(useHttps, url, bucket);
+    }
+
+    /**
      * 判断是否配置了自定义域名。
      *
      * @return 是否配置了非空自定义域名

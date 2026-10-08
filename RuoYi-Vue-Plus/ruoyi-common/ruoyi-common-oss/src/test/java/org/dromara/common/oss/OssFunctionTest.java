@@ -127,6 +127,25 @@ class OssFunctionTest {
     }
 
     /**
+     * 验证服务端读写用的桶地址一律基于 endpoint 生成，忽略自定义域名。
+     *
+     * <p>容器化部署时 endpoint 为容器服务名（如 {@code minio:9000}），服务端下载/解析
+     * 必须使用该地址，而不能使用仅对外可达的自定义域名。</p>
+     */
+    @Test
+    @DisplayName("基于 endpoint 生成服务端读写桶地址并忽略自定义域名")
+    void shouldBuildEndpointBucketUrlIgnoringCustomDomain() {
+        OssProperties properties = properties("minio:9000", "oss.example.com", "ruoyi");
+        properties.setIsHttps("N");
+
+        OssClientConfig config = OssClientConfig.formProperties(properties);
+
+        assertTrue(config.usePathStyleAccess());
+        assertEquals("http://minio:9000/ruoyi", config.getEndpointBucketUrl());
+        assertEquals("http://minio:9000/archive", config.getEndpointBucketUrl("archive"));
+    }
+
+    /**
      * 创建覆盖 URL 构造所需字段的 OSS 属性。
      *
      * @param endpoint endpoint 地址

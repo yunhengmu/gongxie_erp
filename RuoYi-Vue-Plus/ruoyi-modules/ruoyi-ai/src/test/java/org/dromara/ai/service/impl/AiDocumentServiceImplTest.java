@@ -207,11 +207,11 @@ class AiDocumentServiceImplTest {
         old.setDocId(1L);
         old.setVectorId("v1");
         when(chunkMapper.selectList(any())).thenReturn(List.of(old));
-        when(ossService.selectUrlByIds("5")).thenReturn("http://a");
+        when(ossService.selectInternalUrlByIds("5")).thenReturn("http://minio/a");
         when(baseMapper.selectVoById(1L)).thenReturn(new AiDocumentVo());
         try (MockedStatic<HttpUtil> hs = mockStatic(HttpUtil.class);
              MockedStatic<AiDocumentParser> ps = mockStatic(AiDocumentParser.class)) {
-            hs.when(() -> HttpUtil.downloadBytes("http://a")).thenReturn(new byte[]{1, 2, 3});
+            hs.when(() -> HttpUtil.downloadBytes("http://minio/a")).thenReturn(new byte[]{1, 2, 3});
             ps.when(() -> AiDocumentParser.extract(any(byte[].class), eq("txt"))).thenReturn("hello world");
 
             AiDocumentVo result = service.parse(1L);
@@ -230,10 +230,10 @@ class AiDocumentServiceImplTest {
         when(baseMapper.selectById(1L)).thenReturn(doc);
         when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb(2L, 10, 0));
         when(chunkMapper.selectList(any())).thenReturn(List.of());
-        when(ossService.selectUrlByIds("5")).thenReturn("http://a");
+        when(ossService.selectInternalUrlByIds("5")).thenReturn("http://minio/a");
         try (MockedStatic<HttpUtil> hs = mockStatic(HttpUtil.class);
              MockedStatic<AiDocumentParser> ps = mockStatic(AiDocumentParser.class)) {
-            hs.when(() -> HttpUtil.downloadBytes("http://a")).thenReturn(new byte[]{1});
+            hs.when(() -> HttpUtil.downloadBytes("http://minio/a")).thenReturn(new byte[]{1});
             ps.when(() -> AiDocumentParser.extract(any(byte[].class), eq("txt"))).thenReturn("  ");
 
             assertThrows(ServiceException.class, () -> service.parse(1L));
@@ -248,9 +248,9 @@ class AiDocumentServiceImplTest {
         when(baseMapper.selectById(1L)).thenReturn(doc);
         when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb(2L, 10, 0));
         when(chunkMapper.selectList(any())).thenReturn(List.of());
-        when(ossService.selectUrlByIds("5")).thenReturn("http://a");
+        when(ossService.selectInternalUrlByIds("5")).thenReturn("http://minio/a");
         try (MockedStatic<HttpUtil> hs = mockStatic(HttpUtil.class)) {
-            hs.when(() -> HttpUtil.downloadBytes("http://a")).thenThrow(new RuntimeException("io"));
+            hs.when(() -> HttpUtil.downloadBytes("http://minio/a")).thenThrow(new RuntimeException("io"));
 
             assertThrows(ServiceException.class, () -> service.parse(1L));
         }

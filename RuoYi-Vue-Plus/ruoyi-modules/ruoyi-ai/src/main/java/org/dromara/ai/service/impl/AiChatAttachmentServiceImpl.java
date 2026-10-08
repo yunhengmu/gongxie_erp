@@ -263,10 +263,10 @@ public class AiChatAttachmentServiceImpl implements IAiChatAttachmentService {
     }
 
     /**
-     * 解析 OSS 访问地址（不存在即报错）。
+     * 解析 OSS 服务端读写地址（下载用，忽略对外域名，不存在即报错）。
      */
     private String resolveUrl(Long ossId) {
-        String url = resolveUrlQuietly(ossId);
+        String url = resolveInternalUrlQuietly(ossId);
         if (StringUtils.isBlank(url)) {
             throw new ServiceException("文件不存在或已被删除，请重新上传");
         }
@@ -274,7 +274,22 @@ public class AiChatAttachmentServiceImpl implements IAiChatAttachmentService {
     }
 
     /**
-     * 解析 OSS 访问地址（历史回显用，不存在时返回 null 而不报错）。
+     * 解析 OSS 服务端读写地址（下载用，忽略对外域名，不存在时返回 null 而不报错）。
+     */
+    private String resolveInternalUrlQuietly(Long ossId) {
+        if (ossId == null) {
+            return null;
+        }
+        String urls = ossService.selectInternalUrlByIds(String.valueOf(ossId));
+        if (StringUtils.isBlank(urls)) {
+            return null;
+        }
+        int index = urls.indexOf(',');
+        return index > 0 ? urls.substring(0, index) : urls;
+    }
+
+    /**
+     * 解析 OSS 访问地址（历史回显用，对外展示地址，不存在时返回 null 而不报错）。
      */
     private String resolveUrlQuietly(Long ossId) {
         if (ossId == null) {

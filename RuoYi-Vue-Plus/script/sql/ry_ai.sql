@@ -18,7 +18,8 @@ SET NAMES utf8mb4;
 --      二、36 张 ai_* 业务表（建表 + 列注释 + 索引 + 约束）
 --      三、内置模型配置种子（ai_model_config）
 --      四、内置业务工具种子（ai_tool）
---      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家及其工具绑定）
+--      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家 / 作者信息检索专家及其工具绑定，
+--          含演示知识库「作者简介演示库」与文档「作者简介.txt」及其 OSS 记录 sys_oss）
 --      六、SnailJob 派发任务登记（sj_job）
 --   3. 全部语句幂等（create table if not exists、on duplicate key update），可重复执行；
 --      重复执行不会产生重复数据。
@@ -32,10 +33,14 @@ SET NAMES utf8mb4;
 --      docs/13-BizBuddy数据库设计.md。
 --
 -- 回滚（按依赖倒序执行；菜单与种子先删，再删表）：
---   delete from ai_agent_tool where agent_id in (1761400000000020303, 1761400000000020304);
---   delete from ai_expert_agent where id in (1761400000000020303, 1761400000000020304);
+--   delete from ai_agent_kb where agent_id = 1761400000000020305;
+--   delete from ai_agent_tool where agent_id in (1761400000000020303, 1761400000000020304, 1761400000000020305);
+--   delete from ai_expert_agent where id in (1761400000000020303, 1761400000000020304, 1761400000000020305);
 --   delete from ai_entry_agent where id = 1761400000000020302;
 --   delete from ai_tool where id between 1761400000000020200 and 1761400000000020299;
+--   delete from ai_document where id = 1761400000000021002;
+--   delete from sys_oss where oss_id = 1761400000000021101;
+--   delete from ai_knowledge_base where id = 1761400000000021001;
 --   delete from ai_model_config where id in (1761400000000020400, 1761400000000020401);
 --   delete from sj_job where biz_id = 'bizbuddy-agent-task-dispatch';
 --   delete from sys_menu where menu_id between 1761400000000020000 and 1761400000000020999;
@@ -1336,6 +1341,8 @@ on duplicate key update id = id;
 -- ============================================================
 --   入口智能体「小Z」恒 1 行（ai_entry_agent.singleton 唯一索引强制全平台唯一）；
 --   内置专家「机构管理专家」「公告管理专家」各 1 行，并登记其工具绑定。
+--   另附一套**演示数据**（本节末尾）：「作者简介演示库」知识库 + 文档「作者简介.txt」
+--   + 专家「作者信息检索专家」（绑定该知识库与知识库检索工具），初始化后即可在页面看到演示数据。
 --   下表中的 model_id 统一指向本节预置的对话模型（ai_model_config 中 provider=dashscope 的
 --   deepseek-v4.1-flash）；如需更换，可在「小Z 配置」「专家配置」页调整。
 -- ============================================================
@@ -1481,6 +1488,81 @@ values (1761400000000020336, 1761400000000020303, 'search_notice', '0', '只读�
        (1761400000000020338, 1761400000000020303, 'create_notice', '1', '写入：发布公告（需确认）', 1761000000000000103, 1761100000000000001, now()),
        (1761400000000020339, 1761400000000020303, 'update_notice', '1', '写入：修改公告（需确认）', 1761000000000000103, 1761100000000000001, now()),
        (1761400000000020340, 1761400000000020303, 'delete_notice', '1', '写入：删除公告（需确认）', 1761000000000000103, 1761100000000000001, now())
+on duplicate key update agent_id = agent_id, tool_code = tool_code;
+
+-- 演示数据：知识库「作者简介演示库」+ 文档「作者简介.txt」+ 专家「作者信息检索专家」
+--   知识库默认值对齐 AiKnowledgeBaseServiceImpl：collection_name = 'kb_' + kb_code、切片 500/50、
+--   召回 5、相似度 0.500、公开（visible_scope=0，owner_dept_id 留空）；
+--   文档解析状态取 AiDocumentServiceImpl.STATUS_PARSED='2'、向量化状态取 STATUS_VECTOR_PENDING='0'，
+--   正文直接写入 content（无 OSS 文件也可直接向量化）；同时预置一行 sys_oss（key=demo/author_bio.txt）
+--   并把这行文档的 oss_id 指向它，使「重新解析」能按对象键读取——对象由部署编排的 minio-init 在
+--   初始化时用 mc cp 写入 MinIO（见 deploy*/docker-compose.yml，种子文件 docs/作者简介.txt）；
+--   专家的知识库检索工具（search_knowledge_base）不在 AgentRegistry.BUILTIN_READONLY_TOOL_CODES 之列
+--   （需按提问用户过滤生效范围），故须经 ai_agent_tool 显式绑定。
+insert into ai_knowledge_base (id, kb_name, kb_code, description, embedding_model_id, collection_name,
+                               dimension, chunk_size, chunk_overlap, retrieval_top_k, similarity_threshold,
+                               status, remark, create_dept, create_by, create_time, update_by, update_time,
+                               del_flag, owner_dept_id, visible_scope)
+values (1761400000000021001, '作者简介演示库', 'author_demo_kb',
+        '演示知识库：收录作者张磊的简介，供「作者信息检索专家」检索回答',
+        1761400000000020401, 'kb_author_demo_kb',
+        1024, 500, 50, 5, 0.500,
+        '0', '平台预置演示知识库（向量模型同预置 qwen3.7-text-embedding，公开可用）',
+        1761000000000000103, 1761100000000000001, now(), null, now(),
+        '0', null, '0')
+on duplicate key update id = id;
+
+-- 演示文档的 OSS 记录：file_name 即对象键（demo/author_bio.txt），与 minio-init 写入 MinIO 的路径一致；
+-- url 留空避免写死 http://localhost:9000 这类主机相关地址（读取按 endpoint 动态生成）。
+-- 列名严格照抄 sys_oss 真实 DDL（无 del_flag；含 update_by/update_time）。
+insert into sys_oss (oss_id, file_name, original_name, file_suffix, url, service,
+                     create_dept, create_by, create_time, update_by, update_time)
+values (1761400000000021101, 'demo/author_bio.txt', '作者简介.txt', 'txt', '', 'minio',
+        1761000000000000103, 1761100000000000001, now(), null, null)
+on duplicate key update oss_id = oss_id;
+
+insert into ai_document (id, kb_id, doc_name, file_suffix, oss_id, file_url, file_size,
+                         char_count, chunk_count, parse_status, error_msg, remark,
+                         create_dept, create_by, create_time, update_by, update_time, del_flag,
+                         content, vector_status, vector_error_msg)
+values (1761400000000021002, 1761400000000021001, '作者简介.txt', 'txt', 1761400000000021101, null, null,
+        371, 0, '2', '', '平台预置演示文档（正文直接入库，可执行「向量化」）',
+        1761000000000000103, 1761100000000000001, now(), null, now(), '0',
+        '张磊，资深软件架构师，二十余年的软件开发经验，持有PMP、系统架构设计师证书，华为开发者专家(HDE)、华为云开发者专家(HCDE)、官方认证首批鸿蒙极客，仓颉语言社区卓越贡献者，著有《HarmonyOS网络编程》、《仓颉语言网络编程》、《仓颉语言元编程》、《仓颉语言实战》、《鲲鹏架构入门与实战》、《鲲鹏开发套件应用快速入门》等图书，清华大学出版社出版，研究方向聚焦在基础软件领域的自主可控和国产替代。主要开源项目有BizBuddy （https://gitee.com/zl3624/biz-buddy）企业级智能业务运行平台、鸿蒙网络编程示例仓库（https://gitee.com/zl3624/harmonyos_network_samples），B站地址：https://space.bilibili.com/482393709。',
+        '0', '')
+on duplicate key update id = id;
+
+insert into ai_expert_agent (id, agent_name, agent_code, description, sys_prompt, model_id,
+                             owner_dept_id, visible_scope, max_iters, status, remark,
+                             capability_desc, expert_write_enabled, auto_route,
+                             create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020305, '作者信息检索专家', 'author_bio_expert',
+        '基于知识库回答关于作者张磊的专业背景、著作与开源项目等问题',
+        '你是「作者信息检索」专家，基于绑定的知识库回答关于作者张磊的问题。请遵守以下纪律：
+
+【总则】
+1. 一切事实必须来自知识库检索结果，禁止凭猜测回答张磊的专业背景、著作、开源项目、联系方式等信息。
+2. 用户提问涉及作者信息时，先调用 search_knowledge_base 检索（关键词尽量取用户问题中的关键概念，如「著作」「开源项目」「鸿蒙」），再依据返回的片段作答；**绝不编造检索结果中没有的内容**。
+
+【回答要求】
+1. 只依据知识库返回的资料作答，引用具体书名、项目名、网址时保持与资料一致，不要改写或杜撰。
+2. 若检索结果为空或不足以回答，如实说明「知识库中未找到相关信息」，不要臆测；必要时可提示用户换个说法或补充关键词。
+3. 若问题与作者张磊无关，礼貌说明本专家的职责范围是作者相关信息检索。
+
+【输出风格】
+- 用简体中文，先给结论，再给依据（引用相关书名 / 项目 / 链接），避免冗长复述检索原文。',
+        1761400000000020400, 1761000000000000103, '0', 10, '0',
+        '平台预置专家：绑定演示知识库「作者简介演示库」与知识库检索工具（只读，不允许写入）；模型指向预置对话模型 deepseek-v4.1-flash',
+        '基于绑定的知识库检索回答作者张磊的专业背景、著作与开源项目等信息', '0', '1',
+        1761000000000000103, 1761100000000000001, now(), null, now(), '0')
+on duplicate key update id = id;
+
+insert into ai_agent_kb (id, agent_id, kb_id, remark, create_dept, create_by, create_time)
+values (1761400000000020357, 1761400000000020305, 1761400000000021001, '绑定演示知识库「作者简介演示库」', 1761000000000000103, 1761100000000000001, now())
+on duplicate key update agent_id = agent_id, kb_id = kb_id;
+
+insert into ai_agent_tool (id, agent_id, tool_code, decision, remark, create_dept, create_by, create_time)
+values (1761400000000020356, 1761400000000020305, 'search_knowledge_base', '0', '只读：知识库检索', 1761000000000000103, 1761100000000000001, now())
 on duplicate key update agent_id = agent_id, tool_code = tool_code;
 -- ============================================================
 -- 六、SnailJob 派发任务登记（sj_job）

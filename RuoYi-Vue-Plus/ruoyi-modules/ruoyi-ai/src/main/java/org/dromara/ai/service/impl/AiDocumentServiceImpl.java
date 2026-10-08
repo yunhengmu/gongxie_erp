@@ -327,7 +327,7 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
      * @return 文件字节
      */
     private byte[] download(AiDocument document) {
-        String url = resolveUrl(document.getOssId());
+        String url = resolveInternalUrl(document.getOssId());
         byte[] bytes;
         try {
             bytes = HttpUtil.downloadBytes(url);
@@ -341,7 +341,7 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
     }
 
     /**
-     * 解析 OSS 文件访问地址。
+     * 解析 OSS 文件访问地址（对外展示用，写入 file_url）。
      *
      * @param ossId OSS 主键
      * @return 访问地址
@@ -351,6 +351,24 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
             throw new ServiceException("文件未上传，请重新上传后再提交");
         }
         String urls = ossService.selectUrlByIds(String.valueOf(ossId));
+        if (StringUtils.isBlank(urls)) {
+            throw new ServiceException("文件不存在或已被删除，请重新上传");
+        }
+        int index = urls.indexOf(',');
+        return index > 0 ? urls.substring(0, index) : urls;
+    }
+
+    /**
+     * 解析 OSS 文件的服务端读写地址（下载/解析源文件用，忽略对外域名）。
+     *
+     * @param ossId OSS 主键
+     * @return 服务端读写地址
+     */
+    private String resolveInternalUrl(Long ossId) {
+        if (ossId == null) {
+            throw new ServiceException("文件未上传，请重新上传后再提交");
+        }
+        String urls = ossService.selectInternalUrlByIds(String.valueOf(ossId));
         if (StringUtils.isBlank(urls)) {
             throw new ServiceException("文件不存在或已被删除，请重新上传");
         }

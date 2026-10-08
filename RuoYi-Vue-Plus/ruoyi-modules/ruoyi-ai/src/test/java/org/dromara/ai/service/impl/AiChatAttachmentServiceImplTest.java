@@ -69,7 +69,7 @@ class AiChatAttachmentServiceImplTest {
     @DisplayName("图片超过大小上限被拒绝")
     void shouldRejectOversizeImage() {
         when(ossService.selectByIds(String.valueOf(OSS_ID))).thenReturn(List.of(oss("png")));
-        when(ossService.selectUrlByIds(String.valueOf(OSS_ID))).thenReturn("http://oss/x.png");
+        when(ossService.selectInternalUrlByIds(String.valueOf(OSS_ID))).thenReturn("http://minio/x.png");
         byte[] oversized = new byte[(int) aiProperties.getChat().getImageMaxBytes() + 1];
 
         try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
@@ -84,6 +84,8 @@ class AiChatAttachmentServiceImplTest {
     @DisplayName("文档登记解析文本并落库")
     void shouldRegisterDocumentAndParse() {
         when(ossService.selectByIds(String.valueOf(OSS_ID))).thenReturn(List.of(oss("txt")));
+        // 下载走服务端内部地址（忽略对外域名），VO 回显走对外地址
+        when(ossService.selectInternalUrlByIds(String.valueOf(OSS_ID))).thenReturn("http://minio/x.txt");
         when(ossService.selectUrlByIds(String.valueOf(OSS_ID))).thenReturn("http://oss/x.txt");
         byte[] content = "你好智造".getBytes(StandardCharsets.UTF_8);
 
