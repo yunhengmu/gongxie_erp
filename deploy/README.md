@@ -55,14 +55,15 @@ docker compose up -d --build
 
 > 智能体只绑定了模型，未绑知识库 / 技能；若要换用其它厂商或模型，在「模型配置」页新建即可（提供商选对应项，`base_url` 填其 OpenAI 兼容根地址）。
 
-## 4. 实测结论（2026-10-08，WSL2 + Docker 29.3 / Compose v5.1.1）
+## 4. 实测结论（2026-10-09，WSL2 + Docker 29.3 / Compose v5.1.1）
 
 `docker compose up -d --build` 后：
 
 | 容器 | 状态 |
 |---|---|
 | bizbuddy-postgres / redis / milvus / milvus-etcd / milvus-minio | Up (healthy) |
-| bizbuddy-admin | Up，日志 `Started DromaraApplication in ~25s`，无 ERROR |
+| bizbuddy-minio（平台 OSS） | Up（`minio-init` 一次性建桶 / 上传演示文档后退出） |
+| bizbuddy-admin | Up，日志 `RuoYi-Vue-Plus启动成功`，无 ERROR |
 | bizbuddy-snailjob-server | Up，无 ERROR |
 | bizbuddy-web | Up |
 
@@ -76,7 +77,18 @@ docker compose up -d --build
 | `GET http://localhost:8800/snail-job/`（调度控制台） | 200 |
 | 后端数据源 | HikariPool 初始化成功 |
 | 后端 Redis | Redisson 已连接 `redis:6379` |
-| 建库结果 | 94 张基础表（`ai_*` 36 / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 等）；`admin` 等初始账号在位；`ai_tool` 25、入口小Z 1、专家 2、`ai_model_config` 2（`api_key` 留空）；`sj_job` 已有派发任务 |
+| 建库结果 | 95 张表（`ai_*` **37** / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 / `test_*` 3 / `gen_*` 2）；`admin` 等初始账号在位；`ai_tool` 25、入口小Z 1、专家 **3**（机构管理 / 公告管理 / 演示「BizBuddy项目介绍专家」）、`ai_model_config` 2（`api_key` 留空）；演示种子一套（知识库 `bizbuddy_demo_kb` + 文档 `BizBuddy简介.txt` + `sys_oss` 行）；`sj_job` 已有派发任务 |
+
+> **可一键自检**：仓库自带端到端测试脚本 [`../e2e/`](../e2e)——对**已运行**的栈发真实 HTTP 断言，覆盖「模型连通 → 专家提示词生成 → 知识库解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具人工确认」。用法：
+
+```bash
+cd biz-buddy
+node e2e/run.mjs                        # 全量；未配密钥的层自动 SKIP
+node e2e/run.mjs --only L1,L3 --verbose # 指定层级
+node e2e/run.mjs --allow-writes         # L5 走「接受」路径（会真建公告，收尾自动清理）
+```
+
+> 密钥放 `e2e/.env.local`（模板见 `e2e/.env.example`，已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L5 走「模型配置」里已保存的密钥。退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败（栈不可达、登录失败、种子缺失）/ `3` 参数错误。详见 [docs/14 §85](../docs/14-BizBuddy未覆盖项与已知限制.md#s85) 与 [docs/17 §85](../docs/17-BizBuddy实施过程与验证记录.md#s85)。
 
 ## 5. 已知坑（都踩过，按此排查）
 
@@ -125,6 +137,7 @@ docker compose restart ruoyi-admin      # 让 OSS 配置重新加载
 
 MinIO 控制台：<http://localhost:9001>（`ruoyi` / `ruoyi123`）。
 > 上传成功还只是第一步：知识库文档随后要**向量化**，需先在「模型配置」配好 **embedding 模型**，否则会在向量化阶段再报错。
+> **预置的演示文档**（`BizBuddy简介.txt`）在种子里标为**未解析**（只写正文、不预生成切片），须先在「文档与切片」页点「**重新解析**」再点「**向量化**」；直接向量化会提示「文档切片为空，请先重新解析文档」。
 
 **⑦ 上传成功，但图片/文档在页面上「加载失败」（聊天里的图片、知识库预览）**
 

@@ -1764,8 +1764,11 @@ on conflict (agent_id, tool_code) do nothing;
 -- 演示数据：知识库「BizBuddy介绍演示库」+ 文档「BizBuddy简介.txt」+ 专家「BizBuddy项目介绍专家」
 --   知识库默认值对齐 AiKnowledgeBaseServiceImpl：collection_name = 'kb_' + kb_code、切片 500/50、
 --   召回 5、相似度 0.500、公开（visible_scope=0，owner_dept_id 留空）；
---   文档解析状态取 AiDocumentServiceImpl.STATUS_PARSED='2'、向量化状态取 STATUS_VECTOR_PENDING='0'，
---   正文直接写入 content（无 OSS 文件也可直接向量化）；同时预置一行 sys_oss（key=demo/bizbuddy_intro.txt）
+--   文档解析状态取 AiDocumentServiceImpl.STATUS_PENDING='0'——**与「无切片」一致**：种子只写正文、
+--   不预生成切片（chunk_count=0），故管理页显示「未解析」，用户须先「重新解析」再「向量化」
+--   （若写成 STATUS_PARSED='2' 则界面显示「已解析」但向量化会被拒，见 docs/14 §85）；
+--   向量化状态取 STATUS_VECTOR_PENDING='0'；正文直接写入 content（预览可看，解析另有 OSS 源文件）；
+--   同时预置一行 sys_oss（key=demo/bizbuddy_intro.txt）
 --   并把这行文档的 oss_id 指向它，使「重新解析」能按对象键读取——对象由部署编排的 minio-init 在
 --   初始化时用 mc cp 写入 MinIO（见 deploy*/docker-compose.yml，种子文件 docs/BizBuddy简介.txt）；
 --   专家的知识库检索工具（search_knowledge_base）不在 AgentRegistry.BUILTIN_READONLY_TOOL_CODES 之列
@@ -1797,7 +1800,7 @@ insert into ai_document (id, kb_id, doc_name, file_suffix, oss_id, file_url, fil
                          create_dept, create_by, create_time, update_by, update_time, del_flag,
                          content, vector_status, vector_error_msg)
 values (1761400000000021002, 1761400000000021001, 'BizBuddy简介.txt', 'txt', 1761400000000021101, null, null,
-        1100, 0, '2', '', '平台预置演示文档（正文直接入库，可执行「向量化」）',
+        1100, 0, '0', '', '平台预置演示文档（正文直接入库；请先「重新解析」再「向量化」）',
         1761000000000000103, 1761100000000000001, now(), null, now(), '0',
         'BizBuddy 是一个面向企业内部场景的 AI 应用平台，构建在企业级框架 RuoYi-Vue-Plus 之上（Spring Boot 4.1 + Vue 3），把大模型能力做成 可配置、可治理、可审计 的平台能力，而不是零散的对话 Demo。
 

@@ -1,0 +1,4 @@
+# 本地密钥与运行产物不入库
+.env.local
+.e2e-report-*.json
+node_modules/
