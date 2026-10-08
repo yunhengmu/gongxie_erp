@@ -26,6 +26,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 - **专家路由**——入口智能体按候选清单把任务**直接委派**给对应的领域专家；专家的回复**直接交付用户**（专家直答，小Z 只负责选谁）。
 - **写操作人工确认（HITL）**——涉及写库 / 写外部系统的工具调用会暂停并请求人工确认，确认后才继续执行。
 - **多渠道接入**——支持飞书 / 企业微信 / 钉钉 / GitHub Webhook 入站回调。
+- **多模态对话**——消息可携带**图片与文档附件**（先上传为暂存件、发送时绑定消息）；图片按 Base64 下发给视觉模型，文档解析为纯文本内联，附件内容块**随任务片段一并交给专家**；
 - **全链路审计留痕**——会话、路由、工具调用、确认与用量均有审计记录，可追溯。
 
 ## 仓库结构
@@ -34,14 +35,18 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 |---|---|
 | [`RuoYi-Vue-Plus/`](RuoYi-Vue-Plus) | **后端工程**：Spring Boot 4.1.1 + JDK 21，多模块 Maven；AI 能力在 `ruoyi-modules/ruoyi-ai`（AgentScope 2.0.3 内核） |
 | [`plus-ui-Vue/`](plus-ui-Vue) | **前端工程**：Vue 3 + TypeScript + Element Plus + Vite，包管理 pnpm |
+| [`docs/`](docs/README.md) | **开发者文档**：运行时架构、二次开发（新增业务工具）、配置项参考 |
 | [`RuoYi-Vue-Plus/docs/`](RuoYi-Vue-Plus/docs) | 平台功能说明（含 9 张运行界面截图） |
+| [`deploy/`](deploy) | **PostgreSQL 全栈容器编排**：PG 14 + Redis + Milvus + 后端 + 调度 + Nginx（`docker compose up -d --build` 即「有表有数据可登录」） |
+| [`deploy-mysql/`](deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
+| [`e2e/`](e2e) | **端到端测试脚本**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP 断言，见下文「测试与覆盖率」 |
 
 ## 功能说明
 
 平台完整功能说明见 **[RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md)**，按真实菜单与代码梳理，涵盖：
 
 - **功能地图与权限模型**——5 个分组、26 个功能页与权限标识约定、工具三档授权；
-- **智能体与对话**——任务工作台、入口智能体「小Z」配置、专家配置、任务管理、定时任务、计划模式、技能仓库、长期记忆、工作区文件、子智能体、场景包；
+- **智能体与对话**——任务工作台、入口智能体「小Z」配置、专家配置（含提示词 **AI 辅助生成 / 模板套用 / 克隆专家 / 保存前体检**）、任务管理、定时任务、计划模式、技能仓库、长期记忆、工作区文件、子智能体、场景包；
 - **模型与推理 / 知识库与检索**——模型配置与连通性测试、用量与配额、上下文压缩策略；知识库、文档与切片、检索测试；
 - **工具与集成**——业务工具注册、MCP 服务端（对外出口）与客户端（接入外部）、飞书 / 企业微信 / 钉钉 / GitHub 渠道接入；
 - **审计与观测**——会话与消息、工具调用、权限决策、链路追踪、编排运行五类留痕；
@@ -232,6 +237,31 @@ JaCoCo 覆盖率报告（构建后生成）：
 RuoYi-Vue-Plus/ruoyi-modules/ruoyi-ai/target/site/jacoco/index.html   # HTML 报告
 RuoYi-Vue-Plus/ruoyi-modules/ruoyi-ai/target/site/jacoco/jacoco.csv   # 机器可读
 ```
+
+### 端到端测试（e2e）
+
+单测证明「代码分支正确」，但不证明「跑起来能用」——模型是否真的连通、知识库是否真的检索得到、小Z 是否真的把问题路由给专家、写工具的人工确认闭环是否真的通，都需要在**真实运行**的栈上验证。`e2e/` 为此提供一套**外部驱动脚本**（Node.js 纯 ESM、**零 npm 依赖**），对**已运行**的容器栈发真实 HTTP 请求做断言：
+
+| 层 | 覆盖 |
+|---|---|
+| L1 | 模型连通性（对话 + 向量） |
+| L2 | 专家提示词辅助生成（`POST /ai/agent/experts/prompt/generate`） |
+| L3 | 知识库链路：文档解析（按对象键从 OSS 取源文件）→ 向量化 → 检索命中 |
+| L4 | 对话与专家编排：建会话（指定专家强制路由）→ SSE 流 → 编排轨迹落库 |
+| L5 | HITL：写工具暂停 → 确认 / 拒绝 → 恢复执行至 `done` |
+
+```bash
+# 需要栈已在运行（deploy/ 或 deploy-mysql/ 任一）
+node e2e/run.mjs                          # 全量；未配置密钥的层自动 SKIP
+node e2e/run.mjs --only L1,L3 --verbose    # 指定层级
+node e2e/run.mjs --allow-writes            # L5 走「接受」路径（会真建公告，收尾自动清理）
+node e2e/run.mjs --base-url http://localhost:8081   # 指向 MySQL 栈（PG 栈为 8080）
+```
+
+- 配置：复制 [`e2e/.env.example`](e2e/.env.example) 为 `e2e/.env.local`（已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L5 走平台「模型配置」里已保存的密钥。
+- 退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败 / `3` 参数错误。
+- **L5 默认走「拒绝」路径、不产生任何业务数据**；`--allow-writes` 才真写，并在收尾按标题清理公告与会话。
+- 它**不进 `mvn test`**、不引 Testcontainers，与上面的单测**互不影响**；两个数据库栈均已实跑通过（PostgreSQL `8080` / MySQL `8081`）。
 
 ## 文档
 
