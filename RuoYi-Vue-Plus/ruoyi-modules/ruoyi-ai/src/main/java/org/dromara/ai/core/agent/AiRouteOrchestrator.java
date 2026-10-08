@@ -2,7 +2,10 @@ package org.dromara.ai.core.agent;
 
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
+import io.agentscope.core.message.ContentBlock;
 import io.agentscope.core.message.Msg;
+import io.agentscope.core.message.TextBlock;
+import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.skill.SkillFilter;
 import io.agentscope.harness.agent.HarnessAgent;
@@ -459,7 +462,7 @@ public class AiRouteOrchestrator {
     private ExpertAttempt runOnce(AiRouteContext route, AiExpertCandidate candidate,
                                   int attempt, String kind) {
         return runExpert(route, candidate, attempt, kind,
-            buildExpertMessage(route), null);
+            buildExpertMsg(route), null);
     }
 
     /**
@@ -479,7 +482,7 @@ public class AiRouteOrchestrator {
      */
     private ExpertAttempt runExpert(AiRouteContext route, AiExpertCandidate candidate,
                                     int attempt, String kind,
-                                    String userMessage, List<Msg> resumeMessages) {
+                                    Msg userMessage, List<Msg> resumeMessages) {
         boolean resume = resumeMessages != null;
         AiExpertAgent definition = expertDirectory.definition(candidate.agentId());
         if (definition == null) {
@@ -756,6 +759,24 @@ public class AiRouteOrchestrator {
             .append("6. 若某次写工具调用返回「已跳过重复执行」：说明该操作**本次任务中已成功执行过**，")
             .append("直接复用上一次调用的结果作答即可，**不要**换参数或换工具重复执行。\n");
         return sb.toString();
+    }
+
+    /**
+     * 构造下发给专家的 user message：任务片段文本 + 本轮用户附件内容块（图片 / 文档）。
+     *
+     * <p>专家用独立会话、拿不到用户会话历史，附件（如图片）若只留在入口轮，专家就"看不到"；
+     * 故这里把 {@link AiRouteContext#attachmentBlocks} 与任务片段一并下发。</p>
+     *
+     * @param route 编排运行状态
+     * @return 专家 user message
+     */
+    private Msg buildExpertMsg(AiRouteContext route) {
+        List<ContentBlock> blocks = new ArrayList<>();
+        blocks.add(TextBlock.builder().text(buildExpertMessage(route)).build());
+        if (route.attachmentBlocks != null && !route.attachmentBlocks.isEmpty()) {
+            blocks.addAll(route.attachmentBlocks);
+        }
+        return new UserMessage(blocks);
     }
 
     /**

@@ -19,6 +19,7 @@ import org.dromara.ai.mapper.AiScenarioPackMapper;
 import org.dromara.ai.mapper.AiSessionMapper;
 import org.dromara.ai.mapper.AiToolCallLogMapper;
 import org.dromara.ai.service.IAiAgentService;
+import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiScenarioPackService;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.core.exception.ServiceException;
@@ -62,8 +63,10 @@ class AiSessionServiceImplTest {
     private final DeptService deptService = mock(DeptService.class);
     private final AgentStateStore aiAgentStateStore = mock(AgentStateStore.class);
     private final AiExpertDirectory expertDirectory = mock(AiExpertDirectory.class);
+    private final IAiChatAttachmentService aiChatAttachmentService = mock(IAiChatAttachmentService.class);
     private final AiSessionServiceImpl service = new AiSessionServiceImpl(baseMapper, messageMapper, toolCallLogMapper,
-        scenarioPackMapper, agentService, scenarioPackService, userService, deptService, aiAgentStateStore, expertDirectory);
+        scenarioPackMapper, agentService, scenarioPackService, userService, deptService, aiAgentStateStore, expertDirectory,
+        aiChatAttachmentService);
 
     private MockedStatic<LoginHelper> loginHelper;
 

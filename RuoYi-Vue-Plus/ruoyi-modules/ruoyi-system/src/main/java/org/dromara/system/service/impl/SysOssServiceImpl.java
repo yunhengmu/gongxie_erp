@@ -326,6 +326,18 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
         // 仅修改桶类型为 private 的URL，临时URL时长为120s
         if (instance.verifyConfig(config -> AccessPolicy.PRIVATE.equals(config.accessControlPolicyConfig().accessPolicy()))) {
             oss.setUrl(instance.presignGetUrl(oss.getFileName(), Duration.ofSeconds(120)));
+            return oss;
+        }
+        // 公开桶：按客户端配置重新生成对外访问地址。
+        // 容器化部署时 endpoint 常为容器服务名（如 minio:9000），浏览器无法解析；
+        // 配置自定义域名（sys_oss_config.domain_url，会拼上桶名）后即可返回对外可达地址，
+        // 且存量记录的 URL 同样在读取时被纠正（无需数据迁移）。
+        if (StringUtils.isNotBlank(oss.getFileName())) {
+            try {
+                oss.setUrl(instance.config().getBucketUrl() + "/" + oss.getFileName());
+            } catch (Exception ignored) {
+                // 配置不完整（如未配置桶）时保留存量 URL，避免列表接口整体失败
+            }
         }
         return oss;
     }

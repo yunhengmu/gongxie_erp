@@ -108,6 +108,25 @@ class OssFunctionTest {
     }
 
     /**
+     * 验证路径风格（如 MinIO）下自定义域名同样生效：域名不含桶，按路径风格拼上桶名。
+     *
+     * <p>用于容器化部署：endpoint 为容器服务名（如 {@code minio:9000}）浏览器不可达，
+     * 通过 {@code sys_oss_config.domain_url} 给出对外可访问地址。</p>
+     */
+    @Test
+    @DisplayName("路径风格下自定义域名拼接桶名")
+    void shouldAppendBucketForCustomDomainUnderPathStyle() {
+        OssProperties properties = properties("minio:9000", "oss.example.com", "ruoyi");
+        properties.setIsHttps("N");
+
+        OssClientConfig config = OssClientConfig.formProperties(properties);
+
+        assertTrue(config.usePathStyleAccess());
+        assertEquals("http://oss.example.com/ruoyi", config.getBucketUrl());
+        assertEquals("http://oss.example.com/ruoyi", config.getBucketUrl("ruoyi"));
+    }
+
+    /**
      * 创建覆盖 URL 构造所需字段的 OSS 属性。
      *
      * @param endpoint endpoint 地址

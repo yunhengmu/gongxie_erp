@@ -8,17 +8,20 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.agent.AiChatFacade;
 import org.dromara.ai.domain.AiMessage;
+import org.dromara.ai.domain.bo.AiChatAttachmentBo;
 import org.dromara.ai.domain.bo.AiChatConfirmBo;
 import org.dromara.ai.domain.bo.AiChatPinExpertBo;
 import org.dromara.ai.domain.bo.AiChatSendBo;
 import org.dromara.ai.domain.bo.AiSessionBo;
 import org.dromara.ai.domain.bo.AiSessionResourceBatchBo;
+import org.dromara.ai.domain.vo.AiChatAttachmentVo;
 import org.dromara.ai.domain.vo.AiChatPendingVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
 import org.dromara.ai.domain.vo.AiRouteRunDetailVo;
 import org.dromara.ai.domain.vo.AiSessionResourceVo;
 import org.dromara.ai.domain.vo.AiSessionVo;
 import org.dromara.ai.domain.vo.AiToolCallLogVo;
+import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiRouteService;
 import org.dromara.ai.service.IAiSessionResourceService;
 import org.dromara.ai.service.IAiSessionService;
@@ -73,6 +76,11 @@ public class AiChatController extends BaseController {
     private final AiChatFacade aiChatFacade;
 
     private final AiProperties aiProperties;
+
+    /**
+     * 对话附件（REQ：聊天上传图片/文档）：校验、落库、解析与绑定
+     */
+    private final IAiChatAttachmentService aiChatAttachmentService;
 
     /**
      * 创建会话
@@ -215,14 +223,48 @@ public class AiChatController extends BaseController {
     public R<AiMessageVo> sendMessage(@NotNull(message = "会话不能为空")
                                       @PathVariable("sessionId") Long sessionId,
                                       @Validated @RequestBody AiChatSendBo bo) {
-        AiMessage message = aiSessionService.appendUserMessage(sessionId, bo.getContent());
+        AiMessage message = aiSessionService.appendUserMessage(sessionId, bo.getContent(), bo.getAttachmentIds());
         AiMessageVo vo = new AiMessageVo();
         vo.setId(message.getId());
         vo.setSessionId(message.getSessionId());
         vo.setRole(message.getRole());
         vo.setContent(message.getContent());
         vo.setCreateTime(message.getCreateTime());
+        vo.setAttachments(aiChatAttachmentService.listVoMapByMessageIds(List.of(message.getId()))
+            .get(message.getId()));
         return R.ok(vo);
+    }
+
+    /**
+     * 登记聊天附件（图片 / 文档）
+     *
+     * <p>文件本体先经框架 OSS 上传接口（{@code /resource/oss/upload}）落库，这里按 {@code ossId}
+     * 校验类型与大小，文档解析为纯文本后返回附件信息；发送消息时再以 {@code attachmentIds} 绑定。</p>
+     *
+     * @param sessionId 会话主键
+     * @param bo        附件登记参数（ossId + 文件名）
+     */
+    @PostMapping("/session/{sessionId}/attachment")
+    public R<AiChatAttachmentVo> registerAttachment(@NotNull(message = "会话不能为空")
+                                                    @PathVariable("sessionId") Long sessionId,
+                                                    @Validated @RequestBody AiChatAttachmentBo bo) {
+        aiSessionService.getOwnedSession(sessionId);
+        return R.ok(aiChatAttachmentService.register(sessionId, bo));
+    }
+
+    /**
+     * 删除尚未发送的暂存附件（用户移除 chip 时调用）
+     *
+     * @param sessionId    会话主键
+     * @param attachmentId 附件主键
+     */
+    @DeleteMapping("/session/{sessionId}/attachment/{attachmentId}")
+    public R<Void> deleteAttachment(@NotNull(message = "会话不能为空")
+                                    @PathVariable("sessionId") Long sessionId,
+                                    @NotNull(message = "附件不能为空")
+                                    @PathVariable("attachmentId") Long attachmentId) {
+        aiChatAttachmentService.deletePending(sessionId, attachmentId);
+        return R.ok();
     }
 
     /**

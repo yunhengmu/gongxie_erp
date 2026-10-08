@@ -64,6 +64,34 @@ export interface ChatMessageVO {
   durationMs?: number;
   /** 创建时间 */
   createTime?: string;
+  /** 随本条消息发送的附件（聊天上传的图片/文档） */
+  attachments?: ChatAttachmentVO[];
+}
+
+/** 聊天附件（图片/文档） */
+export interface ChatAttachmentVO {
+  /** 附件主键 */
+  id: string | number;
+  /** 附件类型（image 图片 / document 文档） */
+  fileType: 'image' | 'document';
+  /** 原始文件名 */
+  fileName: string;
+  /** 文件后缀（小写，不含点） */
+  fileSuffix?: string;
+  /** 文件大小（字节） */
+  fileSize?: number;
+  /** 访问地址（图片预览 / 文档下载） */
+  url?: string;
+  /** 文档解析后的字符数 */
+  parsedCharCount?: number;
+}
+
+/** 聊天附件登记参数 */
+export interface ChatAttachmentBo {
+  /** 对象存储主键（框架上传返回） */
+  ossId: string | number;
+  /** 原始文件名 */
+  fileName: string;
 }
 
 export interface ChatSessionQuery extends PageQuery {

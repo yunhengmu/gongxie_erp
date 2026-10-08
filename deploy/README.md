@@ -126,6 +126,23 @@ docker compose restart ruoyi-admin      # 让 OSS 配置重新加载
 MinIO 控制台：<http://localhost:9001>（`ruoyi` / `ruoyi123`）。
 > 上传成功还只是第一步：知识库文档随后要**向量化**，需先在「模型配置」配好 **embedding 模型**，否则会在向量化阶段再报错。
 
+**⑦ 上传成功，但图片/文档在页面上「加载失败」（聊天里的图片、知识库预览）**
+
+现象：后端能读到文件（模型识图、文档解析都正常），**浏览器却加载不出来**。
+原因：`sys_oss_config` 有两个坐标——`endpoint`（后端读写用）与 `domain_url`（**返回给前端的对外地址**）。
+上面的 `minio:9000` 是**容器网络内**的服务名，浏览器无法解析；后端在容器里能连通，所以只有前端受影响。
+处置：`50-oss-endpoint.sql` 已同时写入 `domain_url = 'http://localhost:9000'`（宿主机可达的 MinIO）；
+**存量数据卷不会重跑该脚本**，需手动补一次（见 ⑥ 的命令，脚本本身包含这两条 `update`），随后 `docker compose restart ruoyi-admin`。
+若从其它机器 / 公网访问，把 `domain_url` 改成对应可达的域名或 IP 即可（后端返回的 URL 以此为准，无需改数据行）。
+
+> 平台侧对公开桶的 URL 是**读取时按配置重新生成**的，因此改 `domain_url` 后**存量文件也一并生效**，不必迁移 `sys_oss.url`。
+
+**⑧ 重建 `ruoyi-admin` 后前端接口报 502**
+
+现象：`docker compose up -d --build`（或单独重建后端）之后，网页能打开但接口 502。
+原因：nginx 在**启动时**解析并缓存了 `ruoyi-admin` 的容器 IP；后端容器被**重建**（换 IP）后，nginx 仍指向旧 IP。
+处置：`docker compose restart web`（让 nginx 重新解析）。
+
 ## 6. 运维命令
 
 ```bash

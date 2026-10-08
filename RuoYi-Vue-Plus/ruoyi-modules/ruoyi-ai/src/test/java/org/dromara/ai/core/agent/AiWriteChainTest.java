@@ -122,7 +122,7 @@ class AiWriteChainTest {
         // ① 提问 → ② 路由：入口智能体（小Z）调用 route_decision，选中「公告管理专家」
         // ③ 专家发起写工具 create_notice，框架按「需确认」档暂停并上抛确认事件
         ToolUseBlock pendingWriteCall = new ToolUseBlock(TOOL_CALL_ID, "create_notice", noticeInput());
-        when(expert.streamEvents(anyString(), any(RuntimeContext.class))).thenReturn(Flux.just(
+        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class))).thenReturn(Flux.just(
             new ToolCallStartEvent(FIRST_REPLY_ID, TOOL_CALL_ID, "create_notice"),
             new RequireUserConfirmEvent(FIRST_REPLY_ID, List.of(pendingWriteCall))));
 

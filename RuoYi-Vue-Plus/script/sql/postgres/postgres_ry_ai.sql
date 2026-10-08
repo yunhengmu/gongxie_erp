@@ -57,6 +57,7 @@
 --   drop table if exists ai_route_expert_call;
 --   drop table if exists ai_route_run;
 --   drop table if exists ai_tool_call_log;
+--   drop table if exists ai_message_attachment;
 --   drop table if exists ai_message;
 --   drop table if exists ai_session_resource;
 --   drop table if exists ai_session;
@@ -569,6 +570,38 @@ comment on column ai_message.completion_tokens is '输出 Token 数';
 comment on column ai_message.total_tokens is '总 Token 数';
 comment on column ai_message.duration_ms is '本轮耗时（毫秒）';
 create index if not exists idx_ai_message_session on ai_message (session_id, id);
+
+create table if not exists ai_message_attachment (
+    id             bigint       not null,
+    session_id     bigint       not null,
+    message_id     bigint,
+    file_type      varchar(16)  not null,
+    file_name      varchar(255) not null,
+    file_suffix    varchar(32),
+    file_size      bigint,
+    mime_type      varchar(64),
+    oss_id         bigint,
+    parsed_content text,
+    create_dept    bigint,
+    create_by      bigint,
+    create_time    timestamp,
+    update_by      bigint,
+    update_time    timestamp,
+    del_flag       char(1)      default '0',
+    constraint pk_ai_message_attachment primary key (id)
+);
+comment on table ai_message_attachment is 'AI 会话消息附件表（聊天上传的图片/文档）';
+comment on column ai_message_attachment.session_id is '所属会话（ai_session.id）';
+comment on column ai_message_attachment.message_id is '所属用户消息（ai_message.id）；为空表示尚未发送的暂存件';
+comment on column ai_message_attachment.file_type is '附件类型（image 图片 / document 文档）';
+comment on column ai_message_attachment.file_name is '原始文件名';
+comment on column ai_message_attachment.file_suffix is '文件后缀（小写，不含点）';
+comment on column ai_message_attachment.file_size is '文件大小（字节）';
+comment on column ai_message_attachment.mime_type is 'MIME 类型（图片为 image/*）';
+comment on column ai_message_attachment.oss_id is '对象存储主键（sys_oss.oss_id）';
+comment on column ai_message_attachment.parsed_content is '文档解析后的纯文本（图片为空）';
+create index if not exists idx_ai_message_attachment_session on ai_message_attachment (session_id);
+create index if not exists idx_ai_message_attachment_message on ai_message_attachment (message_id);
 
 create table if not exists ai_tool_call_log (
     id           bigint       not null,

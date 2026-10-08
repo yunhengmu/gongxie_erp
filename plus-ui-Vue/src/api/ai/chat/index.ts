@@ -1,5 +1,7 @@
 import type {
   AiRouteRunDetailVO,
+  ChatAttachmentBo,
+  ChatAttachmentVO,
   ChatConfirmBody,
   ChatMessageVO,
   ChatPendingVO,
@@ -152,13 +154,46 @@ export const listChatRouteRuns = (sessionId: string | number): AxiosPromise<AiRo
 /**
  * 发送用户消息（先落库，返回带 messageId 的消息）
  * @param sessionId 会话主键
- * @param content 消息正文
+ * @param content 消息正文（可为空，此时须带附件）
+ * @param attachmentIds 随消息发送的附件主键集合（可选）
  */
-export const sendChatMessage = (sessionId: string | number, content: string): AxiosPromise<ChatMessageVO> => {
+export const sendChatMessage = (
+  sessionId: string | number,
+  content: string,
+  attachmentIds?: Array<string | number>
+): AxiosPromise<ChatMessageVO> => {
   return request({
     url: `/ai/chat/session/${sessionId}/message`,
     method: 'post',
-    data: { content }
+    data: { content, attachmentIds }
+  });
+};
+
+/**
+ * 登记聊天附件（文件本体先经框架 OSS 上传，这里按 ossId 校验类型/大小并（文档）解析）
+ * @param sessionId 会话主键
+ * @param data 附件登记参数（ossId + 原始文件名）
+ */
+export const registerChatAttachment = (
+  sessionId: string | number,
+  data: ChatAttachmentBo
+): AxiosPromise<ChatAttachmentVO> => {
+  return request({
+    url: `/ai/chat/session/${sessionId}/attachment`,
+    method: 'post',
+    data
+  });
+};
+
+/**
+ * 删除尚未发送的暂存附件
+ * @param sessionId 会话主键
+ * @param attachmentId 附件主键
+ */
+export const deleteChatAttachment = (sessionId: string | number, attachmentId: string | number): AxiosPromise<void> => {
+  return request({
+    url: `/ai/chat/session/${sessionId}/attachment/${attachmentId}`,
+    method: 'delete'
   });
 };
 

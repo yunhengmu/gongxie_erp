@@ -63,6 +63,7 @@ SET NAMES utf8mb4;
 --   drop table if exists ai_route_expert_call;
 --   drop table if exists ai_route_run;
 --   drop table if exists ai_tool_call_log;
+--   drop table if exists ai_message_attachment;
 --   drop table if exists ai_message;
 --   drop table if exists ai_session_resource;
 --   drop table if exists ai_session;
@@ -483,6 +484,28 @@ create table if not exists ai_message (
     constraint pk_ai_message primary key (id),
     key idx_ai_message_session (session_id, id)
 ) engine=innodb default charset=utf8mb4 comment='AI 会话消息表';
+
+create table if not exists ai_message_attachment (
+    id             bigint(20)   not null,
+    session_id     bigint(20)   not null comment '所属会话（ai_session.id）',
+    message_id     bigint(20) comment '所属用户消息（ai_message.id）；为空表示尚未发送的暂存件',
+    file_type      varchar(16)  not null comment '附件类型（image 图片 / document 文档）',
+    file_name      varchar(255) not null comment '原始文件名',
+    file_suffix    varchar(32) comment '文件后缀（小写，不含点）',
+    file_size      bigint(20) comment '文件大小（字节）',
+    mime_type      varchar(64) comment 'MIME 类型（图片为 image/*）',
+    oss_id         bigint(20) comment '对象存储主键（sys_oss.oss_id）',
+    parsed_content longtext comment '文档解析后的纯文本（图片为空）',
+    create_dept    bigint(20),
+    create_by      bigint(20),
+    create_time    datetime,
+    update_by      bigint(20),
+    update_time    datetime,
+    del_flag       char(1)      default '0',
+    constraint pk_ai_message_attachment primary key (id),
+    key idx_ai_message_attachment_session (session_id),
+    key idx_ai_message_attachment_message (message_id)
+) engine=innodb default charset=utf8mb4 comment='AI 会话消息附件表（聊天上传的图片/文档）';
 
 create table if not exists ai_tool_call_log (
     id           bigint(20)       not null,
