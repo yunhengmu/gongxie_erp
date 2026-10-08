@@ -350,8 +350,11 @@ const loadKbOptions = async () => {
 /** 查询文档列表 */
 const getList = async () => {
   if (!queryParams.value.kbId) {
+    // 未选知识库（含「还没有任何知识库」）：清空列表**并结束 loading**，
+    // 否则初值为 true 的 loading 不会被复位，页面会一直转圈
     docList.value = [];
     total.value = 0;
+    loading.value = false;
     return;
   }
   await withLoading(async () => {
