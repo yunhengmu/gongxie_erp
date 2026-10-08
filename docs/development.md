@@ -16,7 +16,7 @@ ai_tool 表（元数据：编码/描述/参数/实现标识/启停）
 
 ## 1. 实现工具类
 
-在 `RuoYi-Vue-Plus/ruoyi-modules/ruoyi-ai/src/main/java/org/dromara/ai/core/agent/tools/` 下新增类，继承 `io.agentscope.core.tool.ToolBase`：
+在 `RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/core/agent/tools/` 下新增类，继承 `io.agentscope.core.tool.ToolBase`：
 
 ```java
 package org.dromara.ai.core.agent.tools;
@@ -159,7 +159,7 @@ if (!perms.contains("*:*:*") && !perms.contains("system:xxx:add")) {
 
 ## 6. 测试
 
-在 `ruoyi-ai/src/test/java/org/dromara/ai/core/agent/tools/` 下补单测（参考同级 `*ToolTest`），至少覆盖：
+在 `biz-buddy/src/test/java/org/dromara/ai/core/agent/tools/` 下补单测（参考同级 `*ToolTest`），至少覆盖：
 
 - 正常参数 → 返回成功文本；
 - 缺参 / 非法参数 → 返回 error 且含可读原因；
@@ -168,7 +168,7 @@ if (!perms.contains("*:*:*") && !perms.contains("system:xxx:add")) {
 
 ```bash
 cd RuoYi-Vue-Plus
-./mvnw -o -pl ruoyi-modules/ruoyi-ai test
+./mvnw -o -pl ruoyi-modules/biz-buddy test
 ```
 
 **单测之外，建议再跑一次端到端回归**（尤其改的是写工具 / 工具描述 / 装配与权限时）——单测走 Mockito 打桩、不起 Spring 容器，验证不了「模型是否真的会调这个工具」：

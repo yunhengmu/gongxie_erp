@@ -14,12 +14,12 @@ BizBuddy 是一个**企业级智能业务运行平台**：在成熟中后台底�
 | 智能体内核 | **AgentScope Harness 2.0.3** | 工具循环、中间件、权限三态、HITL、状态存储、上下文压缩、技能 |
 | 数据 | PostgreSQL 14 / Redis / Milvus | 业务与审计 / 会话状态与锁 / 向量检索 |
 
-**一个进程、一个 jar**：AI 能力是后端的一个模块（`ruoyi-modules/ruoyi-ai`），不是独立服务。
+**一个进程、一个 jar**：AI 能力是后端的一个模块（`ruoyi-modules/biz-buddy`），不是独立服务。
 
 ```mermaid
 flowchart LR
   U["用户 / 飞书 / 企微 / 钉钉 / GitHub"] --> FE["Vue3 前端"]
-  FE -->|SSE| API["ruoyi-admin / ruoyi-ai"]
+  FE -->|SSE| API["ruoyi-admin / biz-buddy"]
   API --> ENTRY["入口智能体 小Z<br/>意图判断 + 专家路由"]
   ENTRY -->|route_decision| EXP["领域专家 装配实例"]
   EXP --> TOOLS["业务工具（代码侧实现）"]

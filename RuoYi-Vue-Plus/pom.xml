@@ -311,7 +311,7 @@
                 <artifactId>agentscope-extensions-redis</artifactId>
                 <version>${agentscope.version}</version>
             </dependency>
-            <!-- AgentScope RAG：已用 MilvusStore 做知识库向量存储与检索，其余传递依赖在 ruoyi-ai 中排除 -->
+            <!-- AgentScope RAG：已用 MilvusStore 做知识库向量存储与检索，其余传递依赖在 biz-buddy 中排除 -->
             <dependency>
                 <groupId>io.agentscope</groupId>
                 <artifactId>agentscope-extensions-rag-simple</artifactId>
@@ -495,10 +495,10 @@
                 <version>${revision}</version>
             </dependency>
 
-            <!-- AI业务模块 -->
+            <!-- BizBuddy AI 能力模块 -->
             <dependency>
                 <groupId>org.dromara</groupId>
-                <artifactId>ruoyi-ai</artifactId>
+                <artifactId>biz-buddy</artifactId>
                 <version>${revision}</version>
             </dependency>
 

@@ -9,10 +9,10 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
     <packaging>jar</packaging>
-    <artifactId>ruoyi-ai</artifactId>
+    <artifactId>biz-buddy</artifactId>
 
     <description>
-        ai模块
+        BizBuddy 平台 AI 能力模块
     </description>
 
     <dependencies>

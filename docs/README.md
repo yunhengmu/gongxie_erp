@@ -13,7 +13,7 @@
 | 想做的事 | 从哪里入手 |
 |---|---|
 | 加一个业务工具 | [development.md](development.md) |
-| 改智能体装配 / 路由 / 权限 | `ruoyi-ai` 的 `core/agent`（先读 [architecture.md](architecture.md)） |
+| 改智能体装配 / 路由 / 权限 | `biz-buddy` 的 `core/agent`（先读 [architecture.md](architecture.md)） |
 | 改对话交互 / 前端页面 | `plus-ui-Vue`（对话工作台：`src/views/ai/agent/chat`） |
 | 调整模型 / 压缩 / 记忆等运行策略 | [configuration.md](configuration.md) |
 | 部署到服务器 | PostgreSQL 栈 [../deploy/README.md](../deploy/README.md)、MySQL 8.0 栈 [../deploy-mysql/README.md](../deploy-mysql/README.md)（均含构建前置与已知坑） |
@@ -24,8 +24,8 @@
 ```bash
 # AI 模块单测（改动 core/agent 后必做）
 cd RuoYi-Vue-Plus
-./mvnw -o -pl ruoyi-modules/ruoyi-ai test
-# 覆盖率报告：ruoyi-modules/ruoyi-ai/target/site/jacoco/index.html
+./mvnw -o -pl ruoyi-modules/biz-buddy test
+# 覆盖率报告：ruoyi-modules/biz-buddy/target/site/jacoco/index.html
 
 # 后端
 ./mvnw -pl ruoyi-admin spring-boot:run
@@ -51,7 +51,7 @@ node e2e/run.mjs --base-url http://localhost:8081  # 指向 MySQL 栈（PG 栈�
 
 ## 代码导览（AI 部分）
 
-AI 能力集中在 `ruoyi-modules/ruoyi-ai`（包 `org.dromara.ai`）：
+AI 能力集中在 `ruoyi-modules/biz-buddy`（包 `org.dromara.ai`）：
 
 | 包 | 职责 |
 |---|---|

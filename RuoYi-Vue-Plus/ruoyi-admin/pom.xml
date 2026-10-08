@@ -86,10 +86,10 @@
             <artifactId>ruoyi-job</artifactId>
         </dependency>
 
-        <!-- AI业务模块 -->
+        <!-- BizBuddy AI 能力模块 -->
         <dependency>
             <groupId>org.dromara</groupId>
-            <artifactId>ruoyi-ai</artifactId>
+            <artifactId>biz-buddy</artifactId>
         </dependency>
 
         <!--  demo模块  -->
