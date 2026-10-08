@@ -211,3 +211,37 @@ export interface AgentToolTrustVO {
   /** 形成时间 */
   createTime?: string;
 }
+
+/** 专家提示词辅助生成入参（只收集少量硬信息） */
+export interface ExpertPromptGenerateForm {
+  /** 专家名称 */
+  agentName?: string;
+  /** 领域一句话 */
+  domainHint?: string;
+  /** 将绑定的业务工具显示名 */
+  toolNames?: string[];
+  /** 其中属于写操作的工具显示名 */
+  writeToolNames?: string[];
+  /** 可检索的知识库名称 */
+  kbNames?: string[];
+  /** 是否允许写操作 */
+  writeEnabled?: boolean;
+  /** 用于生成的对话模型主键（可空，取首个启用对话模型） */
+  modelId?: string | number;
+}
+
+/** 专家提示词辅助生成结果（建议值，回填后仍可编辑） */
+export interface ExpertPromptGenerateVO {
+  /** 是否生成成功 */
+  success?: boolean;
+  /** 结果说明（成功为提示，失败为原因） */
+  message?: string;
+  /** 一句话职责说明（建议值；同时作为路由候选清单里的「擅长」） */
+  description?: string;
+  /** 系统提示词（建议值） */
+  sysPrompt?: string;
+  /** 实际使用的模型名称 */
+  modelName?: string;
+  /** 耗时（毫秒） */
+  elapsedMs?: number;
+}

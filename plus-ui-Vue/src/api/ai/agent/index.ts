@@ -1,4 +1,14 @@
-import type { AgentForm, AgentQuery, AgentToolTrustVO, AgentVO, EntryAgentForm, ExpertOptionVO, ToolOptionVO } from '@/api/ai/agent/types';
+import type {
+  AgentForm,
+  AgentQuery,
+  AgentToolTrustVO,
+  AgentVO,
+  EntryAgentForm,
+  ExpertOptionVO,
+  ExpertPromptGenerateForm,
+  ExpertPromptGenerateVO,
+  ToolOptionVO
+} from '@/api/ai/agent/types';
 import type { PageResult } from '@/api/types';
 import type { AxiosPromise } from '@/utils/api-types';
 import request from '@/utils/request';
@@ -87,6 +97,18 @@ export const getAgent = (id: string | number): AxiosPromise<AgentVO> => {
   return request({
     url: '/ai/agent/' + id,
     method: 'get'
+  });
+};
+
+/**
+ * 按少量硬信息辅助生成专家配置建议值（描述 / 能力描述 / 系统提示词）
+ * @param data 硬信息
+ */
+export const generateExpertPrompt = (data: ExpertPromptGenerateForm): AxiosPromise<ExpertPromptGenerateVO> => {
+  return request({
+    url: '/ai/agent/experts/prompt/generate',
+    method: 'post',
+    data
   });
 };
 

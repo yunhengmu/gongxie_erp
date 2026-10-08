@@ -12,8 +12,8 @@
 --      二、36 张 ai_* 业务表（建表 + 列注释 + 索引 + 约束）
 --      三、内置模型配置种子（ai_model_config）
 --      四、内置业务工具种子（ai_tool）
---      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家 / 作者信息检索专家及其工具绑定，
---          含演示知识库「作者简介演示库」与文档「作者简介.txt」及其 OSS 记录 sys_oss）
+--      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家 / BizBuddy项目介绍专家及其工具绑定，
+--          含演示知识库「BizBuddy介绍演示库」与文档「BizBuddy简介.txt」及其 OSS 记录 sys_oss）
 --      六、SnailJob 派发任务登记（sj_job）
 --   3. 全部语句幂等（create table / index if not exists、on conflict do nothing），可重复执行；
 --      重复执行不会产生重复数据。
@@ -1612,8 +1612,8 @@ on conflict (id) do nothing;
 -- ============================================================
 --   入口智能体「小Z」恒 1 行（ai_entry_agent.singleton 唯一索引强制全平台唯一）；
 --   内置专家「机构管理专家」「公告管理专家」各 1 行，并登记其工具绑定。
---   另附一套**演示数据**（本节末尾）：「作者简介演示库」知识库 + 文档「作者简介.txt」
---   + 专家「作者信息检索专家」（绑定该知识库与知识库检索工具），初始化后即可在页面看到演示数据。
+--   另附一套**演示数据**（本节末尾）：「BizBuddy介绍演示库」知识库 + 文档「BizBuddy简介.txt」
+--   + 专家「BizBuddy项目介绍专家」（绑定该知识库与知识库检索工具），初始化后即可在页面看到演示数据。
 --   下表中的 model_id 统一指向本节预置的对话模型（ai_model_config 中 provider=dashscope 的
 --   deepseek-v4.1-flash）；如需更换，可在「小Z 配置」「专家配置」页调整。
 -- ============================================================
@@ -1761,34 +1761,34 @@ values (1761400000000020336, 1761400000000020303, 'search_notice', '0', '只读�
        (1761400000000020340, 1761400000000020303, 'delete_notice', '1', '写入：删除公告（需确认）', 1761000000000000103, 1761100000000000001, now())
 on conflict (agent_id, tool_code) do nothing;
 
--- 演示数据：知识库「作者简介演示库」+ 文档「作者简介.txt」+ 专家「作者信息检索专家」
+-- 演示数据：知识库「BizBuddy介绍演示库」+ 文档「BizBuddy简介.txt」+ 专家「BizBuddy项目介绍专家」
 --   知识库默认值对齐 AiKnowledgeBaseServiceImpl：collection_name = 'kb_' + kb_code、切片 500/50、
 --   召回 5、相似度 0.500、公开（visible_scope=0，owner_dept_id 留空）；
 --   文档解析状态取 AiDocumentServiceImpl.STATUS_PARSED='2'、向量化状态取 STATUS_VECTOR_PENDING='0'，
---   正文直接写入 content（无 OSS 文件也可直接向量化）；同时预置一行 sys_oss（key=demo/author_bio.txt）
+--   正文直接写入 content（无 OSS 文件也可直接向量化）；同时预置一行 sys_oss（key=demo/bizbuddy_intro.txt）
 --   并把这行文档的 oss_id 指向它，使「重新解析」能按对象键读取——对象由部署编排的 minio-init 在
---   初始化时用 mc cp 写入 MinIO（见 deploy*/docker-compose.yml，种子文件 docs/作者简介.txt）；
+--   初始化时用 mc cp 写入 MinIO（见 deploy*/docker-compose.yml，种子文件 docs/BizBuddy简介.txt）；
 --   专家的知识库检索工具（search_knowledge_base）不在 AgentRegistry.BUILTIN_READONLY_TOOL_CODES 之列
 --   （需按提问用户过滤生效范围），故须经 ai_agent_tool 显式绑定。
 insert into ai_knowledge_base (id, kb_name, kb_code, description, embedding_model_id, collection_name,
                                dimension, chunk_size, chunk_overlap, retrieval_top_k, similarity_threshold,
                                status, remark, create_dept, create_by, create_time, update_by, update_time,
                                del_flag, owner_dept_id, visible_scope)
-values (1761400000000021001, '作者简介演示库', 'author_demo_kb',
-        '演示知识库：收录作者张磊的简介，供「作者信息检索专家」检索回答',
-        1761400000000020401, 'kb_author_demo_kb',
+values (1761400000000021001, 'BizBuddy介绍演示库', 'bizbuddy_demo_kb',
+        '演示知识库：收录 BizBuddy 平台的简介，供「BizBuddy项目介绍专家」检索回答',
+        1761400000000020401, 'kb_bizbuddy_demo_kb',
         1024, 500, 50, 5, 0.500,
         '0', '平台预置演示知识库（向量模型同预置 qwen3.7-text-embedding，公开可用）',
         1761000000000000103, 1761100000000000001, now(), null, now(),
         '0', null, '0')
 on conflict (id) do nothing;
 
--- 演示文档的 OSS 记录：file_name 即对象键（demo/author_bio.txt），与 minio-init 写入 MinIO 的路径一致；
+-- 演示文档的 OSS 记录：file_name 即对象键（demo/bizbuddy_intro.txt），与 minio-init 写入 MinIO 的路径一致；
 -- url 留空避免写死 http://localhost:9000 这类主机相关地址（读取按 endpoint 动态生成）。
 -- 列名严格照抄 sys_oss 真实 DDL（无 del_flag；含 update_by/update_time）。
 insert into sys_oss (oss_id, file_name, original_name, file_suffix, url, service,
                      create_dept, create_by, create_time, update_by, update_time)
-values (1761400000000021101, 'demo/author_bio.txt', '作者简介.txt', 'txt', '', 'minio',
+values (1761400000000021101, 'demo/bizbuddy_intro.txt', 'BizBuddy简介.txt', 'txt', '', 'minio',
         1761000000000000103, 1761100000000000001, now(), null, null)
 on conflict (oss_id) do nothing;
 
@@ -1796,10 +1796,22 @@ insert into ai_document (id, kb_id, doc_name, file_suffix, oss_id, file_url, fil
                          char_count, chunk_count, parse_status, error_msg, remark,
                          create_dept, create_by, create_time, update_by, update_time, del_flag,
                          content, vector_status, vector_error_msg)
-values (1761400000000021002, 1761400000000021001, '作者简介.txt', 'txt', 1761400000000021101, null, null,
-        371, 0, '2', '', '平台预置演示文档（正文直接入库，可执行「向量化」）',
+values (1761400000000021002, 1761400000000021001, 'BizBuddy简介.txt', 'txt', 1761400000000021101, null, null,
+        1100, 0, '2', '', '平台预置演示文档（正文直接入库，可执行「向量化」）',
         1761000000000000103, 1761100000000000001, now(), null, now(), '0',
-        '张磊，资深软件架构师，二十余年的软件开发经验，持有PMP、系统架构设计师证书，华为开发者专家(HDE)、华为云开发者专家(HCDE)、官方认证首批鸿蒙极客，仓颉语言社区卓越贡献者，著有《HarmonyOS网络编程》、《仓颉语言网络编程》、《仓颉语言元编程》、《仓颉语言实战》、《鲲鹏架构入门与实战》、《鲲鹏开发套件应用快速入门》等图书，清华大学出版社出版，研究方向聚焦在基础软件领域的自主可控和国产替代。主要开源项目有BizBuddy （https://gitee.com/zl3624/biz-buddy）企业级智能业务运行平台、鸿蒙网络编程示例仓库（https://gitee.com/zl3624/harmonyos_network_samples），B站地址：https://space.bilibili.com/482393709。',
+        'BizBuddy 是一个面向企业内部场景的 AI 应用平台，构建在企业级框架 RuoYi-Vue-Plus 之上（Spring Boot 4.1 + Vue 3），把大模型能力做成 可配置、可治理、可审计 的平台能力，而不是零散的对话 Demo。
+
+平台以 AgentScope 2.0.3 为 AI 内核，采用「 入口智能体 + 专家 」两级编排：用户在任务工作台向入口智能体「小Z」提问，小Z 依据各专家的能力描述自动判断该由谁作答，也支持用户直接指定；专家独立装配、独立会话，回答直传用户。这样「通用助理」与「领域专家」各司其职，并可按部门、角色控制可见范围。平台使用纯Java语言开发，同一进程、同一 JVM、同一套权限与事务，和 RuoYi-Vue-Plus 天然融合，不需要跨语言的 sidecar 和 RPC 边界。
+
+能力供给由四条线组织： 工具 （业务函数按目录注册，配「允许 / 需人工确认 / 禁止」三档授权）、 知识库 （解析—切片—向量化—检索问答，向量存 Milvus）、 技能 （可复用的作业规范，按需加载）、 子智能体 （受限委派）；另配长期记忆、工作区文件、上下文压缩与场景包等机制。
+
+安全治理是另一条主线：写操作默认走 人工确认闸门（HITL） ，权限按「智能体 × 工具」三档授权判定，并支持用户级「记住该工具」信任；另有幂等去重、配额与超时约束。每次问答、工具调用、权限决策与编排轨迹均落库留痕，可查询、可导出、可追溯。
+
+平台亦支持对外集成：既可作为 MCP 客户端 接入外部工具，也可把自有只读工具以 MCP 服务端 对外开放；并提供飞书、企业微信、钉钉、GitHub 渠道接入与定时 Agent 任务。部署上 PostgreSQL 与 MySQL 8.0 双栈并列、同一套代码 ，配合 Docker 一键启动（含 Redis、Milvus、MinIO），开箱即可体验预置的知识库与专家。
+
+BizBuddy平台全量开源，托管在Gitee上，访问地址为 https://gitee.com/zl3624/biz-buddy。
+
+平台发起人是资深软件架构师张磊，持有PMP、系统架构设计师证书，华为开发者专家(HDE)、华为云开发者专家(HCDE)、官方认证首批鸿蒙极客，仓颉语言社区卓越贡献者，著有《HarmonyOS网络编程》、《仓颉语言网络编程》、《仓颉语言元编程》、《仓颉语言实战》、《鲲鹏架构入门与实战》、《鲲鹏开发套件应用快速入门》等图书，清华大学出版社出版，B站地址：https://space.bilibili.com/482393709。',
         '0', '')
 on conflict (id) do nothing;
 
@@ -1807,29 +1819,29 @@ insert into ai_expert_agent (id, agent_name, agent_code, description, sys_prompt
                              owner_dept_id, visible_scope, max_iters, status, remark,
                              capability_desc, expert_write_enabled, auto_route,
                              create_dept, create_by, create_time, update_by, update_time, del_flag)
-values (1761400000000020305, '作者信息检索专家', 'author_bio_expert',
-        '基于知识库回答关于作者张磊的专业背景、著作与开源项目等问题',
-        '你是「作者信息检索」专家，基于绑定的知识库回答关于作者张磊的问题。请遵守以下纪律：
+values (1761400000000020305, 'BizBuddy项目介绍专家', 'bizbuddy_intro_expert',
+        '基于知识库介绍 BizBuddy 平台的定位、核心能力、集成方式、部署形态与开源信息',
+        '你是「BizBuddy项目介绍」专家，基于绑定的知识库回答关于 BizBuddy 平台的问题。请遵守以下纪律：
 
 【总则】
-1. 一切事实必须来自知识库检索结果，禁止凭猜测回答张磊的专业背景、著作、开源项目、联系方式等信息。
-2. 用户提问涉及作者信息时，先调用 search_knowledge_base 检索（关键词尽量取用户问题中的关键概念，如「著作」「开源项目」「鸿蒙」），再依据返回的片段作答；**绝不编造检索结果中没有的内容**。
+1. 一切事实必须来自知识库检索结果，禁止凭猜测回答 BizBuddy 的平台定位、核心能力、集成方式、部署形态、开源地址等信息。
+2. 用户提问涉及 BizBuddy 时，先调用 search_knowledge_base 检索（关键词尽量取用户问题中的关键概念，如「架构」「智能体」「部署」「开源」），再依据返回的片段作答；**绝不编造检索结果中没有的内容**。
 
 【回答要求】
-1. 只依据知识库返回的资料作答，引用具体书名、项目名、网址时保持与资料一致，不要改写或杜撰。
+1. 只依据知识库返回的资料作答，引用具体能力名、技术选型、网址时保持与资料一致，不要改写或杜撰。
 2. 若检索结果为空或不足以回答，如实说明「知识库中未找到相关信息」，不要臆测；必要时可提示用户换个说法或补充关键词。
-3. 若问题与作者张磊无关，礼貌说明本专家的职责范围是作者相关信息检索。
+3. 若问题与 BizBuddy 无关，礼貌说明本专家的职责范围是 BizBuddy 平台介绍。
 
 【输出风格】
-- 用简体中文，先给结论，再给依据（引用相关书名 / 项目 / 链接），避免冗长复述检索原文。',
+- 用简体中文，先给结论，再给依据（引用相关资料），避免冗长复述检索原文。',
         1761400000000020400, 1761000000000000103, '0', 10, '0',
-        '平台预置专家：绑定演示知识库「作者简介演示库」与知识库检索工具（只读，不允许写入）；模型指向预置对话模型 deepseek-v4.1-flash',
-        '基于绑定的知识库检索回答作者张磊的专业背景、著作与开源项目等信息', '0', '1',
+        '平台预置专家：绑定演示知识库「BizBuddy介绍演示库」与知识库检索工具（只读，不允许写入）；模型指向预置对话模型 deepseek-v4.1-flash',
+        '基于绑定的知识库检索回答 BizBuddy 平台的定位、核心能力、集成方式与部署形态等信息', '0', '1',
         1761000000000000103, 1761100000000000001, now(), null, now(), '0')
 on conflict (id) do nothing;
 
 insert into ai_agent_kb (id, agent_id, kb_id, remark, create_dept, create_by, create_time)
-values (1761400000000020357, 1761400000000020305, 1761400000000021001, '绑定演示知识库「作者简介演示库」', 1761000000000000103, 1761100000000000001, now())
+values (1761400000000020357, 1761400000000020305, 1761400000000021001, '绑定演示知识库「BizBuddy介绍演示库」', 1761000000000000103, 1761100000000000001, now())
 on conflict (agent_id, kb_id) do nothing;
 
 insert into ai_agent_tool (id, agent_id, tool_code, decision, remark, create_dept, create_by, create_time)

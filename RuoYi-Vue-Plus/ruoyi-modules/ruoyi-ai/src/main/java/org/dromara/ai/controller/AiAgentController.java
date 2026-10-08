@@ -8,13 +8,16 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.dromara.ai.domain.bo.AiEntryAgentBo;
 import org.dromara.ai.domain.bo.AiExpertAgentBo;
+import org.dromara.ai.domain.bo.AiExpertPromptBo;
 import org.dromara.ai.domain.vo.AiAgentToolTrustVo;
 import org.dromara.ai.domain.vo.AiAgentVo;
 import org.dromara.ai.domain.vo.AiEntryAgentVo;
 import org.dromara.ai.domain.vo.AiExpertAgentVo;
+import org.dromara.ai.domain.vo.AiExpertPromptVo;
 import org.dromara.ai.domain.vo.AiExpertVo;
 import org.dromara.ai.domain.vo.AiToolVo;
 import org.dromara.ai.service.IAiAgentService;
+import org.dromara.ai.service.IAiExpertPromptService;
 import org.dromara.ai.service.IAiToolService;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.core.domain.R;
@@ -54,6 +57,8 @@ public class AiAgentController extends BaseController {
     private final IAiAgentService aiAgentService;
 
     private final IAiToolService aiToolService;
+
+    private final IAiExpertPromptService aiExpertPromptService;
 
     /**
      * 查询入口智能体（小Z，全平台唯一）
@@ -122,6 +127,19 @@ public class AiAgentController extends BaseController {
     @GetMapping("/tool/options")
     public R<List<AiToolVo>> toolOptions() {
         return R.ok(aiToolService.queryOptions());
+    }
+
+    /**
+     * 按少量硬信息辅助生成专家配置建议值（描述 / 系统提示词）
+     *
+     * <p>仅生成建议值、不落库；失败时返回体带 {@code success=false} 与原因，不抛业务异常。</p>
+     */
+    @SaCheckPermission(value = {"ai:agent:add", "ai:agent:edit"}, mode = SaMode.OR)
+    @Log(title = "AI专家提示词辅助生成", businessType = BusinessType.OTHER)
+    @RepeatSubmit
+    @PostMapping("/experts/prompt/generate")
+    public R<AiExpertPromptVo> generateExpertPrompt(@Validated @RequestBody AiExpertPromptBo bo) {
+        return R.ok(aiExpertPromptService.generate(bo));
     }
 
     /**

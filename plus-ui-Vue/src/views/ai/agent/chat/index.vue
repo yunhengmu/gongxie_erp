@@ -238,10 +238,25 @@
           <div class="resource-bar">
             <el-popover placement="top-start" :width="190" trigger="click" popper-class="resource-picker-popper">
               <template #reference>
-                <el-button class="resource-add-btn" icon="Plus" circle title="选择资源" />
+                <el-button class="resource-add-btn" icon="Plus" circle title="选择资源或上传附件" />
               </template>
               <!-- 二级：分组列表；三级：悬浮飞出的选项面板（支持上下滚动） -->
               <div class="resource-menu">
+                <!-- 上传附件：置于菜单顶部，与下方资源分组以分割线隔开 -->
+                <div class="resource-menu__action" @click="handleTriggerAttachment">
+                  <el-icon class="resource-menu__action-icon" :class="{ 'is-loading': uploadingAttachment }">
+                    <Paperclip />
+                  </el-icon>
+                  <span class="resource-menu__action-label">上传附件</span>
+                </div>
+                <input
+                  ref="attachmentInputRef"
+                  type="file"
+                  class="attachment-input"
+                  :accept="ATTACHMENT_ACCEPT"
+                  @change="handleAttachmentChange"
+                />
+                <div class="resource-menu__divider"></div>
                 <div
                   v-for="group in resourceGroups"
                   :key="group.key"
@@ -288,25 +303,9 @@
               </span>
             </div>
           </div>
-          <!-- 附件（聊天上传图片/文档）：回形针选文件，选中项以标签跟在后面 -->
-          <div class="attachment-bar">
-            <el-button
-              class="attachment-add-btn"
-              icon="Paperclip"
-              circle
-              title="上传图片或文档"
-              :loading="uploadingAttachment"
-              :disabled="streaming"
-              @click="handleTriggerAttachment"
-            />
-            <input
-              ref="attachmentInputRef"
-              type="file"
-              class="attachment-input"
-              :accept="ATTACHMENT_ACCEPT"
-              @change="handleAttachmentChange"
-            />
-            <div v-if="pendingAttachments.length" class="attachment-chips">
+          <!-- 待发附件：选中项以标签跟在资源标签之后（上传入口已移入上方 + 菜单） -->
+          <div v-if="pendingAttachments.length" class="attachment-bar">
+            <div class="attachment-chips">
               <span
                 v-for="att in pendingAttachments"
                 :key="String(att.id)"
@@ -1607,8 +1606,11 @@ const ensureSession = async (): Promise<string | number | undefined> => {
   return session.id;
 };
 
-/** 点击回形针：打开文件选择框 */
+/** 点击「上传附件」菜单项：打开文件选择框（流式回答中禁用） */
 const handleTriggerAttachment = () => {
+  if (streaming.value || uploadingAttachment.value) {
+    return;
+  }
   attachmentInputRef.value?.click();
 };
 
@@ -2283,6 +2285,43 @@ onMounted(() => {
   padding: 2px 0;
 }
 
+/* 顶部动作项（上传附件）：样式与分组行一致，保持菜单观感统一 */
+.resource-menu__action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-regular, #606266);
+  cursor: pointer;
+}
+
+.resource-menu__action:hover {
+  background: var(--el-fill-color-light, #f4f4f5);
+  color: var(--el-color-primary);
+}
+
+.resource-menu__action-icon {
+  flex: none;
+  font-size: 14px;
+}
+
+.resource-menu__action-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 分割线：把顶部动作项与资源分组隔开 */
+.resource-menu__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--el-border-color-lighter, #ebeef5);
+}
+
 /* 二级：分组行（悬停 / 点击即展开三级飞出菜单） */
 .resource-menu__group {
   position: relative;
@@ -2465,17 +2504,13 @@ onMounted(() => {
   color: var(--el-color-danger, #f56c6c);
 }
 
-/* 聊天附件：回形针按钮 + 待发附件标签 */
+/* 聊天附件：待发附件标签（上传入口在 + 菜单顶部） */
 .attachment-bar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
-}
-
-.attachment-add-btn {
-  flex: none;
 }
 
 .attachment-input {

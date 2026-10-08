@@ -2,13 +2,16 @@ package org.dromara.ai.controller;
 
 import org.dromara.ai.domain.bo.AiEntryAgentBo;
 import org.dromara.ai.domain.bo.AiExpertAgentBo;
+import org.dromara.ai.domain.bo.AiExpertPromptBo;
 import org.dromara.ai.domain.vo.AiAgentToolTrustVo;
 import org.dromara.ai.domain.vo.AiAgentVo;
 import org.dromara.ai.domain.vo.AiEntryAgentVo;
 import org.dromara.ai.domain.vo.AiExpertAgentVo;
+import org.dromara.ai.domain.vo.AiExpertPromptVo;
 import org.dromara.ai.domain.vo.AiExpertVo;
 import org.dromara.ai.domain.vo.AiToolVo;
 import org.dromara.ai.service.IAiAgentService;
+import org.dromara.ai.service.IAiExpertPromptService;
 import org.dromara.ai.service.IAiToolService;
 import org.dromara.ai.test.AiTestSupport;
 import org.dromara.common.core.domain.PageResult;
@@ -36,7 +39,9 @@ class AiAgentControllerTest {
 
     private final IAiToolService toolService = mock(IAiToolService.class);
 
-    private final AiAgentController controller = new AiAgentController(agentService, toolService);
+    private final IAiExpertPromptService promptService = mock(IAiExpertPromptService.class);
+
+    private final AiAgentController controller = new AiAgentController(agentService, toolService, promptService);
 
     @BeforeAll
     static void beforeAll() {
@@ -94,6 +99,15 @@ class AiAgentControllerTest {
         List<AiToolVo> options = List.of(new AiToolVo());
         when(toolService.queryOptions()).thenReturn(options);
         assertSame(options, controller.toolOptions().getData());
+    }
+
+    @Test
+    @DisplayName("辅助生成专家提示词（仅返回建议值，不落库）")
+    void shouldGenerateExpertPrompt() {
+        AiExpertPromptBo bo = new AiExpertPromptBo();
+        AiExpertPromptVo vo = new AiExpertPromptVo();
+        when(promptService.generate(bo)).thenReturn(vo);
+        assertSame(vo, controller.generateExpertPrompt(bo).getData());
     }
 
     @Test
