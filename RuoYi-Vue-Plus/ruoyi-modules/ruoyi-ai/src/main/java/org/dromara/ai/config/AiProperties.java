@@ -318,6 +318,29 @@ public class AiProperties {
          * 会退化为 UTC，导致北京时间 08:00 前算错一天。</p>
          */
         private String currentTimeZone = "Asia/Shanghai";
+
+        /**
+         * 聊天上传：单张图片大小上限（字节），默认 512KB。
+         *
+         * <p>图片在调用模型时按 Base64 data URI 下发，体积会膨胀约 4/3，故上限不宜过大。</p>
+         */
+        private long imageMaxBytes = 512 * 1024L;
+
+        /**
+         * 聊天上传：单个文档大小上限（字节），默认 5MB。
+         */
+        private long documentMaxBytes = 5 * 1024 * 1024L;
+
+        /**
+         * 聊天上传：单个文档解析后内联进本轮对话上下文的**最大字符数**，默认 20000；
+         * 超出部分保留首尾、中段截断（避免单个大文档直接撑爆模型上下文窗口）。
+         */
+        private int documentInlineMaxChars = 20000;
+
+        /**
+         * 聊天上传：单条用户消息允许携带的附件数量上限，默认 5。
+         */
+        private int maxAttachmentsPerMessage = 5;
     }
 
 }

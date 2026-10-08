@@ -2,6 +2,7 @@ package org.dromara.ai.core.agent;
 
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
+import io.agentscope.core.message.Msg;
 import io.agentscope.harness.agent.HarnessAgent;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.domain.AiAgent;
@@ -13,6 +14,7 @@ import org.dromara.ai.domain.vo.AiChatPendingVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
 import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.service.IAiAgentService;
+import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
 import org.dromara.ai.service.IAiQuotaService;
@@ -112,6 +114,8 @@ class AiChatFacadeTest {
     private AiStreamEventBridge streamBridge;
     @Mock
     private IAiTraceService traceService;
+    @Mock
+    private IAiChatAttachmentService attachmentService;
 
     @InjectMocks
     private AiChatFacade facade;
@@ -353,7 +357,8 @@ class AiChatFacadeTest {
         when(sessionResourceService.resolveForSession(session)).thenReturn(resources);
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
         when(agentRegistry.get(definition, resources)).thenReturn(agent);
-        when(agent.streamEvents(anyString(), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>empty());
+        when(attachmentService.listByMessageId(any())).thenReturn(List.of());
+        when(agent.streamEvents(any(Msg.class), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>empty());
         when(aiProperties.getChat()).thenReturn(new AiProperties.Chat());
         when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
@@ -383,7 +388,8 @@ class AiChatFacadeTest {
         when(sessionResourceService.resolveForSession(session)).thenReturn(resources);
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
         when(agentRegistry.get(definition, resources)).thenReturn(agent);
-        when(agent.streamEvents(anyString(), any(RuntimeContext.class)))
+        when(attachmentService.listByMessageId(any())).thenReturn(List.of());
+        when(agent.streamEvents(any(Msg.class), any(RuntimeContext.class)))
             .thenReturn(Flux.<AgentEvent>error(new RuntimeException("boom")));
         SseEmitter emitter = mock(SseEmitter.class);
 

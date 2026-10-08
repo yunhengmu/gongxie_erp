@@ -9,7 +9,13 @@
         </template>
         <el-form ref="queryFormRef" :model="queryParams" :inline="true" class="query-form">
           <el-form-item label="知识库" prop="kbId">
-            <el-select v-model="queryParams.kbId" placeholder="请选择知识库" style="width: 240px" @change="handleKbChange">
+            <el-select
+              v-model="queryParams.kbId"
+              placeholder="全部知识库（不选即查全部）"
+              clearable
+              style="width: 240px"
+              @change="handleKbChange"
+            >
               <el-option v-for="item in kbOptions" :key="item.id" :label="item.kbName" :value="item.id" />
             </el-select>
           </el-form-item>
@@ -347,13 +353,8 @@ const loadKbOptions = async () => {
   }
 };
 
-/** 查询文档列表 */
+/** 查询文档列表（未选知识库时查询全部：后端 kbId 为条件过滤，不传即全量） */
 const getList = async () => {
-  if (!queryParams.value.kbId) {
-    docList.value = [];
-    total.value = 0;
-    return;
-  }
   await withLoading(async () => {
     const res = await listDocument(queryParams.value);
     docList.value = res.data?.rows ?? [];

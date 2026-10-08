@@ -5,6 +5,7 @@ import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.RequireUserConfirmEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
+import io.agentscope.core.message.Msg;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.state.AgentState;
@@ -211,7 +212,7 @@ class AiRouteOrchestratorTest {
         AiExpertAgent definition = expertDefinition();
         HarnessAgent expert = stubExpertRun(definition);
         when(expertDirectory.definition(10L)).thenReturn(definition);
-        when(expert.streamEvents(anyString(), any(RuntimeContext.class)))
+        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class)))
             .thenReturn(Flux.<AgentEvent>just(new TextBlockDeltaEvent("reply-1", "block-1", "专家回答")));
         AiRouteContext route = newRoute();
 
@@ -233,7 +234,7 @@ class AiRouteOrchestratorTest {
         AiExpertAgent definition = expertDefinition();
         HarnessAgent expert = stubExpertRun(definition);
         when(expertDirectory.definition(10L)).thenReturn(definition);
-        when(expert.streamEvents(anyString(), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>empty());
+        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>empty());
         AiRouteContext route = newRoute();
         route.pinnedExpertId = 10L;
 
@@ -254,7 +255,7 @@ class AiRouteOrchestratorTest {
         AiExpertAgent definition = expertDefinition();
         HarnessAgent expert = stubExpertRun(definition);
         when(expertDirectory.definition(10L)).thenReturn(definition);
-        when(expert.streamEvents(anyString(), any(RuntimeContext.class)))
+        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class)))
             .thenReturn(Flux.<AgentEvent>just(new RequireUserConfirmEvent("reply-1", null)));
         AiRouteContext route = newRoute();
 

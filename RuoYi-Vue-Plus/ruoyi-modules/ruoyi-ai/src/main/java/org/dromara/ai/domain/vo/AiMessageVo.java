@@ -7,6 +7,7 @@ import org.dromara.ai.domain.AiMessage;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * AI 会话消息视图对象 ai_message
@@ -89,5 +90,10 @@ public class AiMessageVo implements Serializable {
      * 创建时间
      */
     private LocalDateTime createTime;
+
+    /**
+     * 随本条消息发送的附件（聊天上传的图片 / 文档；非消息表字段，由服务层填充）
+     */
+    private List<AiChatAttachmentVo> attachments;
 
 }

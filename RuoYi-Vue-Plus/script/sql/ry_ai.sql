@@ -18,7 +18,8 @@ SET NAMES utf8mb4;
 --      二、36 张 ai_* 业务表（建表 + 列注释 + 索引 + 约束）
 --      三、内置模型配置种子（ai_model_config）
 --      四、内置业务工具种子（ai_tool）
---      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家及其工具绑定）
+--      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家 / BizBuddy项目介绍专家及其工具绑定，
+--          含演示知识库「BizBuddy介绍演示库」与文档「BizBuddy简介.txt」及其 OSS 记录 sys_oss）
 --      六、SnailJob 派发任务登记（sj_job）
 --   3. 全部语句幂等（create table if not exists、on duplicate key update），可重复执行；
 --      重复执行不会产生重复数据。
@@ -32,10 +33,14 @@ SET NAMES utf8mb4;
 --      docs/13-BizBuddy数据库设计.md。
 --
 -- 回滚（按依赖倒序执行；菜单与种子先删，再删表）：
---   delete from ai_agent_tool where agent_id in (1761400000000020303, 1761400000000020304);
---   delete from ai_expert_agent where id in (1761400000000020303, 1761400000000020304);
+--   delete from ai_agent_kb where agent_id = 1761400000000020305;
+--   delete from ai_agent_tool where agent_id in (1761400000000020303, 1761400000000020304, 1761400000000020305);
+--   delete from ai_expert_agent where id in (1761400000000020303, 1761400000000020304, 1761400000000020305);
 --   delete from ai_entry_agent where id = 1761400000000020302;
 --   delete from ai_tool where id between 1761400000000020200 and 1761400000000020299;
+--   delete from ai_document where id = 1761400000000021002;
+--   delete from sys_oss where oss_id = 1761400000000021101;
+--   delete from ai_knowledge_base where id = 1761400000000021001;
 --   delete from ai_model_config where id in (1761400000000020400, 1761400000000020401);
 --   delete from sj_job where biz_id = 'bizbuddy-agent-task-dispatch';
 --   delete from sys_menu where menu_id between 1761400000000020000 and 1761400000000020999;
@@ -63,6 +68,7 @@ SET NAMES utf8mb4;
 --   drop table if exists ai_route_expert_call;
 --   drop table if exists ai_route_run;
 --   drop table if exists ai_tool_call_log;
+--   drop table if exists ai_message_attachment;
 --   drop table if exists ai_message;
 --   drop table if exists ai_session_resource;
 --   drop table if exists ai_session;
@@ -483,6 +489,28 @@ create table if not exists ai_message (
     constraint pk_ai_message primary key (id),
     key idx_ai_message_session (session_id, id)
 ) engine=innodb default charset=utf8mb4 comment='AI 会话消息表';
+
+create table if not exists ai_message_attachment (
+    id             bigint(20)   not null,
+    session_id     bigint(20)   not null comment '所属会话（ai_session.id）',
+    message_id     bigint(20) comment '所属用户消息（ai_message.id）；为空表示尚未发送的暂存件',
+    file_type      varchar(16)  not null comment '附件类型（image 图片 / document 文档）',
+    file_name      varchar(255) not null comment '原始文件名',
+    file_suffix    varchar(32) comment '文件后缀（小写，不含点）',
+    file_size      bigint(20) comment '文件大小（字节）',
+    mime_type      varchar(64) comment 'MIME 类型（图片为 image/*）',
+    oss_id         bigint(20) comment '对象存储主键（sys_oss.oss_id）',
+    parsed_content longtext comment '文档解析后的纯文本（图片为空）',
+    create_dept    bigint(20),
+    create_by      bigint(20),
+    create_time    datetime,
+    update_by      bigint(20),
+    update_time    datetime,
+    del_flag       char(1)      default '0',
+    constraint pk_ai_message_attachment primary key (id),
+    key idx_ai_message_attachment_session (session_id),
+    key idx_ai_message_attachment_message (message_id)
+) engine=innodb default charset=utf8mb4 comment='AI 会话消息附件表（聊天上传的图片/文档）';
 
 create table if not exists ai_tool_call_log (
     id           bigint(20)       not null,
@@ -1313,6 +1341,8 @@ on duplicate key update id = id;
 -- ============================================================
 --   入口智能体「小Z」恒 1 行（ai_entry_agent.singleton 唯一索引强制全平台唯一）；
 --   内置专家「机构管理专家」「公告管理专家」各 1 行，并登记其工具绑定。
+--   另附一套**演示数据**（本节末尾）：「BizBuddy介绍演示库」知识库 + 文档「BizBuddy简介.txt」
+--   + 专家「BizBuddy项目介绍专家」（绑定该知识库与知识库检索工具），初始化后即可在页面看到演示数据。
 --   下表中的 model_id 统一指向本节预置的对话模型（ai_model_config 中 provider=dashscope 的
 --   deepseek-v4.1-flash）；如需更换，可在「小Z 配置」「专家配置」页调整。
 -- ============================================================
@@ -1458,6 +1488,96 @@ values (1761400000000020336, 1761400000000020303, 'search_notice', '0', '只读�
        (1761400000000020338, 1761400000000020303, 'create_notice', '1', '写入：发布公告（需确认）', 1761000000000000103, 1761100000000000001, now()),
        (1761400000000020339, 1761400000000020303, 'update_notice', '1', '写入：修改公告（需确认）', 1761000000000000103, 1761100000000000001, now()),
        (1761400000000020340, 1761400000000020303, 'delete_notice', '1', '写入：删除公告（需确认）', 1761000000000000103, 1761100000000000001, now())
+on duplicate key update agent_id = agent_id, tool_code = tool_code;
+
+-- 演示数据：知识库「BizBuddy介绍演示库」+ 文档「BizBuddy简介.txt」+ 专家「BizBuddy项目介绍专家」
+--   知识库默认值对齐 AiKnowledgeBaseServiceImpl：collection_name = 'kb_' + kb_code、切片 500/50、
+--   召回 5、相似度 0.500、公开（visible_scope=0，owner_dept_id 留空）；
+--   文档解析状态取 AiDocumentServiceImpl.STATUS_PENDING='0'——**与「无切片」一致**：种子只写正文、
+--   不预生成切片（chunk_count=0），故管理页显示「未解析」，用户须先「重新解析」再「向量化」
+--   （若写成 STATUS_PARSED='2' 则界面显示「已解析」但向量化会被拒，见 docs/14 §85）；
+--   向量化状态取 STATUS_VECTOR_PENDING='0'；正文直接写入 content（预览可看，解析另有 OSS 源文件）；
+--   同时预置一行 sys_oss（key=demo/bizbuddy_intro.txt）
+--   并把这行文档的 oss_id 指向它，使「重新解析」能按对象键读取——对象由部署编排的 minio-init 在
+--   初始化时用 mc cp 写入 MinIO（见 deploy*/docker-compose.yml，种子文件 docs/BizBuddy简介.txt）；
+--   专家的知识库检索工具（search_knowledge_base）不在 AgentRegistry.BUILTIN_READONLY_TOOL_CODES 之列
+--   （需按提问用户过滤生效范围），故须经 ai_agent_tool 显式绑定。
+insert into ai_knowledge_base (id, kb_name, kb_code, description, embedding_model_id, collection_name,
+                               dimension, chunk_size, chunk_overlap, retrieval_top_k, similarity_threshold,
+                               status, remark, create_dept, create_by, create_time, update_by, update_time,
+                               del_flag, owner_dept_id, visible_scope)
+values (1761400000000021001, 'BizBuddy介绍演示库', 'bizbuddy_demo_kb',
+        '演示知识库：收录 BizBuddy 平台的简介，供「BizBuddy项目介绍专家」检索回答',
+        1761400000000020401, 'kb_bizbuddy_demo_kb',
+        1024, 500, 50, 5, 0.500,
+        '0', '平台预置演示知识库（向量模型同预置 qwen3.7-text-embedding，公开可用）',
+        1761000000000000103, 1761100000000000001, now(), null, now(),
+        '0', null, '0')
+on duplicate key update id = id;
+
+-- 演示文档的 OSS 记录：file_name 即对象键（demo/bizbuddy_intro.txt），与 minio-init 写入 MinIO 的路径一致；
+-- url 留空避免写死 http://localhost:9000 这类主机相关地址（读取按 endpoint 动态生成）。
+-- 列名严格照抄 sys_oss 真实 DDL（无 del_flag；含 update_by/update_time）。
+insert into sys_oss (oss_id, file_name, original_name, file_suffix, url, service,
+                     create_dept, create_by, create_time, update_by, update_time)
+values (1761400000000021101, 'demo/bizbuddy_intro.txt', 'BizBuddy简介.txt', 'txt', '', 'minio',
+        1761000000000000103, 1761100000000000001, now(), null, null)
+on duplicate key update oss_id = oss_id;
+
+insert into ai_document (id, kb_id, doc_name, file_suffix, oss_id, file_url, file_size,
+                         char_count, chunk_count, parse_status, error_msg, remark,
+                         create_dept, create_by, create_time, update_by, update_time, del_flag,
+                         content, vector_status, vector_error_msg)
+values (1761400000000021002, 1761400000000021001, 'BizBuddy简介.txt', 'txt', 1761400000000021101, null, null,
+        1100, 0, '0', '', '平台预置演示文档（正文直接入库；请先「重新解析」再「向量化」）',
+        1761000000000000103, 1761100000000000001, now(), null, now(), '0',
+        'BizBuddy 是一个面向企业内部场景的 AI 应用平台，构建在企业级框架 RuoYi-Vue-Plus 之上（Spring Boot 4.1 + Vue 3），把大模型能力做成 可配置、可治理、可审计 的平台能力，而不是零散的对话 Demo。
+
+平台以 AgentScope 2.0.3 为 AI 内核，采用「 入口智能体 + 专家 」两级编排：用户在任务工作台向入口智能体「小Z」提问，小Z 依据各专家的能力描述自动判断该由谁作答，也支持用户直接指定；专家独立装配、独立会话，回答直传用户。这样「通用助理」与「领域专家」各司其职，并可按部门、角色控制可见范围。平台使用纯Java语言开发，同一进程、同一 JVM、同一套权限与事务，和 RuoYi-Vue-Plus 天然融合，不需要跨语言的 sidecar 和 RPC 边界。
+
+能力供给由四条线组织： 工具 （业务函数按目录注册，配「允许 / 需人工确认 / 禁止」三档授权）、 知识库 （解析—切片—向量化—检索问答，向量存 Milvus）、 技能 （可复用的作业规范，按需加载）、 子智能体 （受限委派）；另配长期记忆、工作区文件、上下文压缩与场景包等机制。
+
+安全治理是另一条主线：写操作默认走 人工确认闸门（HITL） ，权限按「智能体 × 工具」三档授权判定，并支持用户级「记住该工具」信任；另有幂等去重、配额与超时约束。每次问答、工具调用、权限决策与编排轨迹均落库留痕，可查询、可导出、可追溯。
+
+平台亦支持对外集成：既可作为 MCP 客户端 接入外部工具，也可把自有只读工具以 MCP 服务端 对外开放；并提供飞书、企业微信、钉钉、GitHub 渠道接入与定时 Agent 任务。部署上 PostgreSQL 与 MySQL 8.0 双栈并列、同一套代码 ，配合 Docker 一键启动（含 Redis、Milvus、MinIO），开箱即可体验预置的知识库与专家。
+
+BizBuddy平台全量开源，托管在Gitee上，访问地址为 https://gitee.com/zl3624/biz-buddy。
+
+平台发起人是资深软件架构师张磊，持有PMP、系统架构设计师证书，华为开发者专家(HDE)、华为云开发者专家(HCDE)、官方认证首批鸿蒙极客，仓颉语言社区卓越贡献者，著有《HarmonyOS网络编程》、《仓颉语言网络编程》、《仓颉语言元编程》、《仓颉语言实战》、《鲲鹏架构入门与实战》、《鲲鹏开发套件应用快速入门》等图书，清华大学出版社出版，B站地址：https://space.bilibili.com/482393709。',
+        '0', '')
+on duplicate key update id = id;
+
+insert into ai_expert_agent (id, agent_name, agent_code, description, sys_prompt, model_id,
+                             owner_dept_id, visible_scope, max_iters, status, remark,
+                             capability_desc, expert_write_enabled, auto_route,
+                             create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020305, 'BizBuddy项目介绍专家', 'bizbuddy_intro_expert',
+        '基于知识库介绍 BizBuddy 平台的定位、核心能力、集成方式、部署形态与开源信息',
+        '你是「BizBuddy项目介绍」专家，基于绑定的知识库回答关于 BizBuddy 平台的问题。请遵守以下纪律：
+
+【总则】
+1. 一切事实必须来自知识库检索结果，禁止凭猜测回答 BizBuddy 的平台定位、核心能力、集成方式、部署形态、开源地址等信息。
+2. 用户提问涉及 BizBuddy 时，先调用 search_knowledge_base 检索（关键词尽量取用户问题中的关键概念，如「架构」「智能体」「部署」「开源」），再依据返回的片段作答；**绝不编造检索结果中没有的内容**。
+
+【回答要求】
+1. 只依据知识库返回的资料作答，引用具体能力名、技术选型、网址时保持与资料一致，不要改写或杜撰。
+2. 若检索结果为空或不足以回答，如实说明「知识库中未找到相关信息」，不要臆测；必要时可提示用户换个说法或补充关键词。
+3. 若问题与 BizBuddy 无关，礼貌说明本专家的职责范围是 BizBuddy 平台介绍。
+
+【输出风格】
+- 用简体中文，先给结论，再给依据（引用相关资料），避免冗长复述检索原文。',
+        1761400000000020400, 1761000000000000103, '0', 10, '0',
+        '平台预置专家：绑定演示知识库「BizBuddy介绍演示库」与知识库检索工具（只读，不允许写入）；模型指向预置对话模型 deepseek-v4.1-flash',
+        '基于绑定的知识库检索回答 BizBuddy 平台的定位、核心能力、集成方式与部署形态等信息', '0', '1',
+        1761000000000000103, 1761100000000000001, now(), null, now(), '0')
+on duplicate key update id = id;
+
+insert into ai_agent_kb (id, agent_id, kb_id, remark, create_dept, create_by, create_time)
+values (1761400000000020357, 1761400000000020305, 1761400000000021001, '绑定演示知识库「BizBuddy介绍演示库」', 1761000000000000103, 1761100000000000001, now())
+on duplicate key update agent_id = agent_id, kb_id = kb_id;
+
+insert into ai_agent_tool (id, agent_id, tool_code, decision, remark, create_dept, create_by, create_time)
+values (1761400000000020356, 1761400000000020305, 'search_knowledge_base', '0', '只读：知识库检索', 1761000000000000103, 1761100000000000001, now())
 on duplicate key update agent_id = agent_id, tool_code = tool_code;
 -- ============================================================
 -- 六、SnailJob 派发任务登记（sj_job）

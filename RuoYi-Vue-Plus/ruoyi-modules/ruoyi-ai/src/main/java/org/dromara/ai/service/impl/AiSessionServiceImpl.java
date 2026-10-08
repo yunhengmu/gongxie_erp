@@ -18,6 +18,7 @@ import org.dromara.ai.domain.AiToolCallLog;
 import org.dromara.ai.domain.bo.AiSessionBo;
 import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiAgentVo;
+import org.dromara.ai.domain.vo.AiChatAttachmentVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
 import org.dromara.ai.domain.vo.AiSessionExportVo;
 import org.dromara.ai.domain.vo.AiSessionVo;
@@ -27,6 +28,7 @@ import org.dromara.ai.mapper.AiScenarioPackMapper;
 import org.dromara.ai.mapper.AiSessionMapper;
 import org.dromara.ai.mapper.AiToolCallLogMapper;
 import org.dromara.ai.service.IAiAgentService;
+import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiScenarioPackService;
 import org.dromara.ai.service.IAiSessionService;
 import org.dromara.common.core.domain.PageResult;
@@ -149,6 +151,11 @@ public class AiSessionServiceImpl implements IAiSessionService {
      */
     private final AiExpertDirectory expertDirectory;
 
+    /**
+     * 对话附件 Service：绑定随消息上传的图片 / 文档，并在消息列表回显
+     */
+    private final IAiChatAttachmentService aiChatAttachmentService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AiSessionVo createSession(Long agentId, Long scenarioPackId, String title, Long pinnedExpertId) {
@@ -263,7 +270,7 @@ public class AiSessionServiceImpl implements IAiSessionService {
     @Transactional(rollbackFor = Exception.class)
     public AiMessage appendUserMessageUnattended(Long sessionId, String content) {
         AiSession session = getSessionOrThrow(sessionId);
-        return appendUserMessageInternal(session, content);
+        return appendUserMessageInternal(session, content, null);
     }
 
     @Override
@@ -347,44 +354,83 @@ public class AiSessionServiceImpl implements IAiSessionService {
         LambdaQueryWrapper<AiMessage> lqw = Wrappers.lambdaQuery();
         lqw.eq(AiMessage::getSessionId, sessionId);
         lqw.orderByAsc(AiMessage::getId);
-        return messageMapper.selectVoList(lqw);
+        List<AiMessageVo> messages = messageMapper.selectVoList(lqw);
+        fillAttachments(messages);
+        return messages;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AiMessage appendUserMessage(Long sessionId, String content) {
         AiSession session = getOwnedSession(sessionId);
-        return appendUserMessageInternal(session, content);
+        return appendUserMessageInternal(session, content, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public AiMessage appendUserMessage(Long sessionId, String content, List<Long> attachmentIds) {
+        if (StringUtils.isBlank(content) && (attachmentIds == null || attachmentIds.isEmpty())) {
+            throw new ServiceException("请输入内容或上传附件");
+        }
+        AiSession session = getOwnedSession(sessionId);
+        return appendUserMessageInternal(session, content, attachmentIds);
     }
 
     /**
      * 落库用户消息（共用实现，会话归属由调用方先行校验）。
      *
-     * @param session 会话实体
-     * @param content 用户输入内容
+     * @param session       会话实体
+     * @param content       用户输入内容（可为空，此时须有附件）
+     * @param attachmentIds 随消息发送的附件主键集合（可空）
      * @return 用户消息实体
      */
-    private AiMessage appendUserMessageInternal(AiSession session, String content) {
+    private AiMessage appendUserMessageInternal(AiSession session, String content, List<Long> attachmentIds) {
         Long sessionId = session.getId();
         if (!SESSION_ACTIVE.equals(session.getStatus())) {
             throw new ServiceException("会话已结束，无法继续提问");
         }
+        String text = content == null ? "" : content;
         AiMessage message = new AiMessage();
         message.setSessionId(sessionId);
         message.setRole(AiMessage.ROLE_USER);
-        message.setContent(content);
+        message.setContent(text);
         message.setStreaming(STREAMING_DONE);
         message.setStatus(MESSAGE_NORMAL);
         message.setToolCallCount(0);
         messageMapper.insert(message);
+        if (attachmentIds != null && !attachmentIds.isEmpty()) {
+            aiChatAttachmentService.bindToMessage(sessionId, message.getId(), attachmentIds);
+        }
         touchSession(sessionId);
         if (isDefaultTitle(session)) {
+            // 只发附件时以占位文案作为标题来源
+            String titleSource = StringUtils.isNotBlank(text) ? text : "（上传了附件）";
             AiSession rename = new AiSession();
             rename.setId(sessionId);
-            rename.setSessionTitle(abbreviate(content));
+            rename.setSessionTitle(abbreviate(titleSource));
             baseMapper.updateById(rename);
         }
         return message;
+    }
+
+    /**
+     * 为消息列表批量回填附件视图。
+     *
+     * @param messages 消息视图列表
+     */
+    private void fillAttachments(List<AiMessageVo> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return;
+        }
+        List<Long> ids = messages.stream().map(AiMessageVo::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        Map<Long, List<AiChatAttachmentVo>> attachmentMap = aiChatAttachmentService.listVoMapByMessageIds(ids);
+        if (attachmentMap == null || attachmentMap.isEmpty()) {
+            return;
+        }
+        messages.forEach(item -> item.setAttachments(attachmentMap.get(item.getId())));
     }
 
     @Override
@@ -600,7 +646,9 @@ public class AiSessionServiceImpl implements IAiSessionService {
         LambdaQueryWrapper<AiMessage> lqw = Wrappers.lambdaQuery();
         lqw.eq(AiMessage::getSessionId, sessionId);
         lqw.orderByAsc(AiMessage::getId);
-        return messageMapper.selectVoList(lqw);
+        List<AiMessageVo> messages = messageMapper.selectVoList(lqw);
+        fillAttachments(messages);
+        return messages;
     }
 
     @Override

@@ -156,7 +156,12 @@ services:
         done
         mc mb -p local/${OSS_BUCKET:-ruoyi} || true
         mc anonymous set download local/${OSS_BUCKET:-ruoyi} || true
+        # 把演示文档送进桶：对应建库脚本里 ai_document「BizBuddy简介.txt」的 oss_id（key=demo/bizbuddy_intro.txt），
+        # 使「重新解析」可按对象键读取；重复 up 覆盖同名对象，天然幂等。
+        mc cp /seed/bizbuddy_intro.txt local/${OSS_BUCKET:-ruoyi}/demo/bizbuddy_intro.txt || true
         echo "MinIO 桶已就绪：${OSS_BUCKET:-ruoyi}"
+    volumes:
+      - ../docs/BizBuddy简介.txt:/seed/bizbuddy_intro.txt:ro
     restart: "no"
 
   # Milvus standalone 依赖 etcd（元数据）与 minio（对象存储），三者构成一个整体。

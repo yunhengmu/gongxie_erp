@@ -134,6 +134,12 @@ MinIO 控制台：<http://localhost:9003>（`ruoyi` / `ruoyi123`）。
 原因：MySQL 8 默认 `caching_sha2_password`，JDBC 在非 SSL 连接下需显式允许取公钥。
 处置：本目录已在 JDBC 参数里带 `allowPublicKeyRetrieval=true&useSSL=false`，无需额外处理。
 
+**⑧ 上传成功，但图片 / 文档在页面上「加载失败」**
+现象：后端能读到文件（模型识图、文档解析都正常），**浏览器却加载不出来**（聊天里的图片、知识库文档的下载 / 在线预览）。
+原因：`sys_oss_config` 有两个坐标——`endpoint`（后端读写用，容器网络内的 `minio:9000`）与 `domain_url`（**返回给前端的对外地址**）。若只改了 `endpoint`，`domain_url` 仍是框架种子的 `127.0.0.1:9000`，浏览器解析不到。
+处置：`50-oss-endpoint.sql` 已**同时**写入 `endpoint = minio:9000` 与 `domain_url = http://localhost:9002`（本栈平台 MinIO 映射在宿主机的 **9002**，与 PG 栈的 9000 错开；**2026-10-09 修正**——此前该脚本漏了 `domain_url`）。**存量数据卷不会重跑该脚本**，需手动补一次（见 ⑥ 的命令，脚本本身包含这两条 `update`），随后 `docker compose restart ruoyi-admin`。
+若改了 `MINIO_API_PORT`，或需从其它机器 / 公网访问，把 `domain_url` 改成实际可达的地址即可（后端返回的 URL 以此为准，无需改数据行）。
+
 ## 7. 运维命令
 
 ```bash

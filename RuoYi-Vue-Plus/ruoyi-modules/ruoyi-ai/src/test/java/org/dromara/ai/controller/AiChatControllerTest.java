@@ -15,6 +15,7 @@ import org.dromara.ai.domain.vo.AiRouteRunDetailVo;
 import org.dromara.ai.domain.vo.AiSessionResourceVo;
 import org.dromara.ai.domain.vo.AiSessionVo;
 import org.dromara.ai.domain.vo.AiToolCallLogVo;
+import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiRouteService;
 import org.dromara.ai.service.IAiSessionResourceService;
 import org.dromara.ai.service.IAiSessionService;
@@ -56,8 +57,10 @@ class AiChatControllerTest {
 
     private final AiChatFacade facade = mock(AiChatFacade.class);
 
-    private final AiChatController controller =
-        new AiChatController(sessionService, resourceService, routeService, facade, new AiProperties());
+    private final IAiChatAttachmentService attachmentService = mock(IAiChatAttachmentService.class);
+
+    private final AiChatController controller = new AiChatController(
+        sessionService, resourceService, routeService, facade, new AiProperties(), attachmentService);
 
     @BeforeAll
     static void beforeAll() {
@@ -152,7 +155,8 @@ class AiChatControllerTest {
         message.setRole(AiMessage.ROLE_USER);
         message.setContent("你好");
         message.setCreateTime(java.time.LocalDateTime.now());
-        when(sessionService.appendUserMessage(5L, "你好")).thenReturn(message);
+        when(sessionService.appendUserMessage(eq(5L), eq("你好"), any())).thenReturn(message);
+        when(attachmentService.listVoMapByMessageIds(any())).thenReturn(java.util.Map.of());
 
         AiMessageVo vo = controller.sendMessage(5L, bo).getData();
         assertEquals(100L, vo.getId());

@@ -4,11 +4,16 @@ import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.ConfirmResult;
 import io.agentscope.core.event.TextBlockDeltaEvent;
+import io.agentscope.core.message.Base64Source;
+import io.agentscope.core.message.ContentBlock;
+import io.agentscope.core.message.ImageBlock;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
+import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.message.ToolCallState;
 import io.agentscope.core.message.ToolResultState;
 import io.agentscope.core.message.ToolUseBlock;
+import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.permission.PermissionRule;
@@ -21,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiMessage;
+import org.dromara.ai.domain.AiMessageAttachment;
 import org.dromara.ai.domain.AiPermissionDecisionLog;
 import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.AiScenarioPack;
@@ -35,6 +41,7 @@ import org.dromara.ai.domain.vo.AiChatPendingVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
 import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.service.IAiAgentService;
+import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
 import org.dromara.ai.service.IAiQuotaService;
@@ -58,6 +65,7 @@ import reactor.core.scheduler.Schedulers;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -200,6 +208,11 @@ public class AiChatFacade {
     private final AiRouteRecorder routeRecorder;
 
     /**
+     * 对话附件（聊天上传图片/文档）：每轮现读用户消息的附件并构造多模态内容块
+     */
+    private final IAiChatAttachmentService attachmentService;
+
+    /**
      * 继承槽位（REQ-AI-31）：每轮按「会话级 &gt; 人级 &gt; 平台默认」合并后注入入口智能体
      */
     private final AiSlotStore slotStore;
@@ -254,6 +267,9 @@ public class AiChatFacade {
         // 继承槽位（REQ-AI-31）：仅入口智能体需要——注入小Z 的 system prompt，并随 task_context 传给专家。
         // 合并顺序「平台默认 → 人级 → 会话级」，读 Redis 发生在请求线程（不占 Reactor 线程）
         AiSlotSet slots = entryAgent ? slotStore.merge(userId, sessionId) : null;
+        // 聊天附件（聊天上传图片/文档）：文档解析文本内联、图片转 Base64 内容块；
+        // 入口轮与专家轮共用同一批内容块（专家用独立会话、拿不到用户历史，必须随任务片段一并下发）
+        List<ContentBlock> attachmentBlocks = buildAttachmentBlocks(userMessage);
         AiRouteContext route = entryAgent
             ? new AiRouteContext(routeRecorder.startRun(sessionId, definition.getId(), userId),
                 sessionId, userId, deptId, definition.getId(),
@@ -262,6 +278,8 @@ public class AiChatFacade {
         if (route != null) {
             // 会话级资源集（REQ-AI-32）：专家继承同一份，供其装配出与小Z 同源的工具 / 技能 / MCP 工具可见面
             route.resources = resources;
+            // 附件内容块随编排上下文下发给专家（REQ：聊天上传图片/文档）
+            route.attachmentBlocks = attachmentBlocks;
             // 指定专家（固化路由，REQ-AI-31）：会话上记「指定专家」→ 本轮强制路由到它并落 action=pinned
             route.pinnedExpertId = session.getPinnedExpertId();
             route.pinSource = PIN_SOURCE_USER;
@@ -313,7 +331,7 @@ public class AiChatFacade {
         AtomicBoolean finished = new AtomicBoolean(false);
         try {
             AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
-            Disposable disposable = agent.streamEvents(userMessage.getContent(), ctx).subscribe(
+            Disposable disposable = agent.streamEvents(buildUserMsg(userMessage.getContent(), attachmentBlocks), ctx).subscribe(
                 event -> dispatchEntryEvent(emitter, state, route, event),
                 error -> {
                     if (!finished.compareAndSet(false, true)) {
@@ -917,6 +935,103 @@ public class AiChatFacade {
         decision.put("fallback", true);
         decision.put("note", "模型本轮未调用 route_decision，服务端补执行强制编排");
         return JsonUtils.toJsonString(decision);
+    }
+
+    /**
+     * 构造本轮用户消息的附件内容块（文档解析文本内联 + 图片 Base64 图片块）。
+     *
+     * @param userMessage 已落库的用户消息
+     * @return 附件内容块（无附件时为空列表）
+     */
+    private List<ContentBlock> buildAttachmentBlocks(AiMessage userMessage) {
+        List<AiMessageAttachment> attachments = attachmentService.listByMessageId(userMessage.getId());
+        if (attachments.isEmpty()) {
+            return List.of();
+        }
+        int inlineMax = aiProperties.getChat().getDocumentInlineMaxChars();
+        List<ContentBlock> blocks = new ArrayList<>();
+        // 文档：解析文本内联为文本块（应在图片之前，作为可读事实）
+        for (AiMessageAttachment attachment : attachments) {
+            if (AiMessageAttachment.TYPE_DOCUMENT.equals(attachment.getFileType())) {
+                blocks.add(TextBlock.builder()
+                    .text("【上传文档：" + attachment.getFileName() + "】\n"
+                        + truncateDocument(attachment.getParsedContent(), inlineMax))
+                    .build());
+            }
+        }
+        // 图片：读回字节转 Base64 data URI（模型侧按 image_url 下发）
+        for (AiMessageAttachment attachment : attachments) {
+            if (AiMessageAttachment.TYPE_IMAGE.equals(attachment.getFileType())) {
+                blocks.add(buildImageBlock(attachment));
+            }
+        }
+        return blocks;
+    }
+
+    /**
+     * 把一张图片附件转成 AgentScope 的图片内容块（Base64 来源）。
+     *
+     * <p>对象存储读取是外部边界：单张图片加载失败时降级为文本占位，避免整轮对话被打断。</p>
+     *
+     * @param attachment 图片附件
+     * @return 图片内容块；加载失败时返回文本占位块
+     */
+    private ContentBlock buildImageBlock(AiMessageAttachment attachment) {
+        try {
+            byte[] bytes = attachmentService.downloadBytes(attachment.getOssId());
+            String mediaType = StringUtils.isNotBlank(attachment.getMimeType())
+                ? attachment.getMimeType() : "image/png";
+            return ImageBlock.builder()
+                .source(Base64Source.builder()
+                    .data(Base64.getEncoder().encodeToString(bytes))
+                    .mediaType(mediaType)
+                    .build())
+                .build();
+        } catch (Exception e) {
+            log.warn("图片附件加载失败，attachmentId={}", attachment.getId(), e);
+            return TextBlock.builder()
+                .text("【图片附件 " + attachment.getFileName() + " 加载失败，已跳过】")
+                .build();
+        }
+    }
+
+    /**
+     * 用「用户文字 + 附件内容块」构造本轮 user message。
+     *
+     * @param content         用户输入文字（可空）
+     * @param attachmentBlocks 附件内容块（可空）
+     * @return 用户消息
+     */
+    private Msg buildUserMsg(String content, List<ContentBlock> attachmentBlocks) {
+        List<ContentBlock> blocks = new ArrayList<>();
+        if (StringUtils.isNotBlank(content)) {
+            blocks.add(TextBlock.builder().text(content).build());
+        }
+        if (attachmentBlocks != null && !attachmentBlocks.isEmpty()) {
+            blocks.addAll(attachmentBlocks);
+        }
+        return new UserMessage(blocks);
+    }
+
+    /**
+     * 按上限截断内联文档文本：保留首尾、中段省略（避免单个大文档撑爆模型上下文窗口）。
+     *
+     * @param text 文档全量文本
+     * @param max  最大字符数（<=0 表示不截断）
+     * @return 截断后的文本
+     */
+    private String truncateDocument(String text, int max) {
+        if (StringUtils.isBlank(text)) {
+            return "";
+        }
+        if (max <= 0 || text.length() <= max) {
+            return text;
+        }
+        int head = max / 2;
+        int tail = max - head;
+        return text.substring(0, head)
+            + "\n……（文档过长，中段已省略）……\n"
+            + text.substring(text.length() - tail);
     }
 
     /**

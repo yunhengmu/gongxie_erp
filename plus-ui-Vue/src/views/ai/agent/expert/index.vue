@@ -104,7 +104,7 @@
           </template>
         </el-table-column>
         <el-table-column label="创建时间" align="center" prop="createTime" width="170" />
-        <el-table-column label="操作" align="center" width="190" class-name="small-padding fixed-width">
+        <el-table-column label="操作" align="center" width="230" class-name="small-padding fixed-width">
           <template #default="scope">
             <el-tooltip content="查看" placement="top">
               <el-button
@@ -122,6 +122,15 @@
                 type="primary"
                 icon="Edit"
                 @click="handleUpdate(scope.row)"
+              ></el-button>
+            </el-tooltip>
+            <el-tooltip content="复制" placement="top">
+              <el-button
+                v-hasPermi="['ai:agent:add']"
+                link
+                type="primary"
+                icon="CopyDocument"
+                @click="handleClone(scope.row)"
               ></el-button>
             </el-tooltip>
             <el-tooltip content="删除" placement="top">
@@ -166,14 +175,31 @@
           <el-input v-model="form.agentCode" :disabled="!!form.id" placeholder="如：finance_expert（小写字母开头，可含数字与下划线）" />
         </el-form-item>
         <el-form-item label="描述" prop="description">
-          <el-input v-model="form.description" type="textarea" :rows="2" placeholder="一句话说明该专家的职责" />
+          <el-input v-model="form.description" type="textarea" :rows="2" placeholder="一句话说明该专家的职责（也作为「AI 生成」与路由判断「擅长」的依据）" />
+        </el-form-item>
+        <el-form-item label="快速生成">
+          <div class="gen-row">
+            <el-select
+              v-model="templateKey"
+              placeholder="套用提示词模板"
+              clearable
+              style="width: 190px"
+              @change="handleApplyTemplate"
+            >
+              <el-option v-for="tpl in EXPERT_PROMPT_TEMPLATES" :key="tpl.key" :label="tpl.label" :value="tpl.key" />
+            </el-select>
+            <el-button type="primary" plain icon="MagicStick" :loading="generating" @click="handleGenerate">
+              AI 生成
+            </el-button>
+            <span class="text-muted">按名称 / 描述 / 已选工具与知识库，生成「描述 + 系统提示词」</span>
+          </div>
         </el-form-item>
         <el-form-item label="系统提示词" prop="sysPrompt">
           <el-input
             v-model="form.sysPrompt"
             type="textarea"
-            :rows="5"
-            placeholder="留空将使用平台默认提示词（声明为企业内部助手、优先检索知识库、答案须有依据）"
+            :rows="8"
+            placeholder="留空将使用平台默认提示词；建议只写「领域知识与口径」——执行纪律由平台统一注入"
           />
         </el-form-item>
         <el-form-item label="绑定模型" prop="modelId">
@@ -522,6 +548,7 @@
 import {
   addAgent,
   delAgent,
+  generateExpertPrompt,
   getAgent,
   listAgent,
   listTrustedTools,
@@ -529,7 +556,14 @@ import {
   revokeTrustedTool,
   updateAgent
 } from '@/api/ai/agent';
-import type { AgentForm, AgentQuery, AgentToolTrustVO, AgentVO, ToolOptionVO } from '@/api/ai/agent/types';
+import type {
+  AgentForm,
+  AgentQuery,
+  AgentToolTrustVO,
+  AgentVO,
+  ExpertPromptGenerateForm,
+  ToolOptionVO
+} from '@/api/ai/agent/types';
 import { visibleKnowledgeBaseOptions } from '@/api/ai/kb/base';
 import type { KnowledgeBaseVO } from '@/api/ai/kb/base/types';
 import { optionModelConfig } from '@/api/ai/model/config';
@@ -546,6 +580,7 @@ import { useSearchReset } from '@/hooks/form/useSearchReset';
 import { useSearchToggle } from '@/hooks/form/useSearchToggle';
 import { useTableSelection } from '@/hooks/table/useTableSelection';
 import modal from '@/plugins/modal';
+import { EXPERT_PROMPT_TEMPLATES, lintExpertPrompt, renderTemplate } from './expertPromptHelper';
 
 const VISIBLE_SCOPE_OPTIONS = [
   { label: '全员', value: '0' },
@@ -572,6 +607,10 @@ const deptOptions = ref<DeptTreeVO[]>([]);
 /** 该专家已记住的工具（「记住该工具」沉淀的免确认决策） */
 const trustedTools = ref<AgentToolTrustVO[]>([]);
 const buttonLoading = ref(false);
+/** 「AI 生成」进行中 */
+const generating = ref(false);
+/** 当前选中的提示词模板（套用后即重置） */
+const templateKey = ref<string | undefined>(undefined);
 const statusLoadingId = ref<string | number | undefined>(undefined);
 const { loading, withLoading } = useLoading(true);
 const { showSearch } = useSearchToggle();
@@ -830,6 +869,7 @@ const loadOptions = async () => {
 const cancel = () => {
   reset();
   trustedTools.value = [];
+  templateKey.value = undefined;
   closeDialog();
 };
 
@@ -851,6 +891,7 @@ const { resetQuery } = useSearchReset({
 /** 新增按钮操作 */
 const handleAdd = () => {
   trustedTools.value = [];
+  templateKey.value = undefined;
   openDialog('新增专家');
 };
 
@@ -864,6 +905,7 @@ const handleView = async (row: AgentRowWithSubagent) => {
 /** 修改按钮操作 */
 const handleUpdate = async (row?: AgentRowWithSubagent) => {
   reset();
+  templateKey.value = undefined;
   const id = row?.id ?? ids.value[0];
   const res = await getAgent(id);
   Object.assign(form.value, toForm(res.data ?? {}));
@@ -873,6 +915,113 @@ const handleUpdate = async (row?: AgentRowWithSubagent) => {
   form.value.subagentIds = form.value.subagentIds ?? [];
   await loadTrustedTools(id);
   showDialog('修改专家');
+};
+
+/**
+ * 复制按钮操作：按既有专家预填新增表单。
+ *
+ * <p>清空主键与编码（编码唯一）、名称加「-副本」，其余（模型 / 工具 / 知识库 / 技能 / 提示词 / 配额）
+ * 原样带入，保存走新增接口。</p>
+ */
+const handleClone = async (row: AgentRowWithSubagent) => {
+  trustedTools.value = [];
+  templateKey.value = undefined;
+  const res = await getAgent(row.id as string | number);
+  const cloned = toForm(res.data ?? {});
+  cloned.id = undefined;
+  cloned.agentCode = undefined;
+  cloned.agentName = row.agentName ? `${row.agentName}-副本` : row.agentName;
+  reset();
+  Object.assign(form.value, cloned);
+  form.value.toolBindings = form.value.toolBindings ?? [];
+  form.value.kbIds = form.value.kbIds ?? [];
+  form.value.skillIds = form.value.skillIds ?? [];
+  form.value.subagentIds = form.value.subagentIds ?? [];
+  showDialog('复制专家');
+};
+
+/** 套用内置提示词模板（覆盖前二次确认） */
+const handleApplyTemplate = async (key?: string) => {
+  templateKey.value = undefined;
+  if (!key) {
+    return;
+  }
+  const template = EXPERT_PROMPT_TEMPLATES.find((tpl) => tpl.key === key);
+  if (!template) {
+    return;
+  }
+  if ((form.value.sysPrompt ?? '').trim()) {
+    const confirmed = await modal
+      .confirm('套用模板将覆盖当前系统提示词，是否继续？')
+      .then(() => true)
+      .catch(() => false);
+    if (!confirmed) {
+      return;
+    }
+  }
+  form.value.sysPrompt = renderTemplate(template, form.value.agentName);
+  modal.msgSuccess(`已套用模板：${template.label}`);
+};
+
+/**
+ * 「AI 生成」：按名称 / 描述 / 已选工具与知识库，补全「描述 + 能力描述 + 系统提示词」。
+ *
+ * <p>生成结果为**建议值**，回填后仍可编辑；失败时如实提示原因（如模型未配置密钥）。</p>
+ */
+const handleGenerate = async () => {
+  if (!form.value.agentName?.trim()) {
+    modal.msgWarning('请先填写专家名称');
+    return;
+  }
+  if (!form.value.description?.trim()) {
+    modal.msgWarning('请先填写「描述」，它同时作为生成的领域依据');
+    return;
+  }
+  if ((form.value.sysPrompt ?? '').trim()) {
+    const confirmed = await modal
+      .confirm('生成将覆盖当前的「描述 / 能力描述 / 系统提示词」，是否继续？')
+      .then(() => true)
+      .catch(() => false);
+    if (!confirmed) {
+      return;
+    }
+  }
+  const toolNames: string[] = [];
+  const writeToolNames: string[] = [];
+  (form.value.toolBindings ?? []).forEach((bind) => {
+    const name = toolLabel(bind.toolCode);
+    toolNames.push(name);
+    if (toolOptions.value.find((item) => item.toolCode === bind.toolCode)?.readOnly === false) {
+      writeToolNames.push(name);
+    }
+  });
+  const payload: ExpertPromptGenerateForm = {
+    agentName: form.value.agentName,
+    domainHint: form.value.description,
+    toolNames,
+    writeToolNames,
+    kbNames: (form.value.kbIds ?? []).map((id) => kbLabel(id)),
+    writeEnabled: form.value.expertWriteEnabled !== '0',
+    modelId: form.value.modelId
+  };
+  generating.value = true;
+  try {
+    const res = await generateExpertPrompt(payload);
+    const data = res.data;
+    if (!data?.success) {
+      modal.msgError(data?.message || '生成失败，请稍后重试');
+      return;
+    }
+    if (data.description) {
+      form.value.description = data.description;
+    }
+    if (data.sysPrompt) {
+      form.value.sysPrompt = data.sysPrompt;
+    }
+    modal.msgSuccess(`生成成功（${data.modelName || '模型'}，${data.elapsedMs ?? 0}ms），请核对后按需修改`);
+  } finally {
+    generating.value = false;
+  }
 };
 
 /**
@@ -914,10 +1063,54 @@ const handleStatusChange = async (row: AgentRowWithSubagent) => {
   }
 };
 
+/**
+ * 保存前提示词体检：只给建议、不硬拦（用户可选择「仍然保存」）。
+ *
+ * @returns 是否继续保存
+ */
+const confirmPromptLint = async (): Promise<boolean> => {
+  const items = lintExpertPrompt({
+    sysPrompt: form.value.sysPrompt,
+    agentName: form.value.agentName,
+    description: form.value.description,
+    tools: (form.value.toolBindings ?? []).map((bind) => ({
+      name: toolLabel(bind.toolCode),
+      readOnly: toolOptions.value.find((item) => item.toolCode === bind.toolCode)?.readOnly !== false
+    })),
+    hasKnowledgeBase: (form.value.kbIds ?? []).length > 0
+  });
+  if (!items.length) {
+    return true;
+  }
+  const escapeHtml = (text: string) =>
+    text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = items
+    .map(
+      (item) =>
+        `${item.level === 'warn' ? '⚠' : '·'} ${escapeHtml(item.message)}` +
+        (item.suggestion ? `<br/><span style="color:#909399">建议：${escapeHtml(item.suggestion)}</span>` : '')
+    )
+    .join('<br/><br/>');
+  try {
+    await ElMessageBox.confirm(html, '提示词体检（仅建议，不影响保存）', {
+      confirmButtonText: '仍然保存',
+      cancelButtonText: '返回修改',
+      type: 'warning',
+      dangerouslyUseHTMLString: true
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 /** 提交按钮 */
 const submitForm = () => {
   agentFormRef.value?.validate(async (valid: boolean) => {
     if (!valid) {
+      return;
+    }
+    if (!(await confirmPromptLint())) {
       return;
     }
     buttonLoading.value = true;
@@ -979,6 +1172,14 @@ loadOptions();
   float: right;
   color: var(--app-text-muted);
   font-size: 12px;
+}
+
+/* 快速生成行：模板下拉 + AI 生成 + 说明 */
+.gen-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
 }
 
 /* 工具授权 / 角色模型 / 配额：与 el-form-item 内容区对齐的窄列表 */

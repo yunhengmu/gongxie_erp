@@ -57,6 +57,12 @@
 | `tool-output-preview-chars` | `2000` | 工具结果下发前端的最大字符数 |
 | `permission-mode` | `DEFAULT` | 全局工具权限模式兜底：未命中显式规则的工具一律需确认 |
 | `pending-confirm-ttl-minutes` | `30` | 待确认工具调用的有效期，超时需重新发起 |
+| `image-max-bytes` | `524288`（512KB） | 聊天上传**图片**的单张大小上限 |
+| `document-max-bytes` | `5242880`（5MB） | 聊天上传**文档**的单文件大小上限 |
+| `document-inline-max-chars` | `20000` | 文档解析后**内联进本轮用户消息**的最大字符数，超出保留首尾截断 |
+| `max-attachments-per-message` | `5` | 单条消息可携带的附件数上限 |
+
+> 附件（多模态对话）：图片在装配期读回字节转 **Base64 data URI** 经 `ImageBlock` 下发（**需视觉模型**），文档用 `AiDocumentParser` 解析为**纯文本内联**（不切片、不向量化——那是知识库链路）；两者的内容块随任务片段一并下发给专家。仅放行解析器支持的后缀，扫描件 / 纯图片 PDF 解析不出文本会被拒绝。
 
 ### 2.4 上下文压缩与大结果卸载
 
@@ -110,6 +116,7 @@
 | `application-dev.yml` | `spring.datasource.dynamic.datasource.master.*` | 主数据源连接（dynamic-datasource）：PostgreSQL 14 或 MySQL 8.0，仅 JDBC URL 不同（驱动由 Hikari 按 URL 自动匹配，不在配置中声明） |
 | `application-dev.yml` | `spring.data.redis.*` / `redisson.*` | Redis 连接与 Redisson 连接池；dev 配置**要求必须设置 Redis 密码** |
 | `application-dev.yml` | `snail-job.*` | 调度客户端：`enabled`、`group`、`token`、`namespace`、服务端地址 |
+| 数据库表 `sys_oss_config`（**不在 yaml**） | `endpoint` / `domain_url` | 平台文件存储（OSS）的**两个坐标**：`endpoint` 供**服务端读写**（容器部署写 `minio:9000`，容器网络内可达），`domain_url` 供**前端展示**（返回给浏览器的 URL，必须**浏览器可达**——PG 栈 `http://localhost:9000`、MySQL 8.0 栈 `http://localhost:9002`）。解析 / 向量化走内部地址，故 `domain_url` 配错只表现为「图片 / 文档在线预览加载失败」。容器部署由 `deploy*/sql/50-oss-endpoint.sql` 在首次建库时写入，**存量数据卷不会重跑**，需按部署文档手工补一次 |
 
 ## 4. 生产环境必改清单
 
@@ -122,9 +129,11 @@
 | 5 | 数据库 / Redis / Milvus 口令 | 默认口令仅用于本地 |
 | 6 | `bizbuddy.ai.current-time-zone` | 容器未挂 tzdata 时会退化为 UTC |
 | 7 | `spring.data.redis.password` | dev 配置要求必填，勿照抄默认值 |
+| 8 | 数据库表 `sys_oss_config.domain_url` | 必须是**浏览器可达**地址；容器部署默认给 `localhost`，从其它机器 / 公网访问需改成实际域名或 IP（各栈端口见部署文档） |
 
 ## 5. 相关文档
 
 - [architecture.md](architecture.md) —— 这些配置在链路里作用于哪一环
 - [development.md](development.md) —— 新增业务工具
-- [../deploy/docker-compose.yml](../deploy/docker-compose.yml) —— 容器化部署与变量覆盖
+- [../deploy/README.md](../deploy/README.md) / [../deploy-mysql/README.md](../deploy-mysql/README.md) —— 容器化部署、变量覆盖与已知坑（含 OSS 地址与「文档需先解析再向量化」）
+- [../e2e/](../e2e) —— 端到端脚本：改完配置后在真实栈上验证（L1~L5）

@@ -129,6 +129,36 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
     }
 
     /**
+     * 根据一组 ossIds 获取对应文件的服务端读写地址列表。
+     * <p>
+     * 与 {@link #selectUrlByIds(String)} 的对外地址不同：公开桶一律按访问端点（endpoint）生成，
+     * 供容器内服务端下载/解析使用；私有桶仍返回 120s 预签名地址。
+     *
+     * @param ossIds 以逗号分隔的 ossId 字符串
+     * @return 以逗号分隔的文件 URL 字符串
+     */
+    @Override
+    public String selectInternalUrlByIds(String ossIds) {
+        List<Long> ids = StringUtils.splitTo(ossIds, Convert::toLong);
+        SysOssServiceImpl ossService = SpringUtils.getAopProxy(this);
+        List<Supplier<String>> suppliers = ids.stream().map(id -> (Supplier<String>) () -> {
+            SysOssVo vo = ossService.getById(id);
+            if (ObjectUtil.isNotNull(vo)) {
+                try {
+                    return this.matchingInternalUrl(vo).getUrl();
+                } catch (Exception ignored) {
+                    // 如果oss异常无法连接则将数据直接返回
+                    return vo.getUrl();
+                }
+            }
+            return null;
+        }).toList();
+        List<String> list = ThreadUtils.virtualSubmitAll(suppliers);
+        list.removeAll(Collections.singleton(null));
+        return StringUtils.joinComma(list);
+    }
+
+    /**
      * 根据逗号分隔的文件主键列表查询文件传输对象集合。
      *
      * @param ossIds 逗号分隔的文件主键字符串
@@ -326,6 +356,45 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
         // 仅修改桶类型为 private 的URL，临时URL时长为120s
         if (instance.verifyConfig(config -> AccessPolicy.PRIVATE.equals(config.accessControlPolicyConfig().accessPolicy()))) {
             oss.setUrl(instance.presignGetUrl(oss.getFileName(), Duration.ofSeconds(120)));
+            return oss;
+        }
+        // 公开桶：按客户端配置重新生成对外访问地址。
+        // 容器化部署时 endpoint 常为容器服务名（如 minio:9000），浏览器无法解析；
+        // 配置自定义域名（sys_oss_config.domain_url，会拼上桶名）后即可返回对外可达地址，
+        // 且存量记录的 URL 同样在读取时被纠正（无需数据迁移）。
+        if (StringUtils.isNotBlank(oss.getFileName())) {
+            try {
+                oss.setUrl(instance.config().getBucketUrl() + "/" + oss.getFileName());
+            } catch (Exception ignored) {
+                // 配置不完整（如未配置桶）时保留存量 URL，避免列表接口整体失败
+            }
+        }
+        return oss;
+    }
+
+    /**
+     * 桶类型为 private 的URL 修改为临时URL时长为120s，公开桶生成服务端读写地址。
+     * <p>
+     * 与 {@link #matchingUrl(SysOssVo)}（对外地址）不同：公开桶忽略自定义域名，
+     * 一律按访问端点（endpoint）生成，供容器内服务端下载/解析使用。
+     *
+     * @param oss OSS对象
+     * @return oss 匹配服务端读写地址的OSS对象
+     */
+    private SysOssVo matchingInternalUrl(SysOssVo oss) {
+        OssClient instance = OssFactory.instance(oss.getService());
+        // 私有桶：仍使用 120s 预签名地址（服务端可访问）
+        if (instance.verifyConfig(config -> AccessPolicy.PRIVATE.equals(config.accessControlPolicyConfig().accessPolicy()))) {
+            oss.setUrl(instance.presignGetUrl(oss.getFileName(), Duration.ofSeconds(120)));
+            return oss;
+        }
+        // 公开桶：按访问端点（endpoint，容器部署为 minio:9000）生成服务端读写地址，忽略对外域名
+        if (StringUtils.isNotBlank(oss.getFileName())) {
+            try {
+                oss.setUrl(instance.config().getEndpointBucketUrl() + "/" + oss.getFileName());
+            } catch (Exception ignored) {
+                // 配置不完整（如未配置桶）时保留存量 URL，避免整体失败
+            }
         }
         return oss;
     }

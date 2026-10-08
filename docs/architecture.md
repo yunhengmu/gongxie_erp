@@ -44,6 +44,11 @@ flowchart LR
 
 `route_decision` 会在**同一轮 ReAct 循环内就地完成整条专家编排**（调用 → 落库 → 下发事件），把结果作为工具结果回喂小Z，因此不需要额外的编排驱动。
 
+两点补充：
+
+- **用户消息可以是多模态的**：一轮消息除文本外还可携带**附件**（图片 / 文档，先上传为暂存件、发送时绑定消息）。图片在装配期读回字节转 **Base64 data URI** 经 `ImageBlock` 下发（需视觉模型）；文档解析为**纯文本内联**（不切片、不向量化）。两者的内容块**随任务片段一并下发给专家**，故专家与入口看到的是同一份材料；附件内容**不落知识库、不进记忆抽取**。
+- **指定专家＝固化路由**：会话上存在 `pinned_expert_id` 时，编排**忽略模型给出的 `action`、强制交给该专家**（落 `action=pinned`），服务端保证「用户指定了就一定由它答」；路由失败 / 契约不合格时**不换专家**，就地重试或降级如实说明。
+
 ## 3. 装配：智能体 × 会话资源集
 
 智能体实例由 `AgentRegistry` 装配并缓存，缓存键是 **`智能体 × 会话资源集签名`**：
@@ -117,3 +122,5 @@ flowchart LR
 - [README.md](README.md) —— 开发者文档索引与代码导览
 - [development.md](development.md) —— 加一个业务工具（最常见的扩展）
 - [configuration.md](configuration.md) —— 配置项参考
+- [../deploy/README.md](../deploy/README.md) / [../deploy-mysql/README.md](../deploy-mysql/README.md) —— 两套容器编排（PostgreSQL 14 / MySQL 8.0，端口错开可并存）
+- [../e2e/](../e2e) —— 端到端脚本（在真实栈上验证上述链路：模型连通、知识库检索、专家编排、HITL 闭环）

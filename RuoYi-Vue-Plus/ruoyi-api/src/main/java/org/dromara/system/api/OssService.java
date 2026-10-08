@@ -20,6 +20,14 @@ public interface OssService {
     String selectUrlByIds(String ossIds);
 
     /**
+     * 通过ossId查询服务端读写用的地址（忽略对外域名，公开桶按访问端点生成，供容器内服务端下载/解析使用）
+     *
+     * @param ossIds ossId串逗号分隔
+     * @return url串逗号分隔
+     */
+    String selectInternalUrlByIds(String ossIds);
+
+    /**
      * 通过ossId查询列表
      *
      * @param ossIds ossId串逗号分隔

@@ -44,7 +44,34 @@
         <template v-for="msg in messages" :key="String(msg.id)">
           <div v-if="msg.role === 'user'" class="msg-row msg-row--user">
             <div class="msg-block msg-block--user">
-              <div class="bubble bubble--user">{{ msg.content }}</div>
+              <div v-if="msg.attachments?.length" class="msg-attachments">
+                <template v-for="att in msg.attachments" :key="String(att.id)">
+                  <el-image
+                    v-if="att.fileType === 'image' && att.url"
+                    class="msg-attachment-image"
+                    :src="att.url"
+                    :preview-src-list="[att.url]"
+                    preview-teleported
+                    fit="cover"
+                  />
+                  <a
+                    v-else-if="att.url"
+                    class="msg-attachment-file"
+                    :href="att.url"
+                    target="_blank"
+                    rel="noopener"
+                    :title="att.fileName"
+                  >
+                    <el-icon><Document /></el-icon>
+                    <span class="msg-attachment-file__name">{{ att.fileName }}</span>
+                  </a>
+                  <span v-else class="msg-attachment-file">
+                    <el-icon><Document /></el-icon>
+                    <span class="msg-attachment-file__name">{{ att.fileName }}</span>
+                  </span>
+                </template>
+              </div>
+              <div v-if="msg.content" class="bubble bubble--user">{{ msg.content }}</div>
               <!-- 悬停或键盘聚焦时显示：发出时间 + 复制 + 删除（整轮删除该提问及其回答） -->
               <div class="msg-actions">
                 <span class="msg-actions__time">{{ formatMessageTime(msg.createTime) }}</span>
@@ -211,10 +238,25 @@
           <div class="resource-bar">
             <el-popover placement="top-start" :width="190" trigger="click" popper-class="resource-picker-popper">
               <template #reference>
-                <el-button class="resource-add-btn" icon="Plus" circle title="选择资源" />
+                <el-button class="resource-add-btn" icon="Plus" circle title="选择资源或上传附件" />
               </template>
               <!-- 二级：分组列表；三级：悬浮飞出的选项面板（支持上下滚动） -->
               <div class="resource-menu">
+                <!-- 上传附件：置于菜单顶部，与下方资源分组以分割线隔开 -->
+                <div class="resource-menu__action" @click="handleTriggerAttachment">
+                  <el-icon class="resource-menu__action-icon" :class="{ 'is-loading': uploadingAttachment }">
+                    <Paperclip />
+                  </el-icon>
+                  <span class="resource-menu__action-label">上传附件</span>
+                </div>
+                <input
+                  ref="attachmentInputRef"
+                  type="file"
+                  class="attachment-input"
+                  :accept="ATTACHMENT_ACCEPT"
+                  @change="handleAttachmentChange"
+                />
+                <div class="resource-menu__divider"></div>
                 <div
                   v-for="group in resourceGroups"
                   :key="group.key"
@@ -261,6 +303,21 @@
               </span>
             </div>
           </div>
+          <!-- 待发附件：选中项以标签跟在资源标签之后（上传入口已移入上方 + 菜单） -->
+          <div v-if="pendingAttachments.length" class="attachment-bar">
+            <div class="attachment-chips">
+              <span
+                v-for="att in pendingAttachments"
+                :key="String(att.id)"
+                class="attachment-chip"
+                :class="`attachment-chip--${att.fileType}`"
+                :title="att.fileName"
+              >
+                <el-icon class="attachment-chip__close" @click="handleRemoveAttachment(att)"><Close /></el-icon>
+                <span class="attachment-chip__label">{{ att.fileName }}</span>
+              </span>
+            </div>
+          </div>
           <div class="composer-actions-right">
             <span class="composer-tip">Ctrl + Enter 发送</span>
             <el-button v-if="streaming" type="danger" icon="VideoPause" @click="handleStop">停止</el-button>
@@ -282,7 +339,9 @@ import {
   closeChatSession,
   confirmChatTool,
   createChatSession,
+  deleteChatAttachment,
   deleteChatMessage,
+  registerChatAttachment,
   listChatMessage,
   listChatPending,
   listChatResources,
@@ -297,6 +356,7 @@ import {
 } from '@/api/ai/chat';
 import type {
   AiRouteRunDetailVO,
+  ChatAttachmentVO,
   ChatMessageVO,
   ChatPendingToolCall,
   ChatResourceItem,
@@ -310,6 +370,7 @@ import type { ScenarioPackMcpOptionVO, ScenarioPackOptionVO } from '@/api/ai/pac
 import { visibleSkillOptions } from '@/api/ai/skill';
 import type { SkillOptionVO } from '@/api/ai/skill/types';
 import type { ToolCallLogVO } from '@/api/ai/session/types';
+import { uploadOss } from '@/api/system/oss';
 import modal from '@/plugins/modal';
 import AiMarkdown from '@/views/ai/components/AiMarkdown.vue';
 
@@ -371,6 +432,8 @@ interface LocalMessage {
   errorMsg?: string;
   durationMs?: number;
   toolCallCount?: number;
+  /** 随本条消息发送的附件（聊天上传的图片/文档） */
+  attachments?: ChatAttachmentVO[];
 }
 
 /** 资源标签（REQ-AI-32）：+ 后面显示的选中项，悬停左侧出叉号可移除 */
@@ -436,6 +499,18 @@ const streaming = ref(false);
 const sending = ref(false);
 const messageContainerRef = ref<HTMLElement>();
 const streamUrl = ref<string | undefined>(undefined);
+/** 待发送附件（登记成功后暂存，发送时随消息提交） */
+const pendingAttachments = ref<ChatAttachmentVO[]>([]);
+/** 附件上传中（回形针按钮 loading） */
+const uploadingAttachment = ref(false);
+/** 隐藏的文件选择框 */
+const attachmentInputRef = ref<HTMLInputElement>();
+
+/** 单条消息可携带的附件数量上限（与后端 bizbuddy.ai.chat.max-attachments-per-message 保持一致） */
+const MAX_ATTACHMENTS = 5;
+/** 聊天附件可接受的类型（与后端一致：图片 + AiDocumentParser 支持的文档） */
+const ATTACHMENT_ACCEPT =
+  '.png,.jpg,.jpeg,.gif,.webp,.heic,.heif,.pdf,.docx,.xlsx,.pptx,.html,.htm,.txt,.md,.markdown,.csv,.tsv,.json,.xml,.yml,.yaml,.log,.sql,.properties,.ini,.conf,.java,.js,.ts,.py,.sh';
 
 /** 工作台高度下限（可用高度不足时兜底，避免窄屏 / 小窗口下主区被压没） */
 const MIN_WORKBENCH_HEIGHT = 360;
@@ -793,7 +868,8 @@ const toLocalMessage = (item: ChatMessageVO, tools: ToolCallLogVO[]): LocalMessa
     createTime: item.createTime,
     errorMsg: item.errorMsg,
     durationMs: item.durationMs,
-    toolCallCount: item.toolCallCount
+    toolCallCount: item.toolCallCount,
+    attachments: item.attachments ?? []
   };
 };
 
@@ -1497,45 +1573,114 @@ const handleStreamEvent = (raw: string) => {
   scrollToBottomSoon();
 };
 
+/** 确保会话存在（无则创建并提交本地暂存资源），返回会话主键 */
+const ensureSession = async (): Promise<string | number | undefined> => {
+  if (currentSessionId.value) {
+    return currentSessionId.value;
+  }
+  const agentId = entryAgentId.value;
+  if (agentId === undefined || agentId === '') {
+    modal.msgWarning('未找到入口智能体「小Z」，请先在「小Z 配置」中启用它');
+    return undefined;
+  }
+  // 场景包参数停写（REQ-AI-32：改用会话级资源集），仅保留指定专家
+  const sessionRes = await createChatSession(agentId, undefined, undefined, pinnedExpert.value?.id);
+  const session = sessionRes.data;
+  if (!session?.id) {
+    modal.msgError('创建任务失败');
+    return undefined;
+  }
+  currentSessionId.value = session.id;
+  // 首次建会话时把本地暂存的资源选择一并提交（REQ-AI-32）
+  if (sessionResources.value.length) {
+    await addChatResources(
+      session.id,
+      sessionResources.value.map((item) => ({
+        resourceType: item.resourceType,
+        resourceId: item.resourceId,
+        resourceKey: item.resourceKey
+      }))
+    );
+  }
+  await getSessions();
+  return session.id;
+};
+
+/** 点击「上传附件」菜单项：打开文件选择框（流式回答中禁用） */
+const handleTriggerAttachment = () => {
+  if (streaming.value || uploadingAttachment.value) {
+    return;
+  }
+  attachmentInputRef.value?.click();
+};
+
+/** 选择文件后：先经框架 OSS 上传，再按 ossId 登记（校验类型/大小并解析文档） */
+const handleAttachmentChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) {
+    return;
+  }
+  if (pendingAttachments.value.length >= MAX_ATTACHMENTS) {
+    modal.msgWarning(`单条消息最多上传 ${MAX_ATTACHMENTS} 个附件`);
+    return;
+  }
+  uploadingAttachment.value = true;
+  try {
+    const sessionId = await ensureSession();
+    if (sessionId === undefined) {
+      return;
+    }
+    const form = new FormData();
+    form.append('file', file);
+    const uploadRes = await uploadOss(form);
+    const ossId = uploadRes.data?.ossId;
+    if (ossId === undefined || ossId === null || ossId === '') {
+      modal.msgError('附件上传失败');
+      return;
+    }
+    const res = await registerChatAttachment(sessionId, { ossId, fileName: file.name });
+    if (res.data?.id === undefined || res.data?.id === null) {
+      modal.msgError('附件登记失败');
+      return;
+    }
+    pendingAttachments.value.push(res.data);
+  } catch (error) {
+    modal.msgError((error as Error)?.message || '附件上传失败');
+  } finally {
+    uploadingAttachment.value = false;
+  }
+};
+
+/** 移除待发附件（同步删除服务端暂存件） */
+const handleRemoveAttachment = async (item: ChatAttachmentVO) => {
+  pendingAttachments.value = pendingAttachments.value.filter((att) => att.id !== item.id);
+  const sessionId = currentSessionId.value;
+  if (sessionId !== undefined && sessionId !== null) {
+    try {
+      await deleteChatAttachment(sessionId, item.id);
+    } catch {
+      // 暂存件删除失败可忽略，不影响发送
+    }
+  }
+};
+
 /** 发送消息：先落库拿 messageId，再建立 SSE 流 */
 const handleSend = async () => {
   const content = inputText.value.trim();
-  if (!content || streaming.value || sending.value) {
+  const attachmentIds = pendingAttachments.value.map((att) => att.id);
+  if ((!content && !attachmentIds.length) || streaming.value || sending.value) {
     return;
   }
   sending.value = true;
   try {
-    let sessionId = currentSessionId.value;
-    if (!sessionId) {
-      const agentId = entryAgentId.value;
-      if (agentId === undefined || agentId === '') {
-        modal.msgWarning('未找到入口智能体「小Z」，请先在「小Z 配置」中启用它');
-        return;
-      }
-      // 场景包参数停写（REQ-AI-32：改用会话级资源集），仅保留指定专家
-      const sessionRes = await createChatSession(agentId, undefined, undefined, pinnedExpert.value?.id);
-      const session = sessionRes.data;
-      if (!session?.id) {
-        modal.msgError('创建任务失败');
-        return;
-      }
-      sessionId = session.id;
-      currentSessionId.value = sessionId;
-      // 首次发送时把本地暂存的资源选择一并提交（REQ-AI-32）
-      if (sessionResources.value.length) {
-        await addChatResources(
-          sessionId,
-          sessionResources.value.map((item) => ({
-            resourceType: item.resourceType,
-            resourceId: item.resourceId,
-            resourceKey: item.resourceKey
-          }))
-        );
-      }
-      await getSessions();
+    const sessionId = await ensureSession();
+    if (sessionId === undefined) {
+      return;
     }
 
-    const res = await sendChatMessage(sessionId, content);
+    const res = await sendChatMessage(sessionId, content, attachmentIds);
     const userMessageId = res.data?.id;
     if (userMessageId === undefined || userMessageId === null) {
       modal.msgError('消息发送失败');
@@ -1546,15 +1691,17 @@ const handleSend = async () => {
       id: userMessageId,
       role: 'user',
       content,
-      parts: [{ kind: 'text', text: content }],
+      parts: content ? [{ kind: 'text', text: content }] : [],
       streaming: false,
       status: '0',
-      createTime: res.data?.createTime
+      createTime: res.data?.createTime,
+      attachments: res.data?.attachments ?? []
     });
     const tempId = `pending-${Date.now()}`;
     messages.value.push({ id: tempId, role: 'assistant', content: '', parts: [], streaming: true, status: '0' });
     currentAssistantKey.value = tempId;
     inputText.value = '';
+    pendingAttachments.value = [];
     scrollToBottomSoon();
 
     streaming.value = true;
@@ -1765,6 +1912,45 @@ onMounted(() => {
 
 .msg-block--user > .bubble {
   max-width: 100%;
+}
+
+/* 用户消息附件：图片缩略图 / 文档卡片（位于气泡上方） */
+.msg-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 100%;
+  margin-bottom: 6px;
+}
+
+.msg-attachment-image {
+  width: 120px;
+  height: 120px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--app-surface-border, #e4e7ed);
+  cursor: zoom-in;
+}
+
+.msg-attachment-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--app-surface-border, #e4e7ed);
+  background: var(--app-elevated-soft-bg, #ffffff);
+  font-size: 12px;
+  color: var(--app-text-title, #303133);
+  text-decoration: none;
+}
+
+.msg-attachment-file__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .msg-actions {
@@ -2099,6 +2285,43 @@ onMounted(() => {
   padding: 2px 0;
 }
 
+/* 顶部动作项（上传附件）：样式与分组行一致，保持菜单观感统一 */
+.resource-menu__action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-regular, #606266);
+  cursor: pointer;
+}
+
+.resource-menu__action:hover {
+  background: var(--el-fill-color-light, #f4f4f5);
+  color: var(--el-color-primary);
+}
+
+.resource-menu__action-icon {
+  flex: none;
+  font-size: 14px;
+}
+
+.resource-menu__action-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 分割线：把顶部动作项与资源分组隔开 */
+.resource-menu__divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--el-border-color-lighter, #ebeef5);
+}
+
 /* 二级：分组行（悬停 / 点击即展开三级飞出菜单） */
 .resource-menu__group {
   position: relative;
@@ -2278,6 +2501,66 @@ onMounted(() => {
 }
 
 .resource-chip__close:hover {
+  color: var(--el-color-danger, #f56c6c);
+}
+
+/* 聊天附件：待发附件标签（上传入口在 + 菜单顶部） */
+.attachment-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.attachment-input {
+  display: none;
+}
+
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 220px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 20px;
+  background: var(--el-fill-color-light, #f4f4f5);
+  color: var(--el-text-color-regular, #606266);
+  border: 1px solid var(--app-surface-border, #e4e7ed);
+}
+
+.attachment-chip--image {
+  background: var(--el-color-primary-light-9, #ecf5ff);
+  border-color: var(--el-color-primary-light-7, #c6e2ff);
+}
+
+.attachment-chip__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-chip__close {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  margin-right: 2px;
+  font-size: 12px;
+  cursor: pointer;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.attachment-chip:hover .attachment-chip__close,
+.attachment-chip:focus-within .attachment-chip__close {
+  visibility: visible;
+  opacity: 1;
+}
+
+.attachment-chip__close:hover {
   color: var(--el-color-danger, #f56c6c);
 }
 

@@ -1,5 +1,6 @@
 package org.dromara.ai.core.agent;
 
+import io.agentscope.core.message.ContentBlock;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.domain.AiToolCallLog;
 import org.dromara.ai.domain.dto.AiSessionResourceSet;
@@ -84,6 +85,15 @@ final class AiRouteContext {
      * 工具 / 技能 / MCP 工具可见面（专家侧仅保留只读 + 会话显式选中的只读工具）。</p>
      */
     AiSessionResourceSet resources = AiSessionResourceSet.empty();
+
+    /**
+     * 本轮用户消息携带的附件内容块（文档纯文本块 + 图片块）。
+     *
+     * <p>专家用独立会话、拿不到用户会话历史，若只下发任务片段文本，专家就**看不到**用户上传的图片与文档；
+     * 故由 {@link AiChatFacade} 在建立编排上下文时把同一批内容块放入本字段，
+     * {@link AiRouteOrchestrator} 下发给专家时与任务片段一并携带。为空表示本轮无附件。</p>
+     */
+    volatile List<ContentBlock> attachmentBlocks = List.of();
 
     /** SSE 发射器；无人值守链路为 null（只落库、不下发） */
     final SseEmitter emitter;

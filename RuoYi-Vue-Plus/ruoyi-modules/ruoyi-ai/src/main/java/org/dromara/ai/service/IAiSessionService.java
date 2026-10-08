@@ -127,6 +127,18 @@ public interface IAiSessionService {
     AiMessage appendUserMessage(Long sessionId, String content);
 
     /**
+     * 落库用户消息（可携带附件），并刷新会话活跃时间与消息条数（标题仍为默认时按首问改写）。
+     *
+     * <p>内容与附件**至少提供一个**：两者皆空时抛业务异常；附件须为本人本会话上传且未发送的暂存件。</p>
+     *
+     * @param sessionId     会话主键
+     * @param content       用户输入内容（可为空，此时须有附件）
+     * @param attachmentIds 随本消息发送的附件主键集合（可空）
+     * @return 用户消息实体
+     */
+    AiMessage appendUserMessage(Long sessionId, String content, List<Long> attachmentIds);
+
+    /**
      * 落库助手回答，并批量落库工具调用明细（同一事务内）。
      *
      * @param sessionId  会话主键

@@ -171,6 +171,15 @@ cd RuoYi-Vue-Plus
 ./mvnw -o -pl ruoyi-modules/ruoyi-ai test
 ```
 
+**单测之外，建议再跑一次端到端回归**（尤其改的是写工具 / 工具描述 / 装配与权限时）——单测走 Mockito 打桩、不起 Spring 容器，验证不了「模型是否真的会调这个工具」：
+
+```bash
+cd ..                       # 仓库根（biz-buddy/）
+node e2e/run.mjs --only L4,L5 --verbose   # L4 对话与专家编排；L5 写工具 HITL 闭环
+```
+
+`e2e/` 自带用例，**一般不需要为单个工具写新用例**；它会真实建会话、发 SSE、触发工具调用并核对编排轨迹。用法与前置见仓库根 [README](../README.md#端到端测试e2e) 或 [docs/README.md](README.md)。
+
 ## 7. 常见坑
 
 | 现象 | 原因 |
@@ -180,3 +189,5 @@ cd RuoYi-Vue-Plus
 | 写工具不被调用、只文字回复 | 工具描述/提示词让模型以为"要先问用户"；参见第 5 节第 2 点 |
 | 入口智能体用不上该工具 | 小Z 不绑业务工具，需在会话资源集里选中 |
 | 报 `Invalid 'tools[0].function.name'` | 工具名不合 LLM 规范（MCP 工具会被自动归一化，自建工具请用具名规范字符） |
+| 聊天里上传的图片 / 文档在页面上「加载失败」 | `sys_oss_config.domain_url` 不是**浏览器可达**地址（服务端读写走 `endpoint`，故解析与模型识图仍正常）；见 [configuration.md](configuration.md) §3 与部署文档排障 |
+| 知识库文档显示「已解析」但点「向量化」被拒 | 该文档**没有切片**（例如只写了正文的种子数据）；先点「重新解析」生成切片再向量化 |

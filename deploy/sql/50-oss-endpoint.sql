@@ -10,3 +10,9 @@
 -- ==========================================================================================
 
 update sys_oss_config set endpoint = 'minio:9000' where config_key in ('minio', 'image');
+
+-- 对外访问地址（自定义域名）：endpoint 的 `minio:9000` 只在容器网络内可达，浏览器解析不了，
+-- 会导致图片/文档在线预览失败（后端读图正常、前端却加载不出来）。
+-- 这里给出**宿主机可达**的地址（宿主机 9000 映射到平台 MinIO），后端返回给前端的 URL 即以此为准。
+-- 若需从其它机器 / 公网访问，请把下面的地址改成对应可达的域名或 IP（改完需重启 ruoyi-admin 让其重载 OSS 配置）。
+update sys_oss_config set domain_url = 'http://localhost:9000' where config_key in ('minio', 'image');
