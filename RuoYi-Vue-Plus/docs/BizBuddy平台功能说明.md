@@ -20,7 +20,7 @@
 
 ### 1.1 平台定位
 
-BizBuddy 是构建在 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus) `6.0.0` 之上的**企业级智能业务运行平台**，以 **AgentScope Java 2.0.3** 为智能体内核。
+BizBuddy 是构建在 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus) `6.0.0` 之上的**企业级智能业务运行平台**，以 **AgentScope Java 2.0.4** 为智能体内核。
 
 它把「智能体」作为业务的一等公民：用户不直接操作功能菜单，而是用自然语言提问，由智能体判断该自己回答还是交给领域专家，并在需要写数据时暂停等待人工确认。
 
@@ -52,7 +52,7 @@ BizBuddy 是构建在 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-V
 | 语言 / 运行时 | Java | 21 |
 | 框架 | Spring Boot | 4.1.1 |
 | Web 容器 | Jetty（基于 Netty） | 随 Boot |
-| **智能体内核** | **AgentScope Harness** | **2.0.3** |
+| **智能体内核** | **AgentScope Harness** | **2.0.4** |
 | MCP 底座 | 官方 MCP Java SDK | 0.17.2 |
 | 关系库 | PostgreSQL 14（默认）/ MySQL 8.0 | 库名均为 `biz_buddy` |
 | 缓存 / 分布式状态 | Redis | ≥ 6.x |

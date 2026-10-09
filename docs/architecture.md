@@ -11,7 +11,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：在成熟中后台底�
 | 前端 | `plus-ui-Vue` | Vue 3 + TypeScript + Element Plus，流式对话走 SSE |
 | 后端 | `RuoYi-Vue-Plus` | Spring Boot 4.1.1 + JDK 21，多模块 Maven |
 | 业务底座 | RuoYi-Vue-Plus 6.0.0 | RBAC、工作流、调度、代码生成、OSS、统一消息推送 |
-| 智能体内核 | **AgentScope Harness 2.0.3** | 工具循环、中间件、权限三态、HITL、状态存储、上下文压缩、技能 |
+| 智能体内核 | **AgentScope Harness 2.0.4** | 工具循环、中间件、权限三态、HITL、状态存储、上下文压缩、技能 |
 | 数据 | PostgreSQL 14 / Redis / Milvus | 业务与审计 / 会话状态与锁 / 向量检索 |
 
 **一个进程、一个 jar**：AI 能力是后端的一个模块（`ruoyi-modules/biz-buddy`），不是独立服务。

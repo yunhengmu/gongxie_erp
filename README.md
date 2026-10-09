@@ -6,7 +6,7 @@
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-success.svg)]()
 [![JDK](https://img.shields.io/badge/JDK-21-green.svg)]()
-[![AgentScope](https://img.shields.io/badge/AgentScope-2.0.3-blue.svg)]()
+[![AgentScope](https://img.shields.io/badge/AgentScope-2.0.4-blue.svg)]()
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791.svg)]()
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1.svg)]()
 [![Vue](https://img.shields.io/badge/Frontend-Vue%203-42b883.svg)]()
@@ -18,7 +18,7 @@
 
 ## 平台简介
 
-BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus) `6.0.0` 的成熟中后台底座（RBAC、工作流、调度、代码生成、文件存储、消息推送等）之上，以 **AgentScope Java 2.0.3** 为智能体内核，叠加了一整套可运营的 AI 能力。
+BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus) `6.0.0` 的成熟中后台底座（RBAC、工作流、调度、代码生成、文件存储、消息推送等）之上，以 **AgentScope Java 2.0.4** 为智能体内核，叠加了一整套可运营的 AI 能力。
 
 核心运行形态：
 
@@ -33,7 +33,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 
 | 目录 | 说明 |
 |---|---|
-| [`RuoYi-Vue-Plus/`](RuoYi-Vue-Plus) | **后端工程**：Spring Boot 4.1.1 + JDK 21，多模块 Maven；AI 能力在 `ruoyi-modules/biz-buddy`（AgentScope 2.0.3 内核） |
+| [`RuoYi-Vue-Plus/`](RuoYi-Vue-Plus) | **后端工程**：Spring Boot 4.1.1 + JDK 21，多模块 Maven；AI 能力在 `ruoyi-modules/biz-buddy`（AgentScope 2.0.4 内核） |
 | [`plus-ui-Vue/`](plus-ui-Vue) | **前端工程**：Vue 3 + TypeScript + Element Plus + Vite，包管理 pnpm |
 | [`docs/`](docs/README.md) | **开发者文档**：运行时架构、二次开发（新增业务工具）、配置项参考 |
 | [`RuoYi-Vue-Plus/docs/`](RuoYi-Vue-Plus/docs) | 平台功能说明（含 9 张运行界面截图） |
@@ -61,7 +61,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 | 语言 / 运行时 | Java | 21 |
 | 框架 | Spring Boot | 4.1.1 |
 | Web 容器 | Jetty（基于 Netty） | 随 Boot |
-| **智能体内核** | **AgentScope Harness** | **2.0.3** |
+| **智能体内核** | **AgentScope Harness** | **2.0.4** |
 | MCP 底座 | 官方 MCP Java SDK | 0.17.2 |
 | 向量库 | Milvus（经 AgentScope `MilvusStore` 接入） | v2.6.13 |
 | 权限认证 | Sa-Token | 1.46.0 |
@@ -191,7 +191,7 @@ docker compose up -d --build
 
 | 配置名称 | 类型 | 说明 |
 |---|---|---|
-| `deepseek-v4.1-flash` | 对话 | 入口智能体「小Z」与内置专家的模型槽位**已指向它** |
+| `deepseek-v4-flash-0731` | 对话 | 入口智能体「小Z」与内置专家的模型槽位**已指向它** |
 | `qwen3.7-text-embedding` | 向量 | 维度按 `1024` 预置，须与模型实际输出一致 |
 
 登录后进「模型配置」，把这两个模型（或你另行新建的模型）的 API Key 换成自己的密钥即可——**不补则对话与向量化不可用**。**两栈的模型配置在各栈自己的库里、互不相通，需分别补一次。**
