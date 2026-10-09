@@ -14,7 +14,7 @@ import java.util.Map;
 /**
  * 写工具「短期去重」装饰器（REQ-AI-30 安全护栏）。
  *
- * <p>包在业务写工具外层（**只有专家装配的写工具会被包**，见 {@code AgentRegistry#registerTools}），
+ * <p>包在业务写工具外层（**只有专家装配的写工具会被包**，见 {@code AgentAssembler#registerTools}），
  * 执行前先查 {@link AiWriteDedupStore}：同一专家会话内「工具名 + 入参」相同的写调用若已成功执行过，
  * 则**不再执行**，直接回填「已跳过重复执行」提示，让模型复用上一次的结果继续完成结论。</p>
  *

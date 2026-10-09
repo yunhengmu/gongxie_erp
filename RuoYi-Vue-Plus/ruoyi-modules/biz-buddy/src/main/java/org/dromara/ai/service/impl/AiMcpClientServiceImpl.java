@@ -51,7 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>装配链路<b>不走</b> {@code ToolsConfig.mcpServers}：框架的 {@code McpServerRegistrar} 会以远端
  * 自声明的工具名原样注册，而这类名字可能不满足 LLM function name 规范。改为由本服务
  * {@link #openClients(McpClientAssembly)} 构建「归一化名装饰」后的客户端，交给装配层自行注册
- * （见 {@code AgentRegistry#registerMcpClients}）；框架的 {@code ToolFilter} 会把不在
+ * （见 {@code AgentAssembler#registerMcpClients}）；框架的 {@code ToolFilter} 会把不在
  * {@code ToolsConfig.allow} 的工具裁掉，故本服务需要**先发现工具名**再交给装配层入白名单。</p>
  *
  * @author BizBuddy

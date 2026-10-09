@@ -3,24 +3,10 @@ package org.dromara.ai.core.agent;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.agentscope.core.model.Model;
-import io.agentscope.core.middleware.MiddlewareBase;
-import io.agentscope.core.permission.PermissionBehavior;
 import io.agentscope.core.permission.PermissionContextState;
-import io.agentscope.core.permission.PermissionRule;
-import io.agentscope.core.skill.SkillFilter;
-import io.agentscope.core.skill.repository.AgentSkillRepository;
-import io.agentscope.core.state.AgentStateStore;
-import io.agentscope.core.tool.AgentTool;
-import io.agentscope.core.tool.Toolkit;
-import io.agentscope.core.tool.mcp.McpClientWrapper;
 import io.agentscope.harness.agent.HarnessAgent;
-import io.agentscope.harness.agent.memory.MemoryConfig;
-import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
-import io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig;
-import io.agentscope.harness.agent.tools.ToolsConfig;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.agent.tools.GetCurrentDeptTool;
 import org.dromara.ai.core.agent.tools.GetCurrentPermissionsTool;
 import org.dromara.ai.core.agent.tools.GetCurrentTimeTool;
@@ -28,7 +14,6 @@ import org.dromara.ai.core.agent.tools.GetCurrentUserTool;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentKb;
 import org.dromara.ai.domain.AiAgentTool;
-import org.dromara.ai.domain.AiModelConfig;
 import org.dromara.ai.domain.AiScenarioPack;
 import org.dromara.ai.domain.AiSubagent;
 import org.dromara.ai.domain.AiTool;
@@ -47,17 +32,9 @@ import org.dromara.ai.service.IAiSkillService;
 import org.dromara.ai.service.IAiSubagentService;
 import org.dromara.ai.service.IAiToolService;
 import org.dromara.common.core.exception.ServiceException;
-import org.dromara.common.core.utils.StringUtils;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -130,18 +107,6 @@ public class AgentRegistry {
     static final String EXPERT_CACHE_SUFFIX = "__expert__";
 
     /**
-     * 子智能体编排与后台任务类**平台工具**（框架注册，不属于业务工具注册表）。
-     *
-     * <p>绑定子智能体时对这些工具追加 ALLOW 规则：它们只做「委派 / 收发任务 / 取结果」，
-     * 本身不产生业务副作用——真正的副作用工具留在主智能体与子智能体的业务工具侧，
-     * 且子智能体只能拿到只读工具。若不放行，委派动作会落入全局默认（未命中即 ASK），
-     * 每委派一次都要人工确认，子智能体能力实际不可用（已实测：agent_spawn 触发 HITL 暂停）。</p>
-     */
-    private static final List<String> SUBAGENT_COORDINATION_TOOLS = List.of(
-        "agent_spawn", "agent_send", "agent_list",
-        "task_output", "task_cancel", "task_list", "wait_async_results");
-
-    /**
      * 强制同步的子智能体调用超时（秒），覆盖模型自行给出的 timeout_seconds。
      *
      * <p>本平台是「一问一答」的流式会话，同步等待必须有上限，否则一次委派可能拖垮整个回答；
@@ -165,31 +130,6 @@ public class AgentRegistry {
         GetCurrentUserTool.TOOL_NAME,
         GetCurrentDeptTool.TOOL_NAME,
         GetCurrentPermissionsTool.TOOL_NAME);
-
-    /**
-     * 技能内置工具名（由框架 DynamicSkillMiddleware 注册，需显式放进 ToolsConfig 白名单，
-     * 否则会被 allow 名单裁掉）
-     */
-    private static final List<String> SKILL_BUILTIN_TOOLS = List.of("load_skill_through_path", "read_skill");
-
-    /**
-     * 专家「技能优先」纪律：装配期追加到专家提示词末尾，**不入库**。
-     *
-     * <p>为什么需要：专家装配本来就会注册 {@code load_skill_through_path} 并注入可用技能清单，
-     * 但领域专家的提示词通篇是数据维护口径，而技能清单是框架在 system prompt 末尾追加的、
-     * 位置靠后且没有强约束力，实测（2026-10-03，部门人数可视化）模型会直接用 Markdown 表格作答、
-     * 自始至终不加载技能。故在专家提示词正文末尾补一段纪律，把「命中技能必须先加载」讲死。</p>
-     */
-    private static final String EXPERT_SKILL_DISCIPLINE = """
-        【技能优先】
-        提示词末尾会列出你可用的技能清单。当用户诉求命中其中某个技能时（例如要求出图 / 画成图表 / 按某格式产出），
-        必须先调用 load_skill_through_path 加载该技能正文（path="SKILL.md"）读懂它的产出规格，再按正文要求用同一工具
-        加载参考资料；最后严格按技能规定的产出物交付。不要用自认为够用的形式（例如纯 Markdown 表格）代替技能的产出规格。""";
-
-    /**
-     * 外部 MCP 工具注册（含连接初始化）的超时上限：避免单个不可达的 Server 拖住整个智能体装配
-     */
-    private static final Duration MCP_REGISTER_TIMEOUT = Duration.ofSeconds(20);
 
     /**
      * 子智能体模型标识的前缀（{@code SubagentDeclaration.model} 只接受字符串，
@@ -239,25 +179,6 @@ public class AgentRegistry {
 
     private final IAiSubagentService subagentService;
 
-    private final AiToolFactory toolFactory;
-
-    private final AgentStateStore stateStore;
-
-    /**
-     * 技能仓库：本项目数据库来源（{@code public.ai_skill} / {@code ai_skill_resource}，只读）。
-     *
-     * <p>技能来源已收口为单一来源——平台只支持在本项目数据库维护技能，不再支持「项目全局目录」，
-     * 故本地直接持有仓库 Bean，不再经过来源配置的中转（见 {@code AgentScopeConfig#aiSkillRepository}）。</p>
-     */
-    private final AgentSkillRepository aiSkillRepository;
-
-    private final AiProperties aiProperties;
-
-    /**
-     * 专家写工具短期去重（REQ-AI-30 安全护栏）：只包装专家装配的写工具
-     */
-    private final AiWriteDedupStore writeDedupStore;
-
     private final AiPermissionModeStore permissionModeStore;
 
     private final AiRuntimeConfigStore runtimeConfigStore;
@@ -274,7 +195,7 @@ public class AgentRegistry {
     private final IAiSessionResourceService sessionResourceService;
 
     /**
-     * 模型构造工厂：按配置构造对话模型与生成参数、解析各可选模型槽位
+     * 模型构造工厂：按配置构造对话模型与生成参数、解析各可选模型槽位（供记忆模型解析取用）
      */
     private final AgentModelFactory modelFactory;
 
@@ -284,22 +205,10 @@ public class AgentRegistry {
     private final AgentFingerprintCalculator fingerprintCalculator;
 
     /**
-     * 装配快照工厂：构造执行期装配快照（REQ-AI-28 链路追踪）
+     * 智能体装配器：给定「定义 + 已解析的装配输入」装配 {@link HarnessAgent} 并生成执行期快照
+     * （REQ-AI-28 链路追踪）
      */
-    private final AgentSnapshotFactory snapshotFactory;
-
-    /**
-     * 子智能体装配支撑：生成声明并解析工具白名单（REQ-AI-04）
-     */
-    private final SubagentAssembler subagentAssembler;
-
-    /**
-     * 专家编排器（REQ-AI-30）：仅供构造 {@link RouteDecisionTool} 使用。
-     *
-     * <p>用 {@code @Lazy} 注入以打破「注册表 ↔ 编排器」的构造期循环依赖：
-     * 编排器装配专家要调 {@link #getExpert}，而注册表构造路由工具要拿编排器。</p>
-     */
-    private final AiRouteOrchestrator routeOrchestrator;
+    private final AgentAssembler assembler;
 
     /**
      * @param agentToolMapper    智能体工具关联 Mapper
@@ -307,58 +216,38 @@ public class AgentRegistry {
      * @param toolService        业务工具注册 Service
      * @param skillService       技能仓库 Service（绑定关系与启用状态）
      * @param subagentService    子智能体 Service（绑定关系与启用状态，REQ-AI-04）
-     * @param toolFactory        业务工具工厂（implName → AgentTool）
-     * @param stateStore         AgentScope 状态存储
-     * @param aiSkillRepository 技能仓库（本项目数据库，平台唯一技能来源）
-     * @param aiProperties       平台配置
      * @param permissionModeStore 全局权限模式
      * @param runtimeConfigStore  运行期策略配置（压缩 / 计划模式）
      * @param mcpClientService    外部 MCP 连接（REQ-AI-16）
      * @param sessionResourceService 会话级资源集（REQ-AI-32）
      * @param modelFactory        模型构造工厂
      * @param fingerprintCalculator 装配指纹计算器
-     * @param snapshotFactory     装配快照工厂
-     * @param subagentAssembler   子智能体装配支撑
-     * @param routeOrchestrator   专家编排器（REQ-AI-30，延迟注入以打破循环依赖）
+     * @param assembler           智能体装配器
      */
     public AgentRegistry(AiAgentToolMapper agentToolMapper,
                          AiAgentKbMapper agentKbMapper,
                          IAiToolService toolService,
                          IAiSkillService skillService,
                          IAiSubagentService subagentService,
-                         AiToolFactory toolFactory,
-                         @Qualifier("aiAgentStateStore") AgentStateStore stateStore,
-                         AgentSkillRepository aiSkillRepository,
-                         AiProperties aiProperties,
-                         AiWriteDedupStore writeDedupStore,
                          AiPermissionModeStore permissionModeStore,
                          AiRuntimeConfigStore runtimeConfigStore,
                          IAiMcpClientService mcpClientService,
                          IAiSessionResourceService sessionResourceService,
                          AgentModelFactory modelFactory,
                          AgentFingerprintCalculator fingerprintCalculator,
-                         AgentSnapshotFactory snapshotFactory,
-                         SubagentAssembler subagentAssembler,
-                         @Lazy AiRouteOrchestrator routeOrchestrator) {
+                         AgentAssembler assembler) {
         this.agentToolMapper = agentToolMapper;
         this.agentKbMapper = agentKbMapper;
         this.toolService = toolService;
         this.skillService = skillService;
         this.subagentService = subagentService;
-        this.toolFactory = toolFactory;
-        this.stateStore = stateStore;
-        this.aiSkillRepository = aiSkillRepository;
-        this.aiProperties = aiProperties;
-        this.writeDedupStore = writeDedupStore;
         this.permissionModeStore = permissionModeStore;
         this.runtimeConfigStore = runtimeConfigStore;
         this.mcpClientService = mcpClientService;
         this.sessionResourceService = sessionResourceService;
         this.modelFactory = modelFactory;
         this.fingerprintCalculator = fingerprintCalculator;
-        this.snapshotFactory = snapshotFactory;
-        this.subagentAssembler = subagentAssembler;
-        this.routeOrchestrator = routeOrchestrator;
+        this.assembler = assembler;
     }
 
     /**
@@ -443,7 +332,8 @@ public class AgentRegistry {
         AiSessionResourceSet res = resources == null ? AiSessionResourceSet.empty() : resources;
         List<AiAgentTool> bindings = queryBindings(definition.getId());
         // 合并决策「智能体绑定 → 包内 → 直接选中（越显式越优先）」后，被禁止的工具不注册进 Toolkit（模型不可见）
-        Map<String, String> merged = mergeToolDecisions(bindings, res.mergedToolDecisions());
+        Map<String, String> merged = AgentPermissionContextFactory.mergeToolDecisions(bindings,
+            res.mergedToolDecisions());
         List<String> allowedCodes = merged.entrySet().stream()
             .filter(entry -> !AiAgentTool.DECISION_DENY.equals(entry.getValue()))
             .map(Map.Entry::getKey)
@@ -510,8 +400,8 @@ public class AgentRegistry {
             if (exists != null) {
                 closeQuietly(exists.agent());
             }
-            AssembledAgent assembled = assemble(definition, enabledTools, kbIds, skillNames, bindings,
-                res, subagents, compactionPolicy, planPolicy, memoryPolicy,
+            AgentAssembler.AssembledAgent assembled = assembler.assemble(definition, enabledTools, kbIds, skillNames,
+                bindings, res, subagents, compactionPolicy, planPolicy, memoryPolicy,
                 workspacePolicy, mcpAssembly, expertMode);
             return new AgentHolder(definition.getId(), assembled.agent(), fingerprint, assembled.snapshot());
         });
@@ -538,7 +428,8 @@ public class AgentRegistry {
         Map<String, String> mcpDecisions = mcpClientService.resolveForAssembly(res.mergedMcpSelections())
             .toolDecisions();
         List<AiSubagent> subagents = subagentService.queryBoundEnabledSubagents(definition.getId());
-        return buildPermissionContext(bindings, res.packToolDecisions(), res.directToolDecisions(), mcpDecisions,
+        return AgentPermissionContextFactory.buildContext(permissionModeStore.resolve(), bindings,
+            res.packToolDecisions(), res.directToolDecisions(), mcpDecisions,
             !subagents.isEmpty(), definition.isEntry());
     }
 
@@ -577,7 +468,8 @@ public class AgentRegistry {
         AiSessionResourceSet res = resources == null ? AiSessionResourceSet.empty() : resources;
         Map<String, String> mcpDecisions = mcpClientService.resolveForAssembly(res.mergedMcpSelections())
             .toolDecisions();
-        return buildPermissionContext(queryBindings(definition.getId()), res.packToolDecisions(),
+        return AgentPermissionContextFactory.buildContext(permissionModeStore.resolve(),
+            queryBindings(definition.getId()), res.packToolDecisions(),
             res.directToolDecisions(), mcpDecisions,
             false, false);
     }
@@ -716,534 +608,6 @@ public class AgentRegistry {
     }
 
     /**
-     * 装配 HarnessAgent。
-     *
-     * @param definition   智能体定义
-     * @param enabledTools 启用中的业务工具实体（已剔除被禁止的工具；含资源集内叠加的工具）
-     * @param kbIds        绑定的知识库主键
-     * @param bindings     智能体侧工具绑定（含授权决策）
-     * @param resources    会话级资源集（REQ-AI-32；含包内与直接选中的工具 / 技能 / MCP 工具与档位）
-     * @param subagents    绑定的启用中子智能体（REQ-AI-04）
-     * @param compactionPolicy 上下文压缩策略
-     * @param planPolicy   计划模式与任务清单配置
-     * @param memoryPolicy 长期记忆配置
-     * @param workspacePolicy 工作区上下文配置
-     * @param mcpAssembly   外部 MCP 连接装配结果（REQ-AI-16；已按资源集收敛）
-     * @param expertMode    是否专家执行装配（子智能体已在外层关闭；专家直答后专家侧不注册任何协议工具）
-     * @return HarnessAgent 实例
-     */
-    private AssembledAgent assemble(AiAgent definition, List<AiTool> enabledTools, List<Long> kbIds,
-                                  List<String> skillNames, List<AiAgentTool> bindings,
-                                  AiSessionResourceSet resources, List<AiSubagent> subagents,
-                                  AiCompactionConfigBo compactionPolicy,
-                                  AiPlanConfigBo planPolicy, AiMemoryConfigBo memoryPolicy,
-                                  AiWorkspaceConfigBo workspacePolicy,
-                                  McpClientAssembly mcpAssembly, boolean expertMode) {
-        AiModelConfig modelConfig = modelFactory.resolveChatModel(definition.getModelId());
-        Model model = modelFactory.buildChatModel(modelConfig);
-        Toolkit toolkit = new Toolkit();
-        List<String> registeredCodes = new ArrayList<>(
-            registerTools(toolkit, enabledTools, kbIds, expertMode));
-        // 外部 MCP 工具（REQ-AI-16）注册进同一工具箱（仅资源集内的工具）
-        registerMcpClients(toolkit, mcpAssembly, definition);
-        // 编排协议工具（REQ-AI-30）：只对入口智能体注册
-        registeredCodes.addAll(registerProtocolTools(toolkit, definition));
-        // 子智能体可继承的工具池＝父级「实际注册成功的只读业务工具」；
-        // 写入类工具永不下放（子智能体不继承父级 allow / ask 规则，没有人工确认闸门，见 docs/00 第 42 项）
-        List<String> subagentToolPool = readOnlyRegisteredCodes(enabledTools, registeredCodes);
-        int maxIters = definition.getMaxIters() == null
-            ? aiProperties.getChat().getDefaultMaxIters() : definition.getMaxIters();
-        log.info("装配智能体：code={}, model={}, tools={}, kbIds={}, maxIters={}, decisions={}, "
-                + "resourceTools={}, mcpTools={}, resourceSig={}",
-            definition.getAgentCode(), modelConfig.getModelCode(), registeredCodes, kbIds, maxIters,
-            renderDecisions(mergeToolDecisions(bindings, resources.mergedToolDecisions())),
-            resources.mergedToolDecisions(), mcpAssembly.toolNames(), resources.signature());
-        HarnessAgent.Builder builder = HarnessAgent.builder()
-            .name(definition.getAgentCode())
-            .description(StringUtils.isBlank(definition.getDescription())
-                ? definition.getAgentName() : definition.getDescription())
-            .sysPrompt(resolveSysPrompt(definition, skillNames, expertMode))
-            .model(model)
-            .toolkit(toolkit)
-            .stateStore(stateStore)
-            .workspace(resolveWorkspace(definition.getAgentCode()))
-            .maxIters(maxIters)
-            .toolsConfig(buildToolsConfig(registeredCodes, skillNames, mcpAssembly))
-            // 工具授权：按「智能体 × 工具」「场景包 × 工具」与「会话直接选中」的合并决策生成 allow / ask / deny 规则
-            //（越显式越优先：直接选中 > 包内 > 智能体绑定；写工具走 ask → HITL 确认）
-            .permissionContext(buildPermissionContext(bindings, resources.packToolDecisions(),
-                resources.directToolDecisions(), mcpAssembly.toolDecisions(),
-                !subagents.isEmpty(), definition.isEntry()))
-            // 当前时间注入：平台级中间件，所有智能体自动生效；每轮现算，改开关/时区无需重建
-            .middlewares(buildMiddlewares(definition));
-        if (subagents.isEmpty()) {
-            // 未绑定子智能体：与既往行为完全一致（不注册 agent_spawn 等协调工具）
-            builder.disableSubagents();
-        } else {
-            // 绑定子智能体（REQ-AI-04）：生成声明并注入模型解析器
-            // （声明的 model 只能是字符串，由 modelResolver 还原为模型实例；解析失败由框架回退主模型）
-            builder.subagents(subagentAssembler.buildSubagentDeclarations(subagents, definition, subagentToolPool))
-                .modelResolver(modelFactory::resolveSubagentModel);
-            log.info("子智能体装配：agent={}, 声明={}", definition.getAgentCode(),
-                subagents.stream().map(AiSubagent::getName).toList());
-        }
-        // 上下文压缩（REQ-AI-21）与计划模式 / 任务清单（REQ-AI-22）按运行期策略装配
-        applyCompaction(builder, definition, compactionPolicy);
-        applyPlanMode(builder, planPolicy);
-        // 长期记忆（REQ-AI-09）按运行期策略装配
-        applyMemory(builder, definition, memoryPolicy);
-        // 工作区上下文（REQ-AI-08）：AGENTS.md 由框架固定注入，附加上下文文件按运行期清单逐个加入
-        applyWorkspaceContext(builder, workspacePolicy);
-        log.info("运行期策略：agent={}, compaction={}(triggerMessages={}, triggerTokens={}, keepMessages={}, "
-                + "flush={}, offload={}), toolResultEviction={}({}/{}), planMode={}(dir={}), "
-                + "taskList={}, memory={}(maxContextTokens={}, consolidation={} tokens/{} 分钟, retention={}/{} 天, "
-                + "flush={}), workspace={}(additionalFiles={})",
-            definition.getAgentCode(), compactionPolicy.isEnabled(), compactionPolicy.getTriggerMessages(),
-            compactionPolicy.getTriggerTokens(), compactionPolicy.getKeepMessages(),
-            compactionPolicy.isFlushBeforeCompact(), compactionPolicy.isOffloadBeforeCompact(),
-            compactionPolicy.isToolResultEvictionEnabled(), compactionPolicy.getToolResultEvictionMaxChars(),
-            compactionPolicy.getToolResultEvictionPreviewChars(), planPolicy.isEnabled(),
-            planPolicy.getPlanFileDirectory(), planPolicy.isTaskListEnabled(),
-            memoryPolicy.isEnabled(), memoryPolicy.getMaxContextTokens(), memoryPolicy.getConsolidationMaxTokens(),
-            memoryPolicy.getConsolidationMinGapMinutes(), memoryPolicy.getDailyFileRetentionDays(),
-            memoryPolicy.getSessionRetentionDays(), memoryPolicy.getFlushMode(), workspacePolicy.isEnabled(),
-            workspacePolicy.getAdditionalContextFiles());
-        log.info("当前时间注入：agent={}, enabled={}, zone={}", definition.getAgentCode(),
-            aiProperties.getChat().isCurrentTimeEnabled(), aiProperties.getChat().getCurrentTimeZone());
-        HarnessAgent.Builder tail = builder
-            // 记忆工具（memory_search / memory_get / memory_save / session_search）不注册，
-            // 记忆仅以「MEMORY.md 注入 + 自动抽取 + 自动合并」方式工作，保持工具集最小化
-            .disableMemoryTools();
-        if (skillNames.isEmpty()) {
-            // 未绑定技能且无资源集技能：不注册技能内置工具、不注入技能清单（与既往行为一致）
-            tail = tail.disableDynamicSkills();
-        } else {
-            // 有技能：接入本项目数据库技能仓库（平台只此一个来源，事务见 AgentScopeConfig#aiSkillRepository），
-            // 并以白名单仅放行「绑定且启用中」的技能；
-            // 提问用户维度的生效范围在运行期由 SkillFilter 覆盖（见 AiRouteSupport#runtimeSkillFilter）
-            tail = tail.skillRepositories(List.of(aiSkillRepository))
-                .skillFilter(SkillFilter.only(skillNames.toArray(new String[0])));
-        }
-        // 技能一律来自本项目数据库：关闭框架默认的工作区（文件系统）技能来源
-        tail = tail.disableDefaultWorkspaceSkills();
-        // 平台无沙箱：智能体只能调用登记在册的业务工具，禁用内置文件、命令与 Web 工具。
-        // 内置 Web 工具（web_fetch / web_search）默认注册并可直接出网，绕过「无裸 HTTP、工具最小化、
-        // 全链路审计」的平台纪律，故一并关闭；确需联网能力时应改造为受控工具后再登记。
-        tail = tail.disableFilesystemTools().disableShellTool().disableWebTools();
-        if (!memoryPolicy.isEnabled()) {
-            // 关闭记忆：停掉记忆 hooks（抽取 / 合并 / 后台维护）。
-            // 记忆工具恒定关闭（disableMemoryTools），二者同时关闭后中间件即不再注入 <memory_context>，
-            // 故无需连带 disableWorkspaceContext —— 否则会把 AGENTS.md 等定义类文件一并关掉（REQ-AI-08）。
-            tail = tail.disableMemoryHooks();
-        }
-        if (!memoryPolicy.isEnabled() && !workspacePolicy.isEnabled()) {
-            // 记忆与工作区上下文均关闭时，才彻底停掉 system prompt 的工作区段落注入
-            tail = tail.disableWorkspaceContext();
-        }
-        HarnessAgent agent = tail.build();
-        log.info("智能体装配完成：code={}, 生效工具={}", definition.getAgentCode(), agent.getToolkit().getToolNames());
-        AgentSnapshot snapshot = snapshotFactory.buildSnapshot(definition, modelConfig, registeredCodes, kbIds,
-            skillNames, subagents, bindings, compactionPolicy, planPolicy, memoryPolicy,
-            workspacePolicy, mcpAssembly, maxIters);
-        return new AssembledAgent(agent, snapshot);
-    }
-
-    /**
-     * 构造智能体的系统提示词。
-     *
-     * <p>专家执行装配且装配了技能时，在库中提示词正文之后追加一段平台级「技能优先」纪律
-     * （{@link #EXPERT_SKILL_DISCIPLINE}）；其余场景原样返回库中提示词。
-     * 追加物只作用于装配产物、不回写数据库，故定义页看到的仍是管理员维护的原文。</p>
-     *
-     * @param definition 智能体定义
-     * @param skillNames 生效技能过滤键（为空表示未装配技能，纪律无意义）
-     * @param expertMode 是否专家执行装配
-     * @return 实际下发给模型的系统提示词
-     */
-    private String resolveSysPrompt(AiAgent definition, List<String> skillNames, boolean expertMode) {
-        String base = definition.getSysPrompt() == null ? "" : definition.getSysPrompt();
-        if (!expertMode || skillNames.isEmpty()) {
-            return base;
-        }
-        return base + "\n\n" + EXPERT_SKILL_DISCIPLINE;
-    }
-
-    /**
-     * 装配长期记忆（REQ-AI-09）。
-     *
-     * <p>记忆按用户隔离（AgentScope 默认 {@code IsolationScope.USER}），文件位于智能体工作区下：
-     * {@code MEMORY.md} 为合并后的长期记忆，{@code memory/YYYY-MM-DD.md} 为当日事实流水（只追加）。</p>
-     *
-     * <p>抽取与合并模型取智能体定义的「记忆抽取与合并模型」槽位（REQ-AI-06）；
-     * 未配置或已失效时回退主模型。</p>
-     *
-     * @param builder    智能体构建器
-     * @param definition 智能体定义
-     * @param policy     长期记忆配置
-     */
-    private void applyMemory(HarnessAgent.Builder builder, AiAgent definition, AiMemoryConfigBo policy) {
-        if (!policy.isEnabled()) {
-            return;
-        }
-        MemoryConfig.Builder memory = MemoryConfig.builder()
-            .consolidationMaxTokens(policy.getConsolidationMaxTokens())
-            .consolidationMinGap(Duration.ofMinutes(policy.getConsolidationMinGapMinutes()))
-            .dailyFileRetentionDays(policy.getDailyFileRetentionDays())
-            .sessionRetentionDays(policy.getSessionRetentionDays())
-            .flushTrigger(resolveFlushTrigger(policy));
-        Model memoryModel = modelFactory.resolveMemoryModel(definition);
-        if (memoryModel != null) {
-            memory.model(memoryModel);
-        }
-        builder.memory(memory.build());
-        builder.maxContextTokens(policy.getMaxContextTokens());
-    }
-
-    /**
-     * 装配工作区上下文（REQ-AI-08）。
-     *
-     * <p>人格与行为约定文件 {@code AGENTS.md} 由框架的 {@code WorkspaceContextMiddleware} 固定读入，
-     * 本方法只负责按运行期清单追加「附加上下文文件」（全文注入 system prompt）。
-     * 两类文件均走框架两层读：工作区根为共享默认，用户目录（{@code <userId>/}）为按用户覆盖，
-     * 由 {@code RuntimeContext.userId} 驱动，无需应用层自行拼路径。</p>
-     *
-     * <p>关闭本开关时不再注册附加文件；工作区段落的彻底关闭由 {@link #assemble} 统一按
-     * 「工作区开关 与 记忆开关 同时关闭」判定。</p>
-     *
-     * @param builder 智能体构建器
-     * @param policy  工作区上下文配置
-     */
-    private void applyWorkspaceContext(HarnessAgent.Builder builder, AiWorkspaceConfigBo policy) {
-        if (!policy.isEnabled() || policy.getAdditionalContextFiles() == null) {
-            return;
-        }
-        for (String file : policy.getAdditionalContextFiles()) {
-            if (file != null && !file.isBlank()) {
-                builder.additionalContextFile(file);
-            }
-        }
-    }
-
-    /**
-     * 解析事实抽取触发策略。
-     *
-     * @param policy 长期记忆配置
-     * @return AgentScope 触发策略
-     */
-    private MemoryConfig.FlushTrigger resolveFlushTrigger(AiMemoryConfigBo policy) {
-        return switch (policy.getFlushMode()) {
-            case "never" -> MemoryConfig.FlushTrigger.never();
-            case "throttled" ->
-                MemoryConfig.FlushTrigger.throttled(Duration.ofMinutes(policy.getFlushThrottleMinutes()));
-            default -> MemoryConfig.FlushTrigger.always();
-        };
-    }
-
-    /**
-     * 装配上下文压缩与大工具结果卸载（REQ-AI-21）。
-     *
-     * <p>压缩摘要模型取智能体定义的「压缩摘要模型」槽位（REQ-AI-06）；未配置或已失效时回退主模型。</p>
-     *
-     * @param builder       智能体构建器
-     * @param definition    智能体定义
-     * @param policy        压缩策略
-     */
-    private void applyCompaction(HarnessAgent.Builder builder, AiAgent definition,
-                                 AiCompactionConfigBo policy) {
-        if (!policy.isEnabled()) {
-            builder.disableCompaction();
-        } else {
-            CompactionConfig.Builder compaction = CompactionConfig.builder()
-                .triggerMessages(policy.getTriggerMessages())
-                .triggerTokens(policy.getTriggerTokens())
-                .keepMessages(policy.getKeepMessages())
-                .flushBeforeCompact(policy.isFlushBeforeCompact())
-                .offloadBeforeCompact(policy.isOffloadBeforeCompact());
-            Model summaryModel = modelFactory.resolveSummaryModel(definition);
-            if (summaryModel != null) {
-                compaction.model(summaryModel);
-            }
-            builder.compaction(compaction.build());
-        }
-        if (!policy.isToolResultEvictionEnabled()) {
-            builder.disableToolResultEviction();
-        } else {
-            builder.toolResultEviction(ToolResultEvictionConfig.builder()
-                .maxResultChars(policy.getToolResultEvictionMaxChars())
-                .previewChars(policy.getToolResultEvictionPreviewChars())
-                .build());
-        }
-    }
-
-    /**
-     * 装配计划模式与任务清单（REQ-AI-22）。
-     *
-     * @param builder 智能体构建器
-     * @param policy  计划模式配置
-     */
-    private void applyPlanMode(HarnessAgent.Builder builder, AiPlanConfigBo policy) {
-        if (policy.isEnabled()) {
-            builder.enablePlanMode(true);
-            if (StringUtils.isNotBlank(policy.getPlanFileDirectory())) {
-                builder.planFileDirectory(policy.getPlanFileDirectory());
-            }
-        }
-        if (policy.isTaskListEnabled()) {
-            builder.enableTaskList(true);
-        }
-    }
-
-    /**
-     * 取「父级实际注册成功的只读业务工具」编码，作为子智能体可继承的工具池。
-     *
-     * <p>写入类工具（{@code ai_tool.tool_type = '1'}）永不下放：框架不为子智能体继承父级的
-     * allow / ask 权限规则（仅继承 deny），子智能体内没有人工确认闸门，一旦下放即绕过确认直接执行。</p>
-     *
-     * @param enabledTools   启用中的业务工具实体
-     * @param registeredCodes 实际注册成功的工具编码
-     * @return 只读工具编码集合（保持注册顺序）
-     */
-    private List<String> readOnlyRegisteredCodes(List<AiTool> enabledTools, List<String> registeredCodes) {
-        List<String> result = new ArrayList<>();
-        for (AiTool tool : enabledTools) {
-            if (AiTool.TYPE_READ_ONLY.equals(tool.getToolType())
-                && registeredCodes.contains(tool.getToolCode())) {
-                result.add(tool.getToolCode());
-            }
-        }
-        return result;
-    }
-
-    /**
-     * 把外部 MCP 客户端注册进工具箱（REQ-AI-16），工具名已由服务层归一化。
-     *
-     * <p><b>为何自行注册而不交给 {@code ToolsConfig.mcpServers}</b>：框架的 {@code McpServerRegistrar}
-     * 会以远端自声明的工具名原样注册（{@code McpClientManager} 直接用 {@code McpSchema.Tool.name()} 构造
-     * {@code McpTool}），而这类名字可能不满足 LLM function name 规范（如 {@code weather.search_local}），
-     * 在严格校验的模型上会整轮 400。这里改为注册「归一化名装饰后」的客户端：注册方式与框架
-     * {@code McpServerRegistrar} 内部完全一致（{@code McpClientManager.registerMcpClient(...).block()}），
-     * 且发生在 {@code HarnessAgent.build()} 之前，故仍受 {@code ToolFilter} 的 allow 名单管辖。</p>
-     *
-     * <p>单个 Server 失败不影响其余工具：失败时由本方法关闭该客户端（框架 {@code McpClientManager}
-     * 不负责关闭），装配继续。</p>
-     *
-     * @param toolkit     工具箱
-     * @param mcpAssembly MCP 装配结果
-     * @param definition  智能体定义（仅用于日志）
-     */
-    private void registerMcpClients(Toolkit toolkit, McpClientAssembly mcpAssembly, AiAgent definition) {
-        Map<String, McpClientWrapper> clients = mcpClientService.openClients(mcpAssembly);
-        if (clients.isEmpty()) {
-            return;
-        }
-        List<String> registered = new ArrayList<>(clients.size());
-        for (Map.Entry<String, McpClientWrapper> entry : clients.entrySet()) {
-            try {
-                // block 与框架一致：装配必须同步完成，否则工具箱里还没有工具就开始构建 Agent
-                toolkit.registerMcpClient(entry.getValue()).block(MCP_REGISTER_TIMEOUT);
-                registered.add(entry.getKey());
-            } catch (Exception e) {
-                closeQuietly(entry.getValue());
-                log.warn("外部 MCP 工具接入失败，该 Server 本轮不接入：agent={}, server={}, 原因={}",
-                    definition.getAgentCode(), entry.getKey(), e.getMessage());
-            }
-        }
-        if (!registered.isEmpty()) {
-            log.info("外部 MCP 工具接入：agent={}, servers={}, tools={}",
-                definition.getAgentCode(), registered, mcpAssembly.toolNames());
-        }
-    }
-
-    /**
-     * 按注册表装配业务工具，返回实际生效的工具编码。
-     *
-     * <p>写入类工具同样注册（其执行由「智能体 × 工具」的授权决策控制：命中 ask 时由 AgentScope
-     * 框架原生 HITL 暂停并等待人工确认，允许时直接执行）；仅当实现未在代码侧登记时跳过。</p>
-     *
-     * @param toolkit      工具容器
-     * @param enabledTools 启用中的业务工具实体
-     * @param kbIds        智能体绑定的知识库主键
-     * @param dedupWrites  是否为专家装配（为写工具包一层「同专家会话短期去重」，见 {@link DedupWriteTool}）
-     * @return 实际生效的工具编码
-     */
-    private List<String> registerTools(Toolkit toolkit, List<AiTool> enabledTools, List<Long> kbIds,
-                                       boolean dedupWrites) {
-        if (enabledTools.isEmpty()) {
-            return List.of();
-        }
-        List<String> registered = new ArrayList<>();
-        for (AiTool definition : enabledTools) {
-            toolFactory.create(definition, kbIds).ifPresent(tool -> {
-                // 专家链路的写工具包一层「同专家会话短期去重」（REQ-AI-30 安全护栏）：
-                // 契约校验不合格重试、或 HITL 恢复段续跑时，模型若重复调用同一写工具
-                // （同 sessionId + 同工具名 + 同入参），不会产生重复副作用（如重复发布公告）。
-                // 入口 / 普通智能体为长期会话，不包装（避免误伤「同一会话再执行一次同样操作」）
-                AgentTool effective = dedupWrites && !tool.isReadOnly()
-                    ? new DedupWriteTool(tool, writeDedupStore) : tool;
-                toolkit.registerAgentTool(effective);
-                registered.add(definition.getToolCode());
-            });
-        }
-        return registered;
-    }
-
-    /**
-     * 构建工具权限上下文：显式决策翻译为 allow / ask / deny 规则，未命中时按全局模式兜底。
-     *
-     * <p>决策来源有四处（REQ-AI-32 新增第 ④）：① 智能体 × 工具（{@code ai_agent_tool.decision}）；
-     * ② 场景包 × 业务工具（{@code ai_scenario_pack_tool.decision}）；③ 场景包 × MCP 工具
-     * （{@code ai_scenario_pack_mcp_tool.decision}，键为**归一化后**的工具名）；④ **会话级资源选择器**
-     * 直接选中的工具（来源 {@code session}，档位取选中时的默认：只读 → 允许 / 写入 → 需确认）。
-     * 优先级**越显式越优先**：直接选中 &gt; 包内 &gt; 智能体绑定。</p>
-     *
-     * <p><b>此处刻意不含「记住该工具」的用户级信任决策</b>：装配实例是智能体级、跨用户共享的，
-     * 若把某个用户的信任写进共享上下文会让其他用户也被免确认；用户级信任由对话链路每轮按提问用户
-     * 并入该 {@code (userId, sessionId)} 槽位的权限上下文（见 {@link AiTrustApplier}）。</p>
-     *
-     * @param bindings      智能体侧工具绑定（含授权决策）
-     * @param packToolDecisions 场景包内业务工具的授权决策（可为空；多包时后者覆盖前者）
-     * @param sessionToolDecisions 会话直接选中的业务工具决策（可为空；覆盖绑定与包内）
-     * @param mcpDecisions  资源集内 MCP 工具的授权决策（归一化名 → 决策，可为空）
-     * @param subagentsEnabled 是否绑定了启用中的子智能体（决定是否放行编排类平台工具）
-     * @param entryAgent    是否入口智能体（决定是否放行 {@code route_decision}）
-     * @return 权限上下文
-     */
-    private PermissionContextState buildPermissionContext(List<AiAgentTool> bindings,
-                                                          Map<String, String> packToolDecisions,
-                                                          Map<String, String> sessionToolDecisions,
-                                                          Map<String, String> mcpDecisions,
-                                                          boolean subagentsEnabled,
-                                                          boolean entryAgent) {
-        Map<String, String> sessionDecisions = sessionToolDecisions == null ? Map.of() : sessionToolDecisions;
-        PermissionContextState.Builder builder = PermissionContextState.builder()
-            .mode(permissionModeStore.resolve());
-        for (AiAgentTool bind : bindings) {
-            // 同一工具被包内或会话直接选中显式覆盖时，以更显式者为准（不再生成智能体侧规则）
-            if (packToolDecisions.containsKey(bind.getToolCode())
-                || sessionDecisions.containsKey(bind.getToolCode())) {
-                continue;
-            }
-            addRule(builder, bind.getToolCode(), bind.getDecision(), SOURCE_AGENT_TOOL);
-        }
-        for (Map.Entry<String, String> entry : packToolDecisions.entrySet()) {
-            // 直接选中优先于包内
-            if (sessionDecisions.containsKey(entry.getKey())) {
-                continue;
-            }
-            addRule(builder, entry.getKey(), entry.getValue(), SOURCE_PACK);
-        }
-        for (Map.Entry<String, String> entry : sessionDecisions.entrySet()) {
-            // 会话级资源选择器：直接选中，优先级最高
-            addRule(builder, entry.getKey(), entry.getValue(), SOURCE_SESSION);
-        }
-        for (Map.Entry<String, String> entry : mcpDecisions.entrySet()) {
-            addRule(builder, entry.getKey(), entry.getValue(), SOURCE_PACK);
-        }
-        for (String code : BUILTIN_READONLY_TOOL_CODES) {
-            // 平台内置无害只读工具：未绑定时默认放行，避免落入全局模式（默认 DEFAULT＝未命中即 ASK）
-            // 而对「看时间」这类无副作用操作弹确认卡片；已显式绑定的不覆盖其决策（含包内 / 直接选中决策）
-            boolean bound = bindings.stream().anyMatch(bind -> code.equals(bind.getToolCode()))
-                || packToolDecisions.containsKey(code) || sessionDecisions.containsKey(code)
-                || mcpDecisions.containsKey(code);
-            if (!bound) {
-                builder.addAllowRule(code, new PermissionRule(code, null, PermissionBehavior.ALLOW, SOURCE_BUILTIN));
-            }
-        }
-        if (subagentsEnabled) {
-            // 子智能体编排 / 后台任务类平台工具默认放行，否则每次委派都会弹人工确认（REQ-AI-04）
-            for (String tool : SUBAGENT_COORDINATION_TOOLS) {
-                builder.addAllowRule(tool, new PermissionRule(tool, null, PermissionBehavior.ALLOW, SOURCE_SUBAGENT));
-            }
-        }
-        // 专家直答修订（2026-10-03）：专家侧不再有 submit_expert_result 协议工具（其回复直接交付用户），
-        // 故此处只为入口侧的 route_decision 放行
-        if (entryAgent) {
-            builder.addAllowRule(RouteDecisionTool.TOOL_NAME, new PermissionRule(
-                RouteDecisionTool.TOOL_NAME, null, PermissionBehavior.ALLOW, SOURCE_ROUTE));
-        }
-        return builder.build();
-    }
-
-    /**
-     * 装配平台级中间件列表。
-     *
-     * <p>「当前时间」对所有智能体生效；「本轮候选专家清单」只对入口智能体生效
-     * （清单每轮现算，故不进装配指纹）。</p>
-     *
-     * @param definition 智能体定义
-     * @return 中间件列表
-     */
-    private List<MiddlewareBase> buildMiddlewares(AiAgent definition) {
-        List<MiddlewareBase> middlewares = new ArrayList<>();
-        middlewares.add(new CurrentTimeMiddleware(aiProperties));
-        if (definition.isEntry()) {
-            middlewares.add(new ExpertRosterMiddleware());
-            // 继承槽位（REQ-AI-31）：仅入口智能体注入；槽位由门面每轮合并后放入运行期上下文，不进装配指纹
-            middlewares.add(new SlotInheritanceMiddleware());
-        }
-        return middlewares;
-    }
-
-    /**
-     * 注册编排协议工具（REQ-AI-30）：**只对入口智能体注册**。
-     *
-     * <p><b>为什么不放进 {@code BUILTIN_READONLY_TOOL_CODES}</b>：那个集合的语义是
-     * 「免绑定 + 默认放行给所有智能体」。把 {@code route_decision} 放进去会让专家等非入口智能体
-     * 也看到并可能调用它，徒增误触发面。</p>
-     *
-     * <p>专家侧**不注册任何协议工具**：专家直答（2026-10-03）后结论直接交付用户，
-     * 原有的结构化提交工具 {@code submit_expert_result} 已整体删除。</p>
-     *
-     * @param toolkit    工具箱
-     * @param definition 智能体定义
-     * @return 实际注册的协议工具名
-     */
-    private List<String> registerProtocolTools(Toolkit toolkit, AiAgent definition) {
-        if (definition.isEntry()) {
-            toolkit.registerAgentTool(new RouteDecisionTool(routeOrchestrator));
-            return List.of(RouteDecisionTool.TOOL_NAME);
-        }
-        return List.of();
-    }
-
-    /**
-     * 按三档决策追加权限规则（0 允许 / 1 需确认 / 2 禁止；其余值按「允许」兜底）。
-     *
-     * @param builder  权限上下文构建器
-     * @param tool     工具名 / 工具编码
-     * @param decision 决策值
-     * @param source   规则来源标识
-     */
-    private void addRule(PermissionContextState.Builder builder, String tool, String decision, String source) {
-        if (AiAgentTool.DECISION_ASK.equals(decision)) {
-            builder.addAskRule(tool, new PermissionRule(tool, null, PermissionBehavior.ASK, source));
-        } else if (AiAgentTool.DECISION_DENY.equals(decision)) {
-            builder.addDenyRule(tool, new PermissionRule(tool, null, PermissionBehavior.DENY, source));
-        } else {
-            builder.addAllowRule(tool, new PermissionRule(tool, null, PermissionBehavior.ALLOW, source));
-        }
-    }
-
-    /**
-     * 合并「智能体绑定」与「包内工具」的授权决策：同一工具**以包内决策优先**。
-     *
-     * @param bindings          智能体侧工具绑定
-     * @param packToolDecisions 包内工具决策（工具编码 → 决策）
-     * @return 合并后的决策（保持「智能体在前、包内覆盖」的顺序）
-     */
-    private Map<String, String> mergeToolDecisions(List<AiAgentTool> bindings,
-                                                   Map<String, String> packToolDecisions) {
-        Map<String, String> merged = new LinkedHashMap<>();
-        for (AiAgentTool bind : bindings) {
-            merged.put(bind.getToolCode(), bind.getDecision());
-        }
-        if (packToolDecisions != null) {
-            merged.putAll(packToolDecisions);
-        }
-        return merged;
-    }
-
-    /**
      * 生成装配缓存键（REQ-AI-32）：{@code agentId#R:<sig>} 或 {@code agentId#__expert__#R:<sig>}。
      *
      * <p>{@code sig} 是会话资源集的**身份签名**（排序后的 type:key 列表 → SHA-256 前 8 字节）：
@@ -1259,74 +623,6 @@ public class AgentRegistry {
         return expertMode
             ? agentId + "#" + EXPERT_CACHE_SUFFIX + "#R:" + sig
             : agentId + "#R:" + sig;
-    }
-
-    /**
-     * 渲染工具决策（仅用于日志）。
-     *
-     * @param decisions 工具编码 → 决策
-     * @return 形如 code=decision 的字符串
-     */
-    private String renderDecisions(Map<String, String> decisions) {
-        StringBuilder sb = new StringBuilder();
-        decisions.forEach((code, decision) -> {
-            if (!sb.isEmpty()) {
-                sb.append(',');
-            }
-            sb.append(code).append('=').append(decision);
-        });
-        return sb.toString();
-    }
-
-    /**
-     * 构建工具白名单。
-     *
-     * <p>HarnessAgent 的默认工具箱会附带联网检索、文件读写、命令执行等内置工具，
-     * 这里通过白名单（非平台工具一律移除）+ 显式黑名单（联网检索）双重收敛：
-     * 平台无沙箱，只放行业务侧登记的工具（框架内置的文件与命令工具在装配处统一禁用）。</p>
-     *
-     * @param registeredCodes 实际生效的业务工具编码
-     * @param skillNames      绑定且启用中的技能标识（非空时放行技能内置工具）
-     * @param mcpAssembly     外部 MCP 连接装配结果（工具名已归一化，需显式放行；
-     *                        连接注册由 {@link #registerMcpClients} 完成，不经 {@code mcpServers}）
-     * @return 工具过滤配置
-     */
-    private ToolsConfig buildToolsConfig(List<String> registeredCodes,
-                                        List<String> skillNames, McpClientAssembly mcpAssembly) {
-        List<String> allow = new ArrayList<>(registeredCodes);
-        if (!skillNames.isEmpty()) {
-            // 技能内置工具由框架 DynamicSkillMiddleware 注册，必须显式放行，否则会被 allow 名单裁掉
-            allow.addAll(SKILL_BUILTIN_TOOLS);
-        }
-        if (!mcpAssembly.toolNames().isEmpty()) {
-            // 外部 MCP 工具由本类自行注册进工具箱（registerMcpClients），工具名已归一化；
-            // 与技能工具同款：必须显式放行，否则会被 ToolFilter 按 allow 名单裁掉
-            allow.addAll(mcpAssembly.toolNames());
-        }
-        ToolsConfig config = new ToolsConfig();
-        config.setAllow(allow);
-        config.setDeny(List.of("web_search", "web_fetch"));
-        return config;
-    }
-
-    /**
-     * 解析智能体工作区目录（不存在则创建）。
-     *
-     * @param agentCode 智能体编码
-     * @return 工作区路径
-     */
-    private Path resolveWorkspace(String agentCode) {
-        // 必须绝对化并规范化：框架 WorkspaceManager.readManagedWorkspaceFileUtf8 以 startsWith(workspace)
-        // 做越界校验，若工作区为「./data/...」这类相对路径（含 "." 段），规范化后的文件路径不再满足
-        // startsWith，导致附加上下文文件一律读为空（见 docs/00 第 39 项）
-        Path workspace = Path.of(aiProperties.getChat().getWorkspaceRoot(), agentCode)
-            .toAbsolutePath().normalize();
-        try {
-            Files.createDirectories(workspace);
-        } catch (IOException e) {
-            throw new ServiceException("智能体工作区目录创建失败：" + workspace);
-        }
-        return workspace;
     }
 
     /**
@@ -1369,19 +665,6 @@ public class AgentRegistry {
     }
 
     /**
-     * 静默关闭 MCP 客户端（仅用于注册失败时的清理：此时连接尚未交给工具箱，须由调用方负责关闭）。
-     *
-     * @param client MCP 客户端
-     */
-    private void closeQuietly(McpClientWrapper client) {
-        try {
-            client.close();
-        } catch (Exception e) {
-            log.warn("关闭 MCP 客户端失败：{}", e.getMessage());
-        }
-    }
-
-    /**
      * 装配缓存项。
      *
      * @param agentId     所属智能体主键（供按智能体整体失效缓存）
@@ -1390,15 +673,6 @@ public class AgentRegistry {
      * @param snapshot    该次装配的执行期快照
      */
     private record AgentHolder(Long agentId, HarnessAgent agent, String fingerprint, AgentSnapshot snapshot) {
-    }
-
-    /**
-     * 装配结果：智能体实例 + 该次装配的执行期快照（REQ-AI-28 链路追踪取用）
-     *
-     * @param agent    智能体实例
-     * @param snapshot 装配快照（模型版本 + 上下文清单）
-     */
-    private record AssembledAgent(HarnessAgent agent, AgentSnapshot snapshot) {
     }
 
 }
