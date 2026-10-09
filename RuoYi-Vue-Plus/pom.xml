@@ -24,7 +24,7 @@
         <spring-boot-admin.version>4.1.2</spring-boot-admin.version>
         <springdoc.version>3.1.1</springdoc.version>
 
-        <!-- MCP 官方 Java SDK 版本：与 AgentScope 2.0.3 传递的版本保持一致（移除 spring-ai 后统一到 0.17.2） -->
+        <!-- MCP 官方 Java SDK 版本：与 AgentScope 2.0.4 传递的版本保持一致（移除 spring-ai 后统一到 0.17.2） -->
         <mcp-sdk.version>0.17.2</mcp-sdk.version>
 
         <!-- 数据访问与持久化相关依赖版本 -->
@@ -47,8 +47,8 @@
         <snailjob.version>2.0.2</snailjob.version>
 
         <!-- 智能体内核：AgentScope Harness（详见 docs/agentscope/07 与 docs/11） -->
-        <agentscope.version>2.0.3</agentscope.version>
-        <!-- victools JSON Schema：AgentScope core 2.0.3 依赖 4.38.0（其工具参数 schema 生成走该版本 API）。
+        <agentscope.version>2.0.4</agentscope.version>
+        <!-- victools JSON Schema：AgentScope core 2.0.4 依赖 4.38.0（其工具参数 schema 生成走该版本 API）。
              已移除 spring-ai，不再有与 5.x 的版本冲突；此处显式钉版以固定行为、避免后续被其它依赖抬版。 -->
         <victools.version>4.38.0</victools.version>
 
@@ -311,7 +311,7 @@
                 <artifactId>agentscope-extensions-redis</artifactId>
                 <version>${agentscope.version}</version>
             </dependency>
-            <!-- AgentScope RAG：已用 MilvusStore 做知识库向量存储与检索，其余传递依赖在 ruoyi-ai 中排除 -->
+            <!-- AgentScope RAG：已用 MilvusStore 做知识库向量存储与检索，其余传递依赖在 biz-buddy 中排除 -->
             <dependency>
                 <groupId>io.agentscope</groupId>
                 <artifactId>agentscope-extensions-rag-simple</artifactId>
@@ -495,10 +495,10 @@
                 <version>${revision}</version>
             </dependency>
 
-            <!-- AI业务模块 -->
+            <!-- BizBuddy AI 能力模块 -->
             <dependency>
                 <groupId>org.dromara</groupId>
-                <artifactId>ruoyi-ai</artifactId>
+                <artifactId>biz-buddy</artifactId>
                 <version>${revision}</version>
             </dependency>
 

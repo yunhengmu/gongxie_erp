@@ -17,7 +17,7 @@
 
 ## 2. AI 平台配置 `bizbuddy.ai`
 
-前缀绑定到 [`AiProperties`](../RuoYi-Vue-Plus/ruoyi-modules/ruoyi-ai/src/main/java/org/dromara/ai/config/AiProperties.java)。
+前缀绑定到 [`AiProperties`](../RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/config/AiProperties.java)。
 下表只列**需要你关注的**项，其余保持默认即可。
 
 ### 2.1 密钥与模型
