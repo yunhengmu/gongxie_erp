@@ -25,7 +25,8 @@ class McpResultTest {
     @DisplayName("转换 MCP 工具调用结果")
     void shouldConvertMcpToolCallResult() {
         McpSchema.CallToolResult sdkResult = mock(McpSchema.CallToolResult.class);
-        McpSchema.Content content = mock(McpSchema.Content.class);
+        // McpSchema.Content 是 sealed interface，Mockito 无法 mock，故用真实实现类
+        McpSchema.TextContent content = new McpSchema.TextContent("hello");
         when(sdkResult.isError()).thenReturn(true);
         when(sdkResult.content()).thenReturn(List.of(content));
         when(sdkResult.structuredContent()).thenReturn(Map.of("id", 1));
@@ -56,7 +57,9 @@ class McpResultTest {
     @DisplayName("转换 MCP 资源读取结果")
     void shouldConvertMcpResourceReadResult() {
         McpSchema.ReadResourceResult sdkResult = mock(McpSchema.ReadResourceResult.class);
-        McpSchema.ResourceContents content = mock(McpSchema.ResourceContents.class);
+        // McpSchema.ResourceContents 是 sealed interface，Mockito 无法 mock，故用真实实现类
+        McpSchema.TextResourceContents content =
+            new McpSchema.TextResourceContents("demo://x", "text/plain", "hi");
         when(sdkResult.contents()).thenReturn(List.of(content));
 
         McpResourceReadResult result = McpResourceReadResult.of("server-b", sdkResult);
