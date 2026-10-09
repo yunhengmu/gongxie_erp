@@ -820,7 +820,7 @@ public class AgentRegistry {
         } else {
             // 有技能：接入本项目数据库技能仓库（平台只此一个来源，事务见 AgentScopeConfig#aiSkillRepository），
             // 并以白名单仅放行「绑定且启用中」的技能；
-            // 提问用户维度的生效范围在运行期由 SkillFilter 覆盖（见 AiChatFacade）
+            // 提问用户维度的生效范围在运行期由 SkillFilter 覆盖（见 AiRouteSupport#runtimeSkillFilter）
             tail = tail.skillRepositories(List.of(aiSkillRepository))
                 .skillFilter(SkillFilter.only(skillNames.toArray(new String[0])));
         }
@@ -1098,7 +1098,7 @@ public class AgentRegistry {
      *
      * <p><b>此处刻意不含「记住该工具」的用户级信任决策</b>：装配实例是智能体级、跨用户共享的，
      * 若把某个用户的信任写进共享上下文会让其他用户也被免确认；用户级信任由对话链路每轮按提问用户
-     * 并入该 {@code (userId, sessionId)} 槽位的权限上下文（见 {@code AiChatFacade#applyUserTrust}）。</p>
+     * 并入该 {@code (userId, sessionId)} 槽位的权限上下文（见 {@link AiTrustApplier}）。</p>
      *
      * @param bindings      智能体侧工具绑定（含授权决策）
      * @param packToolDecisions 场景包内业务工具的授权决策（可为空；多包时后者覆盖前者）

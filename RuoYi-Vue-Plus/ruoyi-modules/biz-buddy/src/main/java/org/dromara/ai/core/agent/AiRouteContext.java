@@ -127,7 +127,7 @@ final class AiRouteContext {
      * 专家调用产生的工具调用明细（REQ-AI-30 Phase 2）。
      *
      * <p>编排期助手消息主键尚未产生，故先在此累积（专家执行线程写入、收尾线程读取），
-     * 由 {@link AiChatFacade} 在收尾落库助手消息时与入口轮明细**合并一次写入**，
+     * 由 {@link AiTurnFinisher} 在收尾落库助手消息时与入口轮明细**合并一次写入**，
      * 使专家执行的（写）操作可审计、可归属到具体专家。</p>
      */
     final Queue<AiToolCallLog> expertToolLogs = new ConcurrentLinkedQueue<>();

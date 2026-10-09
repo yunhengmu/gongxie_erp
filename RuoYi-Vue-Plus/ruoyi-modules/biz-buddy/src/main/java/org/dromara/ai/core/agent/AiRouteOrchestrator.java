@@ -381,7 +381,7 @@ public class AiRouteOrchestrator {
      * 专家命中「需确认」工具：把暂停**上浮**为入口轮的待确认，并记下续跑上下文。
      *
      * <p>框架暂停的是专家自己的会话（{@code (userId, expertSessionId)}），用户看到的是入口轮，
-     * 故把专家侧的待确认信息写入入口轮状态，由 {@code AiChatFacade} 的收尾逻辑落「待确认」助手消息
+     * 故把专家侧的待确认信息写入入口轮状态，由 {@link AiTurnFinisher} 的收尾逻辑落「待确认」助手消息
      * 并下发确认卡片；用户确认后由 {@link #resumeExpert} 用 {@code ConfirmResult} 驱动同一专家续跑。</p>
      *
      * @param route          编排运行状态

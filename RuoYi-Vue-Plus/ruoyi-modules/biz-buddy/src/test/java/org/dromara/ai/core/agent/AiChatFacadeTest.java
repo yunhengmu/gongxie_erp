@@ -29,10 +29,10 @@ import org.dromara.ai.test.AiTestSupport;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -121,8 +121,29 @@ class AiChatFacadeTest {
     @Mock
     private AiRunRegistry runRegistry;
 
-    @InjectMocks
     private AiChatFacade facade;
+
+    /**
+     * 显式构造门面：门面已按职责拆出协作类（附件装配等），{@code @InjectMocks} 无法为具体类注入。
+     * 拆出的类用**真实实例 + 共享同一批 {@code @Mock}**，故原有 verify 断言不受影响。
+     */
+    @BeforeEach
+    void setUp() {
+        AiAttachmentAssembler assembler = new AiAttachmentAssembler(attachmentService, aiProperties);
+        AiRouteSupport routeSupport = new AiRouteSupport(skillService, scenarioPackService);
+        AiTrustApplier trustApplier = new AiTrustApplier(agentRegistry, agentService);
+        AiTurnFinisher turnFinisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
+            traceService, memoryService, aiProperties, routeRecorder, pendingStore);
+        AiIntegrationDriver integrationDriver = new AiIntegrationDriver(sessionService, pendingStore, traceService,
+            routeOrchestrator, streamBridge, runRegistry, turnFinisher);
+        AiExpertResumeDriver expertResumeDriver = new AiExpertResumeDriver(sessionService, agentService, agentRegistry,
+            pendingStore, traceService, sessionResourceService, expertDirectory, slotStore, permissionModeStore,
+            routeOrchestrator, runRegistry, turnFinisher, integrationDriver, routeSupport, trustApplier);
+        facade = new AiChatFacade(sessionService, agentService, messageMapper, agentRegistry, aiProperties,
+            pendingStore, permissionModeStore, decisionService, usageStatService, quotaService,
+            sessionResourceService, expertDirectory, routeRecorder, assembler, routeSupport, trustApplier,
+            slotStore, streamBridge, traceService, runRegistry, turnFinisher, integrationDriver, expertResumeDriver);
+    }
 
     @BeforeAll
     static void init() {

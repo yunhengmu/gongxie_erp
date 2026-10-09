@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 单轮对话的流式累积状态（由事件桥写入，由 {@link AiChatFacade} 的收尾逻辑读取）。
+ * 单轮对话的流式累积状态（由事件桥写入，由 {@link AiTurnFinisher} 的收尾逻辑读取）。
  *
  * <p>字段为**包级可见**：这些是「一次对话运行的共享可变状态」，写入方（{@link AiStreamEventBridge}，
  * Reactor 订阅线程）与读取方（收尾落库，同一订阅回调线程）分处两个类，故不再用私有字段 + 访问器

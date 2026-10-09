@@ -381,7 +381,7 @@ public class AiAgentServiceImpl implements IAiAgentService {
             agentToolTrustMapper.update(update, lqw);
         }
         // 信任不参与装配（装配实例是智能体级、跨用户共享），故无需清理装配缓存：
-        // 生效发生在对话链路每轮按提问用户同步会话级权限上下文时（见 AiChatFacade#applyUserTrust）
+        // 生效发生在对话链路每轮按提问用户同步会话级权限上下文时（见 AiTrustApplier#apply）
         return true;
     }
 
