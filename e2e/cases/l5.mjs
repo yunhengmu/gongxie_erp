@@ -67,7 +67,13 @@ export const run = async (ctx) => {
 
   const confirmed = Boolean(args.allowWrites);
   await http.request('POST', `/ai/chat/session/${session.id}/confirm`, {
-    body: { messageId: confirm.messageId, confirmed, remember: false }
+    body: {
+      messageId: confirm.messageId,
+      confirmed,
+      remember: false,
+      // 拒绝路径带自定义拒绝原因，覆盖「原因回传模型 + 写入决策日志」
+      rejectReason: confirmed ? undefined : 'e2e：默认拒绝路径，不执行写操作'
+    }
   });
   evidence.confirmed = confirmed;
 

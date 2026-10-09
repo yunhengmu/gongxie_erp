@@ -49,8 +49,9 @@ public interface IAiPermissionDecisionService {
      * @param messageId 助手消息主键
      * @param confirmed 是否确认执行
      * @param remember  是否记住该工具
+     * @param reason    自定义拒绝原因（可选；拒绝且非空时写入决策说明）
      */
-    void applyConfirm(Long messageId, boolean confirmed, boolean remember);
+    void applyConfirm(Long messageId, boolean confirmed, boolean remember, String reason);
 
     /**
      * 分页查询决策日志。

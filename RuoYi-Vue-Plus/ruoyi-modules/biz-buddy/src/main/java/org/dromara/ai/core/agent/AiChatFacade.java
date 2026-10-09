@@ -67,6 +67,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1073,14 +1074,16 @@ public class AiChatFacade {
             .orElseThrow(() -> new ServiceException("确认已过期或已被处理，请重新提问"));
         boolean confirmed = Boolean.TRUE.equals(bo.getConfirmed());
         boolean remember = Boolean.TRUE.equals(bo.getRemember());
+        // 自定义拒绝原因（可选）：仅在拒绝时生效，回传模型并写入决策日志
+        String rejectReason = StringUtils.trim(bo.getRejectReason());
         List<AiConfirmPendingStore.PendingDecision> decisions = new ArrayList<>();
         for (AiConfirmPendingStore.PendingToolCall call : pending.toolCalls()) {
-            decisions.add(new AiConfirmPendingStore.PendingDecision(call.toolCallId(), confirmed, remember));
+            decisions.add(new AiConfirmPendingStore.PendingDecision(call.toolCallId(), confirmed, remember, rejectReason));
         }
         pendingStore.save(new AiConfirmPendingStore.PendingConfirm(pending.sessionId(), pending.messageId(),
             pending.agentId(), pending.userId(), pending.replyId(), pending.toolCalls(), decisions,
             pending.createdAt(), pending.expertResume()));
-        decisionService.applyConfirm(bo.getMessageId(), confirmed, remember);
+        decisionService.applyConfirm(bo.getMessageId(), confirmed, remember, rejectReason);
         // 框架原生 HITL：确认结果通过 ConfirmResult 在恢复流中回传，由框架决定放行或拒绝；
         // 此处处理「记住该工具」：落「智能体 × 工具 × 用户」信任决策 + 并入对应会话槽位的权限上下文
         if (confirmed && remember) {
@@ -1222,6 +1225,7 @@ public class AiChatFacade {
         }
         List<ConfirmResult> results = new ArrayList<>();
         boolean rejectedAll = true;
+        LinkedHashSet<String> rejectReasons = new LinkedHashSet<>();
         for (AiConfirmPendingStore.PendingDecision decision : pending.decisions()) {
             AiConfirmPendingStore.PendingToolCall call = toolCalls.get(decision.toolCallId());
             if (call == null) {
@@ -1235,14 +1239,23 @@ public class AiChatFacade {
                 ? List.of(new PermissionRule(call.toolName(), null, PermissionBehavior.ALLOW,
                     AiPermissionDecisionLog.SOURCE_REMEMBER))
                 : null;
-            results.add(new ConfirmResult(decision.confirmed(), block, rules));
+            // 自定义拒绝原因随 ConfirmResult 回传（拒绝时框架在工具结果事件中带上该说明）
+            String reason = decision.confirmed() ? null : decision.reason();
+            results.add(new ConfirmResult(decision.confirmed(), block, rules, reason));
             if (decision.confirmed()) {
                 rejectedAll = false;
+            } else if (StringUtils.isNotBlank(reason)) {
+                rejectReasons.add(reason);
             }
         }
-        String text = rejectedAll
-            ? "用户拒绝了上述工具调用，请不要重复请求执行，改为基于已有信息作答或明确说明无法完成。"
-            : "用户已确认执行上述工具调用，请继续。";
+        String text;
+        if (rejectedAll) {
+            String reasonText = rejectReasons.isEmpty() ? "" : "，原因是：" + String.join("；", rejectReasons);
+            text = "用户拒绝了上述工具调用" + reasonText
+                + "，请不要重复请求执行，改为基于已有信息作答或明确说明无法完成。";
+        } else {
+            text = "用户已确认执行上述工具调用，请继续。";
+        }
         Msg msg = Msg.builder()
             .role(MsgRole.USER)
             .textContent(text)

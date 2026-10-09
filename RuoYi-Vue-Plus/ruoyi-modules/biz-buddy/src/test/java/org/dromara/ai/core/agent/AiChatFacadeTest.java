@@ -212,8 +212,8 @@ class AiChatFacadeTest {
 
         facade.confirm(SESSION_ID, bo);
 
-        verify(pendingStore).save(withDecisions(p, true, false));
-        verify(decisionService).applyConfirm(MESSAGE_ID, true, false);
+        verify(pendingStore).save(withDecisions(p, true, false, null));
+        verify(decisionService).applyConfirm(MESSAGE_ID, true, false, null);
         verify(agentService, never()).rememberToolForAgent(any(), any(), any());
     }
 
@@ -226,9 +226,23 @@ class AiChatFacadeTest {
 
         facade.confirm(SESSION_ID, bo);
 
-        verify(pendingStore).save(withDecisions(p, false, true));
-        verify(decisionService).applyConfirm(MESSAGE_ID, false, true);
+        verify(pendingStore).save(withDecisions(p, false, true, null));
+        verify(decisionService).applyConfirm(MESSAGE_ID, false, true, null);
         verify(agentService, never()).rememberToolForAgent(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("拒绝并带原因：原因随决策暂存并写入决策日志")
+    void shouldRecordRejectionReason() {
+        AiChatConfirmBo bo = confirmBo(MESSAGE_ID, false, false);
+        bo.setRejectReason("  数据敏感，暂不执行  ");
+        AiConfirmPendingStore.PendingConfirm p = pending(twoCalls(), null);
+        when(pendingStore.get(SESSION_ID, MESSAGE_ID)).thenReturn(Optional.of(p));
+
+        facade.confirm(SESSION_ID, bo);
+
+        verify(pendingStore).save(withDecisions(p, false, false, "数据敏感，暂不执行"));
+        verify(decisionService).applyConfirm(MESSAGE_ID, false, false, "数据敏感，暂不执行");
     }
 
     @Test
@@ -248,8 +262,8 @@ class AiChatFacadeTest {
         verify(agentService).rememberToolForAgent(7L, 4L, "delete_user");
         verify(agentRegistry).get(definition, resources);
         verify(agentRegistry, never()).getExpert(definition, resources);
-        verify(pendingStore).save(withDecisions(p, true, true));
-        verify(decisionService).applyConfirm(MESSAGE_ID, true, true);
+        verify(pendingStore).save(withDecisions(p, true, true, null));
+        verify(decisionService).applyConfirm(MESSAGE_ID, true, true, null);
     }
 
     @Test
@@ -271,8 +285,8 @@ class AiChatFacadeTest {
         verify(agentService).rememberToolForAgent(7L, 4L, "delete_user");
         verify(agentRegistry).getExpert(definition, resources);
         verify(agentRegistry, never()).get(definition, resources);
-        verify(pendingStore).save(withDecisions(p, true, true));
-        verify(decisionService).applyConfirm(MESSAGE_ID, true, true);
+        verify(pendingStore).save(withDecisions(p, true, true, null));
+        verify(decisionService).applyConfirm(MESSAGE_ID, true, true, null);
     }
 
     // ---------------- streamChat：前置校验 / 早退 ----------------
@@ -462,7 +476,7 @@ class AiChatFacadeTest {
         AiConfirmPendingStore.ExpertResume resume =
             new AiConfirmPendingStore.ExpertResume(9L, 8L, "9#8", "task", 1, "first");
         List<AiConfirmPendingStore.PendingDecision> decisions =
-            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false));
+            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false, null));
         when(sessionService.getOwnedSession(SESSION_ID)).thenReturn(session("0"));
         when(messageMapper.selectById(MESSAGE_ID)).thenReturn(userMessage(SESSION_ID));
         when(pendingStore.get(SESSION_ID, MESSAGE_ID))
@@ -487,7 +501,7 @@ class AiChatFacadeTest {
         HarnessAgent agent = mock(HarnessAgent.class);
         AiMessage assistant = mock(AiMessage.class);
         List<AiConfirmPendingStore.PendingDecision> decisions =
-            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false));
+            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false, null));
         AiConfirmPendingStore.PendingConfirm pending = new AiConfirmPendingStore.PendingConfirm(
             SESSION_ID, MESSAGE_ID, 7L, null, "reply-1", List.of(), decisions, "2026-01-01T00:00:00", null);
         when(sessionService.getOwnedSession(SESSION_ID)).thenReturn(session);
@@ -571,10 +585,10 @@ class AiChatFacadeTest {
     }
 
     private static AiConfirmPendingStore.PendingConfirm withDecisions(
-        AiConfirmPendingStore.PendingConfirm p, boolean confirmed, boolean remember) {
+        AiConfirmPendingStore.PendingConfirm p, boolean confirmed, boolean remember, String reason) {
         List<AiConfirmPendingStore.PendingDecision> decisions = new ArrayList<>();
         for (AiConfirmPendingStore.PendingToolCall call : p.toolCalls()) {
-            decisions.add(new AiConfirmPendingStore.PendingDecision(call.toolCallId(), confirmed, remember));
+            decisions.add(new AiConfirmPendingStore.PendingDecision(call.toolCallId(), confirmed, remember, reason));
         }
         return new AiConfirmPendingStore.PendingConfirm(p.sessionId(), p.messageId(), p.agentId(), p.userId(),
             p.replyId(), p.toolCalls(), decisions, p.createdAt(), p.expertResume());

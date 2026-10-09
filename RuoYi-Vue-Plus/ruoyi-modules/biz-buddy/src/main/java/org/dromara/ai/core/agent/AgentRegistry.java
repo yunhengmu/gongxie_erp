@@ -826,8 +826,10 @@ public class AgentRegistry {
         }
         // 技能一律来自本项目数据库：关闭框架默认的工作区（文件系统）技能来源
         tail = tail.disableDefaultWorkspaceSkills();
-        // 平台无沙箱：智能体只能调用登记在册的业务工具，禁用内置文件与命令工具，避免越权读写服务器文件
-        tail = tail.disableFilesystemTools().disableShellTool();
+        // 平台无沙箱：智能体只能调用登记在册的业务工具，禁用内置文件、命令与 Web 工具。
+        // 内置 Web 工具（web_fetch / web_search）默认注册并可直接出网，绕过「无裸 HTTP、工具最小化、
+        // 全链路审计」的平台纪律，故一并关闭；确需联网能力时应改造为受控工具后再登记。
+        tail = tail.disableFilesystemTools().disableShellTool().disableWebTools();
         if (!memoryPolicy.isEnabled()) {
             // 关闭记忆：停掉记忆 hooks（抽取 / 合并 / 后台维护）。
             // 记忆工具恒定关闭（disableMemoryTools），二者同时关闭后中间件即不再注入 <memory_context>，

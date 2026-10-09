@@ -193,9 +193,12 @@
                       允许本次
                     </el-button>
                     <el-button size="small" @click="handleConfirmTool(part, true, true)">记住该工具</el-button>
-                    <el-button type="danger" size="small" plain @click="handleConfirmTool(part, false, false)">
+                    <el-button type="danger" size="small" plain @click="handleRejectTool(part)">
                       拒绝
                     </el-button>
+                  </div>
+                  <div v-else-if="part.confirmState === 'rejected'" class="confirm-card__tip">
+                    已拒绝{{ part.confirmReason ? `：${part.confirmReason}` : '' }}。
                   </div>
                   <div v-else-if="part.confirmState === 'expired'" class="confirm-card__tip">
                     确认已过期，请重新提问。
@@ -400,6 +403,8 @@ interface MessagePart {
   toolCalls?: ChatPendingToolCall[];
   /** 确认状态（pending / approved / rejected / expired，kind=confirm） */
   confirmState?: 'pending' | 'approved' | 'rejected' | 'expired';
+  /** 拒绝原因（kind=confirm，用户拒绝时填写，用于卡片回显） */
+  confirmReason?: string;
   /** 专家标识（kind=expert，REQ-AI-30） */
   expertKey?: string;
   /** 专家智能体主键（kind=expert，用于按 agentId + attemptNo 挂回轨迹里的原始结论） */
@@ -1394,14 +1399,21 @@ const handleStop = () => {
 };
 
 /** 处置待确认的工具调用：写入结果后建立恢复流继续生成 */
-const handleConfirmTool = async (part: MessagePart, confirmed: boolean, remember: boolean) => {
+const handleConfirmTool = async (part: MessagePart, confirmed: boolean, remember: boolean, rejectReason?: string) => {
   const sessionId = currentSessionId.value;
   const messageId = part.messageId;
   if (!sessionId || messageId === undefined || messageId === null || streaming.value) {
     return;
   }
-  await confirmChatTool(sessionId, { messageId, confirmed, remember });
+  // 拒绝原因仅拒绝时有意义：后端会回传模型并写入权限决策日志
+  await confirmChatTool(sessionId, {
+    messageId,
+    confirmed,
+    remember,
+    rejectReason: confirmed ? undefined : rejectReason
+  });
   part.confirmState = confirmed ? 'approved' : 'rejected';
+  part.confirmReason = confirmed ? undefined : rejectReason;
   // 拒绝同样需要恢复流：由模型基于现有信息作答或说明无法完成，避免本轮悬空
   const target = messages.value.find((item) => item.id === messageId);
   if (!target) {
@@ -1412,6 +1424,26 @@ const handleConfirmTool = async (part: MessagePart, confirmed: boolean, remember
   streaming.value = true;
   streamUrl.value = buildChatResumeUrl(sessionId, messageId);
   openStream();
+};
+
+/** 拒绝待确认的工具调用：可填写拒绝原因（可选），交后端回传模型并留痕 */
+const handleRejectTool = async (part: MessagePart) => {
+  const result = await ElMessageBox.prompt('可填写拒绝原因（可选），将回传给模型并记入审计', '拒绝执行', {
+    confirmButtonText: '确认拒绝',
+    cancelButtonText: '取消',
+    closeOnClickModal: false,
+    inputPlaceholder: '如：数据敏感，暂不执行（可不填）',
+    inputValidator: (value: string) => {
+      if (value && value.trim().length > 200) {
+        return '拒绝原因不能超过 200 个字符';
+      }
+      return true;
+    }
+  }).catch(() => null);
+  if (!result) {
+    return;
+  }
+  await handleConfirmTool(part, false, false, result.value?.trim() || undefined);
 };
 
 /** SSE 事件信封：补充后端新增的子智能体来源字段（主智能体自身发起时不带该字段） */

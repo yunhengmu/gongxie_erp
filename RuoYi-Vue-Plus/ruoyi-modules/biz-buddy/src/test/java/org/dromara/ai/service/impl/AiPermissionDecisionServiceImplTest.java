@@ -79,14 +79,14 @@ class AiPermissionDecisionServiceImplTest {
     @Test
     @DisplayName("消息主键为空时不更新确认结果")
     void shouldSkipApplyConfirmWhenMessageIdNull() {
-        service.applyConfirm(null, true, true);
+        service.applyConfirm(null, true, true, null);
         verify(decisionLogMapper, never()).update(any(), any());
     }
 
     @Test
     @DisplayName("确认并记住时回填确认与记住来源")
     void shouldApplyConfirmApprovedRemember() {
-        service.applyConfirm(2L, true, true);
+        service.applyConfirm(2L, true, true, null);
 
         ArgumentCaptor<AiPermissionDecisionLog> captor = ArgumentCaptor.forClass(AiPermissionDecisionLog.class);
         verify(decisionLogMapper).update(captor.capture(), any());
@@ -98,13 +98,23 @@ class AiPermissionDecisionServiceImplTest {
     @Test
     @DisplayName("拒绝且仅本次时回填拒绝与单次来源")
     void shouldApplyConfirmRejectedOnce() {
-        service.applyConfirm(2L, false, false);
+        service.applyConfirm(2L, false, false, null);
 
         ArgumentCaptor<AiPermissionDecisionLog> captor = ArgumentCaptor.forClass(AiPermissionDecisionLog.class);
         verify(decisionLogMapper).update(captor.capture(), any());
         AiPermissionDecisionLog update = captor.getValue();
         assertEquals(AiPermissionDecisionLog.CONFIRM_REJECTED, update.getConfirmed());
         assertEquals(AiPermissionDecisionLog.CONFIRM_ONCE, update.getConfirmSource());
+    }
+
+    @Test
+    @DisplayName("拒绝并带原因时把原因写入决策说明")
+    void shouldApplyConfirmRejectedWithReason() {
+        service.applyConfirm(2L, false, false, "数据敏感");
+
+        ArgumentCaptor<AiPermissionDecisionLog> captor = ArgumentCaptor.forClass(AiPermissionDecisionLog.class);
+        verify(decisionLogMapper).update(captor.capture(), any());
+        assertEquals("用户拒绝：数据敏感", captor.getValue().getReason());
     }
 
     @Test
