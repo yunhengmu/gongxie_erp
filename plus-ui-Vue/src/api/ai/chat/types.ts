@@ -60,6 +60,8 @@ export interface ChatMessageVO {
   errorMsg?: string;
   /** 工具调用次数 */
   toolCallCount?: number;
+  /** 总 Token 数 */
+  totalTokens?: number;
   /** 耗时（毫秒） */
   durationMs?: number;
   /** 创建时间 */

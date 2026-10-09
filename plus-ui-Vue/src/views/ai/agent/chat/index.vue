@@ -213,8 +213,25 @@
                 <span>{{ msg.errorMsg || '回复失败' }}</span>
               </div>
               <div v-else-if="!msg.streaming && msg.durationMs !== undefined" class="msg-meta">
-                <span>耗时 {{ msg.durationMs }} ms</span>
-                <span v-if="msg.toolCallCount">· 工具调用 {{ msg.toolCallCount }} 次</span>
+                <!-- 复制图标：始终显示（左对齐） -->
+                <el-icon
+                  class="msg-meta__icon"
+                  role="button"
+                  tabindex="0"
+                  title="复制"
+                  @click="handleCopyMessage(msg)"
+                  @keydown.enter.prevent="handleCopyMessage(msg)"
+                >
+                  <DocumentCopy />
+                </el-icon>
+                <!-- 文字区域：悬停回复内容才显示；整体前带一个分隔竖线 -->
+                <span class="msg-meta__info">
+                  <span>耗时 {{ msg.durationMs }} ms</span>
+                  <span v-if="msg.toolCallCount">工具调用 {{ msg.toolCallCount }} 次</span>
+                  <span v-if="msg.totalTokens">消耗 {{ msg.totalTokens }} tokens</span>
+                </span>
+                <!-- AI 生成声明：始终显示，右对齐 -->
+                <span class="msg-meta__ai">由 AI 生成</span>
               </div>
             </div>
           </div>
@@ -438,6 +455,8 @@ interface LocalMessage {
   errorMsg?: string;
   durationMs?: number;
   toolCallCount?: number;
+  /** 总 Token 数（悬停时展示的消耗量） */
+  totalTokens?: number;
   /** 随本条消息发送的附件（聊天上传的图片/文档） */
   attachments?: ChatAttachmentVO[];
 }
@@ -875,6 +894,7 @@ const toLocalMessage = (item: ChatMessageVO, tools: ToolCallLogVO[]): LocalMessa
     errorMsg: item.errorMsg,
     durationMs: item.durationMs,
     toolCallCount: item.toolCallCount,
+    totalTokens: item.totalTokens,
     attachments: item.attachments ?? []
   };
 };
@@ -1593,6 +1613,7 @@ const handleStreamEvent = (raw: string) => {
       msg.streaming = false;
       msg.durationMs = event.durationMs;
       msg.toolCallCount = event.toolCallCount;
+      msg.totalTokens = event.totalTokens;
       finishStream();
       getSessions();
       // 编排轨迹回填：异步补齐专家原始结论，不阻塞本轮收尾
@@ -2084,9 +2105,49 @@ onMounted(() => {
 }
 
 .msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 8px;
+  min-height: 18px;
   color: var(--app-text-muted);
   font-size: 12px;
+}
+
+/* 复制图标：始终显示（左对齐） */
+.msg-meta__icon {
+  cursor: pointer;
+  font-size: 14px;
+  transition: color 0.2s;
+}
+
+.msg-meta__icon:hover {
+  color: var(--el-color-primary, #409eff);
+}
+
+/* 文字区域：悬停回复内容才显示；整体前带一个分隔竖线（文字项之间不加） */
+.msg-meta__info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.msg-meta__info::before {
+  content: '|';
+  opacity: 0.5;
+}
+
+.bubble--assistant:hover .msg-meta__info,
+.msg-meta__info:focus-within {
+  opacity: 1;
+}
+
+/* 「由 AI 生成」声明：始终显示、右对齐，弱化处理 */
+.msg-meta__ai {
+  margin-left: auto;
+  opacity: 0.75;
 }
 
 .msg-error {
