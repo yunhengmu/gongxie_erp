@@ -14,7 +14,9 @@ export const DEFAULT_STOP_ON = ['done', 'error', 'tool_confirm'];
  *
  * @param {import('./http.mjs').HttpClient} client HTTP 客户端
  * @param {string} apiPath 接口路径
- * @param {{ query?: object, stopOn?: string[], timeoutMs?: number, idleMs?: number, log?: Function }} options 选项
+ * @param {{ query?: object, stopOn?: string[], timeoutMs?: number, idleMs?: number, log?: Function, onEvent?: Function }} options 选项
+ *        {@code onEvent} 为每收到一个事件就调用的回调（同步、不 await），用于「读流过程中触发动作」
+ *        （如 L6 在首个正文增量时请求停止）
  * @returns {Promise<{ events: object[], stopReason: string }>} 已收事件与停止原因
  */
 export const readSse = async (client, apiPath, options = {}) => {
@@ -22,6 +24,7 @@ export const readSse = async (client, apiPath, options = {}) => {
   const timeoutMs = options.timeoutMs ?? 90000;
   const idleMs = options.idleMs ?? 20000;
   const log = options.log ?? (() => {});
+  const onEvent = options.onEvent;
 
   const events = [];
   let stopReason = 'stream-closed';
@@ -62,6 +65,13 @@ export const readSse = async (client, apiPath, options = {}) => {
         if (event) {
           events.push(event);
           log(`  ← SSE ${event.type}`);
+          if (onEvent) {
+            try {
+              onEvent(event);
+            } catch {
+              // 回调异常不影响读流
+            }
+          }
           if (stopOn.includes(event.type)) {
             stopReason = 'stop-event';
             stopped = true;

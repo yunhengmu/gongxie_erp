@@ -355,6 +355,7 @@ import {
   removeChatResources,
   renameChatSession,
   sendChatMessage,
+  stopChat,
   topChatSession
 } from '@/api/ai/chat';
 import type {
@@ -1389,8 +1390,13 @@ const handleDeleteMessage = async (msg: LocalMessage) => {
   await getSessions();
 };
 
-/** 停止生成 */
+/** 停止生成：通知后端取消本轮执行（避免后端继续跑并落库），随后关闭前端流 */
 const handleStop = () => {
+  const sessionId = currentSessionId.value;
+  if (sessionId) {
+    // 通知后端取消；失败不阻塞前端收尾（如后端本轮已结束）
+    stopChat(sessionId).catch(() => undefined);
+  }
   const msg = currentAssistant();
   if (msg) {
     msg.streaming = false;

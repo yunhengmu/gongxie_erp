@@ -1,5 +1,6 @@
 package org.dromara.ai.core.agent;
 
+import io.agentscope.core.agent.AgentRun;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.ConfirmResult;
@@ -71,6 +72,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * AI 对话门面：负责会话编排并把 AgentScope 事件流桥接为统一的 SSE 事件信封。
@@ -133,6 +135,16 @@ public class AiChatFacade {
      * 事件类型：工具调用需人工确认（HITL 暂停）
      */
     private static final String EVENT_TOOL_CONFIRM = "tool_confirm";
+
+    /**
+     * 事件类型：本轮执行被用户停止（收尾事件，等价于结束）
+     */
+    private static final String EVENT_ABORTED = "aborted";
+
+    /**
+     * 用户主动停止本轮的说明文案（落链路追踪 / 编排运行的中止原因）
+     */
+    private static final String CANCELLED_TEXT = "用户停止生成";
 
     /**
      * 专家链路暂停时落库的助手消息正文（REQ-AI-30 Phase 2 HITL 贯通）。
@@ -234,6 +246,26 @@ public class AiChatFacade {
     private final IAiTraceService traceService;
 
     /**
+     * 单次执行取消注册表：对话页「停止」与 SSE 断连据此取消后端执行（AgentScope 2.0.4）
+     */
+    private final AiRunRegistry runRegistry;
+
+    /**
+     * 停止该会话当前的流式执行（对话页「停止」按钮 / SSE 断连）。
+     *
+     * <p>取消经 {@link AiRunRegistry} 落到**后端**的 {@code AgentRun}：正在跑的模型调用与工具循环就地中止，
+     * 收尾按「已中止」落库，避免出现「前端已停、后端仍在跑并继续落库」。</p>
+     *
+     * @param sessionId 会话主键
+     */
+    public void stop(Long sessionId) {
+        sessionService.getOwnedSession(sessionId);
+        if (!runRegistry.cancel(sessionId)) {
+            log.debug("停止请求无活跃执行：sessionId={}", sessionId);
+        }
+    }
+
+    /**
      * 发起一轮流式对话。
      *
      * @param sessionId     会话主键（即 AgentScope 的 sessionId）
@@ -332,13 +364,25 @@ public class AiChatFacade {
         AtomicBoolean finished = new AtomicBoolean(false);
         try {
             AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
-            Disposable disposable = agent.streamEvents(buildUserMsg(userMessage.getContent(), attachmentBlocks), ctx).subscribe(
+            // 单次执行句柄（AgentScope 2.0.4）：登记后可由「停止」/ SSE 断连取消本段后端执行
+            AgentRun<AgentEvent> run = agent.prepareRun(
+                List.of(buildUserMsg(userMessage.getContent(), attachmentBlocks)), ctx);
+            AiRunRegistry.Cancelable cancelable = run::cancel;
+            runRegistry.register(sessionId, cancelable);
+            Disposable disposable = run.stream()
+                .doFinally(signal -> runRegistry.unregister(sessionId, cancelable))
+                .subscribe(
                 event -> dispatchEntryEvent(emitter, state, route, event),
                 error -> {
                     if (!finished.compareAndSet(false, true)) {
                         return;
                     }
                     long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+                    // 用户停止 / SSE 断连触发的取消：按「已中止」收尾，不当作失败
+                    if (run.status() == AgentRun.Status.CANCELLED) {
+                        finishCancelled(emitter, sessionId, state, durationMs, null, route);
+                        return;
+                    }
                     log.error("对话流式执行失败，sessionId={}", sessionId, error);
                     String message = AiSseSupport.rootCauseMessage(error);
                     traceService.appendTransition(state.traceId, "error", message);
@@ -377,8 +421,10 @@ public class AiChatFacade {
                         null, durationMs);
                 }
             );
-            emitter.onCompletion(disposable::dispose);
-            emitter.onTimeout(disposable::dispose);
+            // SSE 断连 / 超时：取消后端执行（与对话页「停止」同一路径）
+            emitter.onCompletion(run::cancel);
+            emitter.onTimeout(run::cancel);
+            emitter.onError(ignored -> run.cancel());
         } catch (Exception e) {
             throw e instanceof ServiceException serviceException
                 ? serviceException : new ServiceException("对话启动失败：" + e.getMessage());
@@ -645,13 +691,24 @@ public class AiChatFacade {
         AtomicBoolean finished = new AtomicBoolean(false);
         try {
             AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
-            Disposable disposable = agent.streamEvents(buildResumeMessages(pending), ctx).subscribe(
+            AgentRun<AgentEvent> run = agent.prepareRun(buildResumeMessages(pending), ctx);
+            AiRunRegistry.Cancelable cancelable = run::cancel;
+            runRegistry.register(sessionId, cancelable);
+            Disposable disposable = run.stream()
+                .doFinally(signal -> runRegistry.unregister(sessionId, cancelable))
+                .subscribe(
                 event -> streamBridge.handle(emitter, state, event),
                 error -> {
                     if (!finished.compareAndSet(false, true)) {
                         return;
                     }
                     long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+                    // 用户停止 / SSE 断连触发的取消：按「已中止」收尾，不当作失败
+                    if (run.status() == AgentRun.Status.CANCELLED) {
+                        pendingStore.remove(sessionId, messageId);
+                        finishCancelled(emitter, sessionId, state, durationMs, messageId, null);
+                        return;
+                    }
                     log.error("HITL 恢复执行失败，sessionId={}, messageId={}", sessionId, messageId, error);
                     String message = AiSseSupport.rootCauseMessage(error);
                     traceService.appendTransition(state.traceId, "error", "恢复失败：" + message);
@@ -683,8 +740,10 @@ public class AiChatFacade {
                     pendingStore.remove(sessionId, messageId);
                 }
             );
-            emitter.onCompletion(disposable::dispose);
-            emitter.onTimeout(disposable::dispose);
+            // SSE 断连 / 超时：取消后端执行（与对话页「停止」同一路径）
+            emitter.onCompletion(run::cancel);
+            emitter.onTimeout(run::cancel);
+            emitter.onError(ignored -> run.cancel());
         } catch (Exception e) {
             throw e instanceof ServiceException serviceException
                 ? serviceException : new ServiceException("恢复执行失败：" + e.getMessage());
@@ -759,9 +818,29 @@ public class AiChatFacade {
 
         long startNanos = System.nanoTime();
         AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
+        // 专家续跑是阻塞式编排调用：登记「dispose 该 Mono」为取消句柄（中断 boundedElastic 线程）
+        AtomicReference<Disposable> holder = new AtomicReference<>();
+        AiRunRegistry.Cancelable cancelable = () -> {
+            Disposable current = holder.get();
+            if (current == null || current.isDisposed()) {
+                return false;
+            }
+            current.dispose();
+            return true;
+        };
+        runRegistry.register(sessionId, cancelable);
         try {
-            Mono.fromCallable(() -> routeOrchestrator.resumeExpert(route, resume, buildResumeMessages(pending)))
+            Disposable subscription = Mono.fromCallable(
+                    () -> routeOrchestrator.resumeExpert(route, resume, buildResumeMessages(pending)))
                 .subscribeOn(Schedulers.boundedElastic())
+                .doOnCancel(() -> {
+                    // 用户停止 / SSE 断连：本段无 agent 事件回调可依，取消时就地按「已中止」收尾
+                    long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+                    traceService.appendTransition(traceId, "cancelled", "用户停止专家续跑");
+                    finishRoute(route, null, AiRouteRun.STATUS_ABORTED, CANCELLED_TEXT, durationMs);
+                    pendingStore.release(sessionId, messageId);
+                })
+                .doFinally(signal -> runRegistry.unregister(sessionId, cancelable))
                 .subscribe(outcome -> {
                     if (outcome.paused()) {
                         // 恢复段内再次命中「需确认」：同一条消息上再出一张卡片（暂存不清）
@@ -796,7 +875,9 @@ public class AiChatFacade {
                     failStream(emitter, message, error);
                     finishRoute(route, null, AiRouteRun.STATUS_ABORTED, message, durationMs);
                 });
+            holder.set(subscription);
         } catch (Exception e) {
+            runRegistry.unregister(sessionId, cancelable);
             pendingStore.release(sessionId, messageId);
             throw e instanceof ServiceException serviceException
                 ? serviceException : new ServiceException("恢复执行失败：" + e.getMessage());
@@ -828,13 +909,26 @@ public class AiChatFacade {
         state.answer.setLength(0);
         String userMessage = intro + report;
         AtomicBoolean finished = new AtomicBoolean(false);
-        Disposable disposable = agent.streamEvents(userMessage, ctx).subscribe(
+        AgentRun<AgentEvent> run = agent.prepareRun(List.of(new UserMessage(userMessage)), ctx);
+        AiRunRegistry.Cancelable cancelable = run::cancel;
+        runRegistry.register(sessionId, cancelable);
+        Disposable disposable = run.stream()
+            .doFinally(signal -> runRegistry.unregister(sessionId, cancelable))
+            .subscribe(
             event -> streamBridge.handle(emitter, state, event),
             error -> {
                 if (!finished.compareAndSet(false, true)) {
                     return;
                 }
                 long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+                // 用户停止 / SSE 断连触发的取消：按「已中止」收尾，不当作失败
+                if (run.status() == AgentRun.Status.CANCELLED) {
+                    if (messageId != null) {
+                        pendingStore.release(sessionId, messageId);
+                    }
+                    finishCancelled(emitter, sessionId, state, durationMs, messageId, route);
+                    return;
+                }
                 String message = AiSseSupport.rootCauseMessage(error);
                 log.error("编排整合轮失败，sessionId={}, messageId={}", sessionId, messageId, error);
                 traceService.appendTransition(state.traceId, "error", "整合失败：" + message);
@@ -858,8 +952,10 @@ public class AiChatFacade {
                     pendingStore.release(sessionId, messageId);
                 }
             });
-        emitter.onCompletion(disposable::dispose);
-        emitter.onTimeout(disposable::dispose);
+        // SSE 断连 / 超时：取消后端执行（与对话页「停止」同一路径）
+        emitter.onCompletion(run::cancel);
+        emitter.onTimeout(run::cancel);
+        emitter.onError(ignored -> run.cancel());
     }
 
     /**
@@ -891,8 +987,26 @@ public class AiChatFacade {
         route.decisionJson = pinnedFallbackDecision(route);
         AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_ANSWER_RESET));
         state.answer.setLength(0);
-        Mono.fromCallable(() -> routeOrchestrator.executePinned(route))
+        // 兜底编排同为阻塞式调用：登记「dispose 该 Mono」为取消句柄
+        AtomicReference<Disposable> holder = new AtomicReference<>();
+        AiRunRegistry.Cancelable cancelable = () -> {
+            Disposable current = holder.get();
+            if (current == null || current.isDisposed()) {
+                return false;
+            }
+            current.dispose();
+            return true;
+        };
+        runRegistry.register(sessionId, cancelable);
+        Disposable subscription = Mono.fromCallable(() -> routeOrchestrator.executePinned(route))
             .subscribeOn(Schedulers.boundedElastic())
+            .doOnCancel(() -> {
+                // 用户停止 / SSE 断连：本段无 agent 事件回调可依，取消时就地按「已中止」收尾
+                long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+                traceService.appendTransition(route.traceId, "cancelled", "用户停止指定专家兜底");
+                finishRoute(route, null, AiRouteRun.STATUS_ABORTED, CANCELLED_TEXT, durationMs);
+            })
+            .doFinally(signal -> runRegistry.unregister(sessionId, cancelable))
             .subscribe(report -> {
                 if (route.pendingResume != null) {
                     // 指定专家命中「需确认」：与主路径同款暂停并落确认卡片
@@ -920,6 +1034,7 @@ public class AiChatFacade {
                 failStream(emitter, message, error);
                 finishRoute(route, null, AiRouteRun.STATUS_ABORTED, message, durationMs);
             });
+        holder.set(subscription);
     }
 
     /**
@@ -1264,6 +1379,39 @@ public class AiChatFacade {
         return List.of(msg);
     }
 
+
+    /**
+     * 取消收尾（用户停止 / SSE 断连）：按「已中止」落库并留痕，关闭流。
+     *
+     * <p>与正常收尾的区别只在状态：消息状态与链路、编排运行终态都取「已中止」，且不再下发错误提示——
+     * 用户主动停止不是失败。已流出的部分正文照常保留，便于用户回看。</p>
+     *
+     * @param emitter         SSE 发射器；无人值守链路传 null
+     * @param sessionId       会话主键
+     * @param state           流式累积状态
+     * @param durationMs      本次耗时（毫秒）
+     * @param resumeMessageId 恢复段对应的助手消息主键；非空时追加更新同一条消息
+     * @param route           编排运行状态（可为 null）
+     */
+    private void finishCancelled(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
+                                 Long resumeMessageId, AiRouteContext route) {
+        traceService.appendTransition(state.traceId, "cancelled", CANCELLED_TEXT);
+        traceService.accumulate(state.traceId, AiTrace.STATUS_ABORTED, durationMs, null,
+            null, null, null, CANCELLED_TEXT);
+        try {
+            if (resumeMessageId == null) {
+                sessionService.persistAssistantAborted(sessionId, state.answer.toString(), durationMs);
+            } else {
+                sessionService.appendAssistantTurn(resumeMessageId, "",
+                    AiMessage.STATUS_ABORTED, durationMs, buildDoneToolLogs(state, route), state.toTokenUsage());
+            }
+        } catch (Exception e) {
+            log.error("落库已停止消息异常，sessionId={}, messageId={}", sessionId, resumeMessageId, e);
+        }
+        finishRoute(route, resumeMessageId, AiRouteRun.STATUS_ABORTED, CANCELLED_TEXT, durationMs);
+        AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_ABORTED));
+        AiSseSupport.complete(emitter);
+    }
 
     /**
      * 正常收尾：落库助手回答与工具明细（恢复段为追加更新同一条消息），下发 done 并关闭流。

@@ -1,5 +1,6 @@
 package org.dromara.ai.core.agent;
 
+import io.agentscope.core.agent.AgentRun;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.message.Msg;
@@ -116,6 +117,9 @@ class AiChatFacadeTest {
     private IAiTraceService traceService;
     @Mock
     private IAiChatAttachmentService attachmentService;
+
+    @Mock
+    private AiRunRegistry runRegistry;
 
     @InjectMocks
     private AiChatFacade facade;
@@ -289,6 +293,19 @@ class AiChatFacadeTest {
         verify(decisionService).applyConfirm(MESSAGE_ID, true, true, null);
     }
 
+    // ---------------- stop ----------------
+
+    @Test
+    @DisplayName("stop：校验会话归属后取消当前执行")
+    void shouldCancelRunningExecution() {
+        when(sessionService.getOwnedSession(SESSION_ID)).thenReturn(session("0"));
+        when(runRegistry.cancel(SESSION_ID)).thenReturn(true);
+
+        facade.stop(SESSION_ID);
+
+        verify(runRegistry).cancel(SESSION_ID);
+    }
+
     // ---------------- streamChat：前置校验 / 早退 ----------------
 
     @Test
@@ -372,7 +389,8 @@ class AiChatFacadeTest {
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
         when(agentRegistry.get(definition, resources)).thenReturn(agent);
         when(attachmentService.listByMessageId(any())).thenReturn(List.of());
-        when(agent.streamEvents(any(Msg.class), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>empty());
+        when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>empty()));
         when(aiProperties.getChat()).thenReturn(new AiProperties.Chat());
         when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
@@ -403,8 +421,8 @@ class AiChatFacadeTest {
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
         when(agentRegistry.get(definition, resources)).thenReturn(agent);
         when(attachmentService.listByMessageId(any())).thenReturn(List.of());
-        when(agent.streamEvents(any(Msg.class), any(RuntimeContext.class)))
-            .thenReturn(Flux.<AgentEvent>error(new RuntimeException("boom")));
+        when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>error(new RuntimeException("boom"))));
         SseEmitter emitter = mock(SseEmitter.class);
 
         try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
@@ -512,7 +530,8 @@ class AiChatFacadeTest {
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
         when(slotStore.merge(null, SESSION_ID)).thenReturn(AiSlotSet.empty());
         when(agentRegistry.get(definition, resources)).thenReturn(agent);
-        when(agent.streamEvents(anyList(), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>empty());
+        when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>empty()));
         when(aiProperties.getChat()).thenReturn(new AiProperties.Chat());
         when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any())).thenReturn(assistant);
         when(assistant.getId()).thenReturn(200L);

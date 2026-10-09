@@ -164,6 +164,16 @@ public interface IAiSessionService {
     AiMessage persistAssistantFailure(Long sessionId, String errorMsg, Long durationMs);
 
     /**
+     * 落库「已停止生成」的助手消息（用户主动停止本轮执行），状态为已中止。
+     *
+     * @param sessionId  会话主键
+     * @param content    停止前已产生的回答正文（可为空）
+     * @param durationMs 本轮耗时（毫秒）
+     * @return 助手消息实体
+     */
+    AiMessage persistAssistantAborted(Long sessionId, String content, Long durationMs);
+
+    /**
      * 落库「等待人工确认」的助手消息（HITL 暂停），状态为待确认。
      *
      * @param sessionId  会话主键

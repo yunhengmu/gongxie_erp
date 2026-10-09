@@ -471,6 +471,22 @@ public class AiSessionServiceImpl implements IAiSessionService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public AiMessage persistAssistantAborted(Long sessionId, String content, Long durationMs) {
+        AiMessage message = new AiMessage();
+        message.setSessionId(sessionId);
+        message.setRole(AiMessage.ROLE_ASSISTANT);
+        message.setContent(content);
+        message.setStreaming(STREAMING_DONE);
+        message.setStatus(AiMessage.STATUS_ABORTED);
+        message.setDurationMs(durationMs);
+        message.setToolCallCount(0);
+        messageMapper.insert(message);
+        touchSession(sessionId);
+        return message;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public AiMessage persistPendingTurn(Long sessionId, String content, String replyId, Long durationMs,
                                         List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, Long userId) {
         AiMessage message = new AiMessage();
