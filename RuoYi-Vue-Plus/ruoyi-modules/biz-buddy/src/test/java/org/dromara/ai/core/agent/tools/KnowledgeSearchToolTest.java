@@ -73,11 +73,11 @@ class KnowledgeSearchToolTest {
     }
 
     @Test
-    @DisplayName("生效范围内无可见知识库时给出说明")
+    @DisplayName("生效范围内无可见（或已停用）知识库时给出说明")
     void shouldReturnWhenNoVisibleKb() {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
-        when(knowledgeBaseService.filterVisibleKbIds(any(), any())).thenReturn(List.of());
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of());
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
         assertFalse(isError(result));
@@ -89,7 +89,7 @@ class KnowledgeSearchToolTest {
     void shouldRenderHits() {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
-        when(knowledgeBaseService.filterVisibleKbIds(any(), any())).thenReturn(List.of(1L));
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
         when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any()))
             .thenReturn(List.of(hit(11L, "员工手册", 0.5), hit(12L, "报销制度", 0.9)));
         ToolResultBlock result =
@@ -105,7 +105,7 @@ class KnowledgeSearchToolTest {
     void shouldHandleEmptyHits() {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
-        when(knowledgeBaseService.filterVisibleKbIds(any(), any())).thenReturn(List.of(1L));
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
         when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any())).thenReturn(null);
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
@@ -124,7 +124,7 @@ class KnowledgeSearchToolTest {
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "公开"), "100")).block();
         assertFalse(isError(result));
         assertTrue(text(result).contains("公开资料"));
-        verify(knowledgeBaseService, never()).filterVisibleKbIds(any(), any());
+        verify(knowledgeBaseService, never()).filterRetrievableKbIds(any(), any());
     }
 
     @Test
@@ -132,7 +132,7 @@ class KnowledgeSearchToolTest {
     void shouldReturnBusinessFailure() {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
-        when(knowledgeBaseService.filterVisibleKbIds(any(), any())).thenReturn(List.of(1L));
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
         when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any()))
             .thenThrow(new ServiceException("向量库不可用"));
         ToolResultBlock result =
@@ -146,7 +146,7 @@ class KnowledgeSearchToolTest {
     void shouldReturnUnexpectedFailure() {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
-        when(knowledgeBaseService.filterVisibleKbIds(any(), any())).thenReturn(List.of(1L));
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
         when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any()))
             .thenThrow(new IllegalStateException("boom"));
         ToolResultBlock result =

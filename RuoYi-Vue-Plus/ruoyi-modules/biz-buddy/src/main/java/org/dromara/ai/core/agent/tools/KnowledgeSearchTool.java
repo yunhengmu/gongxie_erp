@@ -133,10 +133,11 @@ public class KnowledgeSearchTool extends ToolBase {
             return Mono.just(ToolResultBlock.error("检索关键词不能为空").withIdAndName(id, name));
         }
         // 生效范围（REQ-AI-17）：Agent 实例按智能体缓存（非按用户），故在此按提问用户实时过滤；
+        // 过滤口径为「可见（visible_scope）**且启用**」——停用库同样不应被检索（docs/14 第 36 项）。
         // 平台出口（MCP）无提问用户，绑定集合已由服务端按「公开且启用」解析，不再过滤（REQ-AI-15）
         List<Long> accessible = platformScope
             ? kbIds
-            : knowledgeBaseService.filterVisibleKbIds(kbIds, resolveOperatorId(param));
+            : knowledgeBaseService.filterRetrievableKbIds(kbIds, resolveOperatorId(param));
         if (accessible.isEmpty()) {
             String message = platformScope
                 ? "未检索到相关内容：平台当前没有可对外检索的公开知识库。"

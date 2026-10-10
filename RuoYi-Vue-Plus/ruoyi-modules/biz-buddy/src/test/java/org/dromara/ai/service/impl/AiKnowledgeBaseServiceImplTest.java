@@ -1,5 +1,6 @@
 package org.dromara.ai.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.dromara.ai.domain.AiKnowledgeBase;
 import org.dromara.ai.domain.AiModelConfig;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -154,6 +156,48 @@ class AiKnowledgeBaseServiceImplTest {
         when(baseMapper.selectList(any())).thenReturn(List.of(kb1, kb2));
 
         assertEquals(List.of(1L, 2L), knowledgeBaseService.filterVisibleKbIds(List.of(1L, 2L, 3L), 7L));
+    }
+
+    /**
+     * 验证过滤可检索知识库主键：与「仅可见」口径的区别是额外限定「启用」状态。
+     */
+    @Test
+    @DisplayName("过滤可检索知识库主键（可见且启用）")
+    void shouldFilterRetrievableKbIds() {
+        assertTrue(knowledgeBaseService.filterRetrievableKbIds(List.of(), 1L).isEmpty());
+        assertTrue(knowledgeBaseService.filterRetrievableKbIds(List.of(1L), null).isEmpty());
+
+        when(userService.selectById(7L)).thenReturn(null);
+        AiKnowledgeBase kb1 = new AiKnowledgeBase();
+        kb1.setId(1L);
+        AiKnowledgeBase kb2 = new AiKnowledgeBase();
+        kb2.setId(2L);
+        when(baseMapper.selectList(any())).thenReturn(List.of(kb1, kb2));
+
+        assertEquals(List.of(1L, 2L), knowledgeBaseService.filterRetrievableKbIds(List.of(1L, 2L, 3L), 7L));
+
+        // 检索链路必须把「停用」库一并排除：查询条件里应出现 status 限定
+        ArgumentCaptor<LambdaQueryWrapper<AiKnowledgeBase>> captor =
+            ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(baseMapper).selectList(captor.capture());
+        assertTrue(captor.getValue().getSqlSegment().contains("status"), "可检索过滤应限定启用状态");
+    }
+
+    /**
+     * 验证「仅可见」口径**不含**启用状态条件：绑定校验等场景保持原行为，不受本次收敛影响。
+     */
+    @Test
+    @DisplayName("过滤可见知识库主键不限定启用状态")
+    void shouldFilterVisibleKbIdsWithoutStatusCondition() {
+        when(userService.selectById(7L)).thenReturn(null);
+        when(baseMapper.selectList(any())).thenReturn(List.of());
+
+        knowledgeBaseService.filterVisibleKbIds(List.of(1L), 7L);
+
+        ArgumentCaptor<LambdaQueryWrapper<AiKnowledgeBase>> captor =
+            ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(baseMapper).selectList(captor.capture());
+        assertFalse(captor.getValue().getSqlSegment().contains("status"), "仅可见口径不应限定启用状态");
     }
 
     /**

@@ -134,6 +134,24 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
 
     @Override
     public List<Long> filterVisibleKbIds(Collection<Long> kbIds, Long userId) {
+        return intersectVisible(kbIds, userId, false);
+    }
+
+    @Override
+    public List<Long> filterRetrievableKbIds(Collection<Long> kbIds, Long userId) {
+        // 检索链路额外要求启用：停用库只应从选项下拉消失是既往口径，此处一并收敛（docs/14 第 36 项）
+        return intersectVisible(kbIds, userId, true);
+    }
+
+    /**
+     * 求「待过滤集合」∩「指定用户可见集合」。
+     *
+     * @param kbIds       待过滤的知识库主键集合
+     * @param userId      用户主键
+     * @param onlyEnabled 是否只取启用中的知识库
+     * @return 交集（保持入参顺序）
+     */
+    private List<Long> intersectVisible(Collection<Long> kbIds, Long userId, boolean onlyEnabled) {
         if (kbIds == null || kbIds.isEmpty()) {
             return List.of();
         }
@@ -142,7 +160,7 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
             return List.of();
         }
         Set<Long> visible = new HashSet<>();
-        for (AiKnowledgeBase kb : baseMapper.selectList(buildVisibleWrapper(userId, false))) {
+        for (AiKnowledgeBase kb : baseMapper.selectList(buildVisibleWrapper(userId, onlyEnabled))) {
             visible.add(kb.getId());
         }
         List<Long> result = new ArrayList<>();
