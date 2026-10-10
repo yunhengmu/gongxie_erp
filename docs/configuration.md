@@ -111,25 +111,31 @@
 |---|---|---|
 | `application.yml` | `server.port` | 默认 `8080`；Jetty，`threads.max=20000`（SSE 长连接持续占槽位，按在线量调） |
 | `application.yml` | `security.excludes` | 免鉴权路径；渠道入站回调 `/ai/channel/callback/**` 在此放开（安全靠验签/口令） |
-| `application.yml` | `api-decrypt` | 接口加解密开关与 RSA 密钥对；**生产必须替换**，需与前端 `.env.*` 成对更换 |
-| `application.yml` | `sa-token` | 认证：token 名、并发登录、JWT 秘钥（**生产必须替换** `jwt-secret-key`） |
+| `application.yml` | `api-decrypt` | 接口加解密开关与 RSA 密钥对；**生产必须替换**（环境变量 `API_DECRYPT_PUBLIC_KEY` / `API_DECRYPT_PRIVATE_KEY`），需与前端 `.env.*` 的 `VITE_APP_RSA_*` 成对更换 |
+| `application.yml` | `sa-token` | 认证：token 名、并发登录、JWT 秘钥（环境变量 `SA_TOKEN_JWT_SECRET_KEY`，**生产必须替换**） |
+| `application.yml` / `application-prod.yml` | `ProductionConfigGuard`（启动自检） | **`prod` profile 启动时**逐项比对出厂示例值（JWT 秘钥 / 接口加密密钥对 / `bizbuddy.ai.crypto-key` / 数据库·Redis·Milvus 口令 / SnailJob 令牌），仍是示例值即**拒绝启动**并列出命中项。非 `prod`（本地与容器默认 `dev`）不干预 |
 | `application-dev.yml` | `spring.datasource.dynamic.datasource.master.*` | 主数据源连接（dynamic-datasource）：PostgreSQL 14 或 MySQL 8.0，仅 JDBC URL 不同（驱动由 Hikari 按 URL 自动匹配，不在配置中声明） |
 | `application-dev.yml` | `spring.data.redis.*` / `redisson.*` | Redis 连接与 Redisson 连接池；dev 配置**要求必须设置 Redis 密码** |
 | `application-dev.yml` | `snail-job.*` | 调度客户端：`enabled`、`group`、`token`、`namespace`、服务端地址 |
-| 数据库表 `sys_oss_config`（**不在 yaml**） | `endpoint` / `domain_url` | 平台文件存储（OSS）的**两个坐标**：`endpoint` 供**服务端读写**（容器部署写 `minio:9000`，容器网络内可达），`domain_url` 供**前端展示**（返回给浏览器的 URL，必须**浏览器可达**——PG 栈 `http://localhost:9000`、MySQL 8.0 栈 `http://localhost:9002`）。解析 / 向量化走内部地址，故 `domain_url` 配错只表现为「图片 / 文档在线预览加载失败」。容器部署由 `deploy*/sql/50-oss-endpoint.sql` 在首次建库时写入，**存量数据卷不会重跑**，需按部署文档手工补一次 |
+| 数据库表 `sys_oss_config`（**不在 yaml**） | `endpoint` / `domain_url` / `access_policy` | 平台文件存储（OSS）坐标：`endpoint` 供**服务端读写**（容器部署写 `minio:9000`，容器网络内可达），`domain_url` 供**前端展示**（返回给浏览器的 URL，必须**浏览器可达**——PG 栈 `http://localhost:9000`、MySQL 8.0 栈 `http://localhost:9002`），`access_policy` 容器部署为 **`0`（私有桶）**。私有桶下文件访问统一由后端**读取时现算预签名 URL**（对外按 `domain_url`、服务端按 `endpoint` 签名），故 `domain_url` 配错会导致前端预览 / 下载失败。容器部署由 `deploy*/sql/50-oss-endpoint.sql` 在首次建库时写入，**存量数据卷不会重跑**，需按部署文档手工补一次 |
+| `application.yml` | `oss.presign-expire-seconds` | 私有桶预签名 URL 有效期（秒），默认 `120`；过短会导致预览 / 下载中途失效，过长则弱化私有桶的访问控制（改后需重启 `ruoyi-admin`） |
 
 ## 4. 生产环境必改清单
 
-| # | 项 | 原因 |
-|---|---|---|
-| 1 | `bizbuddy.ai.crypto-key` | 模型密钥的加密根，默认值等于公开 |
-| 2 | `bizbuddy.ai.mcp-server-token` | 否则 `/mcp` 出口要么不可用要么开放 |
-| 3 | `api-decrypt` 的 RSA 公私钥对 + 前端 `VITE_APP_RSA_*` | 默认密钥对等于公开 |
-| 4 | `sa-token.jwt-secret-key` | 默认值为示例 |
-| 5 | 数据库 / Redis / Milvus 口令 | 默认口令仅用于本地 |
-| 6 | `bizbuddy.ai.current-time-zone` | 容器未挂 tzdata 时会退化为 UTC |
-| 7 | `spring.data.redis.password` | dev 配置要求必填，勿照抄默认值 |
-| 8 | 数据库表 `sys_oss_config.domain_url` | 必须是**浏览器可达**地址；容器部署默认给 `localhost`，从其它机器 / 公网访问需改成实际域名或 IP（各栈端口见部署文档） |
+> **启动自检**：以 `SPRING_PROFILES_ACTIVE=prod` 启动时，[`ProductionConfigGuard`](../RuoYi-Vue-Plus/ruoyi-admin/src/main/java/org/dromara/web/config/ProductionConfigGuard.java) 会逐项比对下表 1~5 及 7 的**出厂示例值**，仍为示例值则**直接拒绝启动**并列出命中项与对应环境变量——即这些项已不是「靠自觉」，漏改会立刻失败。
+
+| # | 配置项 | 环境变量 | 原因 |
+|---|---|---|---|
+| 1 | `bizbuddy.ai.crypto-key` | `BIZBUDDY_AI_CRYPTO_KEY` | 模型密钥的加密根，默认值等于公开（长度须 16/24/32） |
+| 2 | `bizbuddy.ai.chat.mcp-server-token` | —（运行期配置） | `/mcp` 出口口令，在「MCP 服务端」页配置（存 Redis、即时生效）；**留空且开启校验时一律拒绝请求（fail-closed）**，故不在启动自检内 |
+| 3 | `api-decrypt` 的 RSA 公私钥对 + 前端 `VITE_APP_RSA_*` | `API_DECRYPT_PUBLIC_KEY` / `API_DECRYPT_PRIVATE_KEY` | 默认密钥对等于公开，且必须与前端成对更换 |
+| 4 | `sa-token.jwt-secret-key` | `SA_TOKEN_JWT_SECRET_KEY` | 默认值为示例 |
+| 5 | 数据库 / Redis / Milvus 口令 | `POSTGRES_PASSWORD`（MySQL 栈 `MYSQL_PASSWORD`） / `REDIS_PASSWORD` / `MILVUS_PASSWORD` | 默认口令仅用于本地 |
+| 6 | `bizbuddy.ai.chat.current-time-zone` | `BIZBUDDY_AI_CHAT_CURRENT_TIME_ZONE` | 容器未挂 tzdata 时会退化为 UTC（默认 `Asia/Shanghai`，一般无需改） |
+| 7 | `snail-job.token` | `SNAILJOB_TOKEN` | 接入令牌默认随源码公开；须与 `sj_group_config` 表一致 |
+| 8 | 数据库表 `sys_oss_config.domain_url` | —（数据库配置） | 必须是**浏览器可达**地址；容器部署默认给 `localhost`，从其它机器 / 公网访问需改成实际域名或 IP（各栈端口见部署文档） |
+
+> 环境变量名与部署侧的登记见 `deploy/.env.example` / `deploy-mysql/.env.example` 的「生产部署密钥」段。
 
 ## 5. 相关文档
 
