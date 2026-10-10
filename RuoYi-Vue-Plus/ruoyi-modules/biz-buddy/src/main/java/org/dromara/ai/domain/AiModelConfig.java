@@ -20,6 +20,16 @@ import java.math.BigDecimal;
 @TableName("ai_model_config")
 public class AiModelConfig extends BaseEntity {
 
+    /**
+     * 是否支持视觉（图片输入）：支持
+     */
+    public static final String VISION_SUPPORTED = "1";
+
+    /**
+     * 是否支持视觉（图片输入）：不支持
+     */
+    public static final String VISION_UNSUPPORTED = "0";
+
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -48,6 +58,14 @@ public class AiModelConfig extends BaseEntity {
      * 模型标识
      */
     private String modelCode;
+
+    /**
+     * 是否支持视觉（图片输入；仅对话模型有意义）：1是 0否
+     *
+     * <p>聊天上传图片走 AgentScope {@code ImageBlock}（OpenAI {@code image_url}），**非视觉模型**
+     * 会报错或被忽略；本列用于上传前的能力校验，避免「白屏式」的模型侧报错（见 docs/14 第 82 项）。</p>
+     */
+    private String supportsVision;
 
     /**
      * 服务地址（OpenAI 兼容根地址）

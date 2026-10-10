@@ -125,10 +125,23 @@ class AgentRegistryTest {
 
     @BeforeEach
     void setUp() {
-        registry = new AgentRegistry(agentToolMapper, agentKbMapper, toolService, skillService, subagentService,
-            toolFactory, stateStore, aiSkillRepository, aiProperties, writeDedupStore, permissionModeStore,
-            runtimeConfigStore, mcpClientService, sessionResourceService, modelFactory, fingerprintCalculator,
-            snapshotFactory, subagentAssembler, routeOrchestrator);
+        registry = newRegistry(assembler());
+    }
+
+    /**
+     * 构造共享同一批 {@code @Mock} 的真实装配器：注册表把装配职责委托给它，
+     * 故装配主流程用例（模型缺失、指纹重建）仍走真实装配路径。
+     */
+    private AgentAssembler assembler() {
+        return new AgentAssembler(modelFactory, aiProperties, stateStore, toolFactory, writeDedupStore,
+            mcpClientService, aiSkillRepository, permissionModeStore, snapshotFactory, subagentAssembler,
+            routeOrchestrator);
+    }
+
+    private AgentRegistry newRegistry(AgentAssembler assembler) {
+        return new AgentRegistry(agentToolMapper, agentKbMapper, toolService, skillService, subagentService,
+            permissionModeStore, runtimeConfigStore, mcpClientService, sessionResourceService, modelFactory,
+            fingerprintCalculator, assembler);
     }
 
     // ---------- fixtures ----------
@@ -172,9 +185,8 @@ class AgentRegistryTest {
      */
     private AgentRegistry registryWithoutAssembly() {
         return new AgentRegistry(agentToolMapper, agentKbMapper, toolService, skillService, subagentService,
-            toolFactory, stateStore, aiSkillRepository, aiProperties, writeDedupStore, permissionModeStore,
-            runtimeConfigStore, mcpClientService, sessionResourceService, modelFactory, fingerprintCalculator,
-            snapshotFactory, subagentAssembler, routeOrchestrator) {
+            permissionModeStore, runtimeConfigStore, mcpClientService, sessionResourceService, modelFactory,
+            fingerprintCalculator, assembler()) {
             @Override
             public HarnessAgent get(AiAgent definition, AiSessionResourceSet resources) {
                 return null;

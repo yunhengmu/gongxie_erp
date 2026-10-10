@@ -260,6 +260,17 @@ export const confirmChatTool = (sessionId: string | number, data: ChatConfirmBod
 };
 
 /**
+ * 停止该会话当前正在进行的流式执行（对话页「停止」按钮）
+ * @param sessionId 会话主键
+ */
+export const stopChat = (sessionId: string | number): AxiosPromise<void> => {
+  return request({
+    url: `/ai/chat/session/${sessionId}/stop`,
+    method: 'post'
+  });
+};
+
+/**
  * 查询会话内未决的工具确认（刷新页面后恢复确认卡片）
  * @param sessionId 会话主键
  */

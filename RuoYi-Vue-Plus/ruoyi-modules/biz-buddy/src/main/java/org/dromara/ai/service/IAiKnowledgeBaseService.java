@@ -53,14 +53,27 @@ public interface IAiKnowledgeBaseService {
     /**
      * 求「指定知识库集合」与「指定用户可见集合」的交集。
      *
+     * <p>**只判可见性**，不含启用状态；供绑定校验等场景使用。检索链路请用
+     * {@link #filterRetrievableKbIds(Collection, Long)}。</p>
+     *
+     * @param kbIds  待过滤的知识库主键集合
+     * @param userId 提问用户主键
+     * @return 该用户实际可见的知识库主键集合（保持入参顺序）
+     */
+    List<Long> filterVisibleKbIds(Collection<Long> kbIds, Long userId);
+
+    /**
+     * 求「指定知识库集合」与「指定用户可见**且启用**集合」的交集。
+     *
      * <p>供对话检索链路在**运行时**过滤使用——Agent 实例按智能体缓存（非按用户），
-     * 故可见性只能在每次调用时按提问用户判定。</p>
+     * 故生效判定只能在每次调用时按提问用户进行；除生效范围（{@code visible_scope}）外，
+     * 还须排除**已停用**的知识库（停用库不应再被检索）。</p>
      *
      * @param kbIds  智能体绑定的知识库主键集合
      * @param userId 提问用户主键
-     * @return 该用户实际可用的知识库主键集合（保持入参顺序）
+     * @return 该用户实际可检索的知识库主键集合（保持入参顺序）
      */
-    List<Long> filterVisibleKbIds(Collection<Long> kbIds, Long userId);
+    List<Long> filterRetrievableKbIds(Collection<Long> kbIds, Long userId);
 
     /**
      * 校验知识库集合对指定用户是否全部可见，不可见时抛出业务异常。

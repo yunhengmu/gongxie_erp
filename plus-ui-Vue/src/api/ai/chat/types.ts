@@ -60,6 +60,8 @@ export interface ChatMessageVO {
   errorMsg?: string;
   /** 工具调用次数 */
   toolCallCount?: number;
+  /** 总 Token 数 */
+  totalTokens?: number;
   /** 耗时（毫秒） */
   durationMs?: number;
   /** 创建时间 */
@@ -234,6 +236,8 @@ export interface ChatConfirmBody {
   confirmed: boolean;
   /** 是否记住该工具（确认后改写该智能体 × 该工具的授权决策为「允许」） */
   remember?: boolean;
+  /** 自定义拒绝原因（可选；仅 confirmed=false 时生效，回传模型并写入决策日志） */
+  rejectReason?: string;
 }
 
 /** 专家调用明细（REQ-AI-30，来源标注与追溯的载体） */

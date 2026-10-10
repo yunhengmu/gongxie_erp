@@ -34,4 +34,11 @@ public class AiChatConfirmBo implements Serializable {
      */
     private Boolean remember;
 
+    /**
+     * 自定义拒绝原因（可选；仅 {@code confirmed=false} 时生效）。
+     *
+     * <p>回传给模型使其知道「为什么被拒」，并写入权限决策日志，避免用户拒绝后模型重复请求同一工具。</p>
+     */
+    private String rejectReason;
+
 }

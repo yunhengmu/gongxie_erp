@@ -177,6 +177,7 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
         copy.setProvider(source.getProvider());
         copy.setModelType(source.getModelType());
         copy.setModelCode(source.getModelCode());
+        copy.setSupportsVision(source.getSupportsVision());
         copy.setBaseUrl(source.getBaseUrl());
         // 密钥密文原样搬运：不解密、不重加密（明文不进内存与日志，副本与源共享同一密钥）
         copy.setApiKey(source.getApiKey());

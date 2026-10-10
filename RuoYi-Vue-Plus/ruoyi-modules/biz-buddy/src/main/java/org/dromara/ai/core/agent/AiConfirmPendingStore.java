@@ -134,8 +134,9 @@ public class AiConfirmPendingStore {
      * @param toolCallId AgentScope 工具调用 ID
      * @param confirmed  是否确认执行
      * @param remember   是否记住（本次确认后改写该智能体 × 工具的授权决策为「允许」）
+     * @param reason     自定义拒绝原因（可选；{@code confirmed=false} 时随恢复上下文回传模型并写入决策日志）
      */
-    public record PendingDecision(String toolCallId, boolean confirmed, boolean remember) {
+    public record PendingDecision(String toolCallId, boolean confirmed, boolean remember, String reason) {
     }
 
     /**

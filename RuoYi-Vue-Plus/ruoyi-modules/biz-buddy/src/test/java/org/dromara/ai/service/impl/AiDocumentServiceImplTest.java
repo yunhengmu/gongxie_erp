@@ -316,4 +316,77 @@ class AiDocumentServiceImplTest {
         assertTrue(service.queryContent(4L).contains("内容过长"));
     }
 
+    @Test
+    @DisplayName("切片：换行回缩后不得丢字，且相邻切片保持重叠")
+    void shouldKeepCoverageAndOverlapWhenBreakingAtNewline() {
+        // 首行 60 字符，使换行落在切片窗口后半段，触发 end 回缩到换行处；
+        // 其后接 140 个内容唯一的字符，避免 indexOf 定位产生歧义
+        String text = "a".repeat(60) + "\n" + "abcdefghij".repeat(14);
+        int size = 100;
+        int overlap = 20;
+
+        List<String> pieces = AiDocumentServiceImpl.split(text, size, overlap);
+
+        assertTrue(pieces.size() > 1, "应切出多个切片");
+        pieces.forEach(piece -> assertTrue(piece.length() <= size, "切片超长：" + piece.length()));
+        int firstPos = text.indexOf(pieces.get(0));
+        assertEquals(0, firstPos, "首片应自文首开始");
+        // 逐片回原定位：后续片不得出现空隙，且须保持配置的重叠量
+        int cursor = firstPos + pieces.get(0).length();
+        int searchFrom = 0;
+        for (int i = 1; i < pieces.size(); i++) {
+            String piece = pieces.get(i);
+            int pos = text.indexOf(piece, searchFrom);
+            assertTrue(pos >= 0, "切片内容在原文中缺失：" + piece);
+            // 容差 1 字符：切片边界上的换行会被 trim 去掉
+            assertTrue(pos <= cursor + 1, "出现丢字空隙：cursor=" + cursor + " pos=" + pos);
+            assertTrue(cursor - pos >= overlap - 1, "相邻切片未保持重叠：cursor=" + cursor + " pos=" + pos);
+            cursor = pos + piece.length();
+            searchFrom = Math.max(0, cursor - overlap - 1);
+        }
+        assertTrue(text.trim().endsWith(pieces.get(pieces.size() - 1)), "末片未覆盖文末");
+    }
+
+    @Test
+    @DisplayName("切片：无换行文本按切片长度减重叠推进，重叠量恰为配置值")
+    void shouldAdvanceBySizeMinusOverlapWithoutNewline() {
+        String text = "x".repeat(300);
+
+        List<String> pieces = AiDocumentServiceImpl.split(text, 100, 20);
+
+        assertEquals(List.of(100, 100, 100, 60), pieces.stream().map(String::length).toList());
+        int total = pieces.stream().mapToInt(String::length).sum();
+        assertEquals(text.length() + 20 * (pieces.size() - 1), total, "重叠量应恰为配置值");
+    }
+
+    @Test
+    @DisplayName("切片：优先在句末标点处断开，且不切断英文单词")
+    void shouldPreferSentenceAndWordBoundaries() {
+        String text = "Alpha beta gamma. Delta epsilon zeta. Eta theta iota.";
+
+        List<String> pieces = AiDocumentServiceImpl.split(text, 30, 5);
+
+        assertTrue(pieces.size() > 1, "应切出多个切片");
+        pieces.forEach(piece -> assertTrue(piece.length() <= 30, "切片超长：" + piece.length()));
+        // 除末片外都应断在句末标点之后
+        for (int i = 0; i < pieces.size() - 1; i++) {
+            assertTrue(pieces.get(i).endsWith("."), "未断在句末标点处：" + pieces.get(i));
+        }
+        // 任一切片的首尾都不得落在英文单词内部
+        int searchFrom = 0;
+        for (String piece : pieces) {
+            int pos = text.indexOf(piece, searchFrom);
+            assertTrue(pos >= 0, "切片不在原文中：" + piece);
+            int end = pos + piece.length();
+            assertFalse(pos > 0 && isAsciiWordChar(text.charAt(pos - 1)) && isAsciiWordChar(text.charAt(pos)),
+                "切片起点落在单词内部：" + piece);
+            assertFalse(end < text.length() && isAsciiWordChar(text.charAt(end - 1)) && isAsciiWordChar(text.charAt(end)),
+                "切片终点落在单词内部：" + piece);
+            searchFrom = pos;
+        }
+    }
+
+    private static boolean isAsciiWordChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+    }
 }

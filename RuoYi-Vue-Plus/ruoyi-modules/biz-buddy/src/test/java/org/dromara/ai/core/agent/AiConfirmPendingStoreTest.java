@@ -40,7 +40,7 @@ class AiConfirmPendingStoreTest {
     private static AiConfirmPendingStore.PendingConfirm pending() {
         return new AiConfirmPendingStore.PendingConfirm(1L, 2L, 3L, 4L, "reply-1",
             List.of(new AiConfirmPendingStore.PendingToolCall("c1", "create_notice", Map.of("a", 1), "{}")),
-            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false)),
+            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false, null)),
             "2026-01-01T00:00:00",
             new AiConfirmPendingStore.ExpertResume(9L, 8L, "9#8", "task", 1, "first"));
     }

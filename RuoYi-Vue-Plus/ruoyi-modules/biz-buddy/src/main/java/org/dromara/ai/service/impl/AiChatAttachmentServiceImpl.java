@@ -4,6 +4,7 @@ import cn.hutool.http.HttpUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.agent.AiVisionGuard;
 import org.dromara.ai.domain.AiMessageAttachment;
 import org.dromara.ai.domain.bo.AiChatAttachmentBo;
 import org.dromara.ai.domain.vo.AiChatAttachmentVo;
@@ -58,6 +59,11 @@ public class AiChatAttachmentServiceImpl implements IAiChatAttachmentService {
 
     private final AiProperties aiProperties;
 
+    /**
+     * 图片附件的「支持视觉」能力校验（多模态易踩坑：非视觉模型会白屏式报错）
+     */
+    private final AiVisionGuard visionGuard;
+
     @Override
     public AiChatAttachmentVo register(Long sessionId, AiChatAttachmentBo bo) {
         OssDTO oss = resolveOss(bo.getOssId());
@@ -74,6 +80,10 @@ public class AiChatAttachmentServiceImpl implements IAiChatAttachmentService {
         long limit = image ? aiProperties.getChat().getImageMaxBytes() : aiProperties.getChat().getDocumentMaxBytes();
         if (bytes.length > limit) {
             throw new ServiceException((image ? "图片" : "文档") + "大小超过限制（最大 " + humanSize(limit) + "）");
+        }
+        if (image) {
+            // 图片走多模态 ImageBlock，非视觉模型会报错或被忽略：在此按「支持视觉」声明提前拦下并给出明确提示
+            visionGuard.assertImageSupported(sessionId);
         }
         AiMessageAttachment entity = new AiMessageAttachment();
         entity.setSessionId(sessionId);

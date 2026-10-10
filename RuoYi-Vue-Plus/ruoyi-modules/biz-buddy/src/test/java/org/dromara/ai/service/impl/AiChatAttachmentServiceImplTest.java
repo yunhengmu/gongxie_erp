@@ -2,6 +2,7 @@ package org.dromara.ai.service.impl;
 
 import cn.hutool.http.HttpUtil;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.agent.AiVisionGuard;
 import org.dromara.ai.domain.AiMessageAttachment;
 import org.dromara.ai.domain.bo.AiChatAttachmentBo;
 import org.dromara.ai.domain.vo.AiChatAttachmentVo;
@@ -25,7 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -43,10 +47,13 @@ class AiChatAttachmentServiceImplTest {
     @Mock
     private OssService ossService;
 
+    @Mock
+    private AiVisionGuard visionGuard;
+
     private final AiProperties aiProperties = new AiProperties();
 
     private AiChatAttachmentServiceImpl service() {
-        return new AiChatAttachmentServiceImpl(baseMapper, ossService, aiProperties);
+        return new AiChatAttachmentServiceImpl(baseMapper, ossService, aiProperties, visionGuard);
     }
 
     @BeforeAll
@@ -118,6 +125,40 @@ class AiChatAttachmentServiceImplTest {
         ServiceException ex = assertThrows(ServiceException.class,
             () -> service().bindToMessage(1L, 100L, List.of(1L)));
         assertEquals("附件不属于该会话，请重新上传", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("仅图片登记触发视觉能力校验，文档不触发")
+    void shouldCheckVisionOnlyForImage() {
+        when(ossService.selectByIds(String.valueOf(OSS_ID))).thenReturn(List.of(oss("txt")));
+        when(ossService.selectInternalUrlByIds(String.valueOf(OSS_ID))).thenReturn("http://minio/x.txt");
+        when(ossService.selectUrlByIds(String.valueOf(OSS_ID))).thenReturn("http://oss/x.txt");
+        try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
+            http.when(() -> HttpUtil.downloadBytes(anyString())).thenReturn("你好".getBytes(StandardCharsets.UTF_8));
+            service().register(1L, bo());
+        }
+        verify(visionGuard, never()).assertImageSupported(any());
+
+        when(ossService.selectByIds(String.valueOf(OSS_ID))).thenReturn(List.of(oss("png")));
+        try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
+            http.when(() -> HttpUtil.downloadBytes(anyString())).thenReturn(new byte[8]);
+            service().register(1L, bo());
+        }
+        verify(visionGuard).assertImageSupported(1L);
+    }
+
+    @Test
+    @DisplayName("图片附件：模型未声明支持视觉时透传校验异常")
+    void shouldRejectImageWhenVisionUnsupported() {
+        when(ossService.selectByIds(String.valueOf(OSS_ID))).thenReturn(List.of(oss("png")));
+        when(ossService.selectInternalUrlByIds(String.valueOf(OSS_ID))).thenReturn("http://minio/x.png");
+        doThrow(new ServiceException("图片需要「支持视觉」的对话模型")).when(visionGuard).assertImageSupported(1L);
+
+        try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
+            http.when(() -> HttpUtil.downloadBytes(anyString())).thenReturn(new byte[8]);
+            ServiceException ex = assertThrows(ServiceException.class, () -> service().register(1L, bo()));
+            assertEquals("图片需要「支持视觉」的对话模型", ex.getMessage());
+        }
     }
 
     private AiChatAttachmentBo bo() {

@@ -61,7 +61,7 @@ public class AiPermissionDecisionServiceImpl implements IAiPermissionDecisionSer
     }
 
     @Override
-    public void applyConfirm(Long messageId, boolean confirmed, boolean remember) {
+    public void applyConfirm(Long messageId, boolean confirmed, boolean remember, String reason) {
         if (messageId == null) {
             return;
         }
@@ -72,6 +72,10 @@ public class AiPermissionDecisionServiceImpl implements IAiPermissionDecisionSer
         update.setConfirmed(confirmed ? AiPermissionDecisionLog.CONFIRM_APPROVED : AiPermissionDecisionLog.CONFIRM_REJECTED);
         update.setConfirmSource(remember
             ? AiPermissionDecisionLog.CONFIRM_REMEMBER : AiPermissionDecisionLog.CONFIRM_ONCE);
+        if (!confirmed && StringUtils.isNotBlank(reason)) {
+            // 用户自定义拒绝原因留痕：解释「为什么没执行」，与 confirmed=0 互补
+            update.setReason("用户拒绝：" + reason);
+        }
         decisionLogMapper.update(update, lqw);
     }
 

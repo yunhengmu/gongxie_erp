@@ -83,6 +83,14 @@
           </template>
         </el-table-column>
         <el-table-column label="模型标识" align="center" prop="modelCode" :show-overflow-tooltip="true" />
+        <el-table-column label="支持视觉" align="center" width="100">
+          <template #default="scope">
+            <span v-if="scope.row.modelType === 'embedding'" class="text-muted">-</span>
+            <el-tag v-else :type="scope.row.supportsVision === '0' ? 'info' : 'success'" effect="plain">
+              {{ scope.row.supportsVision === '0' ? '否' : '是' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="服务地址" align="center" prop="baseUrl" :show-overflow-tooltip="true" />
         <el-table-column label="密钥" align="center" width="100">
           <template #default="scope">
@@ -178,6 +186,26 @@
         </el-form-item>
         <el-form-item label="模型标识" prop="modelCode">
           <el-input v-model="form.modelCode" placeholder="如：qwen-plus、text-embedding-v3" />
+        </el-form-item>
+        <el-form-item v-if="!isEmbeddingForm" label="支持视觉" prop="supportsVision">
+          <template #label>
+            <span class="label-tip">
+              支持视觉
+              <el-tooltip placement="top">
+                <template #content>
+                  <div class="tip-content">
+                    仅<b>对话模型</b>有意义：聊天上传的<b>图片</b>会以多模态内容块下发给模型。
+                    未开启时平台会在<b>上传图片</b>时直接拦下并提示，避免非视觉模型报错。
+                  </div>
+                </template>
+                <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
+          <el-radio-group v-model="form.supportsVision">
+            <el-radio value="1">是</el-radio>
+            <el-radio value="0">否</el-radio>
+          </el-radio-group>
         </el-form-item>
         <el-form-item label="服务地址" prop="baseUrl">
           <template #label>
@@ -284,6 +312,11 @@
           <el-descriptions-item label="提供商">{{ providerLabel(detail.record.provider) }}</el-descriptions-item>
           <el-descriptions-item label="模型类型">{{ modelTypeLabel(detail.record.modelType) }}</el-descriptions-item>
           <el-descriptions-item label="模型标识">{{ detail.record.modelCode || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="支持视觉">
+            {{ detail.record.modelType === 'embedding'
+              ? '-'
+              : (detail.record.supportsVision === '0' ? '否' : '是') }}
+          </el-descriptions-item>
           <el-descriptions-item label="密钥">{{ detail.record.apiKeyMask || '未配置' }}</el-descriptions-item>
           <el-descriptions-item label="服务地址" :span="2">{{ detail.record.baseUrl || '-' }}</el-descriptions-item>
           <el-descriptions-item label="向量维度">{{ detail.record.dimension ?? '-' }}</el-descriptions-item>
@@ -357,6 +390,7 @@ const initFormData: ModelConfigForm = {
   provider: 'dashscope',
   modelType: 'chat',
   modelCode: undefined,
+  supportsVision: '1',
   baseUrl: PROVIDER_OPTIONS[1].baseUrl,
   apiKey: undefined,
   dimension: undefined,

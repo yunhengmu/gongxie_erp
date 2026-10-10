@@ -1,5 +1,6 @@
 package org.dromara.ai.core.agent;
 
+import io.agentscope.core.agent.AgentRun;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.message.Msg;
@@ -28,10 +29,10 @@ import org.dromara.ai.test.AiTestSupport;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -117,8 +118,32 @@ class AiChatFacadeTest {
     @Mock
     private IAiChatAttachmentService attachmentService;
 
-    @InjectMocks
+    @Mock
+    private AiRunRegistry runRegistry;
+
     private AiChatFacade facade;
+
+    /**
+     * 显式构造门面：门面已按职责拆出协作类（附件装配等），{@code @InjectMocks} 无法为具体类注入。
+     * 拆出的类用**真实实例 + 共享同一批 {@code @Mock}**，故原有 verify 断言不受影响。
+     */
+    @BeforeEach
+    void setUp() {
+        AiAttachmentAssembler assembler = new AiAttachmentAssembler(attachmentService, aiProperties);
+        AiRouteSupport routeSupport = new AiRouteSupport(skillService, scenarioPackService);
+        AiTrustApplier trustApplier = new AiTrustApplier(agentRegistry, agentService);
+        AiTurnFinisher turnFinisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
+            traceService, memoryService, aiProperties, routeRecorder, pendingStore);
+        AiIntegrationDriver integrationDriver = new AiIntegrationDriver(sessionService, pendingStore, traceService,
+            routeOrchestrator, streamBridge, runRegistry, turnFinisher);
+        AiExpertResumeDriver expertResumeDriver = new AiExpertResumeDriver(sessionService, agentService, agentRegistry,
+            pendingStore, traceService, sessionResourceService, expertDirectory, slotStore, permissionModeStore,
+            routeOrchestrator, runRegistry, turnFinisher, integrationDriver, routeSupport, trustApplier);
+        facade = new AiChatFacade(sessionService, agentService, messageMapper, agentRegistry, aiProperties,
+            pendingStore, permissionModeStore, decisionService, usageStatService, quotaService,
+            sessionResourceService, expertDirectory, routeRecorder, assembler, routeSupport, trustApplier,
+            slotStore, streamBridge, traceService, runRegistry, turnFinisher, integrationDriver, expertResumeDriver);
+    }
 
     @BeforeAll
     static void init() {
@@ -212,8 +237,8 @@ class AiChatFacadeTest {
 
         facade.confirm(SESSION_ID, bo);
 
-        verify(pendingStore).save(withDecisions(p, true, false));
-        verify(decisionService).applyConfirm(MESSAGE_ID, true, false);
+        verify(pendingStore).save(withDecisions(p, true, false, null));
+        verify(decisionService).applyConfirm(MESSAGE_ID, true, false, null);
         verify(agentService, never()).rememberToolForAgent(any(), any(), any());
     }
 
@@ -226,9 +251,23 @@ class AiChatFacadeTest {
 
         facade.confirm(SESSION_ID, bo);
 
-        verify(pendingStore).save(withDecisions(p, false, true));
-        verify(decisionService).applyConfirm(MESSAGE_ID, false, true);
+        verify(pendingStore).save(withDecisions(p, false, true, null));
+        verify(decisionService).applyConfirm(MESSAGE_ID, false, true, null);
         verify(agentService, never()).rememberToolForAgent(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("拒绝并带原因：原因随决策暂存并写入决策日志")
+    void shouldRecordRejectionReason() {
+        AiChatConfirmBo bo = confirmBo(MESSAGE_ID, false, false);
+        bo.setRejectReason("  数据敏感，暂不执行  ");
+        AiConfirmPendingStore.PendingConfirm p = pending(twoCalls(), null);
+        when(pendingStore.get(SESSION_ID, MESSAGE_ID)).thenReturn(Optional.of(p));
+
+        facade.confirm(SESSION_ID, bo);
+
+        verify(pendingStore).save(withDecisions(p, false, false, "数据敏感，暂不执行"));
+        verify(decisionService).applyConfirm(MESSAGE_ID, false, false, "数据敏感，暂不执行");
     }
 
     @Test
@@ -248,8 +287,8 @@ class AiChatFacadeTest {
         verify(agentService).rememberToolForAgent(7L, 4L, "delete_user");
         verify(agentRegistry).get(definition, resources);
         verify(agentRegistry, never()).getExpert(definition, resources);
-        verify(pendingStore).save(withDecisions(p, true, true));
-        verify(decisionService).applyConfirm(MESSAGE_ID, true, true);
+        verify(pendingStore).save(withDecisions(p, true, true, null));
+        verify(decisionService).applyConfirm(MESSAGE_ID, true, true, null);
     }
 
     @Test
@@ -271,8 +310,21 @@ class AiChatFacadeTest {
         verify(agentService).rememberToolForAgent(7L, 4L, "delete_user");
         verify(agentRegistry).getExpert(definition, resources);
         verify(agentRegistry, never()).get(definition, resources);
-        verify(pendingStore).save(withDecisions(p, true, true));
-        verify(decisionService).applyConfirm(MESSAGE_ID, true, true);
+        verify(pendingStore).save(withDecisions(p, true, true, null));
+        verify(decisionService).applyConfirm(MESSAGE_ID, true, true, null);
+    }
+
+    // ---------------- stop ----------------
+
+    @Test
+    @DisplayName("stop：校验会话归属后取消当前执行")
+    void shouldCancelRunningExecution() {
+        when(sessionService.getOwnedSession(SESSION_ID)).thenReturn(session("0"));
+        when(runRegistry.cancel(SESSION_ID)).thenReturn(true);
+
+        facade.stop(SESSION_ID);
+
+        verify(runRegistry).cancel(SESSION_ID);
     }
 
     // ---------------- streamChat：前置校验 / 早退 ----------------
@@ -358,7 +410,8 @@ class AiChatFacadeTest {
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
         when(agentRegistry.get(definition, resources)).thenReturn(agent);
         when(attachmentService.listByMessageId(any())).thenReturn(List.of());
-        when(agent.streamEvents(any(Msg.class), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>empty());
+        when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>empty()));
         when(aiProperties.getChat()).thenReturn(new AiProperties.Chat());
         when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
@@ -389,8 +442,8 @@ class AiChatFacadeTest {
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
         when(agentRegistry.get(definition, resources)).thenReturn(agent);
         when(attachmentService.listByMessageId(any())).thenReturn(List.of());
-        when(agent.streamEvents(any(Msg.class), any(RuntimeContext.class)))
-            .thenReturn(Flux.<AgentEvent>error(new RuntimeException("boom")));
+        when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>error(new RuntimeException("boom"))));
         SseEmitter emitter = mock(SseEmitter.class);
 
         try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
@@ -462,7 +515,7 @@ class AiChatFacadeTest {
         AiConfirmPendingStore.ExpertResume resume =
             new AiConfirmPendingStore.ExpertResume(9L, 8L, "9#8", "task", 1, "first");
         List<AiConfirmPendingStore.PendingDecision> decisions =
-            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false));
+            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false, null));
         when(sessionService.getOwnedSession(SESSION_ID)).thenReturn(session("0"));
         when(messageMapper.selectById(MESSAGE_ID)).thenReturn(userMessage(SESSION_ID));
         when(pendingStore.get(SESSION_ID, MESSAGE_ID))
@@ -487,7 +540,7 @@ class AiChatFacadeTest {
         HarnessAgent agent = mock(HarnessAgent.class);
         AiMessage assistant = mock(AiMessage.class);
         List<AiConfirmPendingStore.PendingDecision> decisions =
-            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false));
+            List.of(new AiConfirmPendingStore.PendingDecision("c1", true, false, null));
         AiConfirmPendingStore.PendingConfirm pending = new AiConfirmPendingStore.PendingConfirm(
             SESSION_ID, MESSAGE_ID, 7L, null, "reply-1", List.of(), decisions, "2026-01-01T00:00:00", null);
         when(sessionService.getOwnedSession(SESSION_ID)).thenReturn(session);
@@ -498,7 +551,8 @@ class AiChatFacadeTest {
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
         when(slotStore.merge(null, SESSION_ID)).thenReturn(AiSlotSet.empty());
         when(agentRegistry.get(definition, resources)).thenReturn(agent);
-        when(agent.streamEvents(anyList(), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>empty());
+        when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>empty()));
         when(aiProperties.getChat()).thenReturn(new AiProperties.Chat());
         when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any())).thenReturn(assistant);
         when(assistant.getId()).thenReturn(200L);
@@ -571,10 +625,10 @@ class AiChatFacadeTest {
     }
 
     private static AiConfirmPendingStore.PendingConfirm withDecisions(
-        AiConfirmPendingStore.PendingConfirm p, boolean confirmed, boolean remember) {
+        AiConfirmPendingStore.PendingConfirm p, boolean confirmed, boolean remember, String reason) {
         List<AiConfirmPendingStore.PendingDecision> decisions = new ArrayList<>();
         for (AiConfirmPendingStore.PendingToolCall call : p.toolCalls()) {
-            decisions.add(new AiConfirmPendingStore.PendingDecision(call.toolCallId(), confirmed, remember));
+            decisions.add(new AiConfirmPendingStore.PendingDecision(call.toolCallId(), confirmed, remember, reason));
         }
         return new AiConfirmPendingStore.PendingConfirm(p.sessionId(), p.messageId(), p.agentId(), p.userId(),
             p.replyId(), p.toolCalls(), decisions, p.createdAt(), p.expertResume());
