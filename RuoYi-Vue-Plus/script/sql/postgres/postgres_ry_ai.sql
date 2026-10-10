@@ -210,6 +210,7 @@ create table if not exists ai_model_config (
     provider        varchar(50)    not null,
     model_type      varchar(20)    not null,
     model_code      varchar(100)   not null,
+    supports_vision char(1)        default '1',
     base_url        varchar(255)   not null,
     api_key         text,
     dimension       integer,
@@ -232,6 +233,7 @@ comment on column ai_model_config.config_name is '配置名称';
 comment on column ai_model_config.provider is '提供商（openai/dashscope/deepseek/glm/ollama/custom）';
 comment on column ai_model_config.model_type is '模型类型（chat 对话 / embedding 向量）';
 comment on column ai_model_config.model_code is '模型标识（如 qwen-plus、text-embedding-v3）';
+comment on column ai_model_config.supports_vision is '是否支持视觉（图片输入；仅对话模型有意义）：1是 0否';
 comment on column ai_model_config.base_url is '服务地址（OpenAI 兼容根地址）';
 comment on column ai_model_config.api_key is 'API 密钥（AES 密文）';
 comment on column ai_model_config.dimension is '向量维度（embedding 模型必填）';
@@ -1283,18 +1285,20 @@ create unique index if not exists uk_ai_scenario_pack_skill on ai_scenario_pack_
 --      OpenAI 兼容客户端，直接使用下面的 base_url（百炼的 OpenAI 兼容根地址）。
 --   c. 向量模型的 dimension 须与该模型实际输出维度一致（此处按 1024 预置）。
 -- ============================================================
-insert into ai_model_config (id, config_name, provider, model_type, model_code, base_url, api_key,
+insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
+                             base_url, api_key,
                              dimension, status, remark, create_dept, create_by, create_time, del_flag)
-values (1761400000000020400, 'deepseek-v4-flash-0731', 'dashscope', 'chat', 'deepseek-v4-flash-0731',
+values (1761400000000020400, 'deepseek-v4-flash-0731', 'dashscope', 'chat', 'deepseek-v4-flash-0731', '1',
         'https://dashscope.aliyuncs.com/compatible-mode/v1', null,
         null, '0',
         '预置示例（对话模型，阿里云百炼）：部署后请把 API 密钥换成本人的，或另行新建模型',
         1761000000000000103, 1761100000000000001, now(), '0')
 on conflict (id) do nothing;
 
-insert into ai_model_config (id, config_name, provider, model_type, model_code, base_url, api_key,
+insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
+                             base_url, api_key,
                              dimension, status, remark, create_dept, create_by, create_time, del_flag)
-values (1761400000000020401, 'qwen3.7-text-embedding', 'dashscope', 'embedding', 'qwen3.7-text-embedding',
+values (1761400000000020401, 'qwen3.7-text-embedding', 'dashscope', 'embedding', 'qwen3.7-text-embedding', '1',
         'https://dashscope.aliyuncs.com/compatible-mode/v1', null,
         1024, '0',
         '预置示例（向量模型，阿里云百炼）：维度须与模型实际输出一致；部署后请换密钥或另行新建模型',

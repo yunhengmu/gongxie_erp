@@ -13,6 +13,8 @@ export interface ModelConfigVO {
   modelType: string;
   /** 模型标识 */
   modelCode: string;
+  /** 是否支持视觉（图片输入；仅对话模型有意义）：1是 0否 */
+  supportsVision?: string;
   /** 服务地址 */
   baseUrl: string;
   /** 密钥掩码：已配置为 ******，未配置为空串 */
@@ -48,6 +50,8 @@ export interface ModelConfigForm extends BaseEntity {
   modelType?: string;
   /** 模型标识 */
   modelCode?: string;
+  /** 是否支持视觉（图片输入；仅对话模型有意义）：1是 0否 */
+  supportsVision?: string;
   /** 服务地址 */
   baseUrl?: string;
   /** 密钥明文：新增时填写，修改时留空表示不修改 */

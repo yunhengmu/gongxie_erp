@@ -48,6 +48,11 @@ public class AiModelConfigVo implements Serializable {
     private String modelCode;
 
     /**
+     * 是否支持视觉（图片输入；仅对话模型有意义）：1是 0否
+     */
+    private String supportsVision;
+
+    /**
      * 服务地址
      */
     private String baseUrl;
