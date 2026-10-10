@@ -76,6 +76,27 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
      */
     private static final int DEFAULT_CHUNK_SIZE = 500;
 
+    /**
+     * 中文句末标点：其后恒视为断点
+     */
+    private static final String CJK_SENTENCE_ENDINGS = "。！？；…";
+
+    /**
+     * 英文句末标点：仅当后一位不再是词字符时才算断点，
+     * 避免把 {@code 4.1}、{@code gitee.com} 这类串误判为句末
+     */
+    private static final String ASCII_SENTENCE_ENDINGS = ".!?;";
+
+    /**
+     * 句内停顿标点：无句末标点时的次级断点
+     */
+    private static final String CLAUSE_PAUSES = "，、,：:—";
+
+    /**
+     * 英文单词回退上限：超过该长度视为非自然串（URL / 长 ID），不再为其缩短切片
+     */
+    private static final int WORD_LOOKBACK_LIMIT = 32;
+
     private final AiDocumentMapper baseMapper;
 
     private final AiChunkMapper chunkMapper;
@@ -283,30 +304,32 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
     }
 
     /**
-     * 按知识库切分策略切分文本，尽量在换行处断开。
+     * 按知识库切分策略切分文本：优先在句末标点处断开，其次句内停顿标点 / 空白 / 英文单词边界，
+     * 最后才硬切（硬切也尽量不切断英文单词）。
+     *
+     * <p>产出保证：全文无遗漏（相邻切片首尾相接或重叠）、单片长度不超过 {@code chunkSize}。
+     * 重叠为「尽量接近」而非严格等于 {@code chunkOverlap}：下一片起点会前移到最近的天然边界，
+     * 只前移不后移，故不会产生原文缺口。包级可见以便直接单测。</p>
      *
      * @param text        全文
      * @param chunkSize   切片长度
      * @param chunkOverlap 切片重叠长度
      * @return 切片列表
      */
-    private List<String> split(String text, Integer chunkSize, Integer chunkOverlap) {
+    static List<String> split(String text, Integer chunkSize, Integer chunkOverlap) {
         int size = chunkSize == null || chunkSize <= 0 ? DEFAULT_CHUNK_SIZE : chunkSize;
         int overlap = chunkOverlap == null || chunkOverlap < 0 ? 0 : chunkOverlap;
         if (overlap >= size) {
+            // 重叠达到切片长度时推进量为零，会死循环；按五分之一兜底
             overlap = size / 5;
         }
-        int step = size - overlap;
         int length = text.length();
         List<String> pieces = new ArrayList<>();
         int start = 0;
         while (start < length) {
             int end = Math.min(start + size, length);
             if (end < length) {
-                int newline = text.lastIndexOf('\n', end);
-                if (newline > start + size / 2) {
-                    end = newline + 1;
-                }
+                end = pickBreakPoint(text, start, end);
             }
             String piece = text.substring(start, end).trim();
             if (!piece.isEmpty()) {
@@ -315,9 +338,133 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
             if (end >= length) {
                 break;
             }
-            start += step;
+            // 下一片起点：先按配置回退，再前移到最近的天然边界（词汇 / 句子起点），
+            // 使切片不从词或句子中间开始；只前移不后移，故不会丢字
+            start = alignToNaturalStart(text, Math.max(end - overlap, start + 1), start, overlap);
         }
         return pieces;
+    }
+
+    /**
+     * 选取切片结束点：句末标点优先，其次停顿标点 / 空白 / 英文单词结束处，最后硬切。
+     *
+     * <p>断点只取窗口后半段，避免切出过短切片。</p>
+     *
+     * @param text  全文
+     * @param start 切片起点
+     * @param limit 窗口上限（{@code start + chunkSize}，严格小于全文长度）
+     * @return 结束位置（不含）
+     */
+    private static int pickBreakPoint(String text, int start, int limit) {
+        int floor = start + (limit - start) / 2;
+        for (int i = limit - 1; i >= floor; i--) {
+            if (isSentenceEnd(text, i)) {
+                return i + 1;
+            }
+        }
+        for (int i = limit - 1; i >= floor; i--) {
+            if (isSoftBoundary(text, i)) {
+                return i + 1;
+            }
+        }
+        return avoidWordSplit(text, start, limit);
+    }
+
+    /**
+     * 该位置是否为句末断点：换行与中文句末标点恒成立；英文句末标点需后一位不再是词字符。
+     *
+     * @param text 全文
+     * @param i    待判位置
+     * @return 是否可视为句末
+     */
+    private static boolean isSentenceEnd(String text, int i) {
+        char c = text.charAt(i);
+        if (c == '\n' || c == '\r' || CJK_SENTENCE_ENDINGS.indexOf(c) >= 0) {
+            return true;
+        }
+        return ASCII_SENTENCE_ENDINGS.indexOf(c) >= 0
+            && (i + 1 >= text.length() || !isAsciiWordChar(text.charAt(i + 1)));
+    }
+
+    /**
+     * 次级断点：句内停顿标点、空白，或英文单词结束处（右侧不再是词字符）。
+     *
+     * @param text 全文
+     * @param i    待判位置（保证 {@code i + 1} 在界内）
+     * @return 是否可在此处断开
+     */
+    private static boolean isSoftBoundary(String text, int i) {
+        char c = text.charAt(i);
+        if (CLAUSE_PAUSES.indexOf(c) >= 0 || Character.isWhitespace(c)) {
+            return true;
+        }
+        return isAsciiWordChar(c) && !isAsciiWordChar(text.charAt(i + 1));
+    }
+
+    /**
+     * 硬切落在英文单词中间时回退到词首；超长「单词」（URL、长 ID 等非自然串）不做回退。
+     *
+     * @param text  全文
+     * @param start 切片起点
+     * @param limit 硬切位置
+     * @return 实际结束位置（不含）
+     */
+    private static int avoidWordSplit(String text, int start, int limit) {
+        if (limit >= text.length()
+            || !isAsciiWordChar(text.charAt(limit - 1)) || !isAsciiWordChar(text.charAt(limit))) {
+            return limit;
+        }
+        int wordStart = limit - 1;
+        while (wordStart > start && isAsciiWordChar(text.charAt(wordStart - 1))) {
+            wordStart--;
+        }
+        return limit - wordStart <= WORD_LOOKBACK_LIMIT && wordStart > start ? wordStart : limit;
+    }
+
+    /**
+     * 把下一片起点前移到最近的天然边界（句末 / 停顿标点 / 空白之后，或英文单词首）。
+     *
+     * @param text     全文
+     * @param pos      期望起点（已按重叠回退）
+     * @param floor    上一片起点（结果必须大于它，保证推进）
+     * @param lookback 前移搜索范围（不超过配置的重叠长度，避免重叠被放大过多）
+     * @return 实际起点
+     */
+    private static int alignToNaturalStart(String text, int pos, int floor, int lookback) {
+        int lowerBound = Math.max(floor, pos - lookback);
+        for (int i = pos; i > lowerBound; i--) {
+            if (isNaturalStart(text, i)) {
+                return i;
+            }
+        }
+        return pos;
+    }
+
+    /**
+     * 该位置是否为天然起点：位于句末 / 停顿标点或空白之后，或恰为英文单词首。
+     *
+     * @param text 全文
+     * @param i    待判位置（保证大于 0）
+     * @return 是否适合作为一个切片的起点
+     */
+    private static boolean isNaturalStart(String text, int i) {
+        char prev = text.charAt(i - 1);
+        if (isSentenceEnd(text, i - 1) || CLAUSE_PAUSES.indexOf(prev) >= 0
+            || Character.isWhitespace(prev)) {
+            return true;
+        }
+        return isAsciiWordChar(text.charAt(i)) && !isAsciiWordChar(prev);
+    }
+
+    /**
+     * ASCII 词字符判定：仅用于识别英文单词边界，中文无需按词切分。
+     *
+     * @param c 字符
+     * @return 是否属于英文单词
+     */
+    private static boolean isAsciiWordChar(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+            || c == '_' || c == '\'';
     }
 
     /**
