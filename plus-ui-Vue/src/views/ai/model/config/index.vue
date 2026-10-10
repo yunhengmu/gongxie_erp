@@ -83,6 +83,14 @@
           </template>
         </el-table-column>
         <el-table-column label="模型标识" align="center" prop="modelCode" :show-overflow-tooltip="true" />
+        <el-table-column label="支持视觉" align="center" width="100">
+          <template #default="scope">
+            <span v-if="scope.row.modelType === 'embedding'" class="text-muted">-</span>
+            <el-tag v-else :type="scope.row.supportsVision === '0' ? 'info' : 'success'" effect="plain">
+              {{ scope.row.supportsVision === '0' ? '否' : '是' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="服务地址" align="center" prop="baseUrl" :show-overflow-tooltip="true" />
         <el-table-column label="密钥" align="center" width="100">
           <template #default="scope">
@@ -305,7 +313,9 @@
           <el-descriptions-item label="模型类型">{{ modelTypeLabel(detail.record.modelType) }}</el-descriptions-item>
           <el-descriptions-item label="模型标识">{{ detail.record.modelCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="支持视觉">
-            {{ detail.record.supportsVision === '0' ? '否' : '是' }}
+            {{ detail.record.modelType === 'embedding'
+              ? '-'
+              : (detail.record.supportsVision === '0' ? '否' : '是') }}
           </el-descriptions-item>
           <el-descriptions-item label="密钥">{{ detail.record.apiKeyMask || '未配置' }}</el-descriptions-item>
           <el-descriptions-item label="服务地址" :span="2">{{ detail.record.baseUrl || '-' }}</el-descriptions-item>
