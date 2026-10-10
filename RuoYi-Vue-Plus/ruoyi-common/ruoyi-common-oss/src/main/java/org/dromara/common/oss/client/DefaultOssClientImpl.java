@@ -88,6 +88,17 @@ public class DefaultOssClientImpl extends AbstractOssClientImpl {
                 .build())
             .build();
 
+        // 创建服务端内部读取专用的预签名生成器：固定绑定访问端点（endpoint），忽略自定义域名。
+        // 外部 presigner 绑定的是 domainUrl（对外可达），容器内解析不了，故内部下载必须用这一份。
+        this.s3InternalPresigner = S3Presigner.builder()
+            .region(region)
+            .credentialsProvider(credentialsProvider)
+            .endpointOverride(URI.create(endpointUrl))
+            .serviceConfiguration(S3Configuration.builder()
+                .pathStyleAccessEnabled(usePathStyleAccess)
+                .build())
+            .build();
+
         // 创建异步调度器对象
         OssAsyncExecutorConfig asyncExecutorConfig = config.asyncExecutorConfig();
         // 是否使用虚拟线程

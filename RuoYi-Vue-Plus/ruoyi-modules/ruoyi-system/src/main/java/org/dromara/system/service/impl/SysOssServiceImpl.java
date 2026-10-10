@@ -30,6 +30,7 @@ import org.dromara.system.domain.vo.SysOssVo;
 import org.dromara.system.mapper.SysOssMapper;
 import org.dromara.system.service.ISysOssService;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -58,6 +59,12 @@ import java.util.function.Supplier;
 public class SysOssServiceImpl implements ISysOssService, OssService {
 
     private final SysOssMapper ossMapper;
+
+    /**
+     * 私有桶预签名 URL 有效期（秒），默认 120s。
+     */
+    @Value("${oss.presign-expire-seconds:120}")
+    private long presignExpireSeconds = 120;
 
     /**
      * 查询OSS对象存储列表
@@ -346,16 +353,16 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
     }
 
     /**
-     * 桶类型为 private 的URL 修改为临时URL时长为120s
+     * 私有桶的 URL 改为临时预签名 URL（默认有效期 120s，可由 oss.presign-expire-seconds 配置）。
      *
      * @param oss OSS对象
      * @return oss 匹配Url的OSS对象
      */
     private SysOssVo matchingUrl(SysOssVo oss) {
         OssClient instance = OssFactory.instance(oss.getService());
-        // 仅修改桶类型为 private 的URL，临时URL时长为120s
+        // 仅修改桶类型为 private 的URL
         if (instance.verifyConfig(config -> AccessPolicy.PRIVATE.equals(config.accessControlPolicyConfig().accessPolicy()))) {
-            oss.setUrl(instance.presignGetUrl(oss.getFileName(), Duration.ofSeconds(120)));
+            oss.setUrl(instance.presignGetUrl(oss.getFileName(), presignExpire()));
             return oss;
         }
         // 公开桶：按客户端配置重新生成对外访问地址。
@@ -373,19 +380,19 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
     }
 
     /**
-     * 桶类型为 private 的URL 修改为临时URL时长为120s，公开桶生成服务端读写地址。
+     * 生成服务端读写地址：私有桶用内部预签名（忽略自定义域名），公开桶按访问端点生成。
      * <p>
-     * 与 {@link #matchingUrl(SysOssVo)}（对外地址）不同：公开桶忽略自定义域名，
-     * 一律按访问端点（endpoint）生成，供容器内服务端下载/解析使用。
+     * 与 {@link #matchingUrl(SysOssVo)}（对外地址）不同：一律忽略自定义域名，按访问端点
+     * （endpoint）生成，供容器内服务端下载/解析使用——容器内往往解析不了对外域名。
      *
      * @param oss OSS对象
      * @return oss 匹配服务端读写地址的OSS对象
      */
     private SysOssVo matchingInternalUrl(SysOssVo oss) {
         OssClient instance = OssFactory.instance(oss.getService());
-        // 私有桶：仍使用 120s 预签名地址（服务端可访问）
+        // 私有桶：使用内部预签名地址（按 endpoint 签名，容器内可访问）
         if (instance.verifyConfig(config -> AccessPolicy.PRIVATE.equals(config.accessControlPolicyConfig().accessPolicy()))) {
-            oss.setUrl(instance.presignGetUrl(oss.getFileName(), Duration.ofSeconds(120)));
+            oss.setUrl(instance.presignInternalGetUrl(oss.getFileName(), presignExpire()));
             return oss;
         }
         // 公开桶：按访问端点（endpoint，容器部署为 minio:9000）生成服务端读写地址，忽略对外域名
@@ -397,5 +404,14 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
             }
         }
         return oss;
+    }
+
+    /**
+     * 私有桶预签名 URL 有效期。
+     *
+     * @return 有效期
+     */
+    private Duration presignExpire() {
+        return Duration.ofSeconds(presignExpireSeconds);
     }
 }

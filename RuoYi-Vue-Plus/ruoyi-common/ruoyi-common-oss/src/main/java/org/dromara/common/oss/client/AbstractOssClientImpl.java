@@ -93,6 +93,11 @@ public abstract class AbstractOssClientImpl implements OssClient {
     protected S3Presigner s3Presigner;
 
     /**
+     * AWS S3 预签名 URL 生成器（按访问端点 endpoint 签名，供服务端内部读取使用，忽略自定义域名）。
+     */
+    protected S3Presigner s3InternalPresigner;
+
+    /**
      * 异步调度线程池。
      */
     protected ExecutorService asyncExecutor;
@@ -728,7 +733,7 @@ public abstract class AbstractOssClientImpl implements OssClient {
      */
     @Override
     public String bucketPresignGetUrl(String bucket, String key, Duration expiredTime) {
-        if (useBucketBoundDomain(bucket)) {
+        if (config.useBucketBoundDomain(bucket)) {
             return bucketBoundDomainPresignUrl(SdkHttpMethod.GET, key, expiredTime, Collections.emptyMap());
         }
         try {
@@ -754,7 +759,7 @@ public abstract class AbstractOssClientImpl implements OssClient {
      */
     @Override
     public String bucketPresignPutUrl(String bucket, String key, Duration expiredTime, Map<String, String> metadata) {
-        if (useBucketBoundDomain(bucket)) {
+        if (config.useBucketBoundDomain(bucket)) {
             return bucketBoundDomainPresignUrl(SdkHttpMethod.PUT, key, expiredTime, metadata);
         }
         try {
@@ -767,20 +772,6 @@ public abstract class AbstractOssClientImpl implements OssClient {
         } catch (Exception e) {
             throw toStorageException(e);
         }
-    }
-
-    /**
-     * 是否使用已绑定默认桶的自定义域名生成无桶名预签名 URL。
-     *
-     * @param bucket 存储桶名称
-     * @return 是否使用自定义域名签名
-     */
-    private boolean useBucketBoundDomain(String bucket) {
-        return config.domain()
-            .filter(StringUtils::isNotBlank)
-            .isPresent() && config.bucket()
-            .filter(defaultBucket -> Objects.equals(defaultBucket, bucket))
-            .isPresent();
     }
 
     /**
@@ -1120,6 +1111,29 @@ public abstract class AbstractOssClientImpl implements OssClient {
     }
 
     /**
+     * 生成默认存储桶对象的下载预签名 URL（服务端内部使用，忽略自定义域名）。
+     *
+     * @param key         对象键
+     * @param expiredTime 过期时间
+     * @return 预签名下载 URL
+     */
+    @Override
+    public String presignInternalGetUrl(String key, Duration expiredTime) {
+        // 服务端内部读取：用绑定访问端点（endpoint）的预签名器，忽略自定义域名
+        // （domain_url 常仅对外可达，容器内解析 localhost 会 Connection refused）
+        try {
+            return s3InternalPresigner.presignGetObject(getObjectPresignRequestBuilder -> {
+                    getObjectPresignRequestBuilder.signatureDuration(expiredTime)
+                        .getObjectRequest(getObjectRequestBuilder -> getObjectRequestBuilder.bucket(defaultBucket()).key(key));
+                })
+                .url()
+                .toExternalForm();
+        } catch (Exception e) {
+            throw toStorageException(e);
+        }
+    }
+
+    /**
      * 生成默认存储桶对象的上传预签名 URL。
      *
      * @param key         对象键
@@ -1242,6 +1256,9 @@ public abstract class AbstractOssClientImpl implements OssClient {
         }
         if (s3Presigner != null) {
             s3Presigner.close();
+        }
+        if (s3InternalPresigner != null) {
+            s3InternalPresigner.close();
         }
         if (asyncExecutor != null) {
             asyncExecutor.close();

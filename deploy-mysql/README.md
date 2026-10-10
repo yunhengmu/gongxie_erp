@@ -120,7 +120,7 @@ docker logs bizbuddy-mysql 2>&1 | grep -iE 'docker-entrypoint|ERROR'
 原因：Spring 松散绑定下 `SNAILJOB_HOST` 落到 **`snail-job.host`（客户端自己的 IP）**。本目录已改用 `SNAILJOB_SERVER_HOST`。
 
 **⑥ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
-原因：**平台文件存储（OSS）坐标存在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9002/9003）；② 一次性初始化 `minio-init` 建桶并设为可公开读。`deploy-mysql/sql/50-oss-endpoint.sql` 会在首次建库时把端点改成 `minio:9000`；**已初始化过的数据卷不会重跑**，需手动补一次：
+原因：**平台文件存储（OSS）坐标存在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9002/9003）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`）。`deploy-mysql/sql/50-oss-endpoint.sql` 会在首次建库时把端点改成 `minio:9000`、`domain_url` 写成宿主机可达地址、`access_policy` 置 `0`（私有，文件访问走后端下发的预签名 URL）；**已初始化过的数据卷不会重跑**，需手动补一次：
 
 ```bash
 docker exec -i bizbuddy-mysql mysql -uroot -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < deploy-mysql/sql/50-oss-endpoint.sql
@@ -137,8 +137,9 @@ MinIO 控制台：<http://localhost:9003>（`ruoyi` / `ruoyi123`）。
 **⑧ 上传成功，但图片 / 文档在页面上「加载失败」**
 现象：后端能读到文件（模型识图、文档解析都正常），**浏览器却加载不出来**（聊天里的图片、知识库文档的下载 / 在线预览）。
 原因：`sys_oss_config` 有两个坐标——`endpoint`（后端读写用，容器网络内的 `minio:9000`）与 `domain_url`（**返回给前端的对外地址**）。若只改了 `endpoint`，`domain_url` 仍是框架种子的 `127.0.0.1:9000`，浏览器解析不到。
-处置：`50-oss-endpoint.sql` 已**同时**写入 `endpoint = minio:9000` 与 `domain_url = http://localhost:9002`（本栈平台 MinIO 映射在宿主机的 **9002**，与 PG 栈的 9000 错开；**2026-10-09 修正**——此前该脚本漏了 `domain_url`）。**存量数据卷不会重跑该脚本**，需手动补一次（见 ⑥ 的命令，脚本本身包含这两条 `update`），随后 `docker compose restart ruoyi-admin`。
+处置：`50-oss-endpoint.sql` 已**同时**写入 `endpoint = minio:9000`、`domain_url = http://localhost:9002`（本栈平台 MinIO 映射在宿主机的 **9002**，与 PG 栈的 9000 错开；**2026-10-09 修正**——此前该脚本漏了 `domain_url`）与 `access_policy = 0`（**私有桶**，文件访问走后端下发的预签名 URL）。**存量数据卷不会重跑该脚本**，需手动补一次（见 ⑥ 的命令，脚本本身包含这三条 `update`：`endpoint` / `domain_url` / `access_policy`），随后 `docker compose restart ruoyi-admin`。
 若改了 `MINIO_API_PORT`，或需从其它机器 / 公网访问，把 `domain_url` 改成实际可达的地址即可（后端返回的 URL 以此为准，无需改数据行）。
+> 私有桶下 `domain_url` 是**硬前置**：预签名 URL 按它生成，留空或指向不可达地址会导致前端预览 / 下载失败（后端解析不受影响，它走 `endpoint`）。
 
 ## 7. 运维命令
 

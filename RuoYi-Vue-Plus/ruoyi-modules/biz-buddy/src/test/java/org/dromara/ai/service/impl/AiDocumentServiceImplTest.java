@@ -104,11 +104,40 @@ class AiDocumentServiceImplTest {
     }
 
     @Test
+    @DisplayName("分页查询文档：按 ossId 现算文件访问地址")
+    void shouldFillFileUrlOnQueryPageList() {
+        AiDocumentVo vo = new AiDocumentVo();
+        vo.setOssId(5L);
+        Page<AiDocumentVo> page = new Page<>(1, 10);
+        page.setRecords(new ArrayList<>(List.of(vo)));
+        page.setTotal(1L);
+        when(baseMapper.selectVoPage(any(), any())).thenReturn(page);
+        when(ossService.selectUrlByIds("5")).thenReturn("http://presigned/a");
+
+        PageResult<AiDocumentVo> result = service.queryPageList(new AiDocumentBo(), new PageQuery(1, 10));
+
+        assertEquals("http://presigned/a", result.getRows().iterator().next().getFileUrl());
+    }
+
+    @Test
     @DisplayName("按主键查询文档")
     void shouldQueryById() {
         AiDocumentVo vo = new AiDocumentVo();
         when(baseMapper.selectVoById(1L)).thenReturn(vo);
         assertSame(vo, service.queryById(1L));
+    }
+
+    @Test
+    @DisplayName("按主键查询文档：按 ossId 现算文件访问地址")
+    void shouldFillFileUrlOnQueryById() {
+        AiDocumentVo vo = new AiDocumentVo();
+        vo.setOssId(5L);
+        when(baseMapper.selectVoById(1L)).thenReturn(vo);
+        when(ossService.selectUrlByIds("5")).thenReturn("http://presigned/a,http://b");
+
+        AiDocumentVo result = service.queryById(1L);
+
+        assertEquals("http://presigned/a", result.getFileUrl());
     }
 
     @Test
@@ -144,7 +173,7 @@ class AiDocumentServiceImplTest {
     }
 
     @Test
-    @DisplayName("新增文档：解析 URL、校验同名并插入")
+    @DisplayName("新增文档：校验文件、校验同名并插入（file_url 不落库）")
     void shouldInsertDocument() {
         AiDocumentBo bo = new AiDocumentBo();
         bo.setKbId(1L);
@@ -164,7 +193,7 @@ class AiDocumentServiceImplTest {
 
             assertTrue(service.insertByBo(bo));
         }
-        assertEquals("http://a", entity.getFileUrl());
+        assertNull(entity.getFileUrl());
         assertEquals("0", entity.getParseStatus());
         assertEquals(88L, bo.getId());
     }

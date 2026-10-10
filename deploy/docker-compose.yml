@@ -139,7 +139,8 @@ services:
       - minio-data:/data
     command: minio server /data --console-address ":9001"
 
-  # 一次性初始化：建桶并设为可公开读（对应 sys_oss_config.access_policy=1）。
+  # 一次性初始化：建桶（保持私有，对应 sys_oss_config.access_policy=0）。
+  # 私有桶下匿名直访一律 403，文件访问改由后端按需下发预签名 URL（见 SysOssServiceImpl）。
   # 复用 minio 镜像本身——它自带 mc 与 sh，故无需额外镜像
   # （minio/mc 在部分镜像源上取不到：403 Forbidden）。
   minio-init:
@@ -155,7 +156,8 @@ services:
           echo "等待 MinIO 就绪..."; sleep 2;
         done
         mc mb -p local/${OSS_BUCKET:-ruoyi} || true
-        mc anonymous set download local/${OSS_BUCKET:-ruoyi} || true
+        # 私有桶：显式清除匿名读权限。新桶本就是私有；存量卷若曾被设为可公开读，这里会纠正。
+        mc anonymous set none local/${OSS_BUCKET:-ruoyi} || true
         # 把演示文档送进桶：对应建库脚本里 ai_document「BizBuddy简介.txt」的 oss_id（key=demo/bizbuddy_intro.txt），
         # 使「重新解析」可按对象键读取；重复 up 覆盖同名对象，天然幂等。
         mc cp /seed/bizbuddy_intro.txt local/${OSS_BUCKET:-ruoyi}/demo/bizbuddy_intro.txt || true

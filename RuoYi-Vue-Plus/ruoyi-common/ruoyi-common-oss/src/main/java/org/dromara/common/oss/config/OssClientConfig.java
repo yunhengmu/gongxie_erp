@@ -264,6 +264,25 @@ public class OssClientConfig implements Config<OssClientConfig, OssClientConfig.
     }
 
     /**
+     * 判断指定存储桶的预签名 URL 是否应使用**绑定桶**的自定义域名（即域名已映射到该桶、路径中不再拼桶名）。
+     * <p>
+     * 三个条件同时成立才成立：未启用路径风格访问、配置了非空自定义域名、目标桶就是当前默认桶。
+     * <p>
+     * <b>路径风格必须排除</b>：路径风格下域名不绑定桶，对象地址形如
+     * {@code <域名>/<桶名>/<对象键>}（见 {@link #getBucketUrl(String)}），若按绑定桶签名就会漏掉桶名，
+     * 得到 {@code <域名>/<对象键>} 这种 404 地址（容器化 MinIO + domain_url 的典型误配）。
+     * <p>
+     * 服务端内部读取（容器内下载 / 解析）也须忽略自定义域名，应直接走
+     * {@link #getEndpointBucketUrl()}。
+     *
+     * @param bucket 存储桶名称
+     * @return 是否使用绑定桶的自定义域名签名
+     */
+    public boolean useBucketBoundDomain(String bucket) {
+        return !usePathStyleAccess && hasCustomDomain() && isDefaultBucket(bucket);
+    }
+
+    /**
      * 判断是否配置了自定义域名。
      *
      * @return 是否配置了非空自定义域名
