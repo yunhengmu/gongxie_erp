@@ -35,7 +35,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 |---|---|
 | [`RuoYi-Vue-Plus/`](RuoYi-Vue-Plus) | **后端工程**：Spring Boot 4.1.1 + JDK 21，多模块 Maven；AI 能力在 `ruoyi-modules/biz-buddy`（AgentScope 2.0.4 内核） |
 | [`plus-ui-Vue/`](plus-ui-Vue) | **前端工程**：Vue 3 + TypeScript + Element Plus + Vite，包管理 pnpm |
-| [`docs/`](docs/README.md) | **开发者文档**：运行时架构、二次开发（新增业务工具）、配置项参考 |
+| [`docs/`](docs/README.md) | **开发者文档**：一键运行（Docker Compose）与快速开始（源码手工跑）、运行时架构、二次开发（新增业务工具）、配置项参考 |
 | [`RuoYi-Vue-Plus/docs/`](RuoYi-Vue-Plus/docs) | 平台功能说明（含 9 张运行界面截图） |
 | [`deploy/`](deploy) | **PostgreSQL 全栈容器编排**：PG 14 + Redis + Milvus + 后端 + 调度 + Nginx（`docker compose up -d --build` 即「有表有数据可登录」） |
 | [`deploy-mysql/`](deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
@@ -122,178 +122,15 @@ RuoYi-Vue-Plus
 
 ## 一键运行（Docker Compose）
 
-不想手工建库、装中间件，用容器拉起**开箱可登录**的完整环境。仓库提供两套编排，**组件一致、仅数据库方言不同**，且**项目名与端口全部错开，可以同时运行**：
+不想手工建库、装中间件，用容器拉起**开箱可登录**的完整环境（PostgreSQL 栈 + MySQL 8.0 栈，端口错开可同时运行）。
 
-| | PostgreSQL 栈 | MySQL 8.0 栈 |
-|---|---|---|
-| 目录 | [`deploy/`](deploy) | [`deploy-mysql/`](deploy-mysql) |
-| Compose 项目名 | `bizbuddy` | `bizbuddy-mysql` |
-| 前端 / 后端 / 调度控制台 | `80` / `8080` / `8800` | `81` / `8081` / `8801` |
-| 数据库 / Redis / Milvus | `5432` / `6379` / `19530` | `3306` / `6380` / `19531` |
-| 平台 MinIO（控制台） | `9000`（`9001`） | `9002`（`9003`） |
-
-`up` 起来的是：数据库 + Redis + Milvus（standalone，含 etcd / minio）+ 后端 `ruoyi-admin` + 调度服务端 `snailjob-server` + Nginx（托管前端 `dist`）+ 平台 MinIO（一次性 `minio-init` 建桶并上传演示文档）。
-
-### 1. 前置：先在宿主机构建三个产物
-
-镜像里**只放 jar / dist、不在镜像内编译**，所以 `up` 之前必须先构建：
-
-```bash
-# ① 后端 jar → RuoYi-Vue-Plus/ruoyi-admin/target/ruoyi-admin.jar
-cd RuoYi-Vue-Plus
-./mvnw clean package -DskipTests                 # Windows: .\mvnw.cmd clean package -DskipTests
-
-# ② 调度服务端 jar → ruoyi-extend/ruoyi-snailjob-server/target/ruoyi-snailjob-server.jar
-./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
-
-# ③ 前端静态资源 → plus-ui-Vue/dist
-cd ../plus-ui-Vue
-pnpm install && pnpm build:prod
-```
-
-> 只调中间件时可跳过构建，例如只要一个 PostgreSQL：`cd deploy && docker compose up -d postgres`。
-
-### 2. 启动 PostgreSQL 栈
-
-```bash
-cd deploy
-cp .env.example .env          # 可选：不复制则用文件内默认值（端口、口令等，见 .env.example）
-docker compose up -d --build
-```
-
-| 访问 | 地址 |
-|---|---|
-| 前端 | <http://localhost/> |
-| 后端接口文档 | <http://localhost:8080/swagger-ui.html> |
-| 调度控制台 | <http://localhost:8800/snail-job> |
-| 初始账号 | `admin / admin123`（另有 `test / 666666`、`test1 / 666666`） |
-
-### 3. 启动 MySQL 8.0 栈
-
-```bash
-cd deploy-mysql
-cp .env.example .env
-docker compose up -d --build
-```
-
-| 访问 | 地址 |
-|---|---|
-| 前端 | <http://localhost:81/> |
-| 后端接口文档 | <http://localhost:8081/swagger-ui.html> |
-| 调度控制台 | <http://localhost:8801/snail-job> |
-| 初始账号 | `admin / admin123` |
-
-> 两栈可**同时运行**（上表端口已错开），适合并排对照；只跑一个也可以。中间件口令在各目录的 `.env.example`（默认值仅供本地）。
-
-### 4. 首次启动后必做：补模型密钥
-
-建库脚本预置了两个**示例模型**（阿里云百炼 / DashScope，走 OpenAI 兼容协议），但 `api_key` **一律留空**：
-
-| 配置名称 | 类型 | 说明 |
-|---|---|---|
-| `deepseek-v4-flash-0731` | 对话 | 入口智能体「小Z」与内置专家的模型槽位**已指向它** |
-| `qwen3.7-text-embedding` | 向量 | 维度按 `1024` 预置，须与模型实际输出一致 |
-
-登录后进「模型配置」，把这两个模型（或你另行新建的模型）的 API Key 换成自己的密钥即可——**不补则对话与向量化不可用**。**两栈的模型配置在各栈自己的库里、互不相通，需分别补一次。**
-
-### 5. 起来就有什么
-
-- 库表与初始数据全部就绪（含 `ai_*` 表与 AI 菜单的 26 个功能页），`admin` 等初始账号在位；
-- 内置智能体：入口智能体「小Z」1 个 + 专家 3 个（机构管理、公告管理，以及演示专家「BizBuddy项目介绍专家」）；
-- 演示知识库一套：知识库 `bizbuddy_demo_kb`（BizBuddy介绍演示库）+ 文档「BizBuddy简介.txt」+ 已绑定检索工具的演示专家；
-- **演示文档需先「重新解析」再「向量化」**：种子只写入正文、不含切片，故初值是「未解析」——按提示点一次「重新解析」即可（这是刻意的状态一致，不是缺陷）。
-
-### 6. 常用运维
-
-```bash
-docker compose ps                        # 状态
-docker compose logs -f ruoyi-admin       # 跟踪后端日志（服务名两栈通用）
-docker compose up -d --build             # 改了代码 / 配置后重建
-docker compose restart ruoyi-admin       # 只重启后端（如改完 OSS 配置）
-docker compose down                      # 停止（保留数据卷）
-docker compose down -v                   # 停止并删数据卷：下次启动会重新建库并重写种子
-```
-
-### 7. 验证「真的跑通了」
-
-栈起来后可跑端到端脚本，对**真实运行**的环境做断言（模型连通 / 知识库检索 / 专家编排 / 写工具确认闭环）：
-
-```bash
-node e2e/run.mjs                                   # PostgreSQL 栈（后端默认 8080）
-node e2e/run.mjs --base-url http://localhost:8081  # MySQL 栈
-```
-
-> 前置条件与排障：PostgreSQL 栈见 [`deploy/README.md`](deploy/README.md)，MySQL 栈见 [`deploy-mysql/README.md`](deploy-mysql/README.md)（含 OSS 对外地址、MySQL 认证插件、端口改动等已知坑）。
+**完整步骤见 [`docs/docker-compose.md`](docs/docker-compose.md)**：构建前置（三个产物）、两栈启动与访问地址、补模型密钥、常用运维（含 `down -v` 的影响）、e2e 验证。
 
 ## 快速开始
 
-> 本节是**从源码手工跑**的步骤（自行准备 PostgreSQL / Redis / Milvus、手工建库）。想省掉这些，用上面的[一键运行（Docker Compose）](#一键运行docker-compose)。
+**从源码手工跑**（自行准备 PostgreSQL / Redis / Milvus 并手工建库，再启动前后端）。
 
-### 1. 环境依赖
-
-| 组件 | 版本 / 说明 |
-|---|---|
-| JDK | 21（推荐 OpenJDK，**不要使用 OracleJDK**） |
-| Maven | ≥ 3.8.x（仓库自带 `mvnw` / `mvnw.cmd`） |
-| 关系库 | PostgreSQL 14（默认）或 MySQL 8.0，库名均为 `biz_buddy` |
-| Redis | ≥ 6.x（缓存、分布式锁、AgentScope 分布式状态） |
-| Milvus | v2.6.13，gRPC `19530`（知识库向量检索） |
-| Node / pnpm | Node ≥ 20.19.0，pnpm ≥ 10 |
-
-### 2. 初始化数据库
-
-先建库 `biz_buddy`，再按顺序导入对应方言的脚本（**PostgreSQL 为默认，MySQL 8.0 为并列支持**）：
-
-PostgreSQL（`RuoYi-Vue-Plus/script/sql/postgres/`）：
-
-```
-postgres_ry_vue.sql        # 框架基础表 + 系统管理数据（含菜单、字典、初始账号）
-postgres_ry_workflow.sql   # 工作流（Warm-Flow）表
-postgres_ry_job.sql        # 调度任务（SnailJob）表：sj_*
-postgres_ry_ai.sql         # AI 平台表（ai_* 表结构 + 种子数据）
-```
-
-MySQL 8.0（`RuoYi-Vue-Plus/script/sql/`）：
-
-```
-ry_vue.sql        # 框架基础表 + 系统管理数据（含菜单、字典、初始账号）
-ry_workflow.sql   # 工作流（Warm-Flow）表
-ry_job.sql        # 调度任务（SnailJob）表：sj_*
-ry_ai.sql         # AI 平台表（ai_* 表结构 + 种子数据）
-```
-
-> 顺序要求：`*_ry_ai.sql` **依赖** `*_ry_job.sql` —— 它末尾要向 `sj_job` 登记「定时 Agent 任务派发」。若先执行 AI 脚本会报 `relation "sj_job" does not exist`（PostgreSQL）/ `Table 'sj_job' doesn't exist`（MySQL）。
-
-> Oracle / SQLServer 方言的历史脚本仍保留在仓库中，但**不维护**。两套编排见 [`deploy/`](deploy)（PostgreSQL 版）与 [`deploy-mysql/`](deploy-mysql)（MySQL 8.0 版），可按需二选一或同时运行（端口已错开）。
-> 数据库差异只影响两处，均已在代码内按数据源自动处理，无需改配置：① JDBC 驱动（`postgresql` / `mysql-connector-j` 均在位）；② 技能持久化仓库（`PostgresSkillRepository` / `MysqlSkillRepository`，见 `AgentScopeConfig#aiSkillRepository`）。
-
-### 3. 启动后端
-
-```bash
-cd RuoYi-Vue-Plus
-
-# 构建（Windows；Linux / macOS 用 ./mvnw）
-./mvnw.cmd clean install -DskipTests
-
-# 启动 ruoyi-admin（默认端口 8080）
-./mvnw.cmd -pl ruoyi-admin spring-boot:run
-```
-
-或在 IDE 中直接运行 `ruoyi-admin` 模块的 [`org.dromara.DromaraApplication`](RuoYi-Vue-Plus/ruoyi-admin/src/main/java/org/dromara/DromaraApplication.java)。
-
-- 默认激活 `dev` 环境（见 `pom.xml` 的 `<profiles>`），接口文档地址：`http://localhost:8080/swagger-ui.html`
-- 初始账号：`admin` / `admin123`
-- 监控中心 `ruoyi-monitor-admin`（`9090`）、调度服务端 `ruoyi-snailjob-server`（`17888` / 控制台 `8800`）按需单独启动
-
-### 4. 启动前端
-
-```bash
-cd plus-ui-Vue
-
-pnpm install
-pnpm dev          # 开发模式，默认端口 80
-pnpm build:prod   # 生产构建
-```
+**完整步骤见 [`docs/getting-started.md`](docs/getting-started.md)**：环境依赖、建库脚本执行顺序、后端与前端启动。
 
 ## 配置说明
 

@@ -1,9 +1,11 @@
 # 开发者文档
 
-面向**开发者**（使用与二次开发本项目）。环境搭建、建库、启动请见仓库根 [README](../README.md)；本目录只提供更深入的内容，不重复搭建步骤。
+面向**开发者**（使用与二次开发本项目）。**环境搭建与启动**见本目录 [docker-compose.md](docker-compose.md)（容器一键运行）与 [getting-started.md](getting-started.md)（源码手工跑）；本目录其余文档只提供更深入的内容，不重复搭建步骤。
 
 | 文档 | 内容 |
 |---|---|
+| [docker-compose.md](docker-compose.md) | **一键运行**：Docker Compose 两栈（PostgreSQL / MySQL 8.0）——构建前置、启动与访问地址、补模型密钥、常用运维、e2e 验证 |
+| [getting-started.md](getting-started.md) | **快速开始**：从源码手工跑——环境依赖、建库脚本执行顺序、后端与前端启动 |
 | [architecture.md](architecture.md) | 运行时架构：入口智能体 → 专家链路、装配与缓存、三层权限、工具与 MCP、状态与审计 |
 | [development.md](development.md) | **二次开发**：新增一个业务工具（实现 → 工厂登记 → 元数据 → 绑定），含写工具与权限注意事项 |
 | [configuration.md](configuration.md) | 配置项参考（`bizbuddy.ai.*`）与生产必改清单 |
