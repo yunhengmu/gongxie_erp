@@ -378,6 +378,12 @@ node e2e/run.mjs --base-url http://localhost:8081   # 指向 MySQL 栈（PG 栈�
 | 平台功能说明（含界面截图） | [`RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md`](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md) |
 | 前端工程说明 | [`plus-ui-Vue/README.md`](plus-ui-Vue/README.md) |
 
+## 联系我们
+
+微信公众号：**BizBuddy**
+
+![微信公众号 BizBuddy 二维码](docs/weixin.jpg)
+
 ## 版权
 
 Copyright © 2026 [AI架构师张磊](https://space.bilibili.com/482393709) All Rights Reserved.
