@@ -70,7 +70,7 @@ docker compose up -d --build
 | `GET http://localhost:81/prod-api/auth/code`（Nginx → 后端代理） | 200 |
 | `GET http://localhost:8081/auth/code`（后端直连） | 200 |
 | `GET http://localhost:8801/snail-job/`（调度控制台） | 200 |
-| 建库结果 | 94 张表（与 PostgreSQL 版一致）；`ai_*` 36 张；`sys_menu` BizBuddy 段 106 行；`ai_tool` 25、入口小Z 1、专家 2、专家工具绑定 20 行；`ai_model_config` 2（`api_key` 留空）；`sj_job` 已有派发任务 |
+| 建库结果 | 97 张表（与 PostgreSQL 版一致）；`ai_*` 39 张；`sys_menu` BizBuddy 段 123 行（6 分组 / 30 功能页 / 86 按钮）；`ai_tool` 26、入口小Z 1、专家 3、专家工具绑定 21 行；`ai_model_config` 2（`api_key` 留空）；`sj_job` 已有派发任务 |
 | 中文数据 | `sys_menu.menu_name='BizBuddy'`、`sys_user.nick_name='本部门及以下 密码666666'` 均完好（库字符集 `utf8mb4` / `utf8mb4_unicode_ci`） |
 | 部分唯一索引 | `ai_tool.uk_ai_tool_code` 的表达式落库为 `if((del_flag = '0'),0,NULL)`，即 MySQL 「函数键部分」等价实现 |
 | OSS 端点 | `sys_oss_config.endpoint = minio:9000` |

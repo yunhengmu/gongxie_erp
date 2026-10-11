@@ -82,7 +82,7 @@ export const preflight = async (client, cfg, options = {}) => {
   log(`· 种子解析完成：入口=${entry.agentName}｜演示专家=${introExpert.agentName}｜公告专家=${noticeExpert.agentName}`);
   log(`· 知识库=${demoKb.kbName}｜文档=${demoDoc.docName}｜对话模型=${chatModel.configName}｜向量模型=${embeddingModel?.configName ?? '(缺失)'}`);
   // 「平台侧是否已配置密钥」看掩码：`******` 表示已配置、空串表示未配置。
-  // L2~L5 走服务端已保存的模型配置（不需要环境变量密钥），故据此决定 SKIP 还是真跑。
+  // L2~L6 走服务端已保存的模型配置（不需要环境变量密钥），故据此决定 SKIP 还是真跑。
   const platformChatKeyReady = Boolean(chatModel.apiKeyMask);
   const platformEmbeddingKeyReady = Boolean(embeddingModel?.apiKeyMask);
   log(`· 平台密钥：对话模型 ${platformChatKeyReady ? '已配置' : '未配置'}｜向量模型 ${embeddingModel ? (platformEmbeddingKeyReady ? '已配置' : '未配置') : '无向量模型'}`);

@@ -37,7 +37,7 @@ cd plus-ui-Vue && pnpm install && pnpm dev
 
 ### 端到端（e2e）回归
 
-单测基于 Mockito 打桩、**不起 Spring 容器**；要验证「模型连通 / 知识库检索 / 专家编排 / 写工具人工确认」在真实环境下的行为，用仓库根目录的 `e2e/`（Node.js 零依赖，对**已运行**的栈发真实 HTTP 断言）：
+单测基于 Mockito 打桩、**不起 Spring 容器**；要验证「模型连通 / 知识库检索 / 专家编排 / 写工具人工确认 / 安全合规 / MCP 双向」在真实环境下的行为，用仓库根目录的 `e2e/`（Node.js 零依赖，对**已运行**的栈发真实 HTTP 断言）：
 
 ```bash
 cd ..                       # 回到仓库根（biz-buddy/）
@@ -46,7 +46,7 @@ node e2e/run.mjs --only L1,L3 --verbose            # 指定层级
 node e2e/run.mjs --base-url http://localhost:8081  # 指向 MySQL 栈（PG 栈默认 8080）
 ```
 
-- 覆盖 **L1 模型连通 → L2 提示词生成 → L3 解析+向量化+检索 → L4 对话与专家编排（SSE）→ L5 HITL 写工具确认闭环**；
+- 覆盖 **L1~L11**：模型连通 → 提示词生成 → 解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端；另含 **RAG 检索质量评测**（`e2e/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；
 - 配置见 `e2e/.env.example`（唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**，放 `e2e/.env.local`，已 gitignore）；
 - 退出码 `0/1/2/3` = 无失败 / 有 FAIL / 前置检查失败 / 参数错误；**L5 默认「拒绝」路径无副作用**，`--allow-writes` 才真写并在收尾自动清理；
 - 它不进 `mvn test`，与单测互不影响；**改了工具 / 装配 / 路由后，建议「单测 + e2e」两道都过**。
