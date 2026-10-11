@@ -5,6 +5,7 @@ import org.dromara.ai.domain.AiRouteRun;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -132,5 +133,25 @@ public class AiRouteRunDetailVo implements Serializable {
      * 合计 Token（入口轮 + 专家轮）
      */
     private Long totalTokens;
+
+    /**
+     * 入口轮费用（元；按入口智能体当前模型单价折算，未配置单价按 0）
+     */
+    private BigDecimal entryCost;
+
+    /**
+     * 专家轮费用（元；按各专家当前模型单价折算，未配置单价按 0）
+     */
+    private BigDecimal expertCost;
+
+    /**
+     * 合计费用（元；入口轮 + 专家轮）
+     */
+    private BigDecimal totalCost;
+
+    /**
+     * 涉及模型是否均已配置单价：为 false 时费用偏低（未配置的按 0 计），前端据此标注「未配置单价」
+     */
+    private Boolean priceConfigured;
 
 }

@@ -141,7 +141,7 @@ class AiChatFacadeTest {
             routeOrchestrator, runRegistry, turnFinisher, integrationDriver, routeSupport, trustApplier);
         facade = new AiChatFacade(sessionService, agentService, messageMapper, agentRegistry, aiProperties,
             pendingStore, permissionModeStore, decisionService, usageStatService, quotaService,
-            sessionResourceService, expertDirectory, routeRecorder, assembler, routeSupport, trustApplier,
+            sessionResourceService, expertDirectory, routeRecorder, routeOrchestrator, assembler, routeSupport, trustApplier,
             slotStore, streamBridge, traceService, runRegistry, turnFinisher, integrationDriver, expertResumeDriver);
     }
 

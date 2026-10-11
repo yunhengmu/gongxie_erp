@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -76,7 +77,8 @@ class AiChannelInboundServiceTest {
     @BeforeEach
     void setUp() {
         service = new AiChannelInboundService(channelService, sessionService, chatFacade,
-            userService, messageMapper, taskRunner);
+            userService, messageMapper, taskRunner,
+            new AiChannelMediaAssembler(new org.dromara.ai.config.AiProperties()));
         doAnswer(invocation -> {
             ((Runnable) invocation.getArgument(0)).run();
             return null;
@@ -88,11 +90,11 @@ class AiChannelInboundServiceTest {
     }
 
     @Test
-    @DisplayName("无文本内容时回复仅支持文本")
+    @DisplayName("无可用内容时回复不支持提示")
     void shouldReplyWhenTextBlank() {
         service.submit(runtime, inboundWithMessages(List.of()));
 
-        assertTrue(lastReply().contains("未识别到文本内容"));
+        assertTrue(lastReply().contains("未识别到可用内容"));
     }
 
     @Test
@@ -103,7 +105,7 @@ class AiChannelInboundServiceTest {
         service.submit(runtime, inbound("你好"));
 
         assertTrue(lastReply().contains("尚未绑定平台用户"));
-        verify(chatFacade, never()).executeUnattended(any(), any(), any());
+        verify(chatFacade, never()).executeUnattended(any(), any(), any(), any());
     }
 
     @Test
@@ -142,7 +144,7 @@ class AiChannelInboundServiceTest {
             .thenReturn(created);
         AiMessage userMessage = new AiMessage();
         when(sessionService.appendUserMessageUnattended(100L, "你好")).thenReturn(userMessage);
-        when(chatFacade.executeUnattended(created, userMessage, 5L))
+        when(chatFacade.executeUnattended(eq(created), eq(userMessage), eq(5L), any()))
             .thenReturn(execution(100L, 200L, true, null));
         AiMessage assistant = new AiMessage();
         assistant.setContent("助手回答");
@@ -166,7 +168,7 @@ class AiChannelInboundServiceTest {
         when(sessionService.getSession(100L)).thenReturn(session(100L, "0"));
         AiMessage userMessage = new AiMessage();
         when(sessionService.appendUserMessageUnattended(100L, "你好")).thenReturn(userMessage);
-        when(chatFacade.executeUnattended(any(), any(), any()))
+        when(chatFacade.executeUnattended(any(), any(), any(), any()))
             .thenReturn(execution(100L, null, true, null));
 
         service.submit(runtime, inbound("你好"));
@@ -187,7 +189,7 @@ class AiChannelInboundServiceTest {
         when(sessionService.createUnattendedSession(any(), anyString(), any(), any(), anyString()))
             .thenReturn(session(101L, "0"));
         when(sessionService.appendUserMessageUnattended(101L, "你好")).thenReturn(new AiMessage());
-        when(chatFacade.executeUnattended(any(), any(), any())).thenReturn(execution(101L, null, false, "err"));
+        when(chatFacade.executeUnattended(any(), any(), any(), any())).thenReturn(execution(101L, null, false, "err"));
 
         service.submit(runtime, inbound("你好"));
 
@@ -207,7 +209,7 @@ class AiChannelInboundServiceTest {
         when(sessionService.createUnattendedSession(any(), anyString(), any(), any(), anyString()))
             .thenReturn(session(102L, "0"));
         when(sessionService.appendUserMessageUnattended(any(), anyString())).thenReturn(new AiMessage());
-        when(chatFacade.executeUnattended(any(), any(), any())).thenReturn(null);
+        when(chatFacade.executeUnattended(any(), any(), any(), any())).thenReturn(null);
 
         service.submit(runtime, inbound("你好"));
 
@@ -224,7 +226,7 @@ class AiChannelInboundServiceTest {
         when(sessionService.createUnattendedSession(any(), anyString(), any(), any(), anyString()))
             .thenReturn(session(100L, "0"));
         when(sessionService.appendUserMessageUnattended(any(), anyString())).thenReturn(new AiMessage());
-        when(chatFacade.executeUnattended(any(), any(), any())).thenReturn(execution(100L, 200L, true, null));
+        when(chatFacade.executeUnattended(any(), any(), any(), any())).thenReturn(execution(100L, 200L, true, null));
         AiMessage assistant = new AiMessage();
         assistant.setContent("  ");
         when(messageMapper.selectById(200L)).thenReturn(assistant);

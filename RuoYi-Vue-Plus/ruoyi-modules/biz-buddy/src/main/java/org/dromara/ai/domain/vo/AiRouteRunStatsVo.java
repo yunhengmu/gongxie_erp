@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 
 /**
  * 编排运行统计视图对象（REQ-AI-30 Phase 2 第三项）。
@@ -115,5 +116,20 @@ public class AiRouteRunStatsVo implements Serializable {
      * 合计 Token（专家轮 + 入口轮）
      */
     private Long totalTokens;
+
+    /**
+     * 合计费用（元；入口轮 + 专家轮，按当前模型单价折算，未配置单价按 0）
+     */
+    private BigDecimal totalCost;
+
+    /**
+     * 入口轮费用（元）
+     */
+    private BigDecimal entryCost;
+
+    /**
+     * 专家轮费用（元）
+     */
+    private BigDecimal expertCost;
 
 }

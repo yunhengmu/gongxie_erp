@@ -86,6 +86,13 @@
             入口轮 {{ formatNumber(stat.entryTokens) }}
           </div>
         </div>
+        <div class="stat-item">
+          <div class="stat-label">费用合计（元）</div>
+          <div class="stat-value">{{ formatCost(stat.totalCost) }}</div>
+          <div class="stat-sub">
+            专家轮 {{ formatCost(stat.expertCost) }} · 入口轮 {{ formatCost(stat.entryCost) }}（按模型单价估算）
+          </div>
+        </div>
       </div>
       <div class="stat-tip">统计与下方列表使用同一筛选条件；入口轮 Token 取自助手消息（含人工确认后的整合轮）。</div>
     </el-card>
@@ -143,6 +150,14 @@
         <el-table-column label="Token" align="center" width="110">
           <template #default="scope">{{ formatNumber(scope.row.totalTokens) }}</template>
         </el-table-column>
+        <el-table-column label="费用（元）" align="center" width="140">
+          <template #default="scope">
+            <span>{{ formatCost(scope.row.totalCost) }}</span>
+            <el-tooltip v-if="scope.row.priceConfigured === false" content="涉及模型未配置单价，费用按 0 估算" placement="top">
+              <el-tag size="small" type="info" effect="plain" class="cost-tip-tag">未配置单价</el-tag>
+            </el-tooltip>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" align="center" width="100" class-name="small-padding fixed-width">
           <template #default="scope">
             <el-button
@@ -198,6 +213,22 @@
                 </span>
               </el-descriptions-item>
               <el-descriptions-item label="专家轮 Token">{{ formatNumber(detail.record.expertTokens) }}</el-descriptions-item>
+              <el-descriptions-item label="费用（元）">
+                {{ formatCost(detail.record.totalCost) }}
+                <span class="form-tip">
+                  入口轮 {{ formatCost(detail.record.entryCost) }} / 专家轮
+                  {{ formatCost(detail.record.expertCost) }}
+                </span>
+                <el-tag
+                  v-if="detail.record.priceConfigured === false"
+                  size="small"
+                  type="info"
+                  effect="plain"
+                  class="cost-tip-tag"
+                >
+                  未配置单价
+                </el-tag>
+              </el-descriptions-item>
               <el-descriptions-item label="创建时间" :span="3">{{ detail.record.createTime || '-' }}</el-descriptions-item>
               <el-descriptions-item v-if="detail.record.degradeReason" label="降级 / 中止原因" :span="3">
                 <span class="detail-error">{{ detail.record.degradeReason }}</span>
@@ -254,6 +285,9 @@
                 <template #default="scope">
                   {{ formatNumber(sumTokens(scope.row.promptTokens, scope.row.completionTokens)) }}
                 </template>
+              </el-table-column>
+              <el-table-column label="费用（元）" align="center" width="100">
+                <template #default="scope">{{ formatCost(scope.row.cost) }}</template>
               </el-table-column>
               <el-table-column label="耗时" align="center" width="100">
                 <template #default="scope">{{ formatDuration(scope.row.durationMs) }}</template>
@@ -362,6 +396,12 @@ const formatNumber = (value?: number | null): string => {
   if (value === null || value === undefined) return '-';
   const num = Number(value);
   return Number.isNaN(num) ? '-' : num.toLocaleString();
+};
+
+/** 费用展示（元；与「用量与配额」页同款：最多 6 位小数、去掉尾随 0；空值显示 0） */
+const formatCost = (cost?: number | null): string => {
+  if (cost === null || cost === undefined) return '0';
+  return Number(cost).toFixed(6).replace(/\.?0+$/, '') || '0';
 };
 
 /** 两个可空数值求和（用于把「输入 + 输出」显示成一列） */
@@ -619,6 +659,10 @@ onMounted(() => {
   margin-left: 10px;
   color: var(--app-text-muted);
   font-size: 12px;
+}
+
+.cost-tip-tag {
+  margin-left: 6px;
 }
 
 .context-block {

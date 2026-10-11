@@ -69,7 +69,7 @@ public class AiChannelInboundService {
         "该渠道绑定的智能体不存在或已停用，请联系管理员处理。";
 
     private static final String REPLY_EMPTY =
-        "未识别到文本内容（当前仅支持文本消息）。";
+        "未识别到可用内容（当前支持文本、图片与常见文档）。";
 
     private final IAiChannelService channelService;
 
@@ -82,6 +82,11 @@ public class AiChannelInboundService {
     private final AiMessageMapper messageMapper;
 
     private final AiAgentTaskRunner taskRunner;
+
+    /**
+     * 入站多媒体内容块装配（图片 / 文件，REQ-AI-24 扩展）
+     */
+    private final AiChannelMediaAssembler mediaAssembler;
 
     /**
      * 提交一次入站消息处理（异步，不阻塞 Webhook 应答）。
@@ -101,8 +106,9 @@ public class AiChannelInboundService {
      */
     private void handle(AiChannelRuntime runtime, InboundMessage inbound) {
         OutboundAddress address = outboundAddress(runtime, inbound);
-        String text = extractText(inbound);
-        if (StringUtils.isBlank(text)) {
+        // 入站内容：文本 + 多媒体内容块（图片 / 文件）；纯文本消息 text 非空、blocks 为空
+        AiChannelMediaAssembler.ChannelContent content = mediaAssembler.assemble(runtime, inbound);
+        if (content == null) {
             reply(runtime, address, REPLY_EMPTY);
             return;
         }
@@ -132,8 +138,9 @@ public class AiChannelInboundService {
 
         AiTaskExecution execution;
         try {
-            AiMessage userMessage = sessionService.appendUserMessageUnattended(session.getId(), text);
-            execution = chatFacade.executeUnattended(session, userMessage, platformUserId);
+            AiMessage userMessage = sessionService.appendUserMessageUnattended(
+                session.getId(), content.storedText());
+            execution = chatFacade.executeUnattended(session, userMessage, platformUserId, content.blocks());
         } catch (Exception e) {
             log.error("渠道入站执行异常：channelCode={}, sessionId={}", runtime.getChannelCode(), session.getId(), e);
             reply(runtime, address, "执行异常：" + e.getMessage());
@@ -199,19 +206,6 @@ public class AiChannelInboundService {
         String to = runtime.getChannelCode() + ":" + peer.kind().name() + ":" + peer.id();
         String threadId = peer.kind().isThread() ? peer.id() : null;
         return new OutboundAddress(runtime.getChannelCode(), inbound.accountId(), to, threadId);
-    }
-
-    /**
-     * 取入站消息的文本正文。
-     *
-     * @param inbound 归一化入站消息
-     * @return 文本正文，或 null
-     */
-    private String extractText(InboundMessage inbound) {
-        if (inbound.messages() == null || inbound.messages().isEmpty()) {
-            return null;
-        }
-        return StringUtils.trim(inbound.messages().get(0).getTextContent());
     }
 
     /**

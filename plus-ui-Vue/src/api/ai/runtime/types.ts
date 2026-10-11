@@ -33,3 +33,11 @@ export interface PlanConfig {
   /** 是否启用任务清单（todo_write） */
   taskListEnabled: boolean;
 }
+
+/** 编排预算配置（REQ-AI-30；0 表示不限） */
+export interface RouteBudgetConfig {
+  /** 单轮编排的专家轮 Token 预算（专家调用输入 + 输出累计），0 表示不限 */
+  expertTokens: number;
+  /** 单轮编排的墙钟预算（秒），0 表示不限 */
+  wallSeconds: number;
+}

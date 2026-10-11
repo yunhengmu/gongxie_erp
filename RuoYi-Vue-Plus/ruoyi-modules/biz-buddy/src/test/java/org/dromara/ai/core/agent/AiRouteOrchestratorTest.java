@@ -13,12 +13,14 @@ import io.agentscope.harness.agent.HarnessAgent;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.domain.AiExpertAgent;
 import org.dromara.ai.domain.AiRouteExpertCall;
+import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.dto.AiSessionResourceSet;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiSkillService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.test.AiTestSupport;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -37,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -64,6 +67,8 @@ class AiRouteOrchestratorTest {
 
     private final AiProperties aiProperties = new AiProperties();
 
+    private final AiRuntimeConfigStore runtimeConfigStore = mock(AiRuntimeConfigStore.class);
+
     private final IAiSkillService skillService = mock(IAiSkillService.class);
 
     private final IAiAgentService agentService = mock(IAiAgentService.class);
@@ -75,9 +80,15 @@ class AiRouteOrchestratorTest {
         AiTestSupport.initialize();
     }
 
+    @BeforeEach
+    void stubBudget() {
+        // 编排预算默认不限（0/0）；按需在用例内覆盖
+        lenient().when(runtimeConfigStore.routeBudget()).thenReturn(new AiRouteBudgetConfigBo());
+    }
+
     private AiRouteOrchestrator newOrchestrator() {
         return new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder, streamBridge,
-            traceService, aiProperties, skillService, agentService);
+            traceService, aiProperties, runtimeConfigStore, skillService, agentService);
     }
 
     private AiRouteContext newRoute() {
@@ -110,7 +121,9 @@ class AiRouteOrchestratorTest {
     @Test
     @DisplayName("预算触顶时在调用专家前降级")
     void shouldDegradeOnBudgetExceeded() throws Exception {
-        aiProperties.getChat().setRouteBudgetExpertTokens(100);
+        AiRouteBudgetConfigBo budget = new AiRouteBudgetConfigBo();
+        budget.setExpertTokens(100);
+        when(runtimeConfigStore.routeBudget()).thenReturn(budget);
         AiRouteContext route = newRoute();
         route.budgetExceeded = true;
         route.expertPromptTokens.addAndGet(150);
@@ -160,7 +173,7 @@ class AiRouteOrchestratorTest {
     private AiRouteOrchestrator newOrchestratorWithRealBridge() {
         return new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
             new AiStreamEventBridge(traceService, aiProperties), traceService, aiProperties,
-            skillService, agentService);
+            runtimeConfigStore, skillService, agentService);
     }
 
     /** 专家定义（主键 10，与 {@link #candidate()} 对齐）。 */

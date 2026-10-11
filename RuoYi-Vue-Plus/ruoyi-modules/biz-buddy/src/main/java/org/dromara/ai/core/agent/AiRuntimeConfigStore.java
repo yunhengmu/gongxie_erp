@@ -7,6 +7,7 @@ import org.dromara.ai.domain.bo.AiCompactionConfigBo;
 import org.dromara.ai.domain.bo.AiMcpServerConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
+import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.bo.AiWorkspaceConfigBo;
 import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.redis.utils.RedisUtils;
@@ -53,6 +54,11 @@ public class AiRuntimeConfigStore {
      * MCP 出口（服务端）访问配置的 Redis 键
      */
     private static final String MCP_SERVER_KEY = "bizbuddy:ai:runtime:mcp-server";
+
+    /**
+     * 编排预算配置的 Redis 键（REQ-AI-30 Phase 2 第四项）
+     */
+    private static final String ROUTE_BUDGET_KEY = "bizbuddy:ai:runtime:route-budget";
 
     private final AiProperties aiProperties;
 
@@ -184,6 +190,43 @@ public class AiRuntimeConfigStore {
         RedisUtils.setCacheObject(MCP_SERVER_KEY, JsonUtils.toJsonString(bo));
         log.info("MCP 出口配置已更新：authEnabled={}, token={}",
             bo.isAuthEnabled(), StringUtils.isBlank(bo.getToken()) ? "未配置" : "已配置");
+    }
+
+    /**
+     * 解析当前生效的编排预算配置：Redis 覆盖值优先，其次配置默认值。
+     *
+     * <p>供编排器在每次专家调用后读取（专家轮 Token 预算与墙钟预算）；0 表示不限。</p>
+     *
+     * @return 编排预算配置
+     */
+    public AiRouteBudgetConfigBo routeBudget() {
+        String cached = RedisUtils.getCacheObject(ROUTE_BUDGET_KEY);
+        AiRouteBudgetConfigBo stored = JsonUtils.parseObject(cached, AiRouteBudgetConfigBo.class);
+        return stored == null ? defaultRouteBudget() : stored;
+    }
+
+    /**
+     * 保存编排预算配置（写入 Redis 覆盖值，下一次编排即生效）。
+     *
+     * @param bo 编排预算配置
+     */
+    public void updateRouteBudget(AiRouteBudgetConfigBo bo) {
+        RedisUtils.setCacheObject(ROUTE_BUDGET_KEY, JsonUtils.toJsonString(bo));
+        log.info("编排预算配置已更新：专家轮 Token={}（0=不限）, 墙钟={}s（0=不限）",
+            bo.getExpertTokens(), bo.getWallSeconds());
+    }
+
+    /**
+     * 由配置默认值构造编排预算配置。
+     *
+     * @return 默认编排预算配置
+     */
+    private AiRouteBudgetConfigBo defaultRouteBudget() {
+        AiProperties.Chat chat = aiProperties.getChat();
+        AiRouteBudgetConfigBo bo = new AiRouteBudgetConfigBo();
+        bo.setExpertTokens(chat.getRouteBudgetExpertTokens());
+        bo.setWallSeconds(chat.getRouteBudgetSeconds());
+        return bo;
     }
 
     /**

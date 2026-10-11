@@ -139,7 +139,8 @@ class AgentRegistryTest {
     }
 
     private AgentRegistry newRegistry(AgentAssembler assembler) {
-        return new AgentRegistry(agentToolMapper, agentKbMapper, toolService, skillService, subagentService,
+        return new AgentRegistry(agentToolMapper, agentKbMapper,
+            mock(org.dromara.ai.mapper.AiEntryAgentMapper.class), toolService, skillService, subagentService,
             permissionModeStore, runtimeConfigStore, mcpClientService, sessionResourceService, modelFactory,
             fingerprintCalculator, assembler);
     }
@@ -184,7 +185,8 @@ class AgentRegistryTest {
      * 匿名子类覆写两参 {@code get}，其余行为与真实实例一致（{@code cache} 为空）。
      */
     private AgentRegistry registryWithoutAssembly() {
-        return new AgentRegistry(agentToolMapper, agentKbMapper, toolService, skillService, subagentService,
+        return new AgentRegistry(agentToolMapper, agentKbMapper,
+            mock(org.dromara.ai.mapper.AiEntryAgentMapper.class), toolService, skillService, subagentService,
             permissionModeStore, runtimeConfigStore, mcpClientService, sessionResourceService, modelFactory,
             fingerprintCalculator, assembler()) {
             @Override

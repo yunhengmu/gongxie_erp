@@ -14,6 +14,7 @@ import org.dromara.ai.core.agent.tools.GetCurrentUserTool;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentKb;
 import org.dromara.ai.domain.AiAgentTool;
+import org.dromara.ai.domain.AiEntryAgent;
 import org.dromara.ai.domain.AiScenarioPack;
 import org.dromara.ai.domain.AiSubagent;
 import org.dromara.ai.domain.AiTool;
@@ -26,6 +27,7 @@ import org.dromara.ai.domain.dto.AiSessionResourceSet;
 import org.dromara.ai.domain.dto.McpClientAssembly;
 import org.dromara.ai.mapper.AiAgentKbMapper;
 import org.dromara.ai.mapper.AiAgentToolMapper;
+import org.dromara.ai.mapper.AiEntryAgentMapper;
 import org.dromara.ai.service.IAiMcpClientService;
 import org.dromara.ai.service.IAiSessionResourceService;
 import org.dromara.ai.service.IAiSkillService;
@@ -173,6 +175,11 @@ public class AgentRegistry {
 
     private final AiAgentKbMapper agentKbMapper;
 
+    /**
+     * 入口智能体 Mapper（REQ-AI-09 扩展：专家执行装配共享入口的长期记忆工作区命名空间）
+     */
+    private final AiEntryAgentMapper entryAgentMapper;
+
     private final IAiToolService toolService;
 
     private final IAiSkillService skillService;
@@ -213,6 +220,7 @@ public class AgentRegistry {
     /**
      * @param agentToolMapper    智能体工具关联 Mapper
      * @param agentKbMapper      智能体知识库关联 Mapper
+     * @param entryAgentMapper   入口智能体 Mapper（REQ-AI-09 扩展：专家记忆命名空间）
      * @param toolService        业务工具注册 Service
      * @param skillService       技能仓库 Service（绑定关系与启用状态）
      * @param subagentService    子智能体 Service（绑定关系与启用状态，REQ-AI-04）
@@ -226,6 +234,7 @@ public class AgentRegistry {
      */
     public AgentRegistry(AiAgentToolMapper agentToolMapper,
                          AiAgentKbMapper agentKbMapper,
+                         AiEntryAgentMapper entryAgentMapper,
                          IAiToolService toolService,
                          IAiSkillService skillService,
                          IAiSubagentService subagentService,
@@ -238,6 +247,7 @@ public class AgentRegistry {
                          AgentAssembler assembler) {
         this.agentToolMapper = agentToolMapper;
         this.agentKbMapper = agentKbMapper;
+        this.entryAgentMapper = entryAgentMapper;
         this.toolService = toolService;
         this.skillService = skillService;
         this.subagentService = subagentService;
@@ -372,6 +382,17 @@ public class AgentRegistry {
         AiWorkspaceConfigBo workspacePolicy = runtimeConfigStore.workspace();
         // 外部 MCP 连接（REQ-AI-16 / REQ-AI-32）：仅接入**资源集内**（包内 ∪ 直接选中）的 MCP 工具；无资源时为空
         McpClientAssembly mcpAssembly = mcpClientService.resolveForAssembly(res.mergedMcpSelections());
+        // 长期记忆工作区命名空间（REQ-AI-09 扩展）：专家执行装配与入口智能体**共享同一份用户记忆**——
+        // 记忆按 <workspaceRoot>/<agentCode>/<userId> 隔离，专家若用自身编码则命名空间为空、读不到
+        // 该用户的历史记忆。故专家装配统一改用入口智能体编码；入口未配置时回退自身编码。
+        final String workspaceCode;
+        if (expertMode) {
+            String entryCode = entryAgentCode();
+            workspaceCode = (entryCode != null && !entryCode.isBlank())
+                ? entryCode : definition.getAgentCode();
+        } else {
+            workspaceCode = definition.getAgentCode();
+        }
         // 模型配置（地址 / 密钥 / 超时 / 重试 / 启用状态）也是装配参数：改配置后须让已装配实例失效重建
         String modelSignature = fingerprintCalculator.modelSignature(definition);
         String fingerprint = fingerprintCalculator.buildFingerprint(definition, enabledTools, bindings, modelSignature,
@@ -402,10 +423,25 @@ public class AgentRegistry {
             }
             AgentAssembler.AssembledAgent assembled = assembler.assemble(definition, enabledTools, kbIds, skillNames,
                 bindings, res, subagents, compactionPolicy, planPolicy, memoryPolicy,
-                workspacePolicy, mcpAssembly, expertMode);
+                workspacePolicy, mcpAssembly, expertMode, workspaceCode);
             return new AgentHolder(definition.getId(), assembled.agent(), fingerprint, assembled.snapshot());
         });
         return holder.agent();
+    }
+
+    /**
+     * 取入口智能体编码（REQ-AI-09 扩展）。入口恒 1 行；未配置或查询失败时返回 null。
+     *
+     * @return 入口智能体编码，或 null
+     */
+    private String entryAgentCode() {
+        try {
+            AiEntryAgent entry = entryAgentMapper.selectList(Wrappers.lambdaQuery()).stream().findFirst().orElse(null);
+            return entry == null ? null : entry.getAgentCode();
+        } catch (Exception e) {
+            log.warn("解析入口智能体编码失败：{}", e.getMessage());
+            return null;
+        }
     }
 
     /**

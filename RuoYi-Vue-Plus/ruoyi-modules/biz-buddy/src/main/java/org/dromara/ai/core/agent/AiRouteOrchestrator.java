@@ -15,6 +15,7 @@ import org.dromara.ai.domain.AiExpertAgent;
 import org.dromara.ai.domain.AiRouteExpertCall;
 import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.AiTrace;
+import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.dto.AiSessionResourceSet;
 import org.dromara.ai.service.IAiAgentService;
@@ -111,6 +112,11 @@ public class AiRouteOrchestrator {
 
     private final AiProperties aiProperties;
 
+    /**
+     * 运行期配置：编排预算（专家轮 Token 预算 / 墙钟预算）可在运行期覆盖，缺省回落 {@link AiProperties.Chat}
+     */
+    private final AiRuntimeConfigStore runtimeConfigStore;
+
     private final IAiSkillService skillService;
 
     /**
@@ -124,7 +130,8 @@ public class AiRouteOrchestrator {
      * @param recorder         编排链路落库
      * @param streamBridge     事件桥（把专家内部事件累积进本地状态并写入子链路）
      * @param traceService     链路追踪（每次专家调用一条子链路）
-     * @param aiProperties     运行期配置（专家同步等待上限）
+     * @param aiProperties     配置默认值（专家同步等待上限等）
+     * @param runtimeConfigStore 运行期配置（编排预算可在运行期覆盖）
      * @param skillService     技能生效范围（专家链路按提问用户过滤可见面）
      * @param agentService     用户级工具信任查询
      */
@@ -134,6 +141,7 @@ public class AiRouteOrchestrator {
                                AiStreamEventBridge streamBridge,
                                IAiTraceService traceService,
                                AiProperties aiProperties,
+                               AiRuntimeConfigStore runtimeConfigStore,
                                IAiSkillService skillService,
                                IAiAgentService agentService) {
         this.agentRegistry = agentRegistry;
@@ -142,6 +150,7 @@ public class AiRouteOrchestrator {
         this.streamBridge = streamBridge;
         this.traceService = traceService;
         this.aiProperties = aiProperties;
+        this.runtimeConfigStore = runtimeConfigStore;
         this.skillService = skillService;
         this.agentService = agentService;
     }
@@ -295,12 +304,13 @@ public class AiRouteOrchestrator {
             route.expertPromptTokens.addAndGet(usage.promptTokens());
             route.expertCompletionTokens.addAndGet(usage.completionTokens());
         }
-        AiProperties.Chat chat = aiProperties.getChat();
+        // 预算走运行期配置（Redis 覆盖优先，缺省回落 AiProperties.Chat），保存后下一次编排即生效
+        AiRouteBudgetConfigBo budget = runtimeConfigStore.routeBudget();
         long tokens = route.expertPromptTokens.get() + route.expertCompletionTokens.get();
-        if (chat.getRouteBudgetExpertTokens() > 0 && tokens >= chat.getRouteBudgetExpertTokens()) {
+        if (budget.getExpertTokens() > 0 && tokens >= budget.getExpertTokens()) {
             route.budgetExceeded = true;
         }
-        int wallBudget = chat.getRouteBudgetSeconds();
+        int wallBudget = budget.getWallSeconds();
         if (wallBudget > 0 && elapsedSeconds(route) >= wallBudget) {
             route.budgetExceeded = true;
         }
@@ -323,13 +333,13 @@ public class AiRouteOrchestrator {
      * @return 形如「超出编排预算：专家轮 Token 累计 12,345 ≥ 上限 10,000（…）」的文本
      */
     private String budgetDegradeReason(AiRouteContext route) {
-        AiProperties.Chat chat = aiProperties.getChat();
+        AiRouteBudgetConfigBo budget = runtimeConfigStore.routeBudget();
         List<String> parts = new ArrayList<>(2);
         long tokens = route.expertPromptTokens.get() + route.expertCompletionTokens.get();
-        if (chat.getRouteBudgetExpertTokens() > 0 && tokens >= chat.getRouteBudgetExpertTokens()) {
-            parts.add("专家轮 Token 累计 " + tokens + " ≥ 上限 " + chat.getRouteBudgetExpertTokens());
+        if (budget.getExpertTokens() > 0 && tokens >= budget.getExpertTokens()) {
+            parts.add("专家轮 Token 累计 " + tokens + " ≥ 上限 " + budget.getExpertTokens());
         }
-        int wallBudget = chat.getRouteBudgetSeconds();
+        int wallBudget = budget.getWallSeconds();
         if (wallBudget > 0 && elapsedSeconds(route) >= wallBudget) {
             parts.add("编排墙钟 " + elapsedSeconds(route) + "s ≥ 上限 " + wallBudget + "s");
         }
@@ -363,17 +373,20 @@ public class AiRouteOrchestrator {
      * <b>未开启写工具开关</b>的专家额外把该槽位上的显式 ask 改写为 deny（Phase 1 口径，专家纯分析型）；
      * <b>开启开关</b>时**保留 ask**——否则「需确认」档不会触发框架暂停，编排链路的 HITL 就无从贯通。</p>
      *
+     * <p><b>无人值守</b>（{@link AiRouteContext#unattended}，定时任务 / 渠道接入）：没有人类可确认，
+     * 故**无视写工具开关**，一律把 ask 改写为 deny，杜绝 HITL 悬挂。</p>
+     *
      * @param expert         已装配的专家实例
      * @param definition     专家定义（判写工具开关）
      * @param context        本次调用的运行期上下文
-     * @param userId         提问用户
+     * @param route          编排运行状态（取提问用户与是否无人值守）
      * @param expertSessionId 专家会话标识
      */
     private void applyExpertPermission(HarnessAgent expert, AiExpertAgent definition, RuntimeContext context,
-                                       Long userId, String expertSessionId) {
+                                       AiRouteContext route, String expertSessionId) {
         expert.setPermissionMode(context, PermissionMode.DONT_ASK);
-        if (!definition.expertWriteAllowed()) {
-            AiPermissionSupport.denyAskingTools(expert, String.valueOf(userId), expertSessionId);
+        if (route.unattended || !definition.expertWriteAllowed()) {
+            AiPermissionSupport.denyAskingTools(expert, String.valueOf(route.userId), expertSessionId);
         }
     }
 
@@ -519,7 +532,7 @@ public class AiRouteOrchestrator {
             agentRegistry.permissionContextOfExpert(definition, route.resources),
             agentService.trustedToolCodes(definition.getId(), route.userId),
             String.valueOf(route.userId), expertSessionId);
-        applyExpertPermission(expert, definition, context, route.userId, expertSessionId);
+        applyExpertPermission(expert, definition, context, route, expertSessionId);
 
         long startNanos = System.nanoTime();
         boolean timeout = false;

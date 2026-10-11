@@ -14,7 +14,9 @@ import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
 import org.dromara.common.web.core.BaseController;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -112,6 +114,48 @@ public class AiMemoryController extends BaseController {
     public R<Void> consolidate(@NotNull(message = "智能体不能为空") @RequestParam Long agentId,
                                @NotNull(message = "用户不能为空") @RequestParam Long userId) {
         memoryService.consolidate(agentId, userId);
+        return R.ok();
+    }
+
+    /**
+     * 归档超期流水（移动到记忆目录下的 archive/ 子目录）
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     */
+    @SaCheckPermission("ai:memory:archive")
+    @Log(title = "AI长期记忆归档", businessType = BusinessType.OTHER)
+    @PostMapping("/archive")
+    public R<Integer> archive(@NotNull(message = "智能体不能为空") @RequestParam Long agentId,
+                              @NotNull(message = "用户不能为空") @RequestParam Long userId) {
+        return R.ok(memoryService.archiveDaily(agentId, userId));
+    }
+
+    /**
+     * 清理超期记忆文件与会话日志
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     */
+    @SaCheckPermission("ai:memory:cleanup")
+    @Log(title = "AI长期记忆清理", businessType = BusinessType.OTHER)
+    @PostMapping("/cleanup")
+    public R<Integer> cleanup(@NotNull(message = "智能体不能为空") @RequestParam Long agentId,
+                              @NotNull(message = "用户不能为空") @RequestParam Long userId) {
+        return R.ok(memoryService.cleanup(agentId, userId));
+    }
+
+    /**
+     * 删除某用户的全部长期记忆（回滚 / 合规删除）
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     */
+    @SaCheckPermission("ai:memory:remove")
+    @Log(title = "AI长期记忆删除", businessType = BusinessType.DELETE)
+    @DeleteMapping("/{agentId}/{userId}")
+    public R<Void> remove(@PathVariable Long agentId, @PathVariable Long userId) {
+        memoryService.deleteAll(agentId, userId);
         return R.ok();
     }
 

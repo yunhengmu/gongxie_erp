@@ -53,6 +53,11 @@ public class AiProperties {
     private Chat chat = new Chat();
 
     /**
+     * 渠道接入配置（REQ-AI-24）：入站幂等 / 限流 / 多媒体下载
+     */
+    private Channel channel = new Channel();
+
+    /**
      * Milvus 连接配置。
      */
     @Data
@@ -77,6 +82,38 @@ public class AiProperties {
          * 连接超时时间（毫秒）
          */
         private long connectTimeoutMs = 10000;
+    }
+
+    /**
+     * 渠道接入配置（REQ-AI-24）。
+     */
+    @Data
+    public static class Channel {
+
+        /**
+         * 单 peer 单窗口允许的入站事件数（超出即进入冷却）
+         */
+        private int maxEventsPerWindow = 20;
+
+        /**
+         * 限流窗口（秒）
+         */
+        private int windowSeconds = 60;
+
+        /**
+         * 超限后的冷却时长（秒）
+         */
+        private int cooldownSeconds = 60;
+
+        /**
+         * 入站事件幂等 TTL（秒）
+         */
+        private int dedupTtlSeconds = 300;
+
+        /**
+         * 入站媒体单文件字节上限（默认 5MB）
+         */
+        private int mediaMaxBytes = 5 * 1024 * 1024;
     }
 
     /**
@@ -120,6 +157,8 @@ public class AiProperties {
          * <p>口径：只覆盖**专家轮**（入口轮 Token 不纳入——编排器看不到、也无法在调用前预估）；
          * 且为「**事后累计 + 触顶即停**」：单次调用花费无法预估，故每次专家调用结束后累计，
          * 一旦超限就不再发起重试 / 换专家，直接降级自答并如实声明。</p>
+         *
+         * <p>本项为**默认值**，可在「编排预算」页运行期覆盖（Redis，{@code AiRuntimeConfigStore#routeBudget}）。</p>
          */
         private long routeBudgetExpertTokens = 60000L;
 
@@ -128,6 +167,8 @@ public class AiProperties {
          *
          * <p>与 Token 预算同时判定；HITL 暂停-恢复跨两次请求，恢复段按恢复段自身重新计时
          * （不跨请求累计——{@code ai_route_run} 无编排开始时刻列）。</p>
+         *
+         * <p>本项为**默认值**，可在「编排预算」页运行期覆盖（Redis）。</p>
          */
         private int routeBudgetSeconds = 180;
 

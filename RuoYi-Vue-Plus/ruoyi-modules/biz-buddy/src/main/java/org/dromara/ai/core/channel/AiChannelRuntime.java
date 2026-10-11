@@ -1,9 +1,10 @@
 package org.dromara.ai.core.channel;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.message.Msg;
-import io.agentscope.extensions.channel.common.BotLoopGuard;
-import io.agentscope.extensions.channel.common.IdempotencyStore;
+import io.agentscope.extensions.channel.common.ChannelMediaMetadata;
+import io.agentscope.extensions.channel.common.InboundEventDeduplicator;
 import io.agentscope.extensions.channel.dingtalk.DingTalkAccessTokenProvider;
 import io.agentscope.extensions.channel.dingtalk.DingTalkChannelProperties;
 import io.agentscope.extensions.channel.dingtalk.DingTalkInboundMapper;
@@ -24,11 +25,17 @@ import io.agentscope.harness.agent.gateway.channel.InboundMessage;
 import io.agentscope.harness.agent.gateway.channel.OutboundAddress;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.domain.AiChannel;
 import org.dromara.common.core.utils.StringUtils;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -36,7 +43,8 @@ import java.util.function.Consumer;
  * 单个渠道的运行期装配（REQ-AI-24）。
  *
  * <p>把本项目渠道配置翻译为 AgentScope channel 扩展的构件：验签 / 加解密、入站报文解析、
- * 出站发送，以及两个通用保障（{@link IdempotencyStore} 幂等、{@link BotLoopGuard} 防自环）。
+ * 出站发送、入站媒体下载，以及两个通用保障（{@link InboundEventDeduplicator} 幂等、
+ * {@link AiChannelRateLimiter} 渠道级限流并兼作防自环）。二者均走 Redis，**多副本共享**。
  * <b>不使用框架的 {@code Channel} / {@code HarnessGateway}</b>——执行链路走本项目无人值守通道，
  * 以便纳入会话、消息、工具明细、配额与链路追踪等治理面。</p>
  *
@@ -91,14 +99,44 @@ public final class AiChannelRuntime {
     private final String fingerprint;
 
     /**
-     * 入站消息幂等存储
+     * 入站消息幂等（Redis，多副本共享）
      */
-    private final IdempotencyStore idempotency;
+    private final InboundEventDeduplicator idempotency;
 
     /**
-     * 按 peer 的防自环限流
+     * 渠道级入站限流（Redis，多副本共享，兼作防自环）
      */
-    private final BotLoopGuard botLoopGuard;
+    private final AiChannelRateLimiter rateLimiter;
+
+    /**
+     * 平台 OpenAPI 基地址（媒体下载用；GitHub 无媒体时为 API 基址）
+     */
+    private final String apiBase;
+
+    /**
+     * 飞书 tenant_access_token 提供者（非飞书渠道为 null）
+     */
+    private final FeishuAccessTokenProvider feishuTokenProvider;
+
+    /**
+     * 企业微信 access_token 提供者（非企微渠道为 null）
+     */
+    private final WeComAccessTokenProvider weComTokenProvider;
+
+    /**
+     * 钉钉 access_token 提供者（非钉钉渠道为 null）
+     */
+    private final DingTalkAccessTokenProvider dingTalkTokenProvider;
+
+    /**
+     * 钉钉机器人编码（媒体下载用；非钉钉渠道为 null）
+     */
+    private final String dingTalkRobotCode;
+
+    /**
+     * 平台 OpenAPI WebClient（媒体下载用；构造期不发请求）
+     */
+    private final WebClient apiClient;
 
     /**
      * 飞书：回调验签与解密
@@ -175,22 +213,25 @@ public final class AiChannelRuntime {
      */
     private final Consumer<InboundMessage> inboundHandler;
 
-    private AiChannelRuntime(AiChannel channel, Consumer<InboundMessage> inboundHandler) {
+    private AiChannelRuntime(AiChannel channel, Consumer<InboundMessage> inboundHandler,
+                             InboundEventDeduplicator idempotency, AiChannelRateLimiter rateLimiter) {
         this.channelId = channel.getId();
         this.channelCode = channel.getChannelCode();
         this.platformType = channel.getPlatformType();
         this.agentId = channel.getAgentId();
         this.fingerprint = channel.getId() + "|" + channel.getUpdateTime();
-        this.idempotency = new IdempotencyStore();
-        this.botLoopGuard = new BotLoopGuard();
+        this.idempotency = idempotency;
+        this.rateLimiter = rateLimiter;
 
         String apiBase = StringUtils.trim(channel.getApiBase());
         FeishuCrypto feishuCryptoLocal = null;
         FeishuInboundMapper feishuMapperLocal = null;
         FeishuOutboundClient feishuOutboundLocal = null;
+        FeishuAccessTokenProvider feishuTokenProviderLocal = null;
         WeComCrypto weComCryptoLocal = null;
         WeComInboundMapper weComMapperLocal = null;
         WeComOutboundClient weComOutboundLocal = null;
+        WeComAccessTokenProvider weComTokenProviderLocal = null;
         GitHubSignatureVerifier gitHubVerifierLocal = null;
         GitHubInboundMapper gitHubMapperLocal = null;
         GitHubOutboundClient gitHubOutboundLocal = null;
@@ -198,30 +239,36 @@ public final class AiChannelRuntime {
         DingTalkInboundMapper dingTalkMapperLocal = null;
         DingTalkOutboundClient dingTalkOutboundLocal = null;
         DingTalkStreamClient dingTalkStreamLocal = null;
+        DingTalkAccessTokenProvider dingTalkTokenProviderLocal = null;
+        String dingTalkRobotCodeLocal = null;
+        String resolvedBase = null;
 
         switch (channel.getPlatformType()) {
             case AiChannel.PLATFORM_FEISHU -> {
                 String base = StringUtils.isBlank(apiBase) ? DEFAULT_FEISHU_API_BASE : apiBase;
+                resolvedBase = base;
                 if (StringUtils.isNotBlank(channel.getEncryptKey())) {
                     feishuCryptoLocal = new FeishuCrypto(channel.getEncryptKey());
                 }
-                FeishuAccessTokenProvider tokenProvider =
+                feishuTokenProviderLocal =
                     new FeishuAccessTokenProvider(base, channel.getAppId(), channel.getAppSecret());
-                feishuOutboundLocal = new FeishuOutboundClient(base, tokenProvider);
+                feishuOutboundLocal = new FeishuOutboundClient(base, feishuTokenProviderLocal);
                 feishuMapperLocal = new FeishuInboundMapper(channel.getChannelCode());
             }
             case AiChannel.PLATFORM_WECOM -> {
                 String base = StringUtils.isBlank(apiBase) ? DEFAULT_WECOM_API_BASE : apiBase;
+                resolvedBase = base;
                 weComCryptoLocal = new WeComCrypto(
                     channel.getVerificationToken(), channel.getEncryptKey(), channel.getAppId());
-                WeComAccessTokenProvider tokenProvider =
+                weComTokenProviderLocal =
                     new WeComAccessTokenProvider(base, channel.getAppId(), channel.getAppSecret());
                 int agentIdValue = Integer.parseInt(StringUtils.trim(channel.getPlatformAgentId()));
-                weComOutboundLocal = new WeComOutboundClient(base, tokenProvider, agentIdValue);
+                weComOutboundLocal = new WeComOutboundClient(base, weComTokenProviderLocal, agentIdValue);
                 weComMapperLocal = new WeComInboundMapper(channel.getChannelCode(), channel.getAppId());
             }
             case AiChannel.PLATFORM_GITHUB -> {
                 String base = StringUtils.isBlank(apiBase) ? DEFAULT_GITHUB_API_BASE : apiBase;
+                resolvedBase = base;
                 gitHubVerifierLocal = new GitHubSignatureVerifier(channel.getWebhookSecret());
                 gitHubOutboundLocal = new GitHubOutboundClient(base, channel.getApiToken());
                 gitHubMapperLocal = new GitHubInboundMapper(channel.getChannelCode());
@@ -241,12 +288,14 @@ public final class AiChannelRuntime {
                     StringUtils.isBlank(apiBase) ? null : apiBase,
                     null,
                     streamRegisterUrl);
-                DingTalkAccessTokenProvider tokenProvider =
+                dingTalkTokenProviderLocal =
                     new DingTalkAccessTokenProvider(props.apiBase(), props.appKey(), props.appSecret());
                 dingTalkOutboundLocal =
-                    new DingTalkOutboundClient(props.apiBase(), tokenProvider, props.robotCode());
+                    new DingTalkOutboundClient(props.apiBase(), dingTalkTokenProviderLocal, props.robotCode());
                 dingTalkMapperLocal = new DingTalkInboundMapper(channel.getChannelCode(), props.appKey());
                 dingTalkStreamLocal = new DingTalkStreamClient(props, this::onDingTalkPayload);
+                resolvedBase = props.apiBase();
+                dingTalkRobotCodeLocal = props.robotCode();
             }
             default -> throw new IllegalArgumentException(
                 "不支持的平台类型：" + channel.getPlatformType());
@@ -266,6 +315,12 @@ public final class AiChannelRuntime {
         this.dingTalkMapper = dingTalkMapperLocal;
         this.dingTalkOutbound = dingTalkOutboundLocal;
         this.dingTalkStream = dingTalkStreamLocal;
+        this.feishuTokenProvider = feishuTokenProviderLocal;
+        this.weComTokenProvider = weComTokenProviderLocal;
+        this.dingTalkTokenProvider = dingTalkTokenProviderLocal;
+        this.dingTalkRobotCode = dingTalkRobotCodeLocal;
+        this.apiBase = resolvedBase;
+        this.apiClient = resolvedBase == null ? null : WebClient.builder().baseUrl(resolvedBase).build();
         this.inboundHandler = inboundHandler;
     }
 
@@ -276,8 +331,24 @@ public final class AiChannelRuntime {
      * @param inboundHandler 归一化入站消息的处理入口（钉钉长连接用它接收报文；Webhook 平台不使用）
      * @return 运行期装配
      */
+    public static AiChannelRuntime build(AiChannel channel, Consumer<InboundMessage> inboundHandler,
+                                         InboundEventDeduplicator idempotency,
+                                         AiChannelRateLimiter rateLimiter) {
+        return new AiChannelRuntime(channel, inboundHandler, idempotency, rateLimiter);
+    }
+
+    /**
+     * 便捷装配（无 Spring 注入场景：单测与本地构造）。幂等与限流均为 Redis 静态工具的无状态包装，
+     * 用默认配置构造即可，语义与注入版本一致；生产链路统一走 {@link AiChannelRuntimeRegistry} 注入的共享实例。
+     *
+     * @param channel        已解密的渠道配置
+     * @param inboundHandler 归一化入站消息的处理入口
+     * @return 运行期装配
+     */
     public static AiChannelRuntime build(AiChannel channel, Consumer<InboundMessage> inboundHandler) {
-        return new AiChannelRuntime(channel, inboundHandler);
+        AiProperties properties = new AiProperties();
+        return new AiChannelRuntime(channel, inboundHandler,
+            new RedisInboundEventDeduplicator(properties), new AiChannelRateLimiter(properties));
     }
 
     /**
@@ -320,7 +391,7 @@ public final class AiChannelRuntime {
             return;
         }
         InboundMessage message = inbound.get();
-        if (!botLoopGuard.allow(message.peer().key())) {
+        if (!rateLimiter.allow(channelCode, message.peer().key())) {
             log.warn("钉钉长连接触发防自环限流：channelCode={}, peer={}", channelCode, message.peer().key());
             return;
         }
@@ -349,6 +420,117 @@ public final class AiChannelRuntime {
             case AiChannel.PLATFORM_DINGTALK -> dingTalkOutbound.send(address, messages);
             default -> Mono.error(new IllegalStateException("不支持的平台类型：" + platformType));
         };
+    }
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /**
+     * 下载一条入站媒体消息的原始字节（REQ-AI-24 扩展：渠道多媒体）。
+     *
+     * <p>框架的入站 mapper 只把媒体消息映射为「标记文本 + {@link ChannelMediaMetadata} 元数据」，
+     * 由本项目按平台凭据下载：飞书 message resource、企业微信 media/get（或直接用 PicUrl）、
+     * 钉钉机器人消息文件。**下载失败一律返回 null**，由上层降级为标记文本，不阻断回答。</p>
+     *
+     * @param kind      媒体类型（{@link ChannelMediaMetadata} 的 image / file / audio / video）
+     * @param messageId 平台消息 id（飞书资源下载必需；其余平台可空）
+     * @param mediaId   平台素材 id（image_key / MediaId / downloadCode）
+     * @param url       平台直接可取的 URL（企业微信 PicUrl；可空）
+     * @param fileName  文件名（可空）
+     * @param maxBytes  单文件字节上限（<=0 表示不限）
+     * @return 媒体字节；不可用或失败时返回 null
+     */
+    public byte[] downloadMedia(String kind, String messageId, String mediaId, String url,
+                                String fileName, int maxBytes) {
+        try {
+            byte[] data = switch (platformType) {
+                case AiChannel.PLATFORM_FEISHU -> downloadFeishu(kind, messageId, mediaId);
+                case AiChannel.PLATFORM_WECOM -> downloadWeCom(mediaId, url);
+                case AiChannel.PLATFORM_DINGTALK -> downloadDingTalk(mediaId);
+                default -> null;
+            };
+            if (data == null) {
+                return null;
+            }
+            if (maxBytes > 0 && data.length > maxBytes) {
+                log.warn("渠道媒体超过大小上限，跳过：channelCode={}, kind={}, bytes={}, max={}",
+                    channelCode, kind, data.length, maxBytes);
+                return null;
+            }
+            log.info("渠道媒体下载完成：channelCode={}, kind={}, fileName={}, bytes={}",
+                channelCode, kind, fileName, data.length);
+            return data;
+        } catch (Exception e) {
+            log.warn("渠道媒体下载失败：channelCode={}, kind={}, mediaId={}, 原因={}",
+                channelCode, kind, mediaId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 飞书：{@code GET /open-apis/im/v1/messages/{message_id}/resources/{file_key}?type=}。
+     */
+    private byte[] downloadFeishu(String kind, String messageId, String fileKey) {
+        if (apiClient == null || feishuTokenProvider == null
+            || StringUtils.isBlank(messageId) || StringUtils.isBlank(fileKey)) {
+            return null;
+        }
+        String token = feishuTokenProvider.token().block(Duration.ofSeconds(10));
+        String type = ChannelMediaMetadata.KIND_IMAGE.equals(kind) ? "image" : "file";
+        return apiClient.get()
+            .uri(uri -> uri.path("/open-apis/im/v1/messages/{mid}/resources/{key}")
+                .queryParam("type", type).build(messageId, fileKey))
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .retrieve()
+            .bodyToMono(byte[].class)
+            .block(Duration.ofSeconds(20));
+    }
+
+    /**
+     * 企业微信：优先用 {@code PicUrl} 直取，否则 {@code /cgi-bin/media/get}。
+     */
+    private byte[] downloadWeCom(String mediaId, String url) {
+        if (StringUtils.isNotBlank(url)) {
+            return WebClient.builder().build().get().uri(url)
+                .retrieve().bodyToMono(byte[].class).block(Duration.ofSeconds(20));
+        }
+        if (apiClient == null || weComTokenProvider == null || StringUtils.isBlank(mediaId)) {
+            return null;
+        }
+        String token = weComTokenProvider.token().block(Duration.ofSeconds(10));
+        return apiClient.get()
+            .uri(uri -> uri.path("/cgi-bin/media/get")
+                .queryParam("access_token", token).queryParam("media_id", mediaId).build())
+            .retrieve()
+            .bodyToMono(byte[].class)
+            .block(Duration.ofSeconds(20));
+    }
+
+    /**
+     * 钉钉：{@code POST /v1.0/robot/messageFiles/download} 换取 {@code downloadUrl} 后再 GET。
+     */
+    private byte[] downloadDingTalk(String downloadCode) throws Exception {
+        if (apiClient == null || dingTalkTokenProvider == null || StringUtils.isBlank(downloadCode)) {
+            return null;
+        }
+        String token = dingTalkTokenProvider.token().block(Duration.ofSeconds(10));
+        String body = apiClient.post()
+            .uri("/v1.0/robot/messageFiles/download")
+            .header("x-acs-dingtalk-access-token", token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of("downloadCode", downloadCode,
+                "robotCode", StringUtils.defaultString(dingTalkRobotCode)))
+            .retrieve()
+            .bodyToMono(String.class)
+            .block(Duration.ofSeconds(20));
+        if (StringUtils.isBlank(body)) {
+            return null;
+        }
+        String downloadUrl = MAPPER.readTree(body).path("downloadUrl").asText(null);
+        if (StringUtils.isBlank(downloadUrl)) {
+            return null;
+        }
+        return WebClient.builder().build().get().uri(downloadUrl)
+            .retrieve().bodyToMono(byte[].class).block(Duration.ofSeconds(20));
     }
 
 }

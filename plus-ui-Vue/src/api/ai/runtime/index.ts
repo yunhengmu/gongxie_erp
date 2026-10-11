@@ -1,4 +1,4 @@
-import type { CompactionConfig, PlanConfig } from '@/api/ai/runtime/types';
+import type { CompactionConfig, PlanConfig, RouteBudgetConfig } from '@/api/ai/runtime/types';
 import type { AxiosPromise } from '@/utils/api-types';
 import request from '@/utils/request';
 
@@ -41,6 +41,28 @@ export const getPlanConfig = (): AxiosPromise<PlanConfig> => {
 export const updatePlanConfig = (data: PlanConfig): AxiosPromise<void> => {
   return request({
     url: '/ai/runtime/plan',
+    method: 'put',
+    data
+  });
+};
+
+/**
+ * 查询当前生效的编排预算配置
+ */
+export const getRouteBudgetConfig = (): AxiosPromise<RouteBudgetConfig> => {
+  return request({
+    url: '/ai/runtime/route-budget',
+    method: 'get'
+  });
+};
+
+/**
+ * 保存编排预算配置（运行期生效）
+ * @param data 编排预算配置
+ */
+export const updateRouteBudgetConfig = (data: RouteBudgetConfig): AxiosPromise<void> => {
+  return request({
+    url: '/ai/runtime/route-budget',
     method: 'put',
     data
   });
