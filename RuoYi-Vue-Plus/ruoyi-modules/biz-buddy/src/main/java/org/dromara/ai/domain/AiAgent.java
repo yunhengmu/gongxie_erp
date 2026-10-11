@@ -76,12 +76,12 @@ public abstract class AiAgent extends BaseEntity {
     private Long modelId;
 
     /**
-     * 长期记忆抽取 / 合并用的小模型（待 2D 生效）
+     * 长期记忆抽取 / 合并用的小模型
      */
     private Long memoryModelId;
 
     /**
-     * 上下文压缩摘要模型（待 2C 生效）
+     * 上下文压缩摘要模型
      */
     private Long summaryModelId;
 
