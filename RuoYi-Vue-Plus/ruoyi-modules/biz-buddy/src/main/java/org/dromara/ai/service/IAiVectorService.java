@@ -49,6 +49,24 @@ public interface IAiVectorService {
     List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, boolean rerank);
 
     /**
+     * 检索测试：按查询文本召回切片，可选开启重排（Rerank）并指定**融合模式**。
+     *
+     * <p>{@code rerank=true} 时先按 {@code max(topK, rerankTopN)} 稠密召回，再调重排模型，
+     * 并按 {@code rerankMode}（{@code replace} / {@code rank_rrf} / {@code score_fusion}）融合后截取 topK；
+     * 重排失败（未配密钥 / 非 2xx / 超时 / 结构异常）时保持原顺序与原文分数，不阻断检索。</p>
+     *
+     * @param kbId       知识库主键
+     * @param query      查询文本
+     * @param topK       召回条数，为空取知识库配置
+     * @param threshold  相似度阈值，为空取知识库配置
+     * @param rerank     是否开启重排
+     * @param rerankMode 融合模式，为空时取平台配置（{@code bizbuddy.ai.rag.rerank-mode}）
+     * @return 命中切片
+     */
+    List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, boolean rerank,
+                                    String rerankMode);
+
+    /**
      * 清理向量库中的切片向量（文档重新解析或删除时调用）。
      *
      * @param kbId      知识库主键

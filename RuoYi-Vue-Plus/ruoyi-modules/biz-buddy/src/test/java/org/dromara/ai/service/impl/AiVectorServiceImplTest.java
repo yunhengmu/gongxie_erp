@@ -83,6 +83,10 @@ class AiVectorServiceImplTest {
         service = new AiVectorServiceImpl(chunkMapper, documentMapper, modelConfigMapper,
             knowledgeBaseService, modelConfigService, embeddingClient, vectorStore, rerankClient, aiProperties,
             safetyGuard, safetyEventService);
+        // 融合相关配置复位到与「纯替换」等价，避免用例间相互影响；召回条数固定 20 以匹配桩
+        aiProperties.getRag().setRerankMode("replace");
+        aiProperties.getRag().setRerankTriggerMargin(0);
+        aiProperties.getRag().setRerankTopN(20);
         // 安全守卫默认「原样放行 / 原样脱敏」，普通文本入参不变，既有断言不受影响
         lenient().when(safetyGuard.guard(any(), any()))
             .thenAnswer(invocation -> SafetyDecision.pass(invocation.getArgument(0)));
@@ -324,6 +328,82 @@ class AiVectorServiceImplTest {
 
         assertEquals(1, result.size());
         assertEquals("A", result.get(0).getContent());
+        assertEquals(0.9, result.get(0).getScore().doubleValue());
+    }
+
+    /**
+     * 检索公共桩：知识库/模型/密钥/查询向量 + 三命中召回。
+     */
+    private void stubRetrieveCommon(List<AiVectorStore.VectorHit> vectorHits) {
+        AiKnowledgeBase kb = kb(2L, 3, 7L);
+        AiModelConfig model = model(7L);
+        when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb);
+        when(modelConfigMapper.selectById(7L)).thenReturn(model);
+        when(modelConfigService.decryptApiKey(7L)).thenReturn("key");
+        when(embeddingClient.embedOne(model, "key", "q")).thenReturn(new double[]{1, 2, 3});
+        when(vectorStore.search(eq("col"), eq(3), any(double[].class), eq(20), eq(0.3))).thenReturn(vectorHits);
+        when(chunkMapper.selectByIds(any())).thenReturn(List.of(chunk(1L, "C1"), chunk(2L, "C2"), chunk(3L, "C3")));
+        AiDocument doc = new AiDocument();
+        doc.setId(10L);
+        doc.setDocName("来源文档");
+        when(documentMapper.selectByIds(any())).thenReturn(List.of(doc));
+    }
+
+    @Test
+    @DisplayName("检索：显式 rerankMode=score_fusion 时按归一化加权融合（保护向量头部）")
+    void shouldFuseByScoreWhenModeExplicit() {
+        stubRetrieveCommon(List.of(
+            new AiVectorStore.VectorHit("1", "10", 0, 0.95),
+            new AiVectorStore.VectorHit("2", "10", 1, 0.7),
+            new AiVectorStore.VectorHit("3", "10", 2, 0.5)));
+        when(rerankClient.rerank(eq("key"), eq("q"), any(), eq(3)))
+            .thenReturn(new AiRerankClient.RerankOutcome(false, List.of(
+                new AiRerankClient.RankedDoc(1, 0.95),
+                new AiRerankClient.RankedDoc(0, 0.9),
+                new AiRerankClient.RankedDoc(2, 0.5))));
+
+        List<AiRetrievalHitVo> result = service.retrieve(2L, "q", 3, null, true, "score_fusion");
+
+        // 向量头部 C1 归一化分最高，叠加后仍居首（纯替换会给出 C2 居首）
+        assertEquals("C1", result.get(0).getContent());
+        assertEquals("C2", result.get(1).getContent());
+        assertEquals("C3", result.get(2).getContent());
+    }
+
+    @Test
+    @DisplayName("检索：配置 rerankMode=rank_rrf 时按排名融合（向量头部与重排头部都在前列）")
+    void shouldFuseByRankWhenConfigured() {
+        aiProperties.getRag().setRerankMode("rank_rrf");
+        stubRetrieveCommon(List.of(
+            new AiVectorStore.VectorHit("1", "10", 0, 0.95),
+            new AiVectorStore.VectorHit("2", "10", 1, 0.7),
+            new AiVectorStore.VectorHit("3", "10", 2, 0.5)));
+        when(rerankClient.rerank(eq("key"), eq("q"), any(), eq(3)))
+            .thenReturn(new AiRerankClient.RerankOutcome(false, List.of(
+                new AiRerankClient.RankedDoc(1, 0.9),
+                new AiRerankClient.RankedDoc(2, 0.6),
+                new AiRerankClient.RankedDoc(0, 0.1))));
+
+        List<AiRetrievalHitVo> result = service.retrieve(2L, "q", 3, null, true);
+
+        assertEquals("C2", result.get(0).getContent());
+        assertEquals("C1", result.get(1).getContent());
+        assertEquals("C3", result.get(2).getContent());
+    }
+
+    @Test
+    @DisplayName("检索：条件触发——首条与次条向量分差达阈值时跳过重排调用")
+    void shouldSkipRerankWhenTopGapExceedsMargin() {
+        aiProperties.getRag().setRerankTriggerMargin(0.05);
+        stubRetrieveCommon(List.of(
+            new AiVectorStore.VectorHit("1", "10", 0, 0.9),
+            new AiVectorStore.VectorHit("2", "10", 1, 0.8)));
+
+        List<AiRetrievalHitVo> result = service.retrieve(2L, "q", 1, null, true);
+
+        verify(rerankClient, never()).rerank(any(), any(), any(), anyInt());
+        assertEquals(1, result.size());
+        assertEquals("C1", result.get(0).getContent());
         assertEquals(0.9, result.get(0).getScore().doubleValue());
     }
 

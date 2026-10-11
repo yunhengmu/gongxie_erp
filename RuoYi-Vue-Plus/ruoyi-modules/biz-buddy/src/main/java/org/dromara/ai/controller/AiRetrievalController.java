@@ -55,6 +55,8 @@ public class AiRetrievalController extends BaseController {
      * @param threshold 相似度阈值，为空取知识库配置
      * @param rerank    是否开启重排，为空时跟随平台配置（{@code bizbuddy.ai.rag.rerank-enabled}）
      * @param assemble  是否对命中应用上下文装配（P0-③ 去重 + 相邻合并 + 字符上限）；为空 / false 时保持原始命中
+     * @param rerankMode 重排融合模式（{@code replace} / {@code rank_rrf} / {@code score_fusion}），
+     *                   为空时跟随平台配置（{@code bizbuddy.ai.rag.rerank-mode}）；仅 {@code rerank=true} 时生效
      */
     @SaCheckPermission("ai:kb:retrieval")
     @Log(title = "AI检索测试", businessType = BusinessType.OTHER)
@@ -68,10 +70,11 @@ public class AiRetrievalController extends BaseController {
                                           @DecimalMax(value = "1.000", message = "相似度阈值不能大于 1")
                                           @RequestParam(required = false) BigDecimal threshold,
                                           @RequestParam(required = false) Boolean rerank,
-                                          @RequestParam(required = false) Boolean assemble) {
+                                          @RequestParam(required = false) Boolean assemble,
+                                          @RequestParam(required = false) String rerankMode) {
         aiKnowledgeBaseService.validateVisible(kbId, LoginHelper.getUserId(), "检索");
         boolean useRerank = rerank != null ? rerank : aiProperties.getRag().isRerankEnabled();
-        List<AiRetrievalHitVo> hits = aiVectorService.retrieve(kbId, query, topK, threshold, useRerank);
+        List<AiRetrievalHitVo> hits = aiVectorService.retrieve(kbId, query, topK, threshold, useRerank, rerankMode);
         if (Boolean.TRUE.equals(assemble)) {
             return R.ok(AiRetrievalContextAssembler.assemble(hits,
                 AiRetrievalContextAssembler.Options.from(aiProperties.getRag())));
