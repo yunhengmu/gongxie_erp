@@ -32,7 +32,7 @@ class AiToolFactoryTest {
     private final AiToolFactory factory = new AiToolFactory(
         mock(IAiVectorService.class), mock(IAiKnowledgeBaseService.class), mock(NoticeService.class),
         mock(PermissionService.class), new AiProperties(), mock(DeptService.class), mock(UserService.class),
-        mock(RoleService.class), mock(MenuService.class));
+        mock(RoleService.class), mock(MenuService.class), new org.dromara.ai.core.AiRetrievalSourceRegistry());
 
     @BeforeAll
     static void init() {

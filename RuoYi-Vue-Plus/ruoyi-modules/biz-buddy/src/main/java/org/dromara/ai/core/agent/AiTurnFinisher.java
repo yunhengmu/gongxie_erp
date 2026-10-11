@@ -157,10 +157,11 @@ public class AiTurnFinisher {
             null, null, null, CANCELLED_TEXT);
         try {
             if (resumeMessageId == null) {
-                sessionService.persistAssistantAborted(sessionId, state.answer.toString(), durationMs);
+                sessionService.persistAssistantAborted(sessionId, state.answer.toString(), durationMs, state.sources);
             } else {
                 sessionService.appendAssistantTurn(resumeMessageId, "",
-                    AiMessage.STATUS_ABORTED, durationMs, buildDoneToolLogs(state, route), state.toTokenUsage());
+                    AiMessage.STATUS_ABORTED, durationMs, buildDoneToolLogs(state, route), state.toTokenUsage(),
+                    state.sources);
             }
         } catch (Exception e) {
             log.error("落库已停止消息异常，sessionId={}, messageId={}", sessionId, resumeMessageId, e);
@@ -205,10 +206,10 @@ public class AiTurnFinisher {
         try {
             if (resumeMessageId == null) {
                 assistant = sessionService.persistAssistantTurn(sessionId, content,
-                    replyId, durationMs, logs, tokens, state.userId);
+                    replyId, durationMs, logs, tokens, state.userId, state.sources);
             } else {
                 assistant = sessionService.appendAssistantTurn(resumeMessageId, content,
-                    AiMessage.STATUS_NORMAL, durationMs, logs, tokens);
+                    AiMessage.STATUS_NORMAL, durationMs, logs, tokens, state.sources);
             }
         } catch (Exception e) {
             log.error("落库助手消息异常，sessionId={}", sessionId, e);
@@ -241,6 +242,10 @@ public class AiTurnFinisher {
         payload.put("toolCallCount", logs.size());
         if (tokens != null) {
             payload.put("totalTokens", tokens.totalTokens());
+        }
+        if (!state.sources.isEmpty()) {
+            // 参考来源：与 references 事件同一 VO 序列化，前端刷新前也可据此回填
+            payload.put("references", state.sources);
         }
         AiSseSupport.send(emitter, payload);
         AiSseSupport.complete(emitter);
@@ -276,7 +281,7 @@ public class AiTurnFinisher {
             // 本段已完成（含被拒）的工具调用照常落明细：暂停发生在工具首次请求之后，
             // 之前已执行的读/内置工具不应因为「本轮暂停」而从审计里消失
             assistant = sessionService.persistPendingTurn(sessionId, content, state.pendingReplyId, durationMs,
-                buildDoneToolLogs(state, route), state.toTokenUsage(), state.userId);
+                buildDoneToolLogs(state, route), state.toTokenUsage(), state.userId, state.sources);
         } catch (Exception e) {
             log.error("落库待确认消息异常，sessionId={}", sessionId, e);
             sendPendingSaveError(emitter, e);
@@ -311,7 +316,7 @@ public class AiTurnFinisher {
             // 同上：暂停前已完成的工具调用（如用户刚确认并已执行的写操作）必须落行，
             // 否则恢复段换了新的编排上下文，这些明细就丢了
             assistant = sessionService.appendAssistantTurn(messageId, content, AiMessage.STATUS_PENDING_CONFIRM,
-                durationMs, buildDoneToolLogs(state, route), state.toTokenUsage());
+                durationMs, buildDoneToolLogs(state, route), state.toTokenUsage(), state.sources);
         } catch (Exception e) {
             log.error("落库待确认消息异常（恢复段），sessionId={}, messageId={}", sessionId, messageId, e);
             sendPendingSaveError(emitter, e);

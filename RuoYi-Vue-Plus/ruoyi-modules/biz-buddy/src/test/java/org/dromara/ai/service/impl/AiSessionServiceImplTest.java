@@ -254,7 +254,7 @@ class AiSessionServiceImplTest {
         AiToolCallLog log = new AiToolCallLog();
 
         AiMessage message = service.persistAssistantTurn(1L, "回答", "reply-1", 120L,
-            List.of(log), new ChatTokenUsage(1, 2, 3), 9L);
+            List.of(log), new ChatTokenUsage(1, 2, 3), 9L, null);
 
         assertEquals(AiMessage.ROLE_ASSISTANT, message.getRole());
         assertEquals(1, message.getToolCallCount());
@@ -280,7 +280,7 @@ class AiSessionServiceImplTest {
     void shouldPersistPendingTurn() {
         when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
 
-        AiMessage message = service.persistPendingTurn(1L, "暂停", "reply", 10L, null, null, 9L);
+        AiMessage message = service.persistPendingTurn(1L, "暂停", "reply", 10L, null, null, 9L, null);
 
         assertEquals(AiMessage.STATUS_PENDING_CONFIRM, message.getStatus());
         assertEquals(0, message.getToolCallCount());
@@ -290,7 +290,7 @@ class AiSessionServiceImplTest {
     @DisplayName("追加助手消息时消息不存在抛出异常")
     void shouldRejectAppendAssistantWhenMissing() {
         when(messageMapper.selectById(5L)).thenReturn(null);
-        assertThrows(ServiceException.class, () -> service.appendAssistantTurn(5L, "x", "0", 1L, null, null));
+        assertThrows(ServiceException.class, () -> service.appendAssistantTurn(5L, "x", "0", 1L, null, null, null));
     }
 
     @Test
@@ -311,7 +311,7 @@ class AiSessionServiceImplTest {
         when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
 
         AiMessage result = service.appendAssistantTurn(5L, "b", AiMessage.STATUS_NORMAL, 5L,
-            List.of(new AiToolCallLog()), new ChatTokenUsage(1, 1, 2));
+            List.of(new AiToolCallLog()), new ChatTokenUsage(1, 1, 2), null);
 
         assertSame(updated, result);
         ArgumentCaptor<AiMessage> captor = ArgumentCaptor.forClass(AiMessage.class);

@@ -586,6 +586,7 @@ create table if not exists ai_message (
     completion_tokens integer,
     total_tokens      integer,
     duration_ms       bigint,
+    sources           text,
     remark            varchar(500),
     create_dept       bigint,
     create_by         bigint,
@@ -607,7 +608,11 @@ comment on column ai_message.prompt_tokens is '输入 Token 数';
 comment on column ai_message.completion_tokens is '输出 Token 数';
 comment on column ai_message.total_tokens is '总 Token 数';
 comment on column ai_message.duration_ms is '本轮耗时（毫秒）';
+comment on column ai_message.sources is '回答参考来源（JSON 字符串，知识库命中；可空）';
 create index if not exists idx_ai_message_session on ai_message (session_id, id);
+
+-- 存量库增量（幂等）：为已存在的 ai_message 补充「回答参考来源」列
+alter table ai_message add column if not exists sources text;
 
 create table if not exists ai_message_attachment (
     id             bigint       not null,

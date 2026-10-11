@@ -1,6 +1,7 @@
 package org.dromara.ai.core.agent.tools;
 
 import org.dromara.ai.core.AiRetrievalContextAssembler;
+import org.dromara.ai.core.AiRetrievalSourceRegistry;
 import org.dromara.ai.util.AiUntrustedContent;
 
 import io.agentscope.core.message.ToolResultBlock;
@@ -9,6 +10,7 @@ import io.agentscope.core.tool.ToolBase;
 import io.agentscope.core.tool.ToolCallParam;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.domain.vo.AiRetrievalHitVo;
+import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiVectorService;
 import org.dromara.common.core.exception.ServiceException;
@@ -76,6 +78,11 @@ public class KnowledgeSearchTool extends ToolBase {
     private final AiRetrievalContextAssembler.Options assembleOptions;
 
     /**
+     * 检索来源注册表：命中时把结构化来源按 toolCallId 暂存，供事件桥下发「参考来源」（可空）
+     */
+    private final AiRetrievalSourceRegistry sourceRegistry;
+
+    /**
      * 智能体场景构造：知识库绑定来自智能体定义，调用时按提问用户过滤生效范围。
      *
      * @param vectorService        向量检索服务
@@ -85,7 +92,7 @@ public class KnowledgeSearchTool extends ToolBase {
      */
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
                                IAiKnowledgeBaseService knowledgeBaseService) {
-        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, false, false, null);
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, false, false, null, null);
     }
 
     /**
@@ -103,7 +110,7 @@ public class KnowledgeSearchTool extends ToolBase {
      */
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
                                IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope) {
-        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, false, null);
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, false, null, null);
     }
 
     /**
@@ -118,7 +125,7 @@ public class KnowledgeSearchTool extends ToolBase {
      */
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
                                IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope, boolean rerank) {
-        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, rerank, null);
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, rerank, null, null);
     }
 
     /**
@@ -135,6 +142,25 @@ public class KnowledgeSearchTool extends ToolBase {
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
                                IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope, boolean rerank,
                                AiRetrievalContextAssembler.Options assembleOptions) {
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, rerank, assembleOptions, null);
+    }
+
+    /**
+     * 完整构造（含上下文装配参数与来源注册表）。
+     *
+     * @param vectorService        向量检索服务
+     * @param kbIds                知识库主键集合
+     * @param defaultTopK          默认召回条数，留空取 5
+     * @param knowledgeBaseService 知识库服务
+     * @param platformScope        是否平台出口模式
+     * @param rerank               是否开启检索重排
+     * @param assembleOptions      上下文装配参数；为 null 取默认值
+     * @param sourceRegistry       检索来源注册表；为 null 时不暂存来源
+     */
+    public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
+                               IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope, boolean rerank,
+                               AiRetrievalContextAssembler.Options assembleOptions,
+                               AiRetrievalSourceRegistry sourceRegistry) {
         super(ToolBase.builder()
             .name(TOOL_NAME)
             .description(DESCRIPTION)
@@ -148,6 +174,7 @@ public class KnowledgeSearchTool extends ToolBase {
         this.platformScope = platformScope;
         this.rerank = rerank;
         this.assembleOptions = assembleOptions;
+        this.sourceRegistry = sourceRegistry;
     }
 
     /**
@@ -206,6 +233,10 @@ public class KnowledgeSearchTool extends ToolBase {
             }
             if (hits.isEmpty()) {
                 return Mono.just(ToolResultBlock.text("未检索到相关内容。").withIdAndName(id, name));
+            }
+            // 命中非空：把结构化来源按 toolCallId 暂存，供事件桥下发「参考来源」（渲染文本与安全包裹语义不变）
+            if (sourceRegistry != null) {
+                sourceRegistry.put(id, toSources(hits));
             }
             return Mono.just(ToolResultBlock.text(AiUntrustedContent.wrap(render(hits))).withIdAndName(id, name));
         } catch (ServiceException e) {
@@ -297,6 +328,27 @@ public class KnowledgeSearchTool extends ToolBase {
             }
         }
         return sb.length() > maxChars ? sb.substring(0, maxChars) : sb.toString();
+    }
+
+    /**
+     * 把命中切片转换为结构化来源（供「参考来源」下发）。
+     *
+     * @param hits 命中切片
+     * @return 来源视图列表
+     */
+    private List<AiSourceVo> toSources(List<AiRetrievalHitVo> hits) {
+        List<AiSourceVo> sources = new ArrayList<>(hits.size());
+        for (AiRetrievalHitVo hit : hits) {
+            AiSourceVo source = new AiSourceVo();
+            source.setDocId(hit.getDocId());
+            source.setDocName(hit.getDocName());
+            source.setHeadingPath(hit.getHeadingPath());
+            source.setPageNo(hit.getPageNo());
+            source.setChunkIndex(hit.getChunkIndex());
+            source.setScore(hit.getScore());
+            sources.add(source);
+        }
+        return sources;
     }
 
     /**

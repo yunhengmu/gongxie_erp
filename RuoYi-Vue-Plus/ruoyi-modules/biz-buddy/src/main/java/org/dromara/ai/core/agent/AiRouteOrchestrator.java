@@ -550,6 +550,11 @@ public class AiRouteOrchestrator {
             error = translatePausedStateError(error);
             log.warn("专家调用失败：expert={}, attempt={}, 原因={}", candidate.agentKey(), attempt, error);
         }
+        // 参考来源（知识库命中）：专家使用**独立的流式状态**，其内部检索命中的来源若只留在该状态会随调用结束丢弃；
+        // 此处回填到入口轮状态（气泡下方「参考来源」与落库均读入口状态），失败/超时也回填已命中的部分
+        if (route.entryState != null) {
+            streamBridge.mergeSources(route.entryState, state.sources);
+        }
         long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
         route.expertCallCount.incrementAndGet();
         // 专家内部执行的工具调用（含被拒绝的写操作）累积到编排上下文，收尾时随入口轮明细一起落库：

@@ -68,6 +68,24 @@ export interface ChatMessageVO {
   createTime?: string;
   /** 随本条消息发送的附件（聊天上传的图片/文档） */
   attachments?: ChatAttachmentVO[];
+  /** 回答参考来源（JSON 字符串，前端自行解析；知识库命中时非空） */
+  sources?: string;
+}
+
+/** 回答参考来源（知识库命中：文档名 + 章节 / 页码 + 相似度） */
+export interface ChatSourceItem {
+  /** 来源文档主键 */
+  docId?: string | number;
+  /** 来源文档名称 */
+  docName?: string;
+  /** 章节路径（各级标题用 > 连接，可空） */
+  headingPath?: string;
+  /** 切片起始页码（可空） */
+  pageNo?: number;
+  /** 切片序号（可空） */
+  chunkIndex?: number;
+  /** 相似度得分（可空） */
+  score?: number;
 }
 
 /** 聊天附件（图片/文档） */
@@ -154,6 +172,7 @@ export interface ChatStreamEvent {
     | 'expert_invalid'
     | 'route_fallback'
     | 'answer_reset'
+    | 'references'
     | 'done'
     | 'error';
   /** 回复标识（text_delta / tool_call_start / done） */
@@ -202,6 +221,10 @@ export interface ChatStreamEvent {
   error?: string;
   /** 降级原因（route_fallback） */
   reason?: string;
+  /** 参考来源（references / done 事件：文档名 + 章节 / 页码 + 相似度） */
+  items?: ChatSourceItem[];
+  /** 参考来源（done 事件，与 references 事件同结构） */
+  references?: ChatSourceItem[];
 }
 
 /** 待确认的工具调用 */

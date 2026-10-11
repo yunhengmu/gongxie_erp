@@ -114,6 +114,11 @@ public class AiMessage extends BaseEntity {
     private Long durationMs;
 
     /**
+     * 回答参考来源（JSON 字符串，知识库命中；可空）
+     */
+    private String sources;
+
+    /**
      * 备注
      */
     private String remark;

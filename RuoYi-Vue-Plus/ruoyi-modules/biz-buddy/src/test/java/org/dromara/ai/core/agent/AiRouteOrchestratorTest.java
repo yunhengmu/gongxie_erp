@@ -5,17 +5,22 @@ import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.RequireUserConfirmEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
+import io.agentscope.core.event.ToolCallStartEvent;
+import io.agentscope.core.event.ToolResultEndEvent;
 import io.agentscope.core.message.Msg;
+import io.agentscope.core.message.ToolResultState;
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.state.AgentState;
 import io.agentscope.harness.agent.HarnessAgent;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.AiRetrievalSourceRegistry;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiExpertAgent;
 import org.dromara.ai.domain.AiRouteExpertCall;
 import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.dto.AiSessionResourceSet;
+import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSkillService;
@@ -177,9 +182,19 @@ class AiRouteOrchestratorTest {
      * 从而驱动 {@code state} 累积（正文 / 待确认），覆盖 {@code runExpert} 的主流程。
      */
     private AiRouteOrchestrator newOrchestratorWithRealBridge() {
+        return newOrchestratorWithRealBridge(new AiRetrievalSourceRegistry());
+    }
+
+    /**
+     * 用**真实**桥接器（指定来源注册表）构造编排器：便于验证「专家子状态」的参考来源回填入口状态。
+     *
+     * @param registry 检索来源注册表
+     * @return 编排器
+     */
+    private AiRouteOrchestrator newOrchestratorWithRealBridge(AiRetrievalSourceRegistry registry) {
         return new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
-            new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService), traceService,
-            aiProperties, runtimeConfigStore, skillService, agentService);
+            new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService, registry),
+            traceService, aiProperties, runtimeConfigStore, skillService, agentService);
     }
 
     /** 专家定义（主键 10，与 {@link #candidate()} 对齐）。 */
@@ -245,6 +260,34 @@ class AiRouteOrchestratorTest {
         verify(recorder).recordExpertCall(any(AiRouteExpertCall.class));
         // route_decision + expert_start + answer_reset + text_delta + expert_result
         verify(emitter, times(5)).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
+    @DisplayName("专家内部检索命中的参考来源回填到入口轮状态（气泡下方展示读入口状态）")
+    void shouldCarryExpertSourcesToEntryState() throws Exception {
+        AiExpertAgent definition = expertDefinition();
+        HarnessAgent expert = stubExpertRun(definition);
+        when(expertDirectory.definition(10L)).thenReturn(definition);
+        // 模拟知识库检索工具命中：注册表按 toolCallId 暂存来源，桥接层在工具结果结束时取出
+        AiRetrievalSourceRegistry registry = new AiRetrievalSourceRegistry();
+        AiSourceVo source = new AiSourceVo();
+        source.setDocId(11L);
+        source.setChunkIndex(0);
+        source.setDocName("员工手册");
+        source.setScore(0.9);
+        registry.put("c1", List.of(source));
+        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>just(
+            new ToolCallStartEvent("reply-1", "c1", "search_knowledge_base"),
+            new ToolResultEndEvent("reply-1", "c1", "search_knowledge_base", ToolResultState.SUCCESS),
+            new TextBlockDeltaEvent("reply-1", "block-1", "专家回答")));
+        AiRouteContext route = newRoute();
+        route.entryState = new AiStreamState();
+
+        newOrchestratorWithRealBridge(registry).execute(route, candidate());
+
+        // 专家用独立状态，来源必须回填到入口状态，否则随专家状态丢弃
+        assertEquals(1, route.entryState.sources.size());
+        assertEquals("员工手册", route.entryState.sources.get(0).getDocName());
     }
 
     @Test

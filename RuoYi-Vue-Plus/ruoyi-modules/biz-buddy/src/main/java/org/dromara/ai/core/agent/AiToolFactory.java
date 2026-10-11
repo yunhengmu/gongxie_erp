@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiRetrievalContextAssembler;
+import org.dromara.ai.core.AiRetrievalSourceRegistry;
 import org.dromara.ai.core.agent.tools.CreateDeptTool;
 import org.dromara.ai.core.agent.tools.CreateNoticeTool;
 import org.dromara.ai.core.agent.tools.CreateUserTool;
@@ -207,6 +208,11 @@ public class AiToolFactory {
     private final MenuService menuService;
 
     /**
+     * 检索来源注册表：知识库检索工具命中时按 toolCallId 暂存结构化来源（供「参考来源」下发）
+     */
+    private final AiRetrievalSourceRegistry retrievalSourceRegistry;
+
+    /**
      * 判断实现标识是否已在代码侧登记。
      *
      * @param implName 实现标识
@@ -264,7 +270,8 @@ public class AiToolFactory {
         String implName = definition.getImplName();
         if (IMPL_KNOWLEDGE_SEARCH.equals(implName)) {
             return Optional.of(new KnowledgeSearchTool(vectorService, kbIds, null, knowledgeBaseService, platformScope,
-                aiProperties.getRag().isRerankEnabled(), AiRetrievalContextAssembler.Options.from(aiProperties.getRag())));
+                aiProperties.getRag().isRerankEnabled(), AiRetrievalContextAssembler.Options.from(aiProperties.getRag()),
+                retrievalSourceRegistry));
         }
         if (IMPL_CREATE_NOTICE.equals(implName)) {
             return Optional.of(new CreateNoticeTool(noticeService, permissionService));

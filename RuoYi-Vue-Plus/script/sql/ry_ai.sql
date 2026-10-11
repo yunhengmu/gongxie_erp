@@ -529,6 +529,7 @@ create table if not exists ai_message (
     completion_tokens int comment '输出 Token 数',
     total_tokens      int comment '总 Token 数',
     duration_ms       bigint(20) comment '本轮耗时（毫秒）',
+    sources           text comment '回答参考来源（JSON 字符串，知识库命中；可空）',
     remark            varchar(500),
     create_dept       bigint(20),
     create_by         bigint(20),
@@ -539,6 +540,20 @@ create table if not exists ai_message (
     constraint pk_ai_message primary key (id),
     key idx_ai_message_session (session_id, id)
 ) engine=innodb default charset=utf8mb4 comment='AI 会话消息表';
+
+-- 存量库增量（幂等）：为已存在的 ai_message 补充「回答参考来源」列。
+delimiter //
+drop procedure if exists add_ai_message_sources_column //
+create procedure add_ai_message_sources_column()
+begin
+    if not exists (select 1 from information_schema.columns
+                   where table_schema = database() and table_name = 'ai_message' and column_name = 'sources') then
+        alter table ai_message add column sources text comment '回答参考来源（JSON 字符串，知识库命中；可空）';
+    end if;
+end //
+delimiter ;
+call add_ai_message_sources_column();
+drop procedure if exists add_ai_message_sources_column;
 
 create table if not exists ai_message_attachment (
     id             bigint(20)   not null,

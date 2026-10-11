@@ -3,6 +3,7 @@ package org.dromara.ai.core.agent;
 import io.agentscope.core.model.ChatUsage;
 import org.dromara.ai.domain.AiToolCallLog;
 import org.dromara.ai.domain.dto.ChatTokenUsage;
+import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.common.core.utils.StringUtils;
 
 import java.util.ArrayList;
@@ -41,6 +42,12 @@ final class AiStreamState {
 
     /** AgentScope replyId */
     volatile String replyId;
+
+    /**
+     * 本轮回答参考来源（知识库检索命中，去重后按命中顺序累积）：
+     * 由事件桥从检索来源注册表 {@code drain} 后写入，收尾时随 done 载荷下发并落库。
+     */
+    final List<AiSourceVo> sources = new ArrayList<>();
 
     /** 输入 Token 累计 */
     int promptTokens;
