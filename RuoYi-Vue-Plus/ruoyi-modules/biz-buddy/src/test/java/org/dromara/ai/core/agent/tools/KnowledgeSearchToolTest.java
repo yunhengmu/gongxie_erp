@@ -62,6 +62,46 @@ class KnowledgeSearchToolTest {
         return vo;
     }
 
+    private static AiRetrievalHitVo hitWithTrace(Long docId, String docName, int chunkIndex, double score,
+                                                 String content, String headingPath, Integer pageNo) {
+        AiRetrievalHitVo vo = hit(docId, docName, chunkIndex, score, content);
+        vo.setHeadingPath(headingPath);
+        vo.setPageNo(pageNo);
+        return vo;
+    }
+
+    @Test
+    @DisplayName("出处行渲染章节路径与页码")
+    void shouldRenderSourceTrace() {
+        KnowledgeSearchTool tool =
+            new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+            .thenReturn(List.of(hitWithTrace(11L, "员工手册", 2, 0.9, "考勤正文。", "第2章 > 2.3 考勤", 12)));
+        ToolResultBlock result =
+            tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "考勤"), "100")).block();
+
+        assertFalse(isError(result));
+        assertTrue(text(result).contains("[1] 文档：员工手册 ｜ §第2章 > 2.3 考勤 ｜ p.12 ｜ 切片 #2 ｜ 相似度 0.90"));
+    }
+
+    @Test
+    @DisplayName("出处行：章节路径与页码为空时跳过对应段")
+    void shouldSkipBlankSourceTraceSegments() {
+        KnowledgeSearchTool tool =
+            new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+            .thenReturn(List.of(hit(11L, "员工手册", 0, 0.5, "正文。")));
+        ToolResultBlock result =
+            tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
+
+        assertFalse(isError(result));
+        assertTrue(text(result).contains("[1] 文档：员工手册 ｜ 切片 #0 ｜ 相似度 0.50"));
+        assertFalse(text(result).contains("§"));
+        assertFalse(text(result).contains("｜ p."));
+    }
+
     @Test
     @DisplayName("未绑定知识库时直接返回说明")
     void shouldReturnWhenNoKbBound() {

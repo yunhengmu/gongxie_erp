@@ -310,18 +310,50 @@ create table if not exists ai_chunk (
     kb_id       bigint(20)       not null,
     doc_id      bigint(20)       not null,
     chunk_index int      not null comment '切片序号（从 0 开始）',
-    content     longtext comment '切片正文',
-    char_count  int      default 0,
-    vector_id   varchar(100) comment 'Milvus 中的向量主键',
-    create_dept bigint(20),
-    create_by   bigint(20),
-    create_time datetime,
-    update_by   bigint(20),
-    update_time datetime,
+    content      longtext comment '切片正文',
+    char_count   int      default 0,
+    vector_id    varchar(100) comment 'Milvus 中的向量主键',
+    heading_path varchar(500) comment '章节路径（各级标题用 > 连接，如 第2章 > 2.3 考勤）',
+    page_no      int comment '切片起始页码（PDF 等分页文档）',
+    char_start   int comment '切片在文档纯文本中的起始字符下标（含）',
+    char_end     int comment '切片在文档纯文本中的结束字符下标（不含）',
+    create_dept  bigint(20),
+    create_by    bigint(20),
+    create_time  datetime,
+    update_by    bigint(20),
+    update_time  datetime,
     constraint pk_ai_chunk primary key (id),
     key idx_ai_chunk_doc (doc_id),
     key idx_ai_chunk_kb (kb_id)
 ) engine=innodb default charset=utf8mb4 comment='AI 知识库文档切片表';
+
+-- 存量库增量（幂等）：为已存在的 ai_chunk 补充溯源元数据列。
+-- MySQL 8.0 不支持 ADD COLUMN IF NOT EXISTS，故用 information_schema 判断后动态执行；全新库由上方建表语句
+-- 已含这些列，重复执行安全（需客户端支持 DELIMITER 指令）。
+delimiter //
+drop procedure if exists add_ai_chunk_trace_columns //
+create procedure add_ai_chunk_trace_columns()
+begin
+    if not exists (select 1 from information_schema.columns
+                   where table_schema = database() and table_name = 'ai_chunk' and column_name = 'heading_path') then
+        alter table ai_chunk add column heading_path varchar(500) comment '章节路径（各级标题用 > 连接，如 第2章 > 2.3 考勤）';
+    end if;
+    if not exists (select 1 from information_schema.columns
+                   where table_schema = database() and table_name = 'ai_chunk' and column_name = 'page_no') then
+        alter table ai_chunk add column page_no int comment '切片起始页码（PDF 等分页文档）';
+    end if;
+    if not exists (select 1 from information_schema.columns
+                   where table_schema = database() and table_name = 'ai_chunk' and column_name = 'char_start') then
+        alter table ai_chunk add column char_start int comment '切片在文档纯文本中的起始字符下标（含）';
+    end if;
+    if not exists (select 1 from information_schema.columns
+                   where table_schema = database() and table_name = 'ai_chunk' and column_name = 'char_end') then
+        alter table ai_chunk add column char_end int comment '切片在文档纯文本中的结束字符下标（不含）';
+    end if;
+end //
+delimiter ;
+call add_ai_chunk_trace_columns();
+drop procedure if exists add_ai_chunk_trace_columns;
 
 -- ============================================================
 -- 智能体与会话

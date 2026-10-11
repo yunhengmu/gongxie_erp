@@ -79,6 +79,8 @@
             <span class="hit-source">
               <el-icon><Document /></el-icon>
               {{ item.docName || '未知文档' }}
+              <template v-if="item.headingPath">· §{{ item.headingPath }}</template>
+              <template v-if="item.pageNo !== undefined && item.pageNo !== null">· p.{{ item.pageNo }}</template>
               <template v-if="item.chunkIndex !== undefined && item.chunkIndex !== null">· 切片 #{{ item.chunkIndex }}</template>
             </span>
           </div>

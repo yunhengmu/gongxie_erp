@@ -234,7 +234,15 @@ public final class AiRetrievalContextAssembler {
             members.sort(Comparator.comparingInt(hit -> hit.getChunkIndex() == null ? Integer.MAX_VALUE : hit.getChunkIndex()));
             StringBuilder content = new StringBuilder();
             Double maxScore = null;
+            Integer minStart = null;
+            Integer maxEnd = null;
             for (AiRetrievalHitVo member : members) {
+                if (member.getCharStart() != null && (minStart == null || member.getCharStart() < minStart)) {
+                    minStart = member.getCharStart();
+                }
+                if (member.getCharEnd() != null && (maxEnd == null || member.getCharEnd() > maxEnd)) {
+                    maxEnd = member.getCharEnd();
+                }
                 String part = member.getContent() == null ? "" : member.getContent().trim();
                 if (part.isEmpty()) {
                     continue;
@@ -247,6 +255,8 @@ public final class AiRetrievalContextAssembler {
                     maxScore = member.getScore();
                 }
             }
+            // 溯源元数据取「起始块」（切片号最小者）：章节路径 / 页码来自该块，字符区间取并集
+            AiRetrievalHitVo first = members.get(0);
             AiRetrievalHitVo merged = new AiRetrievalHitVo();
             merged.setDocId(group.docId);
             merged.setDocName(group.docName);
@@ -254,6 +264,10 @@ public final class AiRetrievalContextAssembler {
             merged.setChunkIndexEnd(group.maxIndex == Integer.MIN_VALUE ? null : group.maxIndex);
             merged.setScore(maxScore);
             merged.setContent(content.toString());
+            merged.setHeadingPath(first.getHeadingPath());
+            merged.setPageNo(first.getPageNo());
+            merged.setCharStart(minStart);
+            merged.setCharEnd(maxEnd);
             result.add(merged);
         }
         return result;
@@ -373,6 +387,10 @@ public final class AiRetrievalContextAssembler {
         target.setChunkIndexEnd(source.getChunkIndexEnd());
         target.setScore(source.getScore());
         target.setContent(source.getContent());
+        target.setHeadingPath(source.getHeadingPath());
+        target.setPageNo(source.getPageNo());
+        target.setCharStart(source.getCharStart());
+        target.setCharEnd(source.getCharEnd());
         return target;
     }
 

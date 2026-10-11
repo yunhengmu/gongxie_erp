@@ -266,8 +266,9 @@ public class KnowledgeSearchTool extends ToolBase {
     /**
      * 渲染检索结果文本。
      *
-     * <p>先经上下文装配（P0-③ 去重 + 相邻合并 + 字符上限，P0-④ 可配 Token 预算），再按「文档名 / 切片号 / 相似度」逐条渲染；
-     * 末尾仍以**生效字符上限**（min(绝对字符上限, Token 预算折算值)）做一次安全截断。编号、格式与安全包裹保持原样。</p>
+     * <p>先经上下文装配（P0-③ 去重 + 相邻合并 + 字符上限，P0-④ 可配 Token 预算），再逐条渲染出处行：
+     * 文档名 + 章节路径 + 页码 + 切片号 + 相似度（章节 / 页码为空则跳过该段）；
+     * 末尾仍以**生效字符上限**（min(绝对字符上限, Token 预算折算值)）做一次安全截断。编号与安全包裹保持原样。</p>
      *
      * @param hits 命中切片（已按相关度降序）
      * @return 结果文本
@@ -281,9 +282,15 @@ public class KnowledgeSearchTool extends ToolBase {
         int index = 1;
         for (AiRetrievalHitVo hit : fragments) {
             sb.append("\n[").append(index++).append("] 文档：")
-                .append(StringUtils.isBlank(hit.getDocName()) ? "未知文档" : hit.getDocName())
-                .append(" ｜ 切片 #").append(sliceLabel(hit))
-                .append(" ｜ 相似度 ").append(hit.getScore() == null ? "-" : String.format("%.4f", hit.getScore()))
+                .append(StringUtils.isBlank(hit.getDocName()) ? "未知文档" : hit.getDocName());
+            if (StringUtils.isNotBlank(hit.getHeadingPath())) {
+                sb.append(" ｜ §").append(hit.getHeadingPath().trim());
+            }
+            if (hit.getPageNo() != null) {
+                sb.append(" ｜ p.").append(hit.getPageNo());
+            }
+            sb.append(" ｜ 切片 #").append(sliceLabel(hit))
+                .append(" ｜ 相似度 ").append(hit.getScore() == null ? "-" : String.format("%.2f", hit.getScore()))
                 .append("\n").append(StringUtils.trim(hit.getContent())).append("\n");
             if (sb.length() > maxChars) {
                 break;

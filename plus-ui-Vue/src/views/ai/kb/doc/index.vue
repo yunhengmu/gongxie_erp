@@ -196,7 +196,13 @@
       <div v-loading="chunkDialog.loading" class="chunk-list">
         <div v-for="item in chunkDialog.list" :key="item.id" class="chunk-item">
           <div class="chunk-index">#{{ item.chunkIndex }}</div>
-          <div class="chunk-content">{{ item.content }}</div>
+          <div class="chunk-body">
+            <div v-if="item.headingPath || (item.pageNo !== undefined && item.pageNo !== null)" class="chunk-meta">
+              <span v-if="item.headingPath">§{{ item.headingPath }}</span>
+              <span v-if="item.pageNo !== undefined && item.pageNo !== null">p.{{ item.pageNo }}</span>
+            </div>
+            <div class="chunk-content">{{ item.content }}</div>
+          </div>
         </div>
       </div>
       <pagination
@@ -584,6 +590,22 @@ onMounted(async () => {
   color: var(--app-accent-strong);
   font-weight: 700;
   font-size: 13px;
+}
+
+.chunk-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.chunk-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--app-accent-strong);
+  font-size: 12px;
 }
 
 .chunk-content {

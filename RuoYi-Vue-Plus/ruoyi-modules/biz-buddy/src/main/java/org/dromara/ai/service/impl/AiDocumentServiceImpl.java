@@ -77,6 +77,11 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
     private static final int DEFAULT_CHUNK_SIZE = 500;
 
     /**
+     * 块之间拼接用的分隔符（与解析器的拼接口径一致，保证切片字符区间与全文下标对齐）
+     */
+    private static final String BLOCK_SEPARATOR = "\n";
+
+    /**
      * 中文句末标点：其后恒视为断点
      */
     private static final String CJK_SENTENCE_ENDINGS = "。！？；…";
@@ -169,12 +174,14 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
         markStatus(id, STATUS_PARSING, "");
         try {
             byte[] bytes = download(document);
-            String text = AiDocumentParser.extract(bytes, document.getFileSuffix());
+            List<AiDocumentParser.ParsedBlock> blocks = AiDocumentParser.parse(bytes, document.getFileSuffix());
+            TextAndRanges parsed = joinBlocks(blocks);
+            String text = parsed.text();
             if (StringUtils.isBlank(text)) {
                 throw new ServiceException("未从文档中解析出文本内容，可能是扫描件或空文档");
             }
-            List<String> pieces = split(text, knowledgeBase.getChunkSize(), knowledgeBase.getChunkOverlap());
-            rebuildChunks(document, pieces);
+            List<SlicePiece> pieces = splitPieces(text, knowledgeBase.getChunkSize(), knowledgeBase.getChunkOverlap());
+            rebuildChunks(document, pieces, parsed.ranges());
             cleanVectors(knowledgeBase, oldChunks);
             AiDocument update = new AiDocument();
             update.setId(id);
@@ -281,12 +288,13 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
     }
 
     /**
-     * 重建文档切片。
+     * 重建文档切片（写入章节路径 / 页码 / 字符区间等溯源元数据）。
      *
      * @param document 文档
-     * @param pieces   切片文本
+     * @param pieces   切片列表（含字符区间）
+     * @param ranges   块区间表（用于按切片起点定位所属块）
      */
-    private void rebuildChunks(AiDocument document, List<String> pieces) {
+    private void rebuildChunks(AiDocument document, List<SlicePiece> pieces, List<BlockRange> ranges) {
         LambdaQueryWrapper<AiChunk> lqw = Wrappers.lambdaQuery();
         lqw.eq(AiChunk::getDocId, document.getId());
         chunkMapper.delete(lqw);
@@ -295,16 +303,85 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
         }
         List<AiChunk> chunks = new ArrayList<>(pieces.size());
         for (int index = 0; index < pieces.size(); index++) {
-            String content = pieces.get(index);
+            SlicePiece piece = pieces.get(index);
+            BlockRange range = locateBlock(ranges, piece.start());
             AiChunk chunk = new AiChunk();
             chunk.setKbId(document.getKbId());
             chunk.setDocId(document.getId());
             chunk.setChunkIndex(index);
-            chunk.setContent(content);
-            chunk.setCharCount(content.length());
+            chunk.setContent(piece.text());
+            chunk.setCharCount(piece.text().length());
+            chunk.setCharStart(piece.start());
+            chunk.setCharEnd(piece.end());
+            if (range != null) {
+                chunk.setHeadingPath(range.headingPath());
+                chunk.setPageNo(range.pageNo());
+            }
             chunks.add(chunk);
         }
         chunkMapper.insertBatch(chunks);
+    }
+
+    /**
+     * 把各块正文按顺序拼成全文，并记录块在全文中的字符区间（含章节路径与页码）。
+     *
+     * <p>拼接口径与 {@link AiDocumentParser#join(List)} 一致（跳过空白块、以换行连接），
+     * 保证切片字符区间与全文下标对齐。</p>
+     *
+     * @param blocks 文本块
+     * @return 全文与块区间表
+     */
+    static TextAndRanges joinBlocks(List<AiDocumentParser.ParsedBlock> blocks) {
+        StringBuilder builder = new StringBuilder();
+        List<BlockRange> ranges = new ArrayList<>();
+        if (blocks != null) {
+            for (AiDocumentParser.ParsedBlock block : blocks) {
+                String text = block.text();
+                if (text == null || text.isEmpty()) {
+                    continue;
+                }
+                if (builder.length() > 0) {
+                    builder.append(BLOCK_SEPARATOR);
+                }
+                int start = builder.length();
+                builder.append(text);
+                ranges.add(new BlockRange(start, builder.length(), block.headingPath(), block.pageNo()));
+            }
+        }
+        return new TextAndRanges(builder.toString(), ranges);
+    }
+
+    /**
+     * 按切片起点定位所属块：落在块区间内取该块；落在块间分隔符时归入其后的块；越界取最后一块。
+     *
+     * <p>跨块切片按此规则取「起始块」，故其章节路径 / 页码取自起点所在块。</p>
+     *
+     * @param ranges 块区间表
+     * @param pos    切片起点（字符下标）
+     * @return 所属块；无块返回 null
+     */
+    static BlockRange locateBlock(List<BlockRange> ranges, int pos) {
+        if (ranges == null || ranges.isEmpty()) {
+            return null;
+        }
+        for (BlockRange range : ranges) {
+            if (pos < range.end()) {
+                return range;
+            }
+        }
+        return ranges.get(ranges.size() - 1);
+    }
+
+    /**
+     * 按知识库切分策略切分文本（返回切片正文，保留供直接单测）。
+     *
+     * @param text         全文
+     * @param chunkSize    切片长度
+     * @param chunkOverlap 切片重叠长度
+     * @return 切片正文列表
+     */
+    static List<String> split(String text, Integer chunkSize, Integer chunkOverlap) {
+        return splitPieces(text, chunkSize, chunkOverlap).stream().map(SlicePiece::text).toList();
     }
 
     /**
@@ -313,14 +390,15 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
      *
      * <p>产出保证：全文无遗漏（相邻切片首尾相接或重叠）、单片长度不超过 {@code chunkSize}。
      * 重叠为「尽量接近」而非严格等于 {@code chunkOverlap}：下一片起点会前移到最近的天然边界，
-     * 只前移不后移，故不会产生原文缺口。包级可见以便直接单测。</p>
+     * 只前移不后移，故不会产生原文缺口。每个切片附带其在全文中的字符区间
+     * {@code [start, end)}（正文经 trim，区间为未裁剪的窗口）。包级可见以便直接单测。</p>
      *
-     * @param text        全文
-     * @param chunkSize   切片长度
+     * @param text         全文
+     * @param chunkSize    切片长度
      * @param chunkOverlap 切片重叠长度
-     * @return 切片列表
+     * @return 切片列表（含字符区间）
      */
-    static List<String> split(String text, Integer chunkSize, Integer chunkOverlap) {
+    static List<SlicePiece> splitPieces(String text, Integer chunkSize, Integer chunkOverlap) {
         int size = chunkSize == null || chunkSize <= 0 ? DEFAULT_CHUNK_SIZE : chunkSize;
         int overlap = chunkOverlap == null || chunkOverlap < 0 ? 0 : chunkOverlap;
         if (overlap >= size) {
@@ -328,7 +406,7 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
             overlap = size / 5;
         }
         int length = text.length();
-        List<String> pieces = new ArrayList<>();
+        List<SlicePiece> pieces = new ArrayList<>();
         int start = 0;
         while (start < length) {
             int end = Math.min(start + size, length);
@@ -337,7 +415,7 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
             }
             String piece = text.substring(start, end).trim();
             if (!piece.isEmpty()) {
-                pieces.add(piece);
+                pieces.add(new SlicePiece(piece, start, end));
             }
             if (end >= length) {
                 break;
@@ -585,6 +663,36 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
         }
         String trimmed = message.trim();
         return trimmed.length() > 900 ? trimmed.substring(0, 900) : trimmed;
+    }
+
+    /**
+     * 全文与块区间表。
+     *
+     * @param text   全文（各块正文按顺序拼接）
+     * @param ranges 块区间表（按文档顺序）
+     */
+    record TextAndRanges(String text, List<BlockRange> ranges) {
+    }
+
+    /**
+     * 块在全文中的字符区间及其溯源元数据。
+     *
+     * @param start       起始字符下标（含）
+     * @param end         结束字符下标（不含）
+     * @param headingPath 章节路径
+     * @param pageNo      页码
+     */
+    record BlockRange(int start, int end, String headingPath, Integer pageNo) {
+    }
+
+    /**
+     * 切片正文及其在全文中的字符区间。
+     *
+     * @param text  切片正文（已 trim）
+     * @param start 起始字符下标（含，未裁剪的窗口）
+     * @param end   结束字符下标（不含，未裁剪的窗口）
+     */
+    record SlicePiece(String text, int start, int end) {
     }
 
 }
