@@ -377,6 +377,9 @@ bizbuddy:
     crypto-key: ${BIZBUDDY_AI_CRYPTO_KEY:bizbuddy-ai-2026}
     # 模型连通性测试的默认超时时间（秒）
     test-timeout-seconds: 30
+    chat:
+      # MCP 出口（/mcp）默认访问口令；仅演示用途，页面「MCP 服务端」可覆盖，生产请替换为强口令
+      mcp-server-token: BizBuddy
     # 向量化时单次提交的文本条数（取各家 OpenAI 兼容服务的兼容值）
     embedding-batch-size: 10
     # 向量化时单条文本最大字符数，超出截断（避免超过模型单行 Token 上限）
