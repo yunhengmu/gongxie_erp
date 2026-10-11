@@ -509,13 +509,6 @@
                 <version>${revision}</version>
             </dependency>
 
-            <!-- demo模块 -->
-            <dependency>
-                <groupId>org.dromara</groupId>
-                <artifactId>ruoyi-demo</artifactId>
-                <version>${revision}</version>
-            </dependency>
-
             <!--  工作流模块  -->
             <dependency>
                 <groupId>org.dromara</groupId>
