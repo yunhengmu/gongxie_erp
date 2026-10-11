@@ -16,7 +16,6 @@
     </description>
 
     <modules>
-        <module>ruoyi-demo</module>
         <module>ruoyi-gen</module>
         <module>ruoyi-job</module>
         <module>ruoyi-system</module>
