@@ -2,6 +2,7 @@ package org.dromara.ai.service.impl;
 
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiEmbeddingClient;
+import org.dromara.ai.core.AiRerankClient;
 import org.dromara.ai.core.AiVectorStore;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.core.safety.SafetyDecision;
@@ -31,6 +32,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -64,6 +66,9 @@ class AiVectorServiceImplTest {
     private AiVectorStore vectorStore;
 
     @Mock
+    private AiRerankClient rerankClient;
+
+    @Mock
     private AiSafetyGuard safetyGuard;
 
     @Mock
@@ -76,7 +81,7 @@ class AiVectorServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new AiVectorServiceImpl(chunkMapper, documentMapper, modelConfigMapper,
-            knowledgeBaseService, modelConfigService, embeddingClient, vectorStore, aiProperties,
+            knowledgeBaseService, modelConfigService, embeddingClient, vectorStore, rerankClient, aiProperties,
             safetyGuard, safetyEventService);
         // 安全守卫默认「原样放行 / 原样脱敏」，普通文本入参不变，既有断言不受影响
         lenient().when(safetyGuard.guard(any(), any()))
@@ -257,6 +262,68 @@ class AiVectorServiceImplTest {
         assertEquals(1, result.size());
         assertEquals("命中内容", result.get(0).getContent());
         assertEquals("来源文档", result.get(0).getDocName());
+        assertEquals(0.9, result.get(0).getScore().doubleValue());
+    }
+
+    @Test
+    @DisplayName("检索：开启重排时多召回、按重排分重排并截取 topK")
+    void shouldRerankRetrieval() {
+        AiKnowledgeBase kb = kb(2L, 3, 7L);
+        AiModelConfig model = model(7L);
+        when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb);
+        when(modelConfigMapper.selectById(7L)).thenReturn(model);
+        when(modelConfigService.decryptApiKey(7L)).thenReturn("key");
+        when(embeddingClient.embedOne(model, "key", "q")).thenReturn(new double[]{1, 2, 3});
+        // topK=2、rerankTopN=20 → 召回上限取 20
+        when(vectorStore.search(eq("col"), eq(3), any(double[].class), eq(20), eq(0.3)))
+            .thenReturn(List.of(
+                new AiVectorStore.VectorHit("1", "10", 0, 0.9),
+                new AiVectorStore.VectorHit("2", "10", 1, 0.8)));
+        when(chunkMapper.selectByIds(any())).thenReturn(List.of(chunk(1L, "A"), chunk(2L, "B")));
+        AiDocument doc = new AiDocument();
+        doc.setId(10L);
+        doc.setDocName("来源文档");
+        when(documentMapper.selectByIds(any())).thenReturn(List.of(doc));
+        // 重排把下标 1（B）提到首位，分 0.95；下标 0（A）次之，分 0.3
+        when(rerankClient.rerank(eq("key"), eq("q"), any(), eq(2)))
+            .thenReturn(new AiRerankClient.RerankOutcome(false, List.of(
+                new AiRerankClient.RankedDoc(1, 0.95),
+                new AiRerankClient.RankedDoc(0, 0.3))));
+
+        List<AiRetrievalHitVo> result = service.retrieve(2L, "q", 2, null, true);
+
+        assertEquals(2, result.size());
+        assertEquals("B", result.get(0).getContent());
+        assertEquals(0.95, result.get(0).getScore().doubleValue());
+        assertEquals("A", result.get(1).getContent());
+        assertEquals(0.3, result.get(1).getScore().doubleValue());
+    }
+
+    @Test
+    @DisplayName("检索：重排降级时保持原顺序与原余弦分并截取 topK")
+    void shouldKeepOriginalOrderWhenRerankDegraded() {
+        AiKnowledgeBase kb = kb(2L, 3, 7L);
+        AiModelConfig model = model(7L);
+        when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb);
+        when(modelConfigMapper.selectById(7L)).thenReturn(model);
+        when(modelConfigService.decryptApiKey(7L)).thenReturn("key");
+        when(embeddingClient.embedOne(model, "key", "q")).thenReturn(new double[]{1, 2, 3});
+        when(vectorStore.search(eq("col"), eq(3), any(double[].class), eq(20), eq(0.3)))
+            .thenReturn(List.of(
+                new AiVectorStore.VectorHit("1", "10", 0, 0.9),
+                new AiVectorStore.VectorHit("2", "10", 1, 0.8)));
+        when(chunkMapper.selectByIds(any())).thenReturn(List.of(chunk(1L, "A"), chunk(2L, "B")));
+        AiDocument doc = new AiDocument();
+        doc.setId(10L);
+        doc.setDocName("来源文档");
+        when(documentMapper.selectByIds(any())).thenReturn(List.of(doc));
+        when(rerankClient.rerank(any(), any(), any(), anyInt()))
+            .thenReturn(AiRerankClient.RerankOutcome.degradedOrder(2));
+
+        List<AiRetrievalHitVo> result = service.retrieve(2L, "q", 1, null, true);
+
+        assertEquals(1, result.size());
+        assertEquals("A", result.get(0).getContent());
         assertEquals(0.9, result.get(0).getScore().doubleValue());
     }
 

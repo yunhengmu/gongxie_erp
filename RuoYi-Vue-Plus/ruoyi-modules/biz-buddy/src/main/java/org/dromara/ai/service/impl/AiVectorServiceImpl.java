@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiEmbeddingClient;
+import org.dromara.ai.core.AiRerankClient;
 import org.dromara.ai.core.AiVectorStore;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.core.safety.SafetyDecision;
@@ -85,6 +86,11 @@ public class AiVectorServiceImpl implements IAiVectorService {
 
     private final AiVectorStore vectorStore;
 
+    /**
+     * 检索重排客户端（默认关闭；未配密钥 / 异常时降级为原顺序）
+     */
+    private final AiRerankClient rerankClient;
+
     private final AiProperties aiProperties;
 
     /**
@@ -157,6 +163,11 @@ public class AiVectorServiceImpl implements IAiVectorService {
 
     @Override
     public List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold) {
+        return retrieve(kbId, query, topK, threshold, false);
+    }
+
+    @Override
+    public List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, boolean rerank) {
         if (StringUtils.isBlank(query)) {
             throw new ServiceException("请输入查询内容");
         }
@@ -171,13 +182,56 @@ public class AiVectorServiceImpl implements IAiVectorService {
                 ? knowledgeBase.getSimilarityThreshold().doubleValue()
                 : aiProperties.getRetrievalScoreThreshold());
 
+        // 开启重排时先多召回（max(topK, rerankTopN)），给重排模型更大的候选池
+        int recallLimit = rerank ? Math.max(limit, aiProperties.getRag().getRerankTopN()) : limit;
+
         double[] queryVector = embeddingClient.embedOne(model, apiKey, query);
         List<AiVectorStore.VectorHit> hits = vectorStore.search(
-            knowledgeBase.getCollectionName(), knowledgeBase.getDimension(), queryVector, limit, scoreThreshold);
+            knowledgeBase.getCollectionName(), knowledgeBase.getDimension(), queryVector, recallLimit, scoreThreshold);
         if (hits.isEmpty()) {
             return List.of();
         }
-        return buildHits(hits);
+        List<AiRetrievalHitVo> result = buildHits(hits);
+        if (!rerank) {
+            return result;
+        }
+        return applyRerank(apiKey, query, result, limit);
+    }
+
+    /**
+     * 对稠密召回结果做文本重排并截取 topK。
+     *
+     * <p><b>score 口径</b>：重排成功时命中项 {@code score} 替换为<b>重排分</b>（relevance_score，
+     * 与余弦分不同尺度，不可与「未重排」的分数直接比较）；重排降级时<b>保留原余弦分与原始顺序</b>。</p>
+     *
+     * @param apiKey 明文密钥（复用知识库向量模型）
+     * @param query  查询文本
+     * @param hits   稠密召回结果（已按相似度降序）
+     * @param topK   最终返回条数
+     * @return 重排后（或降级原序）截取 topK 的结果
+     */
+    private List<AiRetrievalHitVo> applyRerank(String apiKey, String query, List<AiRetrievalHitVo> hits, int topK) {
+        List<String> documents = hits.stream().map(AiRetrievalHitVo::getContent).toList();
+        AiRerankClient.RerankOutcome outcome = rerankClient.rerank(apiKey, query, documents, documents.size());
+        if (outcome.degraded() || outcome.docs().isEmpty()) {
+            // 降级：保持原余弦分与原顺序，仅按 topK 截断
+            log.warn("检索重排降级为原顺序（kb 检索不受影响），候选数={}", hits.size());
+            return hits.size() > topK ? new ArrayList<>(hits.subList(0, topK)) : hits;
+        }
+        List<AiRetrievalHitVo> reordered = new ArrayList<>(outcome.docs().size());
+        for (AiRerankClient.RankedDoc doc : outcome.docs()) {
+            int index = doc.index();
+            if (index < 0 || index >= hits.size()) {
+                continue;
+            }
+            AiRetrievalHitVo hit = hits.get(index);
+            hit.setScore(doc.score());
+            reordered.add(hit);
+            if (reordered.size() >= topK) {
+                break;
+            }
+        }
+        return reordered;
     }
 
     @Override

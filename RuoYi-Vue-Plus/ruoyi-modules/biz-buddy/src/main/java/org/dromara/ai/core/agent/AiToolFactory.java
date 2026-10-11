@@ -4,6 +4,7 @@ import io.agentscope.core.tool.AgentTool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.AiRetrievalContextAssembler;
 import org.dromara.ai.core.agent.tools.CreateDeptTool;
 import org.dromara.ai.core.agent.tools.CreateNoticeTool;
 import org.dromara.ai.core.agent.tools.CreateUserTool;
@@ -262,7 +263,8 @@ public class AiToolFactory {
     public Optional<AgentTool> create(AiTool definition, List<Long> kbIds, boolean platformScope) {
         String implName = definition.getImplName();
         if (IMPL_KNOWLEDGE_SEARCH.equals(implName)) {
-            return Optional.of(new KnowledgeSearchTool(vectorService, kbIds, null, knowledgeBaseService, platformScope));
+            return Optional.of(new KnowledgeSearchTool(vectorService, kbIds, null, knowledgeBaseService, platformScope,
+                aiProperties.getRag().isRerankEnabled(), AiRetrievalContextAssembler.Options.from(aiProperties.getRag())));
         }
         if (IMPL_CREATE_NOTICE.equals(implName)) {
             return Optional.of(new CreateNoticeTool(noticeService, permissionService));

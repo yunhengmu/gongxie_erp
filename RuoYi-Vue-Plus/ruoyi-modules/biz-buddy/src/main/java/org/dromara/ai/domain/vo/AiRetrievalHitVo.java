@@ -17,9 +17,14 @@ public class AiRetrievalHitVo implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 切片序号
+     * 切片序号（相邻合并后为组内最小切片号）
      */
     private Integer chunkIndex;
+
+    /**
+     * 相邻合并后覆盖的切片区间结束号（单条 / 未合并时为 null）
+     */
+    private Integer chunkIndexEnd;
 
     /**
      * 相似度得分（COSINE，越大越相关）

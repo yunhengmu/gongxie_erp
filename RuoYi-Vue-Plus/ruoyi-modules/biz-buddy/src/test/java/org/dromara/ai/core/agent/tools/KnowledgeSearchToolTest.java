@@ -19,6 +19,7 @@ import static org.dromara.ai.core.agent.ToolTestSupport.text;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -51,6 +52,16 @@ class KnowledgeSearchToolTest {
         return vo;
     }
 
+    private static AiRetrievalHitVo hit(Long docId, String docName, int chunkIndex, double score, String content) {
+        AiRetrievalHitVo vo = new AiRetrievalHitVo();
+        vo.setDocId(docId);
+        vo.setDocName(docName);
+        vo.setChunkIndex(chunkIndex);
+        vo.setScore(score);
+        vo.setContent(content);
+        return vo;
+    }
+
     @Test
     @DisplayName("未绑定知识库时直接返回说明")
     void shouldReturnWhenNoKbBound() {
@@ -58,7 +69,7 @@ class KnowledgeSearchToolTest {
         ToolResultBlock result = tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of(), "100")).block();
         assertFalse(isError(result));
         assertTrue(text(result).contains("未绑定知识库"));
-        verify(vectorService, never()).retrieve(anyLong(), anyString(), anyInt(), any());
+        verify(vectorService, never()).retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean());
     }
 
     @Test
@@ -90,8 +101,10 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any()))
-            .thenReturn(List.of(hit(11L, "员工手册", 0.5), hit(12L, "报销制度", 0.9)));
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+            .thenReturn(List.of(
+                hit(11L, "员工手册", 0, 0.5, "员工考勤与请假管理规定正文。"),
+                hit(12L, "报销制度", 0, 0.9, "差旅报销标准与审批流程正文。")));
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
         assertFalse(isError(result));
@@ -101,12 +114,31 @@ class KnowledgeSearchToolTest {
     }
 
     @Test
+    @DisplayName("同一文档相邻切片合并为一条并标注切片区间")
+    void shouldMergeAdjacentChunks() {
+        KnowledgeSearchTool tool =
+            new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+            .thenReturn(List.of(
+                hit(11L, "员工手册", 2, 0.9, "第一段关于考勤的规定。"),
+                hit(11L, "员工手册", 3, 0.8, "第二段关于请假的规定。")));
+        ToolResultBlock result =
+            tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "考勤"), "100")).block();
+        assertFalse(isError(result));
+        assertTrue(text(result).contains("共 1 条"));
+        assertTrue(text(result).contains("切片 #2-3"));
+        assertTrue(text(result).contains("第一段关于考勤的规定"));
+        assertTrue(text(result).contains("第二段关于请假的规定"));
+    }
+
+    @Test
     @DisplayName("检索返回空时给出未检索到文案")
     void shouldHandleEmptyHits() {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any())).thenReturn(null);
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean())).thenReturn(null);
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
         assertFalse(isError(result));
@@ -118,7 +150,7 @@ class KnowledgeSearchToolTest {
     void shouldSkipFilterInPlatformScope() {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), 3, knowledgeBaseService, true);
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
             .thenReturn(List.of(hit(11L, "公开资料", 0.8)));
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "公开"), "100")).block();
@@ -133,7 +165,7 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
             .thenThrow(new ServiceException("向量库不可用"));
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
@@ -147,7 +179,7 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
             .thenThrow(new IllegalStateException("boom"));
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
