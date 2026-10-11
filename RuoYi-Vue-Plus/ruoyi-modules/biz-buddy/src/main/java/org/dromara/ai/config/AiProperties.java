@@ -553,9 +553,20 @@ public class AiProperties {
         private double assembleDedupJaccard = 0.9;
 
         /**
-         * 装配后片段总正文的字符上限（与工具现状一致，默认 6000）：超限时按相关度优先保留。
+         * 装配后片段总正文的**字符上限（绝对上限）**（与工具现状一致，默认 6000）：超限时按相关度优先保留。
+         *
+         * <p>作为不依赖 Token 估算的硬兜底，与 {@link #assembleMaxTokens} 折算出的字符上限取**较小者**生效。</p>
          */
         private int assembleMaxChars = 6000;
+
+        /**
+         * 装配后片段总正文的 **Token 预算**（P0-④，默认 6000）：超限时按相关度优先保留。
+         *
+         * <p>默认值 6000 与「现状 6000 字」等效——按 {@code AiTokenEstimator} 的 CJK 1 token/字符口径，
+         * 6000 字≈6000 token，故默认行为与原字符硬截断一致、不会导致覆盖下降；作为**可配预算**，
+         * 调小即可更早收敛上下文。有效字符上限 = min({@link #assembleMaxChars}, 本预算折算出的字符上限)。</p>
+         */
+        private int assembleMaxTokens = 6000;
     }
 
 }

@@ -105,7 +105,7 @@ const usage = () => `BizBuddy RAG 检索质量评测（e2e/eval）
 
 指标：hit@1 / hit@3 / hit@5、recall@5、MRR@5、平均 top1 分数、平均检索耗时；并按 category（fact/term/synonym/colloquial/crossdoc）分组输出。
 判定：topK 命中中存在 docName ∈ expectDocs 且其 content 含任一 expectKeywords 记为命中。
-装配（--assemble）：额外输出「装配前 → 装配后」的片段条数 / 总字符数 / 期望关键词覆盖率 / 冗余率（整体 + 分类别）。
+装配（--assemble）：额外输出「装配前 → 装配后」的片段条数 / 总字符数 / 估算 Token 数 / 期望关键词覆盖率 / 冗余率（整体 + 分类别）。
 报告：e2e/.e2e-report-rag-<时间戳>.json（已被 .gitignore 忽略，含 byCategory / assembleSummary）`;
 
 /**
@@ -409,9 +409,40 @@ const scoreList = (list, testCase, topK, elapsedMs) => {
 };
 
 /**
- * 计算单个命中列表的「上下文装配」相关统计（条数 / 总字符数 / 期望关键词覆盖率 / 冗余率）。
+ * 估算文本 Token 数（脚本侧口径，与后端 {@code AiTokenEstimator} 一致）。
  *
- * <p>冗余率口径＝字符二元组重复占比（1 − 去重后二元组数 / 二元组总数），越低越精简。</p>
+ * <p>CJK 字符（统一表意文字及扩展 / 兼容区、CJK 标点、全角字符）≈ 1 token / 字符；
+ * 其它字符 ≈ 4 字符 / token（向上取整）。仅为近似值，用于前后对比报告。</p>
+ *
+ * @param {string} text 文本
+ * @returns {number} 估算 Token 数（非负）
+ */
+const estimateTokens = (text) => {
+  const source = String(text ?? '');
+  let cjk = 0;
+  let other = 0;
+  for (const ch of source) {
+    const code = ch.codePointAt(0);
+    const isCjk =
+      (code >= 0x4e00 && code <= 0x9fff) ||
+      (code >= 0x3400 && code <= 0x4dbf) ||
+      (code >= 0xf900 && code <= 0xfaff) ||
+      (code >= 0x3000 && code <= 0x303f) ||
+      (code >= 0xff00 && code <= 0xffef);
+    if (isCjk) {
+      cjk++;
+    } else {
+      other++;
+    }
+  }
+  return cjk + Math.ceil(other / 4);
+};
+
+/**
+ * 计算单个命中列表的「上下文装配」相关统计（条数 / 总字符数 / 估算 Token / 期望关键词覆盖率 / 冗余率）。
+ *
+ * <p>冗余率口径＝字符二元组重复占比（1 − 去重后二元组数 / 二元组总数），越低越精简。
+ * 估算 Token 为**脚本侧估算**，口径与后端 {@code AiTokenEstimator} 一致（CJK≈1 token/字符，其它≈4 字符/token）。</p>
  *
  * @param {object[]} list 命中列表
  * @param {object} testCase 用例（expectKeywords）
@@ -424,6 +455,7 @@ const contentStatOf = (list, testCase) => {
   const joined = contents.join('\n');
   const covered = keywords.filter((word) => joined.includes(word)).length;
   const coverage = keywords.length ? covered / keywords.length : 1;
+  const tokens = estimateTokens(joined);
   const grams = [];
   for (const text of contents) {
     for (let i = 0; i + 2 <= text.length; i++) {
@@ -432,7 +464,7 @@ const contentStatOf = (list, testCase) => {
   }
   const uniqueGrams = new Set(grams).size;
   const redundancy = grams.length ? 1 - uniqueGrams / grams.length : 0;
-  return { fragments: list.length, totalChars, coverage, redundancy };
+  return { fragments: list.length, totalChars, tokens, coverage, redundancy };
 };
 
 /**
@@ -517,12 +549,14 @@ const summarizeAssemble = (results) => {
     before: {
       fragments: mean(list, (x) => x.before.fragments),
       totalChars: mean(list, (x) => x.before.totalChars),
+      tokens: mean(list, (x) => x.before.tokens),
       coverage: mean(list, (x) => x.before.coverage),
       redundancy: mean(list, (x) => x.before.redundancy)
     },
     after: {
       fragments: mean(list, (x) => x.after.fragments),
       totalChars: mean(list, (x) => x.after.totalChars),
+      tokens: mean(list, (x) => x.after.tokens),
       coverage: mean(list, (x) => x.after.coverage),
       redundancy: mean(list, (x) => x.after.redundancy)
     }
@@ -661,7 +695,7 @@ const main = async () => {
   const assembleSummary = summarizeAssemble(results);
   if (assembleSummary) {
     log('\n===== 上下文装配统计（装配前 → 装配后） =====');
-    log('scope          n   片段数(前→后)      总字符(前→后)      关键词覆盖(前→后)     冗余率(前→后)');
+    log('scope          n   片段数(前→后)      总字符(前→后)      估算token(前→后)   关键词覆盖(前→后)     冗余率(前→后)');
     const line = (name, metric) => {
       const b = metric.before;
       const a = metric.after;
@@ -669,6 +703,7 @@ const main = async () => {
         `${name.padEnd(14)}${String(metric.cases).padStart(3)}` +
         `  ${fixed(b.fragments)}→${fixed(a.fragments)}`.padEnd(18) +
         `  ${fixed(b.totalChars)}→${fixed(a.totalChars)}`.padEnd(20) +
+        `  ${fixed(b.tokens)}→${fixed(a.tokens)}`.padEnd(18) +
         `  ${pct(b.coverage)}→${pct(a.coverage)}`.padEnd(20) +
         `  ${pct(b.redundancy)}→${pct(a.redundancy)}`
       );
@@ -678,6 +713,7 @@ const main = async () => {
       log(line(category, metric));
     }
     log('注：装配只做返回集后处理（去重 + 相邻合并 + 字符上限），不改排序；覆盖率不降即可视为无损精简。');
+    log('注：估算 token 为**脚本侧估算**（CJK≈1 token/字符，其它≈4 字符/token），口径与后端 AiTokenEstimator 一致。');
   }
 
   const stamp = String(Date.now());

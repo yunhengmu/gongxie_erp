@@ -1,5 +1,6 @@
 package org.dromara.ai.core;
 
+import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.domain.vo.AiRetrievalHitVo;
 
@@ -20,13 +21,15 @@ import java.util.Set;
  *   <li><b>相邻合并</b>：同一 {@code docId} 且 {@code chunkIndex} 相邻（差 ≤ 窗口）的命中合并为一个片段，
  *       正文按 {@code chunkIndex} 升序拼接、{@code score} 取成员最大值、并记录切片区间；</li>
  *   <li><b>字符上限</b>：合并 / 去重后片段正文总长受上限约束，超限时**按相关度优先保留**（输入即相关度序），
- *       保证不会因合并把高相关片段挤掉。</li>
+ *       保证不会因合并把高相关片段挤掉。上限由「绝对字符上限」{@code assembleMaxChars} 与
+ *       「Token 预算」{@code assembleMaxTokens} 折算出的字符上限取**较小者**（P0-④：可配 Token 预算）。</li>
  * </ul>
  *
  * <p>边界：空集 / 单条 / 无相邻 / 空正文均稳健；始终返回新列表，不修改入参对象。</p>
  *
  * @author BizBuddy
  */
+@Slf4j
 public final class AiRetrievalContextAssembler {
 
     /**
@@ -38,6 +41,11 @@ public final class AiRetrievalContextAssembler {
      * 字符 n-gram 的 n（中文场景按字符二元组更稳）。
      */
     private static final int NGRAM_SIZE = 2;
+
+    /**
+     * 未配置时的字符上限兜底值（与现状一致）。
+     */
+    private static final int DEFAULT_MAX_CHARS = 6000;
 
     private AiRetrievalContextAssembler() {
     }
@@ -68,7 +76,82 @@ public final class AiRetrievalContextAssembler {
         if (opts.mergeAdjacentEnabled()) {
             current = mergeAdjacent(current, opts.mergeWindow());
         }
-        return capByChars(current, opts.maxChars());
+        int effectiveCap = effectiveMaxChars(opts);
+        List<AiRetrievalHitVo> result = capByChars(current, effectiveCap);
+        logSummary(opts, hits, result, effectiveCap);
+        return result;
+    }
+
+    /**
+     * 计算生效的**字符上限**：取「绝对字符上限」与「Token 预算折算出的字符上限」的较小者（P0-④）。
+     *
+     * <p>两者均未配置（≤0）时回退默认值 {@link #DEFAULT_MAX_CHARS}。用于装配截断，
+     * 也供工具侧渲染时做同口径的安全截断。</p>
+     *
+     * @param options 装配参数；为 {@code null} 时取默认配置
+     * @return 生效字符上限（正数）
+     */
+    public static int effectiveMaxChars(Options options) {
+        Options opts = options == null ? Options.defaults() : options;
+        int charCap = opts.maxChars() > 0 ? opts.maxChars() : DEFAULT_MAX_CHARS;
+        int tokenDerived = AiTokenEstimator.tokenBudgetToCharCap(opts.maxTokens());
+        if (tokenDerived <= 0) {
+            return charCap;
+        }
+        return Math.min(charCap, tokenDerived);
+    }
+
+    /**
+     * 输出装配的可观测量（P0-④）：生效字符上限、Token 预算、装配前后的片段数与估算 Token 数。
+     *
+     * @param opts         装配参数
+     * @param input        装配前命中
+     * @param output       装配后片段
+     * @param effectiveCap 生效字符上限
+     */
+    private static void logSummary(Options opts, List<AiRetrievalHitVo> input, List<AiRetrievalHitVo> output,
+                                   int effectiveCap) {
+        int beforeChars = totalChars(input);
+        int afterChars = totalChars(output);
+        int beforeTokens = AiTokenEstimator.estimateTokens(joinContents(input));
+        int afterTokens = AiTokenEstimator.estimateTokens(joinContents(output));
+        log.info("检索上下文装配｜生效字符上限={}（绝对={}，Token预算={}）｜片段 {}→{}｜字符 {}→{}｜估算Token {}→{}",
+            effectiveCap, opts.maxChars(), opts.maxTokens(),
+            input == null ? 0 : input.size(), output.size(), beforeChars, afterChars, beforeTokens, afterTokens);
+    }
+
+    /**
+     * 统计片段正文总字符数。
+     *
+     * @param hits 片段列表
+     * @return 总字符数
+     */
+    private static int totalChars(List<AiRetrievalHitVo> hits) {
+        int total = 0;
+        if (hits != null) {
+            for (AiRetrievalHitVo hit : hits) {
+                total += hit.getContent() == null ? 0 : hit.getContent().length();
+            }
+        }
+        return total;
+    }
+
+    /**
+     * 拼接片段正文（用于估算 Token）。
+     *
+     * @param hits 片段列表
+     * @return 以换行拼接的正文；无内容时为空串
+     */
+    private static String joinContents(List<AiRetrievalHitVo> hits) {
+        StringBuilder sb = new StringBuilder();
+        if (hits != null) {
+            for (AiRetrievalHitVo hit : hits) {
+                if (hit.getContent() != null) {
+                    sb.append(hit.getContent()).append('\n');
+                }
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -184,7 +267,7 @@ public final class AiRetrievalContextAssembler {
      * @return 受上限约束后的片段列表
      */
     private static List<AiRetrievalHitVo> capByChars(List<AiRetrievalHitVo> fragments, int maxChars) {
-        int cap = maxChars > 0 ? maxChars : 6000;
+        int cap = maxChars > 0 ? maxChars : DEFAULT_MAX_CHARS;
         List<AiRetrievalHitVo> result = new ArrayList<>();
         int used = 0;
         for (AiRetrievalHitVo fragment : fragments) {
@@ -331,10 +414,11 @@ public final class AiRetrievalContextAssembler {
      * @param mergeAdjacentEnabled  是否启用相邻切片合并
      * @param mergeWindow           合并窗口（切片号差值上限）
      * @param dedupJaccard          内容去重的 n-gram Jaccard 阈值
-     * @param maxChars              装配后正文总字符上限
+     * @param maxChars              装配后正文总字符上限（绝对上限）
+     * @param maxTokens             装配后正文 Token 预算（P0-④，折算为字符上限后与 maxChars 取较小者）
      */
     public record Options(boolean dedupEnabled, boolean mergeAdjacentEnabled, int mergeWindow,
-                          double dedupJaccard, int maxChars) {
+                          double dedupJaccard, int maxChars, int maxTokens) {
 
         /**
          * 取默认配置（与 {@link AiProperties.Rag} 默认值一致）。
@@ -353,7 +437,8 @@ public final class AiRetrievalContextAssembler {
          */
         public static Options from(AiProperties.Rag rag) {
             return new Options(rag.isAssembleDedupEnabled(), rag.isAssembleMergeAdjacentEnabled(),
-                rag.getAssembleMergeWindow(), rag.getAssembleDedupJaccard(), rag.getAssembleMaxChars());
+                rag.getAssembleMergeWindow(), rag.getAssembleDedupJaccard(), rag.getAssembleMaxChars(),
+                rag.getAssembleMaxTokens());
         }
     }
 

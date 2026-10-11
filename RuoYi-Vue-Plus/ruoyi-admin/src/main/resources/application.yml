@@ -409,4 +409,8 @@ bizbuddy:
       assemble-merge-adjacent-enabled: true
       assemble-merge-window: 1
       assemble-dedup-jaccard: 0.9
+      # 装配后片段总正文的绝对字符上限（不依赖 Token 估算的硬兜底）
       assemble-max-chars: 6000
+      # 装配后片段总正文的 Token 预算（P0-④）：默认 6000，与现状「6000 字」等效（CJK≈1 token/字符，不会导致覆盖下降）；
+      # 有效字符上限 = min(assemble-max-chars, 本预算折算出的字符上限)，调小可更早收敛上下文。
+      assemble-max-tokens: 6000

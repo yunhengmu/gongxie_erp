@@ -266,15 +266,15 @@ public class KnowledgeSearchTool extends ToolBase {
     /**
      * 渲染检索结果文本。
      *
-     * <p>先经上下文装配（P0-③ 去重 + 相邻合并 + 字符上限），再按「文档名 / 切片号 / 相似度」逐条渲染；
-     * 末尾仍以配置的字符上限做一次安全截断。编号、格式与安全包裹保持原样。</p>
+     * <p>先经上下文装配（P0-③ 去重 + 相邻合并 + 字符上限，P0-④ 可配 Token 预算），再按「文档名 / 切片号 / 相似度」逐条渲染；
+     * 末尾仍以**生效字符上限**（min(绝对字符上限, Token 预算折算值)）做一次安全截断。编号、格式与安全包裹保持原样。</p>
      *
      * @param hits 命中切片（已按相关度降序）
      * @return 结果文本
      */
     private String render(List<AiRetrievalHitVo> hits) {
-        int maxChars = assembleOptions == null || assembleOptions.maxChars() <= 0
-            ? DEFAULT_MAX_RESULT_CHARS : assembleOptions.maxChars();
+        int maxChars = assembleOptions == null
+            ? DEFAULT_MAX_RESULT_CHARS : AiRetrievalContextAssembler.effectiveMaxChars(assembleOptions);
         List<AiRetrievalHitVo> fragments = AiRetrievalContextAssembler.assemble(hits, assembleOptions);
         StringBuilder sb = new StringBuilder();
         sb.append("【知识库检索结果】共 ").append(fragments.size()).append(" 条\n");

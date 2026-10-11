@@ -33,17 +33,22 @@ class AiRetrievalContextAssemblerTest {
 
     /** 去重开启、合并关闭、上限充足 */
     private static AiRetrievalContextAssembler.Options dedupOnly() {
-        return new AiRetrievalContextAssembler.Options(true, false, 1, 0.9, 6000);
+        return new AiRetrievalContextAssembler.Options(true, false, 1, 0.9, 6000, 6000);
     }
 
     /** 合并开启、去重关闭 */
     private static AiRetrievalContextAssembler.Options mergeOnly(int window) {
-        return new AiRetrievalContextAssembler.Options(false, true, window, 0.9, 6000);
+        return new AiRetrievalContextAssembler.Options(false, true, window, 0.9, 6000, 6000);
     }
 
     /** 全部关闭（仅字符上限） */
     private static AiRetrievalContextAssembler.Options capOnly(int maxChars) {
-        return new AiRetrievalContextAssembler.Options(false, false, 0, 0.9, maxChars);
+        return capOnly(maxChars, 6000);
+    }
+
+    /** 全部关闭（字符上限 + Token 预算双约束） */
+    private static AiRetrievalContextAssembler.Options capOnly(int maxChars, int maxTokens) {
+        return new AiRetrievalContextAssembler.Options(false, false, 0, 0.9, maxChars, maxTokens);
     }
 
     @Test
@@ -155,6 +160,35 @@ class AiRetrievalContextAssemblerTest {
         assertEquals("0123456789", result.get(0).getContent());
         // 入参对象不被修改
         assertEquals("0123456789ABCDEF", first.getContent());
+    }
+
+    @Test
+    @DisplayName("Token 预算：折算字符上限更小者生效，按相关度优先保留")
+    void shouldCapByTokenBudget() {
+        // 绝对字符上限充足（6000），Token 预算 10 → 生效字符上限 10：仅保留首条（6 字）
+        List<AiRetrievalHitVo> result = AiRetrievalContextAssembler.assemble(
+            List.of(hit(1L, "A", 0, 0.9, "AAAAAA"), hit(2L, "B", 0, 0.8, "BBBBBB")), capOnly(6000, 10));
+        assertEquals(1, result.size());
+        assertEquals("AAAAAA", result.get(0).getContent());
+    }
+
+    @Test
+    @DisplayName("Token 预算：首条（最高相关）超预算时截断而非丢弃")
+    void shouldTruncateFirstFragmentByTokenBudget() {
+        AiRetrievalHitVo first = hit(1L, "A", 0, 0.9, "0123456789ABCDEF");
+        List<AiRetrievalHitVo> result = AiRetrievalContextAssembler.assemble(List.of(first), capOnly(6000, 10));
+        assertEquals(1, result.size());
+        assertEquals("0123456789", result.get(0).getContent());
+    }
+
+    @Test
+    @DisplayName("生效字符上限：取绝对字符上限与 Token 预算折算值的较小者")
+    void shouldComputeEffectiveMaxChars() {
+        assertEquals(10, AiRetrievalContextAssembler.effectiveMaxChars(capOnly(10, 6000)));
+        assertEquals(10, AiRetrievalContextAssembler.effectiveMaxChars(capOnly(6000, 10)));
+        assertEquals(3000, AiRetrievalContextAssembler.effectiveMaxChars(capOnly(6000, 3000)));
+        // 两者均未配置时回退默认 6000
+        assertEquals(6000, AiRetrievalContextAssembler.effectiveMaxChars(capOnly(0, 0)));
     }
 
     @Test
