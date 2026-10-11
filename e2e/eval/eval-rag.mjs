@@ -11,7 +11,7 @@
  *   node e2e/eval/eval-rag.mjs                                  # 库已存在则复用，跑完保留
  *   node e2e/eval/eval-rag.mjs --rebuild                        # 先删旧评测库再重建
  *   node e2e/eval/eval-rag.mjs --corpus d:/some/md --top-k 5    # 指定语料目录与召回条数
- *   node e2e/eval/eval-rag.mjs --rewrite                        # 检索时强制开启查询改写 + RRF 融合（A/B 对比）
+ *   node e2e/eval/eval-rag.mjs --rewrite                        # 【已失效】P0-② 已回退，仅兼容旧命令，无实际作用
  *   node e2e/eval/eval-rag.mjs --clean                          # 跑完删除评测库及其文档
  * </pre></p>
  *
@@ -93,10 +93,10 @@ const usage = () => `BizBuddy RAG 检索质量评测（e2e/eval）
   --base-url <url>   后端地址（默认 http://localhost:8080）
   --corpus <dir>     语料目录（默认取文档仓 docs/，回退 e2e/eval/corpus/；按用例引用挑 ~${CORPUS_LIMIT} 篇）
   --top-k <n>        召回条数（默认 ${DEFAULT_TOP_K}；hit@1/3/5 与 MRR@5 均基于该结果）
-  --rewrite          检索时透传 rewrite=true（强制开启查询改写 + RRF 融合）；不传则跟随后端配置（默认关）
-  --rerank           检索时透传 rerank=true（强制开启检索重排）；不传则跟随后端配置（默认关）
+  --rewrite          已失效（P0-② 查询改写 + RRF 实测无收益，已整体回退；仅保留该参数以兼容旧命令）
+  --rerank           检索时透传 rerank=true（强制开启重排）；**不传则跟随服务端配置**（现已默认开启）
   --rerank-mode <m>  重排融合模式（replace / rank_rrf / score_fusion），透传后端；需配合 --rerank，便于一次评测内 A/B
-  --assemble         检索时透传 assemble=true（对命中做 P0-③ 上下文装配：去重 + 相邻合并 + 字符上限）；并输出「装配前 vs 装配后」统计
+  --assemble         检索时透传 assemble=true（对命中做 P0-③ 上下文装配：去重 + 相邻合并 + 字符上限）；并输出「装配前 vs 装配后」统计；**不传则跟随服务端配置**（现已默认开启）
   --rebuild          先删除旧评测库（含其文档）再重建
   --clean            跑完删除评测库及其文档（默认保留，便于复核）
   --keep-kb          显式保留评测库（默认行为，便于与 --clean 对照）
@@ -604,7 +604,7 @@ const main = async () => {
   const log = (message) => console.log(message);
   const http = new HttpClient(cfg, { timeoutMs: args.timeoutMs, verbose: args.verbose, log: args.verbose ? log : () => {} });
 
-  log(`BizBuddy RAG 评测｜${cfg.baseUrl}｜用例 ${cases.length} 条｜topK ${args.topK}｜查询改写 ${args.rewrite ? '开' : '关'}｜检索重排 ${args.rerank ? '开' : '关'}${args.rerank && args.rerankMode ? `(${args.rerankMode})` : ''}｜上下文装配 ${args.assemble ? '开' : '关'}\n`);
+  log(`BizBuddy RAG 评测｜${cfg.baseUrl}｜用例 ${cases.length} 条｜topK ${args.topK}｜检索重排 ${args.rerank ? '开(强制)' : '跟随服务端配置'}${args.rerank && args.rerankMode ? `(${args.rerankMode})` : ''}｜上下文装配 ${args.assemble ? '开(强制)' : '跟随服务端配置'}\n`);
   await http.login();
   log('· 登录成功');
 
@@ -674,7 +674,7 @@ const main = async () => {
 
   const summary = summarize(results);
   log('\n===== 汇总（整体） =====');
-  log(`用例数 ${summary.cases}｜语料 ${corpus.files.length} 篇｜查询改写 ${args.rewrite ? '开' : '关'}｜检索重排 ${args.rerank ? '开' : '关'}${args.rerank && args.rerankMode ? `(${args.rerankMode})` : ''}｜上下文装配 ${args.assemble ? '开' : '关'}`);
+  log(`用例数 ${summary.cases}｜语料 ${corpus.files.length} 篇｜检索重排 ${args.rerank ? '开(强制)' : '跟随服务端配置'}${args.rerank && args.rerankMode ? `(${args.rerankMode})` : ''}｜上下文装配 ${args.assemble ? '开(强制)' : '跟随服务端配置'}`);
   log(`hit@1 ${pct(summary.hitAt1)}｜hit@3 ${pct(summary.hitAt3)}｜hit@5 ${pct(summary.hitAt5)}`);
   log(`recall@5 ${pct(summary.recallAt5)}｜MRR@5 ${num(summary.mrrAt5)}`);
   log(`平均 top1 分数 ${num(summary.avgTop1Score)}｜平均检索耗时 ${summary.avgLatencyMs}ms`);
