@@ -136,6 +136,27 @@ public class SysOssServiceImpl implements ISysOssService, OssService {
     }
 
     /**
+     * 获取当前默认对象存储配置的对外访问域名（domain_url）。
+     *
+     * <p>供平台健康自检判定「前端附件预览 / 下载的地址来源是否已配置」；未配置或对象存储尚未初始化时返回 null。</p>
+     *
+     * @return 对外域名，缺失时返回 null
+     */
+    @Override
+    public String selectDomainUrl() {
+        try {
+            OssClient client = OssFactory.instance();
+            if (client == null) {
+                return null;
+            }
+            return client.config().getDomainUrl();
+        } catch (Exception e) {
+            // 未配置 / 未初始化对象存储：按「未配置」处理，不向上抛
+            return null;
+        }
+    }
+
+    /**
      * 根据一组 ossIds 获取对应文件的服务端读写地址列表。
      * <p>
      * 与 {@link #selectUrlByIds(String)} 的对外地址不同：公开桶一律按访问端点（endpoint）生成，
