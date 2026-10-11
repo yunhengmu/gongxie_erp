@@ -53,17 +53,17 @@ public class AiAgentVo implements Serializable {
     private Long modelId;
 
     /**
-     * 长期记忆抽取 / 合并用的小模型（待 2D 生效）
+     * 长期记忆抽取 / 合并用的小模型
      */
     private Long memoryModelId;
 
     /**
-     * 上下文压缩摘要模型（待 2C 生效）
+     * 上下文压缩摘要模型
      */
     private Long summaryModelId;
 
     /**
-     * 子智能体默认模型（待 P3 生效）
+     * 子智能体默认模型（子智能体未单独指定模型时生效）
      */
     private Long subagentModelId;
 

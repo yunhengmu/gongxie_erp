@@ -25,11 +25,11 @@ export interface AgentVO {
   modelId: string | number;
   /** 对话模型名称（后端附加字段） */
   modelName?: string;
-  /** 长期记忆抽取 / 合并用的小模型（待 2D 生效） */
+  /** 长期记忆抽取 / 合并用的小模型 */
   memoryModelId?: string | number;
-  /** 上下文压缩摘要模型（待 2C 生效） */
+  /** 上下文压缩摘要模型 */
   summaryModelId?: string | number;
-  /** 子智能体默认模型（待 P3 生效） */
+  /** 子智能体默认模型（子智能体未单独指定模型时生效） */
   subagentModelId?: string | number;
   /** 日 Token 配额（0 表示不限） */
   dailyTokenQuota?: number;
@@ -82,11 +82,11 @@ export interface AgentForm extends BaseEntity {
   sysPrompt?: string;
   /** 绑定对话模型主键 */
   modelId?: string | number;
-  /** 长期记忆抽取 / 合并用的小模型（可空；待 2D 生效） */
+  /** 长期记忆抽取 / 合并用的小模型（可空） */
   memoryModelId?: string | number;
-  /** 上下文压缩摘要模型（可空；待 2C 生效） */
+  /** 上下文压缩摘要模型（可空） */
   summaryModelId?: string | number;
-  /** 子智能体默认模型（可空；待 P3 生效） */
+  /** 子智能体默认模型（可空；子智能体未单独指定模型时生效） */
   subagentModelId?: string | number;
   /** 日 Token 配额（0 表示不限） */
   dailyTokenQuota?: number;
