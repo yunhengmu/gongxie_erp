@@ -45,10 +45,11 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 
 平台完整功能说明见 **[RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md)**，按真实菜单与代码梳理，涵盖：
 
-- **功能地图与权限模型**——5 个分组、26 个功能页与权限标识约定、工具三档授权；
+- **功能地图与权限模型**——6 个分组、30 个功能页与权限标识约定、工具三档授权；
 - **智能体与对话**——任务工作台、入口智能体「小Z」配置、专家配置（含提示词 **AI 辅助生成 / 模板套用 / 克隆专家 / 保存前体检**）、任务管理、定时任务、计划模式、技能仓库、长期记忆、工作区文件、子智能体、场景包；
-- **模型与推理 / 知识库与检索**——模型配置与连通性测试、用量与配额、上下文压缩策略；知识库、文档与切片、检索测试；
-- **工具与集成**——业务工具注册、MCP 服务端（对外出口）与客户端（接入外部）、飞书 / 企业微信 / 钉钉 / GitHub 渠道接入；
+- **模型与推理 / 知识库与检索**——模型配置与连通性测试、用量与配额、上下文压缩策略、编排预算（运行期可调）；知识库、文档与切片、检索测试；**RAG 检索增强**（Rerank 重排默认开启 + 结果去重 / 相邻合并的上下文装配 + Token 预算）；
+- **工具与集成**——业务工具注册、MCP 服务端（对外出口）与客户端（接入外部）、飞书 / 企业微信 / 钉钉 / GitHub 渠道接入；**MCP 自演示**（系统信息工具 `get_system_info` + 启动时登记一条指向自身 `/mcp` 的客户端连接）；
+- **安全合规**——敏感词库、安全事件留痕、安全合规配置（输入 / 输出 / 渠道出站 / 工具结果 / 知识库入库 / MCP 出口全链路过审 + PII 脱敏 + 提示词注入防护）；
 - **审计与观测**——会话与消息、工具调用、权限决策、链路追踪、编排运行五类留痕；
 - **配置项与运行依赖**——`bizbuddy.ai` 配置清单与依赖组件。
 
@@ -95,7 +96,6 @@ RuoYi-Vue-Plus
 │   ├── ruoyi-workflow   # 工作流（Warm-Flow + LiteFlow）
 │   ├── ruoyi-job        # 调度任务实现（@JobExecutor 处理器）
 │   ├── ruoyi-gen        # 代码生成器
-│   ├── ruoyi-demo       # 框架能力示例
 │   └── biz-buddy        # BizBuddy AI 能力模块（AgentScope 智能体宿主）
 └── ruoyi-extend         # 扩展服务（monitor-admin 监控端、snailjob-server 调度端）
 ```
@@ -193,6 +193,12 @@ RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器�
 | L3 | 知识库链路：文档解析（按对象键从 OSS 取源文件）→ 向量化 → 检索命中 |
 | L4 | 对话与专家编排：建会话（指定专家强制路由）→ SSE 流 → 编排轨迹落库 |
 | L5 | HITL：写工具暂停 → 确认 / 拒绝 → 恢复执行至 `done` |
+| L6 | 停止生成：SSE 中途取消 → 后端执行中止 |
+| L7 | 安全合规：输入侧命中敏感词被拒答 + 安全事件留痕（临时配置，收尾无条件恢复） |
+| L8 | 会话治理闭环：重命名 / 置顶 → 关闭后拒绝提问 → 逻辑删除后不可查 |
+| L9 | 鉴权与参数校验边界：未登录 / 伪造 token、缺参 / 空消息 / 不存在会话 |
+| L10 | MCP 出口：协议 `initialize` / `tools/list` / `tools/call` + 错误口令被拒 |
+| L11 | MCP 客户端：连通探测 + 自演示连接登记 |
 
 ```bash
 # 需要栈已在运行（deploy/ 或 deploy-mysql/ 任一）
@@ -202,10 +208,16 @@ node e2e/run.mjs --allow-writes            # L5 走「接受」路径（会真�
 node e2e/run.mjs --base-url http://localhost:8081   # 指向 MySQL 栈（PG 栈为 8080）
 ```
 
-- 配置：复制 [`e2e/.env.example`](e2e/.env.example) 为 `e2e/.env.local`（已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L5 走平台「模型配置」里已保存的密钥。
+- 配置：复制 [`e2e/.env.example`](e2e/.env.example) 为 `e2e/.env.local`（已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走平台「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**。
 - 退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败 / `3` 参数错误。
 - **L5 默认走「拒绝」路径、不产生任何业务数据**；`--allow-writes` 才真写，并在收尾按标题清理公告与会话。
 - 它**不进 `mvn test`**、不引 Testcontainers，与上面的单测**互不影响**；两个数据库栈均已实跑通过（PostgreSQL `8080` / MySQL `8081`）。
+
+另附 **RAG 检索质量评测** [`e2e/eval/eval-rag.mjs`](e2e/eval/eval-rag.mjs)（同样零依赖）：自动建评测库、按语料目录入库，跑 `hit@1/3/5`、`recall@5`、`MRR@5` 与平均耗时并按用例类别汇总，用于重排 / 装配等检索改动的 A/B（当前基线 56 用例、10 篇语料：hit@1 **75.0%** / hit@3 89.3% / hit@5 98.2% / MRR@5 0.829）。
+
+```bash
+node e2e/eval/eval-rag.mjs --base-url http://localhost:8081 --rebuild
+```
 
 ## 文档
 

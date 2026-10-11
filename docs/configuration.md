@@ -105,6 +105,48 @@
 | `current-time-enabled` | `true` | 每轮向 system prompt 注入中文当前时间 |
 | `current-time-zone` | `Asia/Shanghai` | 注入时区；容器化部署务必显式配置（否则可能退化为 UTC） |
 
+### 2.7 RAG 检索增强（`bizbuddy.ai.rag.*`）
+
+| 配置项 | 默认 | 说明 |
+|---|---|---|
+| `rerank-enabled` | `true` | 检索重排总开关；开启后检索走「稠密召回 `max(topK, rerank-top-n)` → 重排 → 融合 → 截断 `topK`」 |
+| `rerank-model` | `gte-rerank-v2` | 重排模型 |
+| `rerank-endpoint` | 百炼 text-rerank | 重排服务地址 |
+| `rerank-top-n` | `30` | 送入重排的候选数上限 |
+| `rerank-timeout-ms` | `12000` | 重排调用超时 |
+| `rerank-mode` | `score_fusion` | 融合模式：`replace`（纯替换）/ `rank_rrf`（排名 RRF）/ `score_fusion`（分数归一化加权） |
+| `rerank-alpha` | `0.5` | `score_fusion` 的重排权重（0~1） |
+| `rerank-rrf-k` | `60` | `rank_rrf` 的平滑常数 |
+| `rerank-trigger-margin` | `0` | 条件触发：首条与次条向量分差 ≥ 本值时跳过重排（`0`/负值＝总是重排） |
+| `assemble-dedup-enabled` | `true` | 上下文装配：确定性去重 |
+| `assemble-merge-adjacent-enabled` | `true` | 相邻切片合并 |
+| `assemble-merge-window` | `1` | 相邻合并窗口 |
+| `assemble-dedup-jaccard` | `0.9` | 去重判据（字符 n-gram Jaccard 阈值） |
+| `assemble-max-chars` | `6000` | 装配后正文的绝对字符上限 |
+| `assemble-max-tokens` | `6000` | 装配后正文的 Token 预算（与字符上限取小，`CJK≈1 token/字符`） |
+
+> 重排密钥复用知识库**向量模型**（`dashscope`）的 `api_key`；未配密钥 / 非 2xx / 超时 / 结构异常一律**降级为原顺序**。上下文装配（`assemble-*`）只作用于返回集后处理，**不改排序**。改动后可用 `e2e/eval/eval-rag.mjs` 做 A/B。
+
+### 2.8 安全合规（`bizbuddy.ai.security.*`）
+
+| 配置项 | 默认 | 说明 |
+|---|---|---|
+| `enabled` | `false` | 内容审核总开关（默认关以免误杀；开启后按 `action` 处置） |
+| `engine` | `local` | 审核引擎：`local`（本地词库）/ `external`（外部 API，预留） |
+| `action` | `log` | 命中处置：`log`（只留痕）/ `mask`（脱敏放行）/ `block`（阻断） |
+| `input-check` | `true` | 审核用户输入 |
+| `output-check` | `true` | 审核模型输出 |
+| `channel-out-check` | `true` | 审核渠道出站回复（对外发布，合规红线） |
+| `tool-result-mask` | `true` | 审核工具结果 |
+| `kb-ingest-check` | `true` | 审核知识库入库内容（切片送向量库前） |
+| `mcp-out-check` | `true` | 审核 MCP 出口（对外只读工具的入参 / 出参） |
+| `prompt-hardening` | `true` | 提示词注入防护（system prompt 加固 + 外部内容边界标记） |
+| `mask-pii` | `true` | PII 脱敏（手机号 / 身份证 / 邮箱 / 银行卡 / IP），**独立于** `enabled` |
+| `hold-back-chars` | `32` | 流式输出尾部缓冲字符数（避免敏感片段被切片切断） |
+| `excerpt-chars` | `200` | 安全事件留痕的命中片段最大字符数 |
+
+> 以上均为**默认值**，可在运行期「安全合规配置」页覆盖（存 Redis、即时生效）。敏感词与安全事件分别在「敏感词库」「安全事件」页维护 / 查阅。
+
 ## 3. 非 AI 配置（按需）
 
 | 位置 | 项 | 说明 |
@@ -142,4 +184,4 @@
 - [architecture.md](architecture.md) —— 这些配置在链路里作用于哪一环
 - [development.md](development.md) —— 新增业务工具
 - [../deploy/README.md](../deploy/README.md) / [../deploy-mysql/README.md](../deploy-mysql/README.md) —— 容器化部署、变量覆盖与已知坑（含 OSS 地址与「文档需先解析再向量化」）
-- [../e2e/](../e2e) —— 端到端脚本：改完配置后在真实栈上验证（L1~L5）
+- [../e2e/](../e2e) —— 端到端脚本：改完配置后在真实栈上验证（L1~L11 + RAG 检索质量评测 `e2e/eval/`）
