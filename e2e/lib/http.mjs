@@ -134,6 +134,47 @@ export class HttpClient {
   }
 
   /**
+   * 发起请求并返回**原始状态与响应体**（不解包、不因非 200 抛错）。
+   *
+   * <p>供「鉴权 / 参数校验」类用例断言失败路径：未登录 / 失效 token（Sa-Token 异常处理器回 `code=401`）、
+   * 参数缺失或业务校验拒绝（`code!=200`）。这些路径走 `request()` 会直接抛异常，无法断言。</p>
+   *
+   * @param {string} method HTTP 方法
+   * @param {string} apiPath 接口路径
+   * @param {{ query?: object, body?: any, token?: string, omitAuth?: boolean, timeoutMs?: number }} options 选项
+   *        {@code omitAuth:true} 不携带鉴权头（模拟未登录）；{@code token} 显式指定 token（模拟伪造 / 失效）
+   * @returns {Promise<{ status: number, payload: any, text: string }>} HTTP 状态、解析后的响应体（非 JSON 为 null）与原文
+   */
+  async requestRaw(method, apiPath, options = {}) {
+    const headers = { clientid: this.cfg.clientId };
+    if (options.omitAuth !== true) {
+      const token = options.token !== undefined ? options.token : this.token;
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    let body;
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(options.body);
+    }
+    const response = await this.fetchWithTimeout(this.buildUrl(apiPath, options.query), {
+      method,
+      headers,
+      body,
+      timeoutMs: options.timeoutMs
+    });
+    const text = await response.text();
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = null;
+    }
+    return { status: response.status, payload, text };
+  }
+
+  /**
    * 打开原始流（供 SSE 使用），不做解包。
    *
    * @param {string} apiPath 接口路径

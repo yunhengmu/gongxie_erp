@@ -87,6 +87,12 @@ export const preflight = async (client, cfg, options = {}) => {
   const platformEmbeddingKeyReady = Boolean(embeddingModel?.apiKeyMask);
   log(`· 平台密钥：对话模型 ${platformChatKeyReady ? '已配置' : '未配置'}｜向量模型 ${embeddingModel ? (platformEmbeddingKeyReady ? '已配置' : '未配置') : '无向量模型'}`);
 
+  // 安全合规接口是否在**运行中的 jar** 内（P1~P3 新增）：容器陈旧时该端点 404，L7 据此 SKIP
+  // 而不是误报 FAIL（与「未配密钥 → SKIP」同一口径）。
+  const securityProbe = await client.requestRaw('GET', '/ai/runtime/security');
+  const safetyReady = securityProbe.status === 200 && securityProbe.payload?.code === 200;
+  log(`· 安全合规接口：${safetyReady ? '可用' : '不可用（运行中的 jar 早于该功能，L7 将 SKIP）'}`);
+
   return {
     entryAgentId: entry.id,
     entryAgentName: entry.agentName,
@@ -102,6 +108,7 @@ export const preflight = async (client, cfg, options = {}) => {
     chatModel,
     embeddingModel,
     platformChatKeyReady,
-    platformEmbeddingKeyReady
+    platformEmbeddingKeyReady,
+    safetyReady
   };
 };
