@@ -187,4 +187,25 @@ class AiStreamEventBridgeTest {
         AiStreamState state = state(100L);
         assertDoesNotThrow(() -> bridge.handle(emitter, state, null));
     }
+
+    @Test
+    @DisplayName("收尾冲刷尾部缓冲：补发未下发的尾部，保证前端所见 == 落库内容")
+    void shouldFlushSafetyTailToEmitter() throws Exception {
+        AiStreamState state = state(100L);
+        state.answer.append("头部");
+        state.safetyPending.append("尾部");
+        bridge.flushSafety(emitter, state);
+        assertEquals("头部尾部", state.answer.toString());
+        verify(emitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
+    @DisplayName("无待冲刷尾部时不下发")
+    void shouldNotEmitWhenNoPendingTail() throws Exception {
+        AiStreamState state = state(100L);
+        state.answer.append("正文");
+        bridge.flushSafety(emitter, state);
+        assertEquals("正文", state.answer.toString());
+        verify(emitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+    }
 }
