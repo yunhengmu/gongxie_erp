@@ -60,7 +60,7 @@ export const loadConfig = (cli = {}) => {
     rsaPrivateKey: trimmedOr(pick('BIZBUDDY_RSA_PRIVATE_KEY'), frontendEnv.VITE_APP_RSA_PRIVATE_KEY),
     llmApiKey: pick('BIZBUDDY_LLM_API_KEY'),
     llmBaseUrl: pick('BIZBUDDY_LLM_BASE_URL'),
-    chatModelName: trimmedOr(pick('BIZBUDDY_CHAT_MODEL_NAME'), 'deepseek-v4-flash-0731'),
+    chatModelName: trimmedOr(pick('BIZBUDDY_CHAT_MODEL_NAME'), 'deepseek-v4-pro-0813'),
     embeddingModelName: trimmedOr(pick('BIZBUDDY_EMBEDDING_MODEL_NAME'), 'qwen3.7-text-embedding'),
     demoKbCode: trimmedOr(pick('BIZBUDDY_DEMO_KB_CODE'), 'bizbuddy_demo_kb'),
     demoDocName: trimmedOr(pick('BIZBUDDY_DEMO_DOC_NAME'), 'BizBuddy简介.txt'),
