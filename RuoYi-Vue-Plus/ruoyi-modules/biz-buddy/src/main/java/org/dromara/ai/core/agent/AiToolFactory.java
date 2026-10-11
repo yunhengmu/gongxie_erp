@@ -19,6 +19,7 @@ import org.dromara.ai.core.agent.tools.GetMenuTool;
 import org.dromara.ai.core.agent.tools.GetNoticeTool;
 import org.dromara.ai.core.agent.tools.GetRolePermissionsTool;
 import org.dromara.ai.core.agent.tools.GetRoleTool;
+import org.dromara.ai.core.agent.tools.GetSystemInfoTool;
 import org.dromara.ai.core.agent.tools.GetUserTool;
 import org.dromara.ai.core.agent.tools.KnowledgeSearchTool;
 import org.dromara.ai.core.agent.tools.SearchDeptTool;
@@ -181,6 +182,11 @@ public class AiToolFactory {
      */
     public static final String IMPL_GET_ROLE_PERMISSIONS = "get_role_permissions";
 
+    /**
+     * 获取系统信息实现标识（平台内置无害只读工具，无参数；MCP 服务端/客户端联动演示用）
+     */
+    public static final String IMPL_GET_SYSTEM_INFO = "get_system_info";
+
     private final IAiVectorService vectorService;
 
     private final IAiKnowledgeBaseService knowledgeBaseService;
@@ -230,7 +236,8 @@ public class AiToolFactory {
             || IMPL_GET_ROLE.equals(implName)
             || IMPL_SEARCH_MENUS.equals(implName)
             || IMPL_GET_MENU.equals(implName)
-            || IMPL_GET_ROLE_PERMISSIONS.equals(implName);
+            || IMPL_GET_ROLE_PERMISSIONS.equals(implName)
+            || IMPL_GET_SYSTEM_INFO.equals(implName);
     }
 
     /**
@@ -328,6 +335,9 @@ public class AiToolFactory {
         }
         if (IMPL_GET_ROLE_PERMISSIONS.equals(implName)) {
             return Optional.of(new GetRolePermissionsTool(roleService, menuService, permissionService));
+        }
+        if (IMPL_GET_SYSTEM_INFO.equals(implName)) {
+            return Optional.of(new GetSystemInfoTool());
         }
         log.warn("工具实现未在代码侧登记，跳过装配：toolCode={}, implName={}", definition.getToolCode(), implName);
         return Optional.empty();
