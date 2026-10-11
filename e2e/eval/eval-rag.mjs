@@ -55,7 +55,7 @@ class UsageError extends Error {}
  * @returns {object} 解析结果
  */
 const parseArgs = (argv) => {
-  const valueFlags = { '--base-url': 'baseUrl', '--corpus': 'corpus', '--top-k': 'topK', '--timeout': 'timeout' };
+  const valueFlags = { '--base-url': 'baseUrl', '--corpus': 'corpus', '--top-k': 'topK', '--timeout': 'timeout', '--rerank-mode': 'rerankMode' };
   const boolFlags = { '--rebuild': 'rebuild', '--clean': 'clean', '--keep-kb': 'keepKb', '--verbose': 'verbose', '--help': 'help', '--rewrite': 'rewrite', '--rerank': 'rerank', '--assemble': 'assemble' };
   const args = { rebuild: false, clean: false, keepKb: false, verbose: false, help: false, rewrite: false, rerank: false, assemble: false, topK: DEFAULT_TOP_K };
   for (let i = 0; i < argv.length; i++) {
@@ -95,6 +95,7 @@ const usage = () => `BizBuddy RAG 检索质量评测（e2e/eval）
   --top-k <n>        召回条数（默认 ${DEFAULT_TOP_K}；hit@1/3/5 与 MRR@5 均基于该结果）
   --rewrite          检索时透传 rewrite=true（强制开启查询改写 + RRF 融合）；不传则跟随后端配置（默认关）
   --rerank           检索时透传 rerank=true（强制开启检索重排）；不传则跟随后端配置（默认关）
+  --rerank-mode <m>  重排融合模式（replace / rank_rrf / score_fusion），透传后端；需配合 --rerank，便于一次评测内 A/B
   --assemble         检索时透传 assemble=true（对命中做 P0-③ 上下文装配：去重 + 相邻合并 + 字符上限）；并输出「装配前 vs 装配后」统计
   --rebuild          先删除旧评测库（含其文档）再重建
   --clean            跑完删除评测库及其文档（默认保留，便于复核）
@@ -342,10 +343,11 @@ const ingestDoc = async (cfg, http, kb, filePath, log) => {
  * @param {number} topK 召回条数
  * @param {boolean} rewrite 是否透传 rewrite=true
  * @param {boolean} rerank 是否透传 rerank=true
+ * @param {string|undefined} rerankMode 透传 rerankMode（融合模式）
  * @param {boolean} assemble 是否透传 assemble=true（对命中做上下文装配）
  * @returns {Promise<{ list: object[], elapsedMs: number }>} 命中列表与耗时
  */
-const fetchHits = async (http, kb, testCase, topK, rewrite, rerank, assemble) => {
+const fetchHits = async (http, kb, testCase, topK, rewrite, rerank, rerankMode, assemble) => {
   const started = Date.now();
   const hits = await http.request('GET', '/ai/kb/retrieval/test', {
     timeoutMs: 60000,
@@ -356,6 +358,7 @@ const fetchHits = async (http, kb, testCase, topK, rewrite, rerank, assemble) =>
       threshold: 0,
       rewrite: rewrite ? true : undefined,
       rerank: rerank ? true : undefined,
+      rerankMode: rerank && rerankMode ? rerankMode : undefined,
       assemble: assemble ? true : undefined
     }
   });
@@ -476,17 +479,18 @@ const contentStatOf = (list, testCase) => {
  * @param {number} topK 召回条数
  * @param {boolean} rewrite 是否透传 rewrite=true
  * @param {boolean} rerank 是否透传 rerank=true
+ * @param {string|undefined} rerankMode 透传 rerankMode（融合模式）
  * @param {boolean} assemble 是否透传 assemble=true
  * @returns {Promise<{ result: object, assemble: object|null }>} 逐条结果与装配统计
  */
-const runCase = async (http, kb, testCase, topK, rewrite, rerank, assemble) => {
-  const primary = await fetchHits(http, kb, testCase, topK, rewrite, rerank, assemble);
+const runCase = async (http, kb, testCase, topK, rewrite, rerank, rerankMode, assemble) => {
+  const primary = await fetchHits(http, kb, testCase, topK, rewrite, rerank, rerankMode, assemble);
   const result = scoreList(primary.list, testCase, topK, primary.elapsedMs);
   if (!assemble) {
     return { result, assemble: null };
   }
   // 装配开启：再取一次「未装配」命中，用于前后对比（向量检索确定性，无需重排）
-  const raw = await fetchHits(http, kb, testCase, topK, rewrite, rerank, false);
+  const raw = await fetchHits(http, kb, testCase, topK, rewrite, rerank, rerankMode, false);
   return { result, assemble: { before: contentStatOf(raw.list, testCase), after: contentStatOf(primary.list, testCase) } };
 };
 
@@ -600,7 +604,7 @@ const main = async () => {
   const log = (message) => console.log(message);
   const http = new HttpClient(cfg, { timeoutMs: args.timeoutMs, verbose: args.verbose, log: args.verbose ? log : () => {} });
 
-  log(`BizBuddy RAG 评测｜${cfg.baseUrl}｜用例 ${cases.length} 条｜topK ${args.topK}｜查询改写 ${args.rewrite ? '开' : '关'}｜检索重排 ${args.rerank ? '开' : '关'}｜上下文装配 ${args.assemble ? '开' : '关'}\n`);
+  log(`BizBuddy RAG 评测｜${cfg.baseUrl}｜用例 ${cases.length} 条｜topK ${args.topK}｜查询改写 ${args.rewrite ? '开' : '关'}｜检索重排 ${args.rerank ? '开' : '关'}${args.rerank && args.rerankMode ? `(${args.rerankMode})` : ''}｜上下文装配 ${args.assemble ? '开' : '关'}\n`);
   await http.login();
   log('· 登录成功');
 
@@ -636,7 +640,7 @@ const main = async () => {
     let result;
     let assembleStat = null;
     try {
-      const outcome = await runCase(http, kb, testCase, args.topK, args.rewrite, args.rerank, args.assemble);
+      const outcome = await runCase(http, kb, testCase, args.topK, args.rewrite, args.rerank, args.rerankMode, args.assemble);
       result = outcome.result;
       assembleStat = outcome.assemble;
     } catch (error) {
@@ -670,7 +674,7 @@ const main = async () => {
 
   const summary = summarize(results);
   log('\n===== 汇总（整体） =====');
-  log(`用例数 ${summary.cases}｜语料 ${corpus.files.length} 篇｜查询改写 ${args.rewrite ? '开' : '关'}｜检索重排 ${args.rerank ? '开' : '关'}｜上下文装配 ${args.assemble ? '开' : '关'}`);
+  log(`用例数 ${summary.cases}｜语料 ${corpus.files.length} 篇｜查询改写 ${args.rewrite ? '开' : '关'}｜检索重排 ${args.rerank ? '开' : '关'}${args.rerank && args.rerankMode ? `(${args.rerankMode})` : ''}｜上下文装配 ${args.assemble ? '开' : '关'}`);
   log(`hit@1 ${pct(summary.hitAt1)}｜hit@3 ${pct(summary.hitAt3)}｜hit@5 ${pct(summary.hitAt5)}`);
   log(`recall@5 ${pct(summary.recallAt5)}｜MRR@5 ${num(summary.mrrAt5)}`);
   log(`平均 top1 分数 ${num(summary.avgTop1Score)}｜平均检索耗时 ${summary.avgLatencyMs}ms`);
@@ -727,6 +731,7 @@ const main = async () => {
         topK: args.topK,
         rewrite: args.rewrite,
         rerank: args.rerank,
+        rerankMode: args.rerank ? (args.rerankMode ?? null) : null,
         assemble: args.assemble,
         kb: { id: kb.id, code: kb.kbCode, name: kb.kbName, chunkSize: kb.chunkSize, chunkOverlap: kb.chunkOverlap, dimension: kb.dimension, embeddingModel: embeddingModel.configName },
         corpusDir: corpus.dir,

@@ -44,13 +44,13 @@ class AiRetrievalControllerTest {
     }
 
     @Test
-    @DisplayName("检索测试先校验可见性再召回（未传 rerank 时跟随配置，默认关）")
+    @DisplayName("检索测试先校验可见性再召回（未传 rerank 时跟随配置，默认开）")
     void shouldTest() {
         List<AiRetrievalHitVo> hits = List.of(new AiRetrievalHitVo());
-        when(vectorService.retrieve(eq(3L), eq("查询"), eq(5), eq(new BigDecimal("0.5")), eq(false))).thenReturn(hits);
+        when(vectorService.retrieve(eq(3L), eq("查询"), eq(5), eq(new BigDecimal("0.5")), eq(true), isNull())).thenReturn(hits);
         try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
             login.when(LoginHelper::getUserId).thenReturn(1L);
-            assertSame(hits, controller.test(3L, "查询", 5, new BigDecimal("0.5"), null, null).getData());
+            assertSame(hits, controller.test(3L, "查询", 5, new BigDecimal("0.5"), null, null, null).getData());
         }
         verify(kbService).validateVisible(3L, 1L, "检索");
     }
@@ -59,10 +59,10 @@ class AiRetrievalControllerTest {
     @DisplayName("检索测试未指定条数与阈值时兜底")
     void shouldTestWithNullOptions() {
         List<AiRetrievalHitVo> hits = List.of();
-        when(vectorService.retrieve(eq(3L), eq("查询"), isNull(), isNull(), eq(false))).thenReturn(hits);
+        when(vectorService.retrieve(eq(3L), eq("查询"), isNull(), isNull(), eq(true), isNull())).thenReturn(hits);
         try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
             login.when(LoginHelper::getUserId).thenReturn(1L);
-            assertSame(hits, controller.test(3L, "查询", null, null, null, null).getData());
+            assertSame(hits, controller.test(3L, "查询", null, null, null, null, null).getData());
         }
     }
 
@@ -70,12 +70,24 @@ class AiRetrievalControllerTest {
     @DisplayName("显式传 rerank=true 时透传开启重排")
     void shouldPassThroughRerank() {
         List<AiRetrievalHitVo> hits = List.of(new AiRetrievalHitVo());
-        when(vectorService.retrieve(eq(3L), eq("查询"), eq(5), isNull(), eq(true))).thenReturn(hits);
+        when(vectorService.retrieve(eq(3L), eq("查询"), eq(5), isNull(), eq(true), isNull())).thenReturn(hits);
         try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
             login.when(LoginHelper::getUserId).thenReturn(1L);
-            assertSame(hits, controller.test(3L, "查询", 5, null, true, null).getData());
+            assertSame(hits, controller.test(3L, "查询", 5, null, true, null, null).getData());
         }
-        verify(vectorService).retrieve(3L, "查询", 5, null, true);
+        verify(vectorService).retrieve(3L, "查询", 5, null, true, null);
+    }
+
+    @Test
+    @DisplayName("显式传 rerankMode 时透传融合模式")
+    void shouldPassThroughRerankMode() {
+        List<AiRetrievalHitVo> hits = List.of(new AiRetrievalHitVo());
+        when(vectorService.retrieve(eq(3L), eq("查询"), eq(5), isNull(), eq(true), eq("rank_rrf"))).thenReturn(hits);
+        try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
+            login.when(LoginHelper::getUserId).thenReturn(1L);
+            assertSame(hits, controller.test(3L, "查询", 5, null, true, null, "rank_rrf").getData());
+        }
+        verify(vectorService).retrieve(3L, "查询", 5, null, true, "rank_rrf");
     }
 
     @Test
@@ -93,12 +105,12 @@ class AiRetrievalControllerTest {
         second.setChunkIndex(3);
         second.setScore(0.8);
         second.setContent("请假规定正文。");
-        when(vectorService.retrieve(eq(3L), eq("查询"), eq(5), isNull(), eq(false)))
+        when(vectorService.retrieve(eq(3L), eq("查询"), eq(5), isNull(), eq(true), isNull()))
             .thenReturn(List.of(first, second));
         List<AiRetrievalHitVo> assembled;
         try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
             login.when(LoginHelper::getUserId).thenReturn(1L);
-            assembled = controller.test(3L, "查询", 5, null, null, true).getData();
+            assembled = controller.test(3L, "查询", 5, null, null, true, null).getData();
         }
         assertEquals(1, assembled.size());
         assertTrue(assembled.get(0).getContent().contains("考勤规定正文"));

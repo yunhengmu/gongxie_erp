@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiEmbeddingClient;
+import org.dromara.ai.core.AiRankFusion;
 import org.dromara.ai.core.AiRerankClient;
 import org.dromara.ai.core.AiVectorStore;
 import org.dromara.ai.core.safety.AiSafetyGuard;
@@ -168,6 +169,12 @@ public class AiVectorServiceImpl implements IAiVectorService {
 
     @Override
     public List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, boolean rerank) {
+        return retrieve(kbId, query, topK, threshold, rerank, null);
+    }
+
+    @Override
+    public List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, boolean rerank,
+                                           String rerankMode) {
         if (StringUtils.isBlank(query)) {
             throw new ServiceException("请输入查询内容");
         }
@@ -195,43 +202,102 @@ public class AiVectorServiceImpl implements IAiVectorService {
         if (!rerank) {
             return result;
         }
-        return applyRerank(apiKey, query, result, limit);
+        return applyRerank(apiKey, query, result, limit, resolveRerankMode(rerankMode));
     }
 
     /**
-     * 对稠密召回结果做文本重排并截取 topK。
+     * 解析本次生效的融合模式：显式参数优先，其次平台配置，无法识别时回退 {@code replace}。
      *
-     * <p><b>score 口径</b>：重排成功时命中项 {@code score} 替换为<b>重排分</b>（relevance_score，
-     * 与余弦分不同尺度，不可与「未重排」的分数直接比较）；重排降级时<b>保留原余弦分与原始顺序</b>。</p>
+     * @param rerankMode 显式融合模式（可为空）
+     * @return 融合模式
+     */
+    private AiRankFusion.Mode resolveRerankMode(String rerankMode) {
+        String mode = StringUtils.isNotBlank(rerankMode) ? rerankMode : aiProperties.getRag().getRerankMode();
+        return AiRankFusion.Mode.from(mode);
+    }
+
+    /**
+     * 对稠密召回结果做文本重排，并按配置的融合模式（{@code replace} / {@code rank_rrf} / {@code score_fusion}）
+     * 融合后截取 topK。
+     *
+     * <p><b>score 口径</b>：重排成功时命中项 {@code score} 替换为<b>融合分</b>（量纲随模式：{@code replace}=重排分 /
+     * {@code rank_rrf}=RRF 分 / {@code score_fusion}=归一化加权分，均不可与「未重排」的余弦分直接比较）；
+     * 重排降级时<b>保留原余弦分与原始顺序</b>。</p>
+     *
+     * <p><b>条件触发</b>：当 {@code rerankTriggerMargin > 0} 且「首条与次条向量分差 ≥ margin」时，
+     * 认为向量头部已足够确信，<b>跳过重排调用</b>直接返回原序 topK，节省一次模型调用。</p>
      *
      * @param apiKey 明文密钥（复用知识库向量模型）
      * @param query  查询文本
      * @param hits   稠密召回结果（已按相似度降序）
      * @param topK   最终返回条数
-     * @return 重排后（或降级原序）截取 topK 的结果
+     * @param mode   融合模式
+     * @return 重排融合后（或降级原序）截取 topK 的结果
      */
-    private List<AiRetrievalHitVo> applyRerank(String apiKey, String query, List<AiRetrievalHitVo> hits, int topK) {
+    private List<AiRetrievalHitVo> applyRerank(String apiKey, String query, List<AiRetrievalHitVo> hits,
+                                               int topK, AiRankFusion.Mode mode) {
+        if (shouldSkipRerank(hits)) {
+            return truncate(hits, topK);
+        }
         List<String> documents = hits.stream().map(AiRetrievalHitVo::getContent).toList();
         AiRerankClient.RerankOutcome outcome = rerankClient.rerank(apiKey, query, documents, documents.size());
         if (outcome.degraded() || outcome.docs().isEmpty()) {
             // 降级：保持原余弦分与原顺序，仅按 topK 截断
             log.warn("检索重排降级为原顺序（kb 检索不受影响），候选数={}", hits.size());
-            return hits.size() > topK ? new ArrayList<>(hits.subList(0, topK)) : hits;
+            return truncate(hits, topK);
         }
-        List<AiRetrievalHitVo> reordered = new ArrayList<>(outcome.docs().size());
-        for (AiRerankClient.RankedDoc doc : outcome.docs()) {
-            int index = doc.index();
+        List<Double> vectorScores = hits.stream()
+            .map(hit -> hit.getScore() == null ? 0.0 : hit.getScore())
+            .toList();
+        AiProperties.Rag rag = aiProperties.getRag();
+        List<AiRankFusion.Fused> fused = AiRankFusion.fuse(
+            vectorScores, outcome.docs(), mode, rag.getRerankAlpha(), rag.getRerankRrfK());
+        List<AiRetrievalHitVo> reordered = new ArrayList<>(fused.size());
+        for (AiRankFusion.Fused item : fused) {
+            int index = item.index();
             if (index < 0 || index >= hits.size()) {
                 continue;
             }
             AiRetrievalHitVo hit = hits.get(index);
-            hit.setScore(doc.score());
+            hit.setScore(item.score());
             reordered.add(hit);
             if (reordered.size() >= topK) {
                 break;
             }
         }
         return reordered;
+    }
+
+    /**
+     * 判断本次是否可以跳过重排（条件触发）。
+     *
+     * <p>仅当配置了正阈值、候选 ≥ 2、且首条与次条的余弦分差 ≥ 阈值时跳过；否则照常重排。</p>
+     *
+     * @param hits 稠密召回结果（已按相似度降序）
+     * @return 是否跳过重排
+     */
+    private boolean shouldSkipRerank(List<AiRetrievalHitVo> hits) {
+        double margin = aiProperties.getRag().getRerankTriggerMargin();
+        if (margin <= 0 || hits.size() < 2) {
+            return false;
+        }
+        Double first = hits.get(0).getScore();
+        Double second = hits.get(1).getScore();
+        if (first == null || second == null) {
+            return false;
+        }
+        return first - second >= margin;
+    }
+
+    /**
+     * 按 topK 截断（不超限时原样返回）。
+     *
+     * @param hits 命中列表
+     * @param topK 目标条数
+     * @return 截断结果
+     */
+    private List<AiRetrievalHitVo> truncate(List<AiRetrievalHitVo> hits, int topK) {
+        return hits.size() > topK ? new ArrayList<>(hits.subList(0, topK)) : hits;
     }
 
     @Override

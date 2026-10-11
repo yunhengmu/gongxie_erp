@@ -504,9 +504,13 @@ public class AiProperties {
     public static class Rag {
 
         /**
-         * 是否启用检索重排（默认关闭）
+         * 是否启用检索重排（**默认开启**）。
+         *
+         * <p>实测依据（56 用例评测集，见 docs/17 §89）：开启后 hit@1 67.9%→75.0%、MRR 0.772→0.829、
+         * hit@5 89.3%→98.2%、recall@5 96.4%→98.2%（延迟约 +170ms，`rerankMode=score_fusion`）。
+         * 依赖 DashScope 文本重排端点与知识库向量模型密钥；任一不可用时**自动降级为原顺序**，不影响检索可用性。</p>
          */
-        private boolean rerankEnabled = false;
+        private boolean rerankEnabled = true;
 
         /**
          * 重排模型标识（DashScope 文本重排）
@@ -519,14 +523,44 @@ public class AiProperties {
         private String rerankEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank";
 
         /**
-         * 重排前的稠密召回条数（先按 max(topK, rerankTopN) 召回再重排）
+         * 重排前的稠密召回条数（先按 max(topK, rerankTopN) 召回再重排）。
+         *
+         * <p>默认 30：由「⑧ Rerank 调优」实验矩阵选定——在 {@code score_fusion} 模式下 30 条候选的
+         * hit@5/MRR 优于 20（且不损 hit@1），仅略增一次重排的输入长度。</p>
          */
-        private int rerankTopN = 20;
+        private int rerankTopN = 30;
 
         /**
          * 重排调用超时（毫秒），超时即降级为原顺序
          */
         private int rerankTimeoutMs = 12000;
+
+        /**
+         * 重排结果与向量召回结果的**融合模式**（默认 {@code score_fusion}）：
+         * <ul>
+         *   <li>{@code replace}：直接用重排分替换向量分与顺序（早期「纯替换」策略）；</li>
+         *   <li>{@code rank_rrf}：对「向量排名」与「重排排名」做倒数排名融合（RRF）；</li>
+         *   <li>{@code score_fusion}：两路分数归一化后按 {@link #rerankAlpha} 加权融合。</li>
+         * </ul>
+         * 未知取值一律回退 {@code replace}。默认值由「⑧ Rerank 调优」实验矩阵选定：
+         * {@code score_fusion} 在保持 hit@3/@5/recall 不回退（相对未重排）的同时显著提升 hit@1。
+         */
+        private String rerankMode = "score_fusion";
+
+        /**
+         * {@code score_fusion} 模式下**重排分**的权重（0~1）：越接近 1 越信重排，越接近 0 越信向量分。
+         */
+        private double rerankAlpha = 0.5;
+
+        /**
+         * {@code rank_rrf} 融合的 RRF 平滑常数 k（越大越弱化头部排名差异，常用 60）；≤0 时取 60。
+         */
+        private int rerankRrfK = 60;
+
+        /**
+         * 条件触发阈值：仅当「首条与次条向量分差 &lt; 本阈值」时才真正调用重排（0 或负值=总是重排）。
+         */
+        private double rerankTriggerMargin = 0.0;
 
         /**
          * 是否启用**检索结果内容去重**（P0-③ 上下文装配）：内容重复 / 高度重叠的命中只保留首个。
