@@ -115,12 +115,15 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
         lqw.eq(StringUtils.isNotBlank(bo.getParseStatus()), AiDocument::getParseStatus, bo.getParseStatus());
         lqw.orderByDesc(AiDocument::getCreateTime);
         Page<AiDocumentVo> result = baseMapper.selectVoPage(pageQuery.build(), lqw);
+        result.getRecords().forEach(this::fillFileUrl);
         return PageResult.build(result.getRecords(), result.getTotal());
     }
 
     @Override
     public AiDocumentVo queryById(Long id) {
-        return baseMapper.selectVoById(id);
+        AiDocumentVo vo = baseMapper.selectVoById(id);
+        fillFileUrl(vo);
+        return vo;
     }
 
     @Override
@@ -133,7 +136,8 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
             throw new ServiceException("暂不支持解析 ." + add.getFileSuffix()
                 + " 格式，请上传 PDF / docx / xlsx / pptx / 文本类文件");
         }
-        add.setFileUrl(resolveUrl(add.getOssId()));
+        // 仅校验文件存在，不落库：私有桶下预签名 URL 有有效期，file_url 在读取时现算（见 fillFileUrl）
+        validateOssFile(add.getOssId());
         add.setParseStatus(STATUS_PENDING);
         add.setCharCount(0);
         add.setChunkCount(0);
@@ -488,12 +492,11 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
     }
 
     /**
-     * 解析 OSS 文件访问地址（对外展示用，写入 file_url）。
+     * 校验 OSS 文件存在（不落库，仅用于新增时的前置校验）。
      *
      * @param ossId OSS 主键
-     * @return 访问地址
      */
-    private String resolveUrl(Long ossId) {
+    private void validateOssFile(Long ossId) {
         if (ossId == null) {
             throw new ServiceException("文件未上传，请重新上传后再提交");
         }
@@ -501,8 +504,29 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
         if (StringUtils.isBlank(urls)) {
             throw new ServiceException("文件不存在或已被删除，请重新上传");
         }
-        int index = urls.indexOf(',');
-        return index > 0 ? urls.substring(0, index) : urls;
+    }
+
+    /**
+     * 按 OSS 主键现算文件访问地址填充到视图对象。
+     * <p>
+     * 私有桶下预签名 URL 有有效期，因此 file_url 不落库，列表 / 详情读取时现算。
+     * OSS 异常时保留空值（前端据此禁用预览 / 下载），避免整体查询失败。
+     *
+     * @param vo 文档视图对象
+     */
+    private void fillFileUrl(AiDocumentVo vo) {
+        if (vo == null || vo.getOssId() == null) {
+            return;
+        }
+        try {
+            String urls = ossService.selectUrlByIds(String.valueOf(vo.getOssId()));
+            if (StringUtils.isNotBlank(urls)) {
+                int index = urls.indexOf(',');
+                vo.setFileUrl(index > 0 ? urls.substring(0, index) : urls);
+            }
+        } catch (Exception ignored) {
+            // OSS 配置缺失等异常时保留空值，避免列表 / 详情整体失败
+        }
     }
 
     /**

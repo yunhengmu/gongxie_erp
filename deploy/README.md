@@ -127,7 +127,7 @@ docker logs bizbuddy-postgres 2>&1 | grep -E 'docker-entrypoint-initdb.d|ERROR'
 **⑥ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
 现象：上传文档失败，后端日志 `S3StorageException: Unable to execute HTTP request: Connection refused: /127.0.0.1:9000`。
 原因：**平台文件存储（OSS）的坐标不在 yaml 里，而在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。容器里 `127.0.0.1` 是容器自身，自然连不上。
-处置：本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9000/9001；注意与 Milvus 自用的 `milvus-minio` 是两套，互不共用）；② 一次性初始化 `minio-init` 建桶并设为可公开读（对应 `sys_oss_config.access_policy=1`，且**框架不会自动建桶**）。建桶复用 `minio` 镜像**自带的 `mc`**——`minio/mc` 独立镜像在部分镜像源上拉不到（403）。
+处置：本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9000/9001；注意与 Milvus 自用的 `milvus-minio` 是两套，互不共用）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`；对应 `sys_oss_config.access_policy=0`，且**框架不会自动建桶**）。文件访问由后端**读取时现算预签名 URL**（有效期 `oss.presign-expire-seconds`，默认 120s）。建桶复用 `minio` 镜像**自带的 `mc`**——`minio/mc` 独立镜像在部分镜像源上拉不到（403）。
 另外 `deploy/sql/50-oss-endpoint.sql` 会在首次建库时把 `sys_oss_config` 的端点改成 `minio:9000`；**已初始化过的数据卷不会重跑**，需手动补一次：
 
 ```bash
@@ -144,8 +144,9 @@ MinIO 控制台：<http://localhost:9001>（`ruoyi` / `ruoyi123`）。
 现象：后端能读到文件（模型识图、文档解析都正常），**浏览器却加载不出来**。
 原因：`sys_oss_config` 有两个坐标——`endpoint`（后端读写用）与 `domain_url`（**返回给前端的对外地址**）。
 上面的 `minio:9000` 是**容器网络内**的服务名，浏览器无法解析；后端在容器里能连通，所以只有前端受影响。
-处置：`50-oss-endpoint.sql` 已同时写入 `domain_url = 'http://localhost:9000'`（宿主机可达的 MinIO）；
-**存量数据卷不会重跑该脚本**，需手动补一次（见 ⑥ 的命令，脚本本身包含这两条 `update`），随后 `docker compose restart ruoyi-admin`。
+处置：`50-oss-endpoint.sql` 已同时写入 `domain_url = 'http://localhost:9000'`（宿主机可达的 MinIO）与 `access_policy = 0`（**私有桶**，文件访问走后端下发的预签名 URL）；
+**存量数据卷不会重跑该脚本**，需手动补一次（见 ⑥ 的命令，脚本本身包含这三条 `update`：`endpoint` / `domain_url` / `access_policy`），随后 `docker compose restart ruoyi-admin`。
+> 私有桶下 `domain_url` 是**硬前置**：预签名 URL 按它生成，留空或指向不可达地址会导致前端预览 / 下载失败（后端解析不受影响，它走 `endpoint`）。
 若从其它机器 / 公网访问，把 `domain_url` 改成对应可达的域名或 IP 即可（后端返回的 URL 以此为准，无需改数据行）。
 
 > 平台侧对公开桶的 URL 是**读取时按配置重新生成**的，因此改 `domain_url` 后**存量文件也一并生效**，不必迁移 `sys_oss.url`。

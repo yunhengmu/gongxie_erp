@@ -15,4 +15,12 @@ update sys_oss_config set endpoint = 'minio:9000' where config_key in ('minio', 
 -- 会导致图片/文档在线预览失败（后端读图正常、前端却加载不出来）。
 -- 这里给出**宿主机可达**的地址（宿主机 9000 映射到平台 MinIO），后端返回给前端的 URL 即以此为准。
 -- 若需从其它机器 / 公网访问，请把下面的地址改成对应可达的域名或 IP（改完需重启 ruoyi-admin 让其重载 OSS 配置）。
+--
+-- 注意：这是**私有桶方案的硬前置**。下面把桶权限改为私有后，所有文件访问都要靠后端下发的
+-- 预签名 URL，而预签名 URL 默认按该 domain_url 生成，故它必须是浏览器可达的地址；
+-- 容器内的服务端下载 / 文档解析不受影响——后端另用 endpoint（minio:9000）内部签名。
 update sys_oss_config set domain_url = 'http://localhost:9000' where config_key in ('minio', 'image');
+
+-- 桶权限：私有（0）。配合 minio-init 不再开放匿名读，匿名直访对象一律 403，
+-- 前端展示 / 下载统一走后端下发的预签名 URL（读取时现算，不落库）。
+update sys_oss_config set access_policy = '0' where config_key in ('minio', 'image');

@@ -570,6 +570,19 @@ public interface OssClient extends AutoCloseable {
     String presignGetUrl(String key, Duration expiredTime);
 
     /**
+     * 生成默认存储桶中文件下载的预签名 URL（服务端内部使用，忽略自定义域名）。
+     * <p>
+     * 与 {@link #presignGetUrl(String, Duration)} 的区别：容器化部署时自定义域名
+     * （domain_url）通常仅对外可达，容器内解析失败；服务端下载 / 解析对象必须按访问端点
+     * （endpoint，如 minio:9000）签名，故这里强制走 endpoint。
+     *
+     * @param key         对象键
+     * @param expiredTime URL 过期时间
+     * @return 预签名下载 URL
+     */
+    String presignInternalGetUrl(String key, Duration expiredTime);
+
+    /**
      * 生成默认存储桶中文件上传的预签名 URL。
      *
      * @param key         对象键

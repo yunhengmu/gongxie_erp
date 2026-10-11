@@ -35,12 +35,52 @@ class McpToolNameNormalizerTest {
     }
 
     @Test
-    @DisplayName("非法字符（点号 / 空格 / 中文）替换为下划线")
+    @DisplayName("非法字符（点号 / 空格）替换为下划线")
     void shouldReplaceIllegalChars() {
         McpToolNameNormalizer normalizer = new McpToolNameNormalizer();
         assertEquals("weather_search_local", normalizer.allocate("weather.search_local"));
         assertEquals("a_b", normalizer.allocate("a b"));
-        assertEquals("__", normalizer.allocate("工具"));
+    }
+
+    @Test
+    @DisplayName("纯中文名改走字母开头的别名，规避框架保留前缀 __")
+    void shouldAliasPureCjkNames() {
+        McpToolNameNormalizer normalizer = new McpToolNameNormalizer();
+
+        // 「工具」直接替换会得到 "__"，正是框架的分片占位符前缀，必须改走别名
+        assertEquals("mcp_" + sha256Prefix("工具"), normalizer.allocate("工具"));
+        // 真实外部 Server 的中文长名：替换后是一串下划线（如 ____7__________）
+        String fortyEight = normalizer.allocate("查询未来7日内指定日期天气预报");
+        assertEquals("mcp_" + sha256Prefix("查询未来7日内指定日期天气预报"), fortyEight);
+        assertFalse(fortyEight.startsWith("__"));
+    }
+
+    @Test
+    @DisplayName("任何归一化结果都不得以框架保留前缀 __ 开头")
+    void shouldNeverStartWithReservedPrefix() {
+        McpToolNameNormalizer normalizer = new McpToolNameNormalizer();
+        String[] raws = {"工具", "查询未来7日内指定日期天气预报", "__fragment__", "__pending__", "未来24小时天气预报",
+            "weather.search", "a b", "123", "-", "_x"};
+
+        for (String raw : raws) {
+            String name = normalizer.allocate(raw);
+            assertNotNull(name, "不应被丢弃：" + raw);
+            assertFalse(name.startsWith("__"), "命中保留前缀：" + raw + " → " + name);
+        }
+
+        // 单个下划线开头是合法的（框架仅把双下划线视为占位符），保持原样
+        assertEquals("_x", new McpToolNameNormalizer().allocate("_x"));
+    }
+
+    @Test
+    @DisplayName("别名与普通名撞名时仍唯一")
+    void shouldKeepAliasUnique() {
+        McpToolNameNormalizer normalizer = new McpToolNameNormalizer();
+        String alias = normalizer.allocate("工具");
+        String again = normalizer.allocate("工具");
+
+        assertNotEquals(alias, again);
+        assertEquals(alias + "_" + sha256Prefix("工具"), again);
     }
 
     @Test

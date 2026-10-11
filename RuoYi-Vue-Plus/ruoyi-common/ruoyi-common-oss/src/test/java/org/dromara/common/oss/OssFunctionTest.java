@@ -146,6 +146,54 @@ class OssFunctionTest {
     }
 
     /**
+     * 验证「绑定桶的自定义域名」仅对**非路径风格**的默认桶成立。
+     *
+     * <p>路径风格（如 MinIO）下域名不绑定桶，对象地址含桶名（{@code <域名>/<桶>/<键>}），
+     * 若按绑定桶签名会漏掉桶名、得到 404 地址，故即便配了域名也必须判为 false。</p>
+     */
+    @Test
+    @DisplayName("判断是否使用绑定桶的自定义域名签名（路径风格须排除）")
+    void shouldUseBucketBoundDomainOnlyWhenNotPathStyleAndDefaultBucket() {
+        // 路径风格 + 自定义域名：不绑定（否则预签名 URL 会漏掉桶名）
+        OssClientConfig pathStyle = OssClientConfig.formProperties(properties("minio:9000", "oss.example.com", "ruoyi"));
+        assertTrue(pathStyle.usePathStyleAccess());
+        assertFalse(pathStyle.useBucketBoundDomain("ruoyi"));
+
+        // 非路径风格（云厂商 endpoint）+ 自定义域名：默认桶绑定、其它桶不绑定
+        OssClientConfig cloudWithDomain = OssClientConfig.formProperties(
+            properties("https://oss-cn-hangzhou.aliyuncs.com", "https://cdn.example.com", "ruoyi"));
+        assertFalse(cloudWithDomain.usePathStyleAccess());
+        assertTrue(cloudWithDomain.useBucketBoundDomain("ruoyi"));
+        assertFalse(cloudWithDomain.useBucketBoundDomain("archive"));
+
+        // 未配置自定义域名：一律不绑定
+        OssClientConfig withoutDomain = OssClientConfig.formProperties(
+            properties("https://oss-cn-hangzhou.aliyuncs.com", null, "ruoyi"));
+        assertFalse(withoutDomain.useBucketBoundDomain("ruoyi"));
+    }
+
+    /**
+     * 验证路径风格下「桶地址」与预签名路径口径一致：都带桶名。
+     *
+     * <p>这是对上面用例的补充——私有桶改用预签名后，若两者口径不一致，
+     * 就会出现「公开地址能开、预签名 404」的隐性回归。</p>
+     */
+    @Test
+    @DisplayName("路径风格下桶地址与预签名口径一致（均带桶名）")
+    void shouldKeepBucketInPathUnderPathStyle() {
+        OssProperties properties = properties("minio:9000", "http://localhost:9000", "ruoyi");
+        properties.setIsHttps("N");
+
+        OssClientConfig config = OssClientConfig.formProperties(properties);
+
+        assertTrue(config.usePathStyleAccess());
+        // 对外桶地址：域名 + 桶名
+        assertEquals("http://localhost:9000/ruoyi", config.getBucketUrl());
+        // 预签名不走「绑定桶」分支，故由 S3Presigner 按路径风格拼出 域名/桶/对象键
+        assertFalse(config.useBucketBoundDomain("ruoyi"));
+    }
+
+    /**
      * 创建覆盖 URL 构造所需字段的 OSS 属性。
      *
      * @param endpoint endpoint 地址
