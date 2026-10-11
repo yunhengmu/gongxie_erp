@@ -162,6 +162,7 @@ public class AgentAssembler {
      * @param workspacePolicy 工作区上下文配置
      * @param mcpAssembly   外部 MCP 连接装配结果（REQ-AI-16；已按资源集收敛）
      * @param expertMode    是否专家执行装配（子智能体已在外层关闭；专家直答后专家侧不注册任何协议工具）
+     * @param workspaceCode 工作区命名空间编码（专家执行装配取入口智能体编码，以共享同一份用户长期记忆）
      * @return 装配结果（智能体实例 + 执行期快照）
      */
     AssembledAgent assemble(AiAgent definition, List<AiTool> enabledTools, List<Long> kbIds,
@@ -170,7 +171,7 @@ public class AgentAssembler {
                             AiCompactionConfigBo compactionPolicy,
                             AiPlanConfigBo planPolicy, AiMemoryConfigBo memoryPolicy,
                             AiWorkspaceConfigBo workspacePolicy,
-                            McpClientAssembly mcpAssembly, boolean expertMode) {
+                            McpClientAssembly mcpAssembly, boolean expertMode, String workspaceCode) {
         AiModelConfig modelConfig = modelFactory.resolveChatModel(definition.getModelId());
         Model model = modelFactory.buildChatModel(modelConfig);
         Toolkit toolkit = new Toolkit();
@@ -199,7 +200,7 @@ public class AgentAssembler {
             .model(model)
             .toolkit(toolkit)
             .stateStore(stateStore)
-            .workspace(resolveWorkspace(definition.getAgentCode()))
+            .workspace(resolveWorkspace(workspaceCode))
             .maxIters(maxIters)
             .toolsConfig(buildToolsConfig(registeredCodes, skillNames, mcpAssembly))
             // 工具授权：按「智能体 × 工具」「场景包 × 工具」与「会话直接选中」的合并决策生成 allow / ask / deny 规则

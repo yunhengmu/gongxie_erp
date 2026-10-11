@@ -36,6 +36,13 @@ public interface IAiAgentService {
     AiEntryAgentVo queryEntryAgent();
 
     /**
+     * 查询入口智能体实体（REQ-AI-09 扩展：专家侧共享入口的长期记忆命名空间）。
+     *
+     * @return 入口智能体实体；未配置时返回 null
+     */
+    AiAgent getEntryAgent();
+
+    /**
      * 修改入口智能体（**只读写主表**）。
      *
      * <p>小Z 不绑定业务工具 / 知识库 / 技能 / 子智能体（能力由会话资源集提供），

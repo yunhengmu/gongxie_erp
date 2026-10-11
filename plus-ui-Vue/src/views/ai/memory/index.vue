@@ -170,6 +170,34 @@
             >
               触发合并
             </el-button>
+            <el-button
+              v-hasPermi="['ai:memory:archive']"
+              plain
+              icon="FolderOpened"
+              :loading="archiving"
+              @click="handleArchive"
+            >
+              归档
+            </el-button>
+            <el-button
+              v-hasPermi="['ai:memory:cleanup']"
+              plain
+              icon="Delete"
+              :loading="cleaning"
+              @click="handleCleanup"
+            >
+              清理
+            </el-button>
+            <el-button
+              v-hasPermi="['ai:memory:remove']"
+              type="danger"
+              plain
+              icon="DeleteFilled"
+              :loading="removing"
+              @click="handleRemove"
+            >
+              删除记忆
+            </el-button>
           </div>
         </div>
       </template>
@@ -251,10 +279,13 @@
 import { optionAgent } from '@/api/ai/agent';
 import type { AgentVO } from '@/api/ai/agent/types';
 import {
+  archiveMemory,
+  cleanupMemory,
   consolidateMemory,
   getMemoryConfig,
   getMemoryContent,
   listMemoryFiles,
+  removeMemory,
   updateMemoryConfig,
   updateMemoryContent
 } from '@/api/ai/memory';
@@ -414,6 +445,65 @@ const handleConsolidate = async () => {
     await loadFiles();
   } finally {
     consolidating.value = false;
+  }
+};
+
+const archiving = ref(false);
+const cleaning = ref(false);
+const removing = ref(false);
+
+/** 校验已选智能体与用户 */
+const requireScope = () => {
+  if (!query.value.agentId || !query.value.userId) {
+    modal.msgWarning('请先选择智能体与用户');
+    return false;
+  }
+  return true;
+};
+
+/** 归档超期流水（移动到记忆目录下的 archive/ 子目录） */
+const handleArchive = async () => {
+  if (!requireScope()) return;
+  archiving.value = true;
+  try {
+    const res = await archiveMemory(query.value.agentId, query.value.userId);
+    modal.msgSuccess(`已归档 ${res.data ?? 0} 个流水文件`);
+    await loadFiles();
+  } finally {
+    archiving.value = false;
+  }
+};
+
+/** 清理超期记忆文件与会话日志 */
+const handleCleanup = async () => {
+  if (!requireScope()) return;
+  cleaning.value = true;
+  try {
+    const res = await cleanupMemory(query.value.agentId, query.value.userId);
+    modal.msgSuccess(`已清理 ${res.data ?? 0} 个文件`);
+    await loadFiles();
+  } finally {
+    cleaning.value = false;
+  }
+};
+
+/** 删除该用户的全部长期记忆（回滚 / 合规删除） */
+const handleRemove = async () => {
+  if (!requireScope()) return;
+  try {
+    await modal.confirm(
+      '将删除该用户在小Z 与专家侧共用的全部长期记忆（MEMORY.md 与每日流水），且不可恢复。确认继续？'
+    );
+  } catch {
+    return;
+  }
+  removing.value = true;
+  try {
+    await removeMemory(query.value.agentId, query.value.userId);
+    modal.msgSuccess('长期记忆已删除');
+    await loadFiles();
+  } finally {
+    removing.value = false;
   }
 };
 

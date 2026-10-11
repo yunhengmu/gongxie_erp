@@ -41,6 +41,16 @@ public class AiChannelRuntimeRegistry {
     private final AiChannelStreamStatus streamStatus;
 
     /**
+     * 入站事件幂等（Redis，多副本共享）
+     */
+    private final RedisInboundEventDeduplicator channelDeduplicator;
+
+    /**
+     * 渠道级入站限流（Redis，多副本共享）
+     */
+    private final AiChannelRateLimiter channelRateLimiter;
+
+    /**
      * 运行期装配缓存：渠道编码 → 装配
      */
     private final Map<String, AiChannelRuntime> cache = new ConcurrentHashMap<>();
@@ -91,7 +101,7 @@ public class AiChannelRuntimeRegistry {
                     return;
                 }
                 inboundService.submit(current, message);
-            });
+            }, channelDeduplicator, channelRateLimiter);
             cache.put(channelCode, runtime);
             log.info("渠道运行期装配已{}：channelCode={}, platform={}",
                 cached == null ? "建立" : "重建", channelCode, channel.getPlatformType());

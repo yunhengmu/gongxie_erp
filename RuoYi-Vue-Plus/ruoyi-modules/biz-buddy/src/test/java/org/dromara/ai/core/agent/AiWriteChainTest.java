@@ -20,12 +20,14 @@ import io.agentscope.harness.agent.HarnessAgent;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.domain.AiExpertAgent;
 import org.dromara.ai.domain.AiRouteExpertCall;
+import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.dto.AiSessionResourceSet;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiSkillService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.test.AiTestSupport;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +49,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -92,11 +95,19 @@ class AiWriteChainTest {
 
     private final AiProperties aiProperties = new AiProperties();
 
+    private final AiRuntimeConfigStore runtimeConfigStore = mock(AiRuntimeConfigStore.class);
+
     private final SseEmitter emitter = mock(SseEmitter.class);
 
     @BeforeAll
     static void init() {
         AiTestSupport.initialize();
+    }
+
+    @BeforeEach
+    void stubBudget() {
+        // 编排预算默认不限（0/0），不影响写工具链路断言
+        lenient().when(runtimeConfigStore.routeBudget()).thenReturn(new AiRouteBudgetConfigBo());
     }
 
     /**
@@ -109,7 +120,7 @@ class AiWriteChainTest {
         // 装配真实编排器与真实路由工具（事件桥亦为真实实现）
         AiRouteOrchestrator orchestrator = new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
             new AiStreamEventBridge(traceService, aiProperties), traceService, aiProperties,
-            skillService, agentService);
+            runtimeConfigStore, skillService, agentService);
         RouteDecisionTool routeTool = new RouteDecisionTool(orchestrator);
 
         AiExpertAgent definition = expertDefinition();

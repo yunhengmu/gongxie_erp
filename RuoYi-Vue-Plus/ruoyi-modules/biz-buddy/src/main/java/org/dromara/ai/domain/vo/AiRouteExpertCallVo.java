@@ -6,6 +6,7 @@ import org.dromara.ai.domain.AiRouteExpertCall;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -96,9 +97,14 @@ public class AiRouteExpertCallVo implements Serializable {
     private Long completionTokens;
 
     /**
-     * 该次调用耗时（毫秒）
+     * 该次调用的耗时（毫秒）
      */
     private Long durationMs;
+
+    /**
+     * 该次调用的费用（元；按专家当前模型单价折算，未配置单价按 0）
+     */
+    private BigDecimal cost;
 
     /**
      * 创建时间

@@ -34,6 +34,7 @@ import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.service.IAiUsageStatService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -42,7 +43,9 @@ import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -181,6 +184,11 @@ public class AiChatFacade {
      * 编排链路落库（REQ-AI-30）：一次编排一行 + 每次专家调用一行
      */
     private final AiRouteRecorder routeRecorder;
+
+    /**
+     * 专家编排器（REQ-AI-30）：无人值守链路的「指定专家兜底」直接同步调用（无 SSE）
+     */
+    private final AiRouteOrchestrator routeOrchestrator;
 
     /**
      * 附件多模态装配（聊天上传图片/文档 → 内容块）
@@ -434,38 +442,95 @@ public class AiChatFacade {
     }
 
     /**
-     * 无人值守执行一轮对话（定时任务链路）。
+     * 无人值守执行一轮对话（定时任务 / 渠道接入链路）。
      *
      * <p>与对话工作台的区别：无登录上下文（运行身份由调用方显式传入）、无 SSE 输出
      * （同步等待事件流结束）、权限模式固定为 {@link PermissionMode#DONT_ASK}
      * ——被配置为「需确认」的写工具会被框架直接拒绝，既不执行也不会悬挂等待人工确认。</p>
      *
-     * @param session     已创建的会话（归属为运行身份用户）
-     * @param userMessage 已落库的用户消息（任务提示词）
-     * @param runAsUserId 运行身份用户
+     * <p><b>编排（全场景可用）</b>：当会话绑定的智能体是**入口智能体（小Z）**时，本轮同样建立
+     * {@link AiRouteContext}（{@code emitter=null}）接入「入口选人 + 专家直答」编排——专家侧一律
+     * 拒绝「需确认」写工具（无人可确认），失败即降级为小Z 兜底自答。绑定非入口智能体时保持原
+     * 单智能体行为。</p>
+     *
+     * @param session          已创建的会话（归属为运行身份用户）
+     * @param userMessage      已落库的用户消息（任务提示词）
+     * @param runAsUserId      运行身份用户
      * @return 执行结果
      */
     public AiTaskExecution executeUnattended(AiSession session, AiMessage userMessage, Long runAsUserId) {
+        return executeUnattended(session, userMessage, runAsUserId, List.of());
+    }
+
+    /**
+     * 无人值守执行一轮对话（含入站附件内容块，供渠道多媒体使用）。
+     *
+     * @param session          已创建的会话（归属为运行身份用户）
+     * @param userMessage      已落库的用户消息（任务提示词；正文仍落库，附件内容块只在本轮下发模型）
+     * @param runAsUserId      运行身份用户
+     * @param attachmentBlocks 入站附件内容块（图片 / 文档；无附件时传空列表）
+     * @return 执行结果
+     */
+    public AiTaskExecution executeUnattended(AiSession session, AiMessage userMessage, Long runAsUserId,
+                                             List<ContentBlock> attachmentBlocks) {
         long startNanos = System.nanoTime();
         Long sessionId = session.getId();
         AiAgent definition = agentService.getEnabledAgent(session.getAgentId());
-        // 无人值守会话（定时任务 / 渠道接入）默认未选场景包，故不接入任何 MCP 工具；
-        // 若将来为其指定了包，则同样按包叠加工具与技能、并按包接入 MCP
+        // 无人值守会话（定时任务 / 渠道接入）默认未选场景包，故不接入任何 MCP 工具
         AiScenarioPack pack = routeSupport.resolveScenarioPack(session);
         // 配额闸门与实时对话同口径：超限直接失败，原因写入执行记录
         quotaService.check(runAsUserId, definition);
-        HarnessAgent agent = agentRegistry.get(definition, pack);
-        RuntimeContext ctx = RuntimeContext.builder()
+        // 入口智能体（小Z）：本轮即一次编排运行——按会话资源集装配（与实时对话同源）
+        boolean entryAgent = definition.isEntry();
+        AiSessionResourceSet resources = entryAgent
+            ? sessionResourceService.resolveForSession(session) : AiSessionResourceSet.empty();
+        Long deptId = session.getDeptId();
+        HarnessAgent agent = entryAgent
+            ? agentRegistry.get(definition, resources) : agentRegistry.get(definition, pack);
+        // 继承槽位（REQ-AI-31）：仅入口智能体需要（注入小Z 的 system prompt 并随 task_context 传给专家）
+        AiSlotSet slots = entryAgent ? slotStore.merge(runAsUserId, sessionId) : null;
+        // 链路追踪（REQ-AI-28）：无人值守链路，来源按会话来源标记（定时任务 / 渠道接入）
+        Long traceId = traceService.start(sessionId, definition.getId(), runAsUserId,
+            AiRouteSupport.resolveTraceSource(session), entryAgent
+                ? agentRegistry.snapshotOf(definition, resources) : agentRegistry.snapshotOf(definition, pack));
+        AiRouteContext route = entryAgent
+            ? new AiRouteContext(routeRecorder.startRun(sessionId, definition.getId(), runAsUserId),
+                sessionId, runAsUserId, deptId, definition.getId(),
+                expertDirectory.candidates(runAsUserId, deptId), traceId, null)
+            : null;
+        if (route != null) {
+            // 无人值守编排：无人类可确认，专家侧一律拒绝写工具（见 AiRouteOrchestrator#applyExpertPermission）
+            route.unattended = true;
+            route.resources = resources;
+            route.attachmentBlocks = attachmentBlocks == null ? List.of() : attachmentBlocks;
+            route.pinnedExpertId = session.getPinnedExpertId();
+            route.pinSource = PIN_SOURCE_USER;
+            if (route.pinnedExpertId != null) {
+                route.pinnedExpert = expertDirectory.visibleCandidate(runAsUserId, deptId, route.pinnedExpertId);
+                route.taskContext = AiRouteSupport.taskContext(userMessage.getContent(), slots, runAsUserId, deptId);
+            }
+        }
+        RuntimeContext.Builder contextBuilder = RuntimeContext.builder()
             .userId(String.valueOf(runAsUserId))
             .sessionId(String.valueOf(sessionId))
             // 技能生效范围（REQ-AI-10）：无人值守链路按运行身份用户过滤
-            .put(SkillFilter.class, routeSupport.runtimeSkillFilter(definition.getId(), pack, runAsUserId))
+            .put(SkillFilter.class, entryAgent
+                ? routeSupport.runtimeSkillFilter(definition.getId(), resources, runAsUserId)
+                : routeSupport.runtimeSkillFilter(definition.getId(), pack, runAsUserId))
             // 子智能体（REQ-AI-04）：无人值守链路必须强制同步，否则后台子任务会在本次执行结束前
             // 就被遗弃（无人追问、无人等待），结果永远无法回收；同样给出硬超时上限
             .put(AgentSpawnTool.CTX_FORCE_SYNC, true)
-            .put(AgentSpawnTool.CTX_FORCE_SYNC_TIMEOUT_SECONDS, AgentRegistry.SUBAGENT_SYNC_TIMEOUT_SECONDS)
-            .build();
-        // 无人值守：把「需确认」的写工具按会话降级为「拒绝」，不执行、不悬挂
+            .put(AgentSpawnTool.CTX_FORCE_SYNC_TIMEOUT_SECONDS, AgentRegistry.SUBAGENT_SYNC_TIMEOUT_SECONDS);
+        if (route != null) {
+            // 编排上下文只在这一轮存在：工具据此判定「是否处于编排链路」
+            contextBuilder.put(AiRouteContext.class, route);
+        }
+        if (slots != null) {
+            contextBuilder.put(AiSlotSet.class, slots);
+        }
+        RuntimeContext ctx = contextBuilder.build();
+        // 无人值守：权限模式恒为 DONT_ASK，并把「需确认」的写工具按会话降级为「拒绝」，不执行、不悬挂
+        agent.setPermissionMode(ctx, PermissionMode.DONT_ASK);
         AiPermissionSupport.denyAskingTools(agent, String.valueOf(runAsUserId), String.valueOf(sessionId));
 
         AiStreamState state = new AiStreamState();
@@ -473,11 +538,15 @@ public class AiChatFacade {
         state.userId = runAsUserId;
         state.agentId = definition.getId();
         state.modelId = definition.getModelId();
-        // 链路追踪（REQ-AI-28）：无人值守链路，来源按会话来源标记（定时任务 / 渠道接入）
-        state.traceId = traceService.start(sessionId, definition.getId(), runAsUserId, AiRouteSupport.resolveTraceSource(session),
-            agentRegistry.snapshotOf(definition, pack));
+        state.traceId = traceId;
+        if (route != null) {
+            route.entryState = state;
+        }
+        List<ContentBlock> blocks = route != null ? route.attachmentBlocks
+            : (attachmentBlocks == null ? List.of() : attachmentBlocks);
         try {
-            Flux<AgentEvent> stream = agent.streamEvents(userMessage.getContent(), ctx)
+            Flux<AgentEvent> stream = agent.streamEvents(
+                    attachmentAssembler.buildUserMsg(userMessage.getContent(), blocks), ctx)
                 .doOnNext(event -> streamBridge.handle(null, state, event));
             long timeoutMs = aiProperties.getChat().getTaskTimeoutMs();
             if (timeoutMs > 0) {
@@ -488,7 +557,7 @@ public class AiChatFacade {
             }
         } catch (Exception e) {
             long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
-            log.error("定时任务执行失败，sessionId={}", sessionId, e);
+            log.error("无人值守执行失败，sessionId={}", sessionId, e);
             String message = AiSseSupport.rootCauseMessage(e);
             traceService.appendTransition(state.traceId, "error", message);
             traceService.accumulate(state.traceId, AiTrace.STATUS_FAILED, durationMs, null,
@@ -498,16 +567,61 @@ public class AiChatFacade {
             } catch (Exception ex) {
                 log.error("落库失败消息异常，sessionId={}", sessionId, ex);
             }
+            turnFinisher.finishRoute(route, null, AiRouteRun.STATUS_ABORTED, message, durationMs);
             return new AiTaskExecution(sessionId, null, false, message, durationMs, 0, null, null, null);
         }
         long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
-        AiMessage assistant = turnFinisher.finish(null, sessionId, state, durationMs, null, null);
+        // 无人值守不可能人工确认：若仍出现待确认暂停（理论上被 DONT_ASK 阻断）按失败收尾，绝不悬挂
+        if (route != null && route.pendingResume != null) {
+            String message = "该操作需要人工确认，无人值守链路无法继续（已拒绝执行）";
+            log.warn("无人值守链路出现待确认暂停，按失败收尾：sessionId={}", sessionId);
+            traceService.appendTransition(state.traceId, "pending_confirm", message);
+            try {
+                sessionService.persistAssistantFailure(sessionId, message, durationMs);
+            } catch (Exception ex) {
+                log.error("落库失败消息异常，sessionId={}", sessionId, ex);
+            }
+            turnFinisher.finishRoute(route, null, AiRouteRun.STATUS_ABORTED, message, durationMs);
+            return new AiTaskExecution(sessionId, null, false, message, durationMs, 0, null, null, null);
+        }
+        // 指定专家兜底（REQ-AI-31）：pin 存在但模型整轮未调用决策工具 → 服务端补执行一次强制编排。
+        // 无人值守为同步阻塞：专家成功则正文直答；失败时 handoff 被置回 false，落小Z 自身正文
+        if (route != null && route.pinnedExpertId != null && !route.routeInvoked) {
+            route.action = AiRouteRun.ACTION_PINNED;
+            route.decisionJson = pinnedFallbackDecision(route);
+            try {
+                routeOrchestrator.executePinned(route);
+            } catch (Exception e) {
+                route.degraded = true;
+                route.degradeReason = AiSseSupport.rootCauseMessage(e);
+                log.warn("无人值守指定专家兜底失败，sessionId={}：{}", sessionId, route.degradeReason);
+            }
+        }
+        AiMessage assistant = turnFinisher.finish(null, sessionId, state, durationMs, null, route);
         if (assistant == null) {
             return new AiTaskExecution(sessionId, null, false, "回答已生成但保存失败", durationMs, 0, null, null, null);
         }
+        turnFinisher.finishRoute(route, assistant.getId(),
+            route != null && route.degraded ? AiRouteRun.STATUS_DEGRADED : AiRouteRun.STATUS_SUCCESS, null, durationMs);
         return new AiTaskExecution(sessionId, assistant.getId(), true, null, durationMs,
             assistant.getToolCallCount(), assistant.getPromptTokens(), assistant.getCompletionTokens(),
             assistant.getTotalTokens());
+    }
+
+    /**
+     * 无人值守链路「指定专家兜底」段的决策留档（无模型决策，记一条服务端补执行的说明）。
+     *
+     * @param route 编排运行状态（{@code pinnedExpertId} 非空）
+     * @return 决策原文（JSON）
+     */
+    private String pinnedFallbackDecision(AiRouteContext route) {
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put("action", AiRouteRun.ACTION_PINNED);
+        decision.put("pin_source", route.pinSource);
+        decision.put("expert_agent_id", route.pinnedExpertId);
+        decision.put("fallback", true);
+        decision.put("note", "无人值守链路模型未调用 route_decision，服务端补执行强制编排");
+        return JsonUtils.toJsonString(decision);
     }
 
     /**

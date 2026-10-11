@@ -98,6 +98,14 @@ final class AiRouteContext {
     /** SSE 发射器；无人值守链路为 null（只落库、不下发） */
     final SseEmitter emitter;
 
+    /**
+     * 是否为「无人值守」编排（定时任务 / 渠道接入）。
+     *
+     * <p>无人值守链路**没有人类可确认**：命中「需确认」的写工具不能走框架 HITL 暂停（否则会悬挂），
+     * 故 {@link AiRouteOrchestrator} 对专家侧一律按「拒绝」处理（无视 {@code expert_write_enabled}）。</p>
+     */
+    volatile boolean unattended;
+
     /** 编排开始时间（纳秒，用于统计总耗时） */
     final long startedNanos = System.nanoTime();
 

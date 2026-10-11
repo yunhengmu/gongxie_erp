@@ -213,7 +213,8 @@ class AiChannelRuntimeTest {
                  mockConstruction(DingTalkStreamClient.class,
                      (mock, context) -> captured.add(context.arguments().toArray()))) {
             AtomicInteger handled = new AtomicInteger();
-            AiChannelRuntime runtime = AiChannelRuntime.build(dingTalkChannel(), msg -> handled.incrementAndGet());
+            AiChannelRuntime runtime = AiChannelRuntime.build(dingTalkChannel(), msg -> handled.incrementAndGet(),
+                new io.agentscope.extensions.channel.common.IdempotencyStore(), allowAllLimiter());
             Consumer<JsonNode> consumer = (Consumer<JsonNode>) captured.get(0)[1];
             ObjectMapper mapper = new ObjectMapper();
             JsonNode textPayload = mapper.readTree("{\"msgtype\":\"text\",\"msgId\":\"m1\","
@@ -241,7 +242,8 @@ class AiChannelRuntimeTest {
         try (MockedConstruction<DingTalkStreamClient> construction =
                  mockConstruction(DingTalkStreamClient.class,
                      (mock, context) -> captured.add(context.arguments().toArray()))) {
-            AiChannelRuntime runtime = AiChannelRuntime.build(dingTalkChannel(), null);
+            AiChannelRuntime runtime = AiChannelRuntime.build(dingTalkChannel(), null,
+                new io.agentscope.extensions.channel.common.IdempotencyStore(), allowAllLimiter());
             assertNull(runtime.getInboundHandler());
             Consumer<JsonNode> consumer = (Consumer<JsonNode>) captured.get(0)[1];
             JsonNode payload = new ObjectMapper().readTree("{\"msgtype\":\"text\",\"msgId\":\"m1\","
@@ -259,7 +261,14 @@ class AiChannelRuntimeTest {
                  mockConstruction(DingTalkStreamClient.class,
                      (mock, context) -> captured.add(context.arguments().toArray()))) {
             AtomicInteger handled = new AtomicInteger();
-            AiChannelRuntime runtime = AiChannelRuntime.build(dingTalkChannel(), msg -> handled.incrementAndGet());
+            // 限流：窗口内前 20 次放行、之后拒绝（与原 BotLoopGuard 默认阈值同口径），故第 21 次不再转交
+            AtomicInteger calls = new AtomicInteger();
+            AiChannelRateLimiter limiter = org.mockito.Mockito.mock(AiChannelRateLimiter.class);
+            org.mockito.Mockito.when(limiter.allow(org.mockito.ArgumentMatchers.any(),
+                    org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> calls.incrementAndGet() <= 20);
+            AiChannelRuntime runtime = AiChannelRuntime.build(dingTalkChannel(), msg -> handled.incrementAndGet(),
+                new io.agentscope.extensions.channel.common.IdempotencyStore(), limiter);
             Consumer<JsonNode> consumer = (Consumer<JsonNode>) captured.get(0)[1];
             ObjectMapper mapper = new ObjectMapper();
 
@@ -269,6 +278,14 @@ class AiChannelRuntimeTest {
             }
             assertEquals(20, handled.get());
         }
+    }
+
+    /** 永不限流的限流器（放行一切），用于「只验证幂等 / 非文本丢弃」的用例。 */
+    private static AiChannelRateLimiter allowAllLimiter() {
+        AiChannelRateLimiter limiter = org.mockito.Mockito.mock(AiChannelRateLimiter.class);
+        org.mockito.Mockito.when(limiter.allow(org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        return limiter;
     }
 
     private AiChannel gitHubChannel() {

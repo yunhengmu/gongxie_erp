@@ -460,6 +460,11 @@ public class AiAgentServiceImpl implements IAiAgentService {
         return entryMapper.selectList(Wrappers.lambdaQuery()).stream().findFirst().orElse(null);
     }
 
+    @Override
+    public AiAgent getEntryAgent() {
+        return selectEntry();
+    }
+
     /**
      * 两表解析智能体实体（先入口表、再专家表）。
      *

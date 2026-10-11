@@ -145,7 +145,7 @@ public class AiChannelCallbackController {
         }
         InboundMessage message = inbound.get();
         // 6. 防自环：按会话 peer 限流
-        if (!runtime.getBotLoopGuard().allow(message.peer().key())) {
+        if (!runtime.getRateLimiter().allow(channelCode, message.peer().key())) {
             log.warn("飞书回调触发防自环限流：channelCode={}, peer={}", channelCode, message.peer().key());
             return ResponseEntity.ok("{}");
         }
@@ -244,7 +244,7 @@ public class AiChannelCallbackController {
             return ResponseEntity.ok("");
         }
         InboundMessage message = inbound.get();
-        if (!runtime.getBotLoopGuard().allow(message.peer().key())) {
+        if (!runtime.getRateLimiter().allow(channelCode, message.peer().key())) {
             log.warn("企业微信回调触发防自环限流：channelCode={}, peer={}", channelCode, message.peer().key());
             return ResponseEntity.ok("");
         }
@@ -313,7 +313,7 @@ public class AiChannelCallbackController {
             return ResponseEntity.ok("{}");
         }
         InboundMessage message = inbound.get();
-        if (!runtime.getBotLoopGuard().allow(message.peer().key())) {
+        if (!runtime.getRateLimiter().allow(channelCode, message.peer().key())) {
             log.warn("GitHub 回调触发防自环限流：channelCode={}, peer={}", channelCode, message.peer().key());
             return ResponseEntity.ok("{}");
         }

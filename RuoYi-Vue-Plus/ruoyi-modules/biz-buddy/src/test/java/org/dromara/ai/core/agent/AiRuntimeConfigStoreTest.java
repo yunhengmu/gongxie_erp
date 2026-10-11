@@ -5,6 +5,7 @@ import org.dromara.ai.domain.bo.AiCompactionConfigBo;
 import org.dromara.ai.domain.bo.AiMcpServerConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
+import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.bo.AiWorkspaceConfigBo;
 import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.redis.utils.RedisUtils;
@@ -35,6 +36,7 @@ class AiRuntimeConfigStoreTest {
     private static final String MEMORY_KEY = "bizbuddy:ai:runtime:memory";
     private static final String WORKSPACE_KEY = "bizbuddy:ai:runtime:workspace";
     private static final String MCP_SERVER_KEY = "bizbuddy:ai:runtime:mcp-server";
+    private static final String ROUTE_BUDGET_KEY = "bizbuddy:ai:runtime:route-budget";
 
     private final AiProperties aiProperties = new AiProperties();
     private final AiRuntimeConfigStore store = new AiRuntimeConfigStore(aiProperties);
@@ -197,6 +199,38 @@ class AiRuntimeConfigStoreTest {
         try (MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
             redis.when(() -> RedisUtils.getCacheObject(anyString())).thenReturn(null);
             assertEquals(List.of("a.md", "b.md"), store.workspace().getAdditionalContextFiles());
+        }
+    }
+
+    @Test
+    @DisplayName("编排预算回落默认与缓存读取")
+    void shouldResolveRouteBudget() {
+        aiProperties.getChat().setRouteBudgetExpertTokens(12345L);
+        aiProperties.getChat().setRouteBudgetSeconds(90);
+        try (MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
+            redis.when(() -> RedisUtils.getCacheObject(anyString())).thenReturn(null);
+            AiRouteBudgetConfigBo policy = store.routeBudget();
+            assertEquals(12345L, policy.getExpertTokens());
+            assertEquals(90, policy.getWallSeconds());
+        }
+
+        AiRouteBudgetConfigBo cached = new AiRouteBudgetConfigBo();
+        cached.setExpertTokens(777L);
+        cached.setWallSeconds(30);
+        try (MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
+            redis.when(() -> RedisUtils.getCacheObject(ROUTE_BUDGET_KEY)).thenReturn(JsonUtils.toJsonString(cached));
+            AiRouteBudgetConfigBo policy = store.routeBudget();
+            assertEquals(777L, policy.getExpertTokens());
+            assertEquals(30, policy.getWallSeconds());
+        }
+    }
+
+    @Test
+    @DisplayName("保存编排预算配置写入 Redis")
+    void shouldSaveRouteBudget() {
+        try (MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
+            store.updateRouteBudget(new AiRouteBudgetConfigBo());
+            redis.verify(() -> RedisUtils.setCacheObject(anyString(), anyString()));
         }
     }
 }

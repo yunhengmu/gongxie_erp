@@ -50,6 +50,36 @@ public interface IAiMemoryService {
     void consolidate(Long agentId, Long userId);
 
     /**
+     * 归档超过保留期的每日流水（移动到记忆目录下的 {@code archive/} 子目录，保留证据、释放上下文）。
+     *
+     * <p>替代框架「&gt;90 天归档」在用户级隔离目录下不生效的问题（与自实现合并同源）。</p>
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 归档的文件数
+     */
+    int archiveDaily(Long agentId, Long userId);
+
+    /**
+     * 清理超过保留期的记忆文件与会话日志（流水按每日保留天数，会话日志按会话保留天数）。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 删除的文件数
+     */
+    int cleanup(Long agentId, Long userId);
+
+    /**
+     * 删除某用户的全部长期记忆（{@code MEMORY.md} + {@code memory/}，并清除合并水位）。
+     *
+     * <p>用于回滚 / 合规删除：删除后该用户在小Z 与专家侧都不再带历史记忆。</p>
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     */
+    void deleteAll(Long agentId, Long userId);
+
+    /**
      * 由对话链路在每轮收尾调用的**自动合并**入口（REQ-AI-09）：判定通过才真正合并。
      *
      * <p>只负责提交（延迟异步执行），不阻塞本轮回答；是否执行由三件事共同决定：

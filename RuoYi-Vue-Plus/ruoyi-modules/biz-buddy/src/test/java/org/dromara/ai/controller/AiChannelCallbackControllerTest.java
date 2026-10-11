@@ -1,7 +1,7 @@
 package org.dromara.ai.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.agentscope.extensions.channel.common.BotLoopGuard;
+import org.dromara.ai.core.channel.AiChannelRateLimiter;
 import io.agentscope.extensions.channel.common.IdempotencyStore;
 import io.agentscope.extensions.channel.feishu.FeishuCrypto;
 import io.agentscope.extensions.channel.feishu.FeishuInboundMapper;
@@ -177,16 +177,16 @@ class AiChannelCallbackControllerTest {
     }
 
     private void setUpFeishu(FeishuInboundMapper mapper, IdempotencyStore idempotency, Boolean allow) {
-        BotLoopGuard guard = mock(BotLoopGuard.class);
+        AiChannelRateLimiter guard = mock(AiChannelRateLimiter.class);
         if (allow != null) {
-            when(guard.allow(any())).thenReturn(allow);
+            when(guard.allow(any(), any())).thenReturn(allow);
         }
         when(registry.resolve(CODE)).thenReturn(runtime);
         when(runtime.getPlatformType()).thenReturn(AiChannel.PLATFORM_FEISHU);
         when(runtime.getFeishuCrypto()).thenReturn(null);
         when(runtime.getFeishuMapper()).thenReturn(mapper);
         when(runtime.getIdempotency()).thenReturn(idempotency);
-        when(runtime.getBotLoopGuard()).thenReturn(guard);
+        when(runtime.getRateLimiter()).thenReturn(guard);
     }
 
     // ---------------------------- 企业微信 ----------------------------
@@ -337,12 +337,12 @@ class AiChannelCallbackControllerTest {
     private void setUpWecom(WeComCrypto crypto, IdempotencyStore idempotency,
                             WeComInboundMapper mapper, Boolean allow) {
         setUpWecomCrypto(crypto);
-        BotLoopGuard guard = mock(BotLoopGuard.class);
+        AiChannelRateLimiter guard = mock(AiChannelRateLimiter.class);
         if (allow != null) {
-            when(guard.allow(any())).thenReturn(allow);
+            when(guard.allow(any(), any())).thenReturn(allow);
         }
         when(runtime.getIdempotency()).thenReturn(idempotency);
-        when(runtime.getBotLoopGuard()).thenReturn(guard);
+        when(runtime.getRateLimiter()).thenReturn(guard);
         when(runtime.getWeComMapper()).thenReturn(mapper);
     }
 
@@ -451,9 +451,9 @@ class AiChannelCallbackControllerTest {
 
     private void setUpGithub(GitHubSignatureVerifier verifier, IdempotencyStore idempotency,
                              GitHubInboundMapper mapper, String botLogin, Boolean allow) {
-        BotLoopGuard guard = mock(BotLoopGuard.class);
+        AiChannelRateLimiter guard = mock(AiChannelRateLimiter.class);
         if (allow != null) {
-            when(guard.allow(any())).thenReturn(allow);
+            when(guard.allow(any(), any())).thenReturn(allow);
         }
         when(registry.resolve(CODE)).thenReturn(runtime);
         when(runtime.getPlatformType()).thenReturn(AiChannel.PLATFORM_GITHUB);
@@ -461,7 +461,7 @@ class AiChannelCallbackControllerTest {
         when(runtime.getIdempotency()).thenReturn(idempotency);
         when(runtime.getGitHubMapper()).thenReturn(mapper);
         when(runtime.getGitHubBotLogin()).thenReturn(botLogin);
-        when(runtime.getBotLoopGuard()).thenReturn(guard);
+        when(runtime.getRateLimiter()).thenReturn(guard);
     }
 
 }

@@ -3,6 +3,7 @@ package org.dromara.ai.service.impl;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.dromara.ai.domain.AiExpertAgent;
 import org.dromara.ai.domain.AiMessage;
+import org.dromara.ai.domain.AiModelConfig;
 import org.dromara.ai.domain.AiRouteExpertCall;
 import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.AiSession;
@@ -12,6 +13,7 @@ import org.dromara.ai.domain.vo.AiRouteRunDetailVo;
 import org.dromara.ai.domain.vo.AiRouteRunStatsVo;
 import org.dromara.ai.domain.vo.AiRouteRunVo;
 import org.dromara.ai.mapper.AiMessageMapper;
+import org.dromara.ai.mapper.AiModelConfigMapper;
 import org.dromara.ai.mapper.AiRouteExpertCallMapper;
 import org.dromara.ai.mapper.AiRouteRunMapper;
 import org.dromara.ai.mapper.AiSessionMapper;
@@ -24,6 +26,7 @@ import org.dromara.system.api.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -46,11 +49,12 @@ class AiRouteServiceImplTest {
     private final AiRouteExpertCallMapper expertCallMapper = mock(AiRouteExpertCallMapper.class);
     private final AiSessionMapper sessionMapper = mock(AiSessionMapper.class);
     private final AiMessageMapper messageMapper = mock(AiMessageMapper.class);
+    private final AiModelConfigMapper modelConfigMapper = mock(AiModelConfigMapper.class);
     private final IAiSessionService sessionService = mock(IAiSessionService.class);
     private final IAiAgentService agentService = mock(IAiAgentService.class);
     private final UserService userService = mock(UserService.class);
     private final AiRouteServiceImpl service = new AiRouteServiceImpl(routeRunMapper, expertCallMapper, sessionMapper,
-        messageMapper, sessionService, agentService, userService);
+        messageMapper, modelConfigMapper, sessionService, agentService, userService);
 
     @Test
     @DisplayName("会话无编排记录时返回空列表")
@@ -183,7 +187,7 @@ class AiRouteServiceImplTest {
         AiExpertAgent entry = new AiExpertAgent();
         entry.setId(5L);
         entry.setAgentName("小Z");
-        when(agentService.queryEntity(5L)).thenReturn(entry);
+        when(agentService.queryEntities(any())).thenReturn(List.of(entry));
 
         AiSession session = new AiSession();
         session.setId(1L);
@@ -200,6 +204,61 @@ class AiRouteServiceImplTest {
         assertEquals(2L, detail.getEntryPromptTokens());
         assertEquals(5L, detail.getEntryCompletionTokens());
         assertEquals(14L, detail.getTotalTokens());
+    }
+
+    @Test
+    @DisplayName("详情费用折算：按入口与各专家模型单价计算")
+    void shouldComputeCostByModelPrice() {
+        AiRouteRun run = new AiRouteRun();
+        run.setId(10L);
+        run.setSessionId(1L);
+        run.setMessageId(100L);
+        run.setEntryAgentId(5L);
+        run.setAction(AiRouteRun.ACTION_ROUTE);
+        when(routeRunMapper.selectById(10L)).thenReturn(run);
+
+        AiRouteExpertCallVo call = new AiRouteExpertCallVo();
+        call.setId(1L);
+        call.setRouteRunId(10L);
+        call.setExpertAgentId(6L);
+        call.setPromptTokens(1000L);
+        call.setCompletionTokens(2000L);
+        when(expertCallMapper.selectVoList(any())).thenReturn(List.of(call));
+
+        AiMessage message = new AiMessage();
+        message.setId(100L);
+        message.setPromptTokens(1000);
+        message.setCompletionTokens(1000);
+        message.setTotalTokens(2000);
+        when(messageMapper.selectById(100L)).thenReturn(message);
+
+        AiExpertAgent entryAgent = new AiExpertAgent();
+        entryAgent.setId(5L);
+        entryAgent.setModelId(1L);
+        AiExpertAgent expertAgent = new AiExpertAgent();
+        expertAgent.setId(6L);
+        expertAgent.setModelId(2L);
+        when(agentService.queryEntities(any())).thenReturn(List.of(entryAgent, expertAgent));
+
+        AiModelConfig entryModel = new AiModelConfig();
+        entryModel.setId(1L);
+        entryModel.setInputPrice(new BigDecimal("0.001"));
+        entryModel.setOutputPrice(new BigDecimal("0.002"));
+        AiModelConfig expertModel = new AiModelConfig();
+        expertModel.setId(2L);
+        expertModel.setInputPrice(new BigDecimal("0.01"));
+        expertModel.setOutputPrice(new BigDecimal("0.02"));
+        when(modelConfigMapper.selectByIds(any())).thenReturn(List.of(entryModel, expertModel));
+
+        AiRouteRunDetailVo detail = service.queryById(10L);
+
+        // 入口轮：1000/1000×0.001 + 1000/1000×0.002 = 0.003
+        assertEquals(0, new BigDecimal("0.003").compareTo(detail.getEntryCost()));
+        // 专家轮：1000/1000×0.01 + 2000/1000×0.02 = 0.05
+        assertEquals(0, new BigDecimal("0.05").compareTo(detail.getExpertCost()));
+        assertEquals(0, new BigDecimal("0.053").compareTo(detail.getTotalCost()));
+        assertTrue(detail.getPriceConfigured());
+        assertEquals(0, new BigDecimal("0.05").compareTo(detail.getExpertCalls().get(0).getCost()));
     }
 
     @Test

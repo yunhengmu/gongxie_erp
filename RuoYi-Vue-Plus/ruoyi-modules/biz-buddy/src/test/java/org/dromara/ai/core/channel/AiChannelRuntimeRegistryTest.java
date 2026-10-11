@@ -63,7 +63,9 @@ class AiChannelRuntimeRegistryTest {
     @BeforeEach
     void setUp() {
         streamStatus = new AiChannelStreamStatus();
-        registry = new AiChannelRuntimeRegistry(channelService, inboundService, streamStatus);
+        registry = new AiChannelRuntimeRegistry(channelService, inboundService, streamStatus,
+            new RedisInboundEventDeduplicator(new org.dromara.ai.config.AiProperties()),
+            new AiChannelRateLimiter(new org.dromara.ai.config.AiProperties()));
         runtimeStatic = mockStatic(AiChannelRuntime.class);
     }
 
@@ -78,7 +80,7 @@ class AiChannelRuntimeRegistryTest {
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(null);
 
         assertNull(registry.resolve("ch-1"));
-        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any()), never());
+        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any(), any(), any()), never());
     }
 
     @Test
@@ -87,11 +89,11 @@ class AiChannelRuntimeRegistryTest {
         AiChannel channel = channel(1L, LocalDateTime.of(2026, 1, 1, 0, 0));
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime runtime = runtimeMock("1|" + channel.getUpdateTime(), "github");
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(runtime);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(runtime);
 
         assertSame(runtime, registry.resolve("ch-1"));
         assertSame(runtime, registry.resolve("ch-1"));
-        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any()), times(1));
+        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any(), any(), any()), times(1));
         verify(runtime).start();
     }
 
@@ -102,14 +104,14 @@ class AiChannelRuntimeRegistryTest {
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime first = runtimeMock("1|" + channel.getUpdateTime(), "github");
         AiChannelRuntime second = runtimeMock("1|" + LocalDateTime.of(2026, 2, 2, 0, 0), "github");
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(first, second);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(first, second);
 
         assertSame(first, registry.resolve("ch-1"));
         channel.setUpdateTime(LocalDateTime.of(2026, 2, 2, 0, 0));
         assertSame(second, registry.resolve("ch-1"));
 
         verify(first).stop();
-        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any()), times(2));
+        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any(), any(), any()), times(2));
     }
 
     @Test
@@ -117,7 +119,7 @@ class AiChannelRuntimeRegistryTest {
     void shouldMarkFailedWhenBuildThrows() {
         when(channelService.loadRuntimeConfig("ch-1"))
             .thenReturn(channel(1L, LocalDateTime.of(2026, 1, 1, 0, 0)));
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any()))
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any()))
             .thenThrow(new RuntimeException("bad-config"));
 
         assertNull(registry.resolve("ch-1"));
@@ -131,7 +133,7 @@ class AiChannelRuntimeRegistryTest {
         channel.setPlatformType(AiChannel.PLATFORM_DINGTALK);
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime runtime = runtimeMock("1|" + channel.getUpdateTime(), "dingtalk");
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(runtime);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(runtime);
 
         registry.resolve("ch-1");
 
@@ -145,7 +147,7 @@ class AiChannelRuntimeRegistryTest {
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime runtime = runtimeMock("1|" + channel.getUpdateTime(), "dingtalk");
         doThrow(new RuntimeException("start-fail")).when(runtime).start();
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(runtime);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(runtime);
 
         assertNotNull(registry.resolve("ch-1"));
         assertEquals(AiChannelStreamStatus.FAILED, streamStatus.get("ch-1").status());
@@ -156,7 +158,7 @@ class AiChannelRuntimeRegistryTest {
     void shouldIgnoreRefreshBlank() {
         registry.refresh(null);
         registry.refresh("  ");
-        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any()), never());
+        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any(), any(), any()), never());
     }
 
     @Test
@@ -166,14 +168,14 @@ class AiChannelRuntimeRegistryTest {
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime first = runtimeMock("1|" + channel.getUpdateTime(), "github");
         AiChannelRuntime second = runtimeMock("1|" + channel.getUpdateTime(), "github");
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(first, second);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(first, second);
 
         registry.resolve("ch-1");
         registry.refresh("ch-1");
 
         verify(first).stop();
         verify(second).start();
-        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any()), times(2));
+        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any(), any(), any()), times(2));
     }
 
     @Test
@@ -182,7 +184,7 @@ class AiChannelRuntimeRegistryTest {
         AiChannel channel = channel(1L, LocalDateTime.of(2026, 1, 1, 0, 0));
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime runtime = runtimeMock("1|" + channel.getUpdateTime(), "dingtalk");
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(runtime);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(runtime);
         registry.resolve("ch-1");
 
         registry.evict("ch-1");
@@ -198,7 +200,7 @@ class AiChannelRuntimeRegistryTest {
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime runtime = runtimeMock("1|" + channel.getUpdateTime(), "github");
         doThrow(new RuntimeException("stop-fail")).when(runtime).stop();
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(runtime);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(runtime);
         registry.resolve("ch-1");
 
         registry.evict("ch-1");
@@ -213,7 +215,7 @@ class AiChannelRuntimeRegistryTest {
         channel.setPlatformType(AiChannel.PLATFORM_DINGTALK);
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime runtime = runtimeMock("1|" + channel.getUpdateTime(), "dingtalk");
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(runtime);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(runtime);
 
         registry.startLongConnectionChannels();
 
@@ -228,7 +230,7 @@ class AiChannelRuntimeRegistryTest {
 
         registry.startLongConnectionChannels();
 
-        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any()), never());
+        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), any(), any(), any()), never());
     }
 
     @Test
@@ -237,7 +239,7 @@ class AiChannelRuntimeRegistryTest {
         AiChannel channel = channel(1L, LocalDateTime.of(2026, 1, 1, 0, 0));
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime runtime = runtimeMock("1|" + channel.getUpdateTime(), "github");
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(runtime);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(runtime);
         registry.resolve("ch-1");
 
         registry.shutdown();
@@ -252,7 +254,7 @@ class AiChannelRuntimeRegistryTest {
         AiChannel channel = channel(1L, LocalDateTime.of(2026, 1, 1, 0, 0));
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime runtime = runtimeMock("1|" + channel.getUpdateTime(), "github");
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(runtime);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(runtime);
 
         registry.resolve("ch-1");
         Consumer<InboundMessage> handler = captureInboundHandler();
@@ -269,7 +271,7 @@ class AiChannelRuntimeRegistryTest {
         AiChannel channel = channel(1L, LocalDateTime.of(2026, 1, 1, 0, 0));
         when(channelService.loadRuntimeConfig("ch-1")).thenReturn(channel);
         AiChannelRuntime runtime = runtimeMock("1|" + channel.getUpdateTime(), "github");
-        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any())).thenReturn(runtime);
+        runtimeStatic.when(() -> AiChannelRuntime.build(any(), any(), any(), any())).thenReturn(runtime);
 
         registry.resolve("ch-1");
         Consumer<InboundMessage> handler = captureInboundHandler();
@@ -282,7 +284,7 @@ class AiChannelRuntimeRegistryTest {
     @SuppressWarnings("unchecked")
     private Consumer<InboundMessage> captureInboundHandler() {
         ArgumentCaptor<Consumer<InboundMessage>> captor = ArgumentCaptor.forClass(Consumer.class);
-        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), captor.capture()));
+        runtimeStatic.verify(() -> AiChannelRuntime.build(any(), captor.capture(), any(), any()));
         return captor.getValue();
     }
 

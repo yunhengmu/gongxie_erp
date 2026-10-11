@@ -41,6 +41,14 @@ export interface RouteRunVO {
   expertTokens?: number | null;
   /** 合计 Token */
   totalTokens?: number | null;
+  /** 入口轮费用（元；按入口智能体当前模型单价折算，未配单价按 0） */
+  entryCost?: number | null;
+  /** 专家轮费用（元；按各专家当前模型单价折算，未配单价按 0） */
+  expertCost?: number | null;
+  /** 合计费用（元；入口轮 + 专家轮） */
+  totalCost?: number | null;
+  /** 涉及模型是否均已配置单价（false 时费用偏低，前端标注「未配置单价」） */
+  priceConfigured?: boolean | null;
   /** 创建时间 */
   createTime?: string;
   /** 路由决策原文（仅详情接口返回） */
@@ -86,6 +94,8 @@ export interface RouteExpertCallVO {
   completionTokens?: number | null;
   /** 耗时（毫秒） */
   durationMs?: number | null;
+  /** 该次调用的费用（元；按专家当前模型单价折算） */
+  cost?: number | null;
   /** 创建时间 */
   createTime?: string;
 }
@@ -127,6 +137,12 @@ export interface RouteRunStatsVO {
   entryTokens?: number | null;
   /** 合计 Token */
   totalTokens?: number | null;
+  /** 合计费用（元；入口轮 + 专家轮，按当前模型单价折算） */
+  totalCost?: number | null;
+  /** 入口轮费用（元） */
+  entryCost?: number | null;
+  /** 专家轮费用（元） */
+  expertCost?: number | null;
 }
 
 export interface RouteRunQuery extends PageQuery {

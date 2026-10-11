@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiMessage;
+import org.dromara.ai.domain.AiModelConfig;
 import org.dromara.ai.domain.AiRouteExpertCall;
 import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.AiSession;
@@ -15,12 +16,14 @@ import org.dromara.ai.domain.vo.AiRouteRunDetailVo;
 import org.dromara.ai.domain.vo.AiRouteRunStatsVo;
 import org.dromara.ai.domain.vo.AiRouteRunVo;
 import org.dromara.ai.mapper.AiMessageMapper;
+import org.dromara.ai.mapper.AiModelConfigMapper;
 import org.dromara.ai.mapper.AiRouteExpertCallMapper;
 import org.dromara.ai.mapper.AiRouteRunMapper;
 import org.dromara.ai.mapper.AiSessionMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiRouteService;
 import org.dromara.ai.service.IAiSessionService;
+import org.dromara.ai.util.AiModelCost;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
@@ -28,7 +31,9 @@ import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.system.api.UserService;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -65,6 +70,8 @@ public class AiRouteServiceImpl implements IAiRouteService {
 
     private final AiMessageMapper messageMapper;
 
+    private final AiModelConfigMapper modelConfigMapper;
+
     private final IAiSessionService sessionService;
 
     private final IAiAgentService agentService;
@@ -86,10 +93,15 @@ public class AiRouteServiceImpl implements IAiRouteService {
         Map<Long, List<AiRouteExpertCallVo>> grouped = loadExpertCalls(runIds);
         // 与本会话相关的助手消息 Token（入口轮 + 整合轮口径，见 AiRouteRunDetailVo）
         Map<Long, AiMessage> messages = loadMessages(runs.stream().map(AiRouteRun::getMessageId).toList());
+        // 费用折算：入口智能体 + 各专家智能体一次批量装配，并按各智能体模型单价折算
+        Map<Long, AiAgent> agents = loadRunAgents(runs, grouped.values());
+        Map<Long, AiModelConfig> prices = loadModelConfigs(agents.values());
         List<AiRouteRunDetailVo> result = new ArrayList<>(runs.size());
         for (AiRouteRun run : runs) {
             AiRouteRunDetailVo detail = toDetail(run, grouped.getOrDefault(run.getId(), List.of()));
-            fillRunTokens(detail, messages.get(run.getMessageId()));
+            AiMessage message = messages.get(run.getMessageId());
+            fillRunTokens(detail, message);
+            fillRunCosts(detail, message, agents.get(run.getEntryAgentId()), agents, prices);
             result.add(detail);
         }
         return result;
@@ -114,7 +126,20 @@ public class AiRouteServiceImpl implements IAiRouteService {
         // message_id 可能为空（HITL 暂停 / 执行中：编排尚未收尾），故不能直接 List.of(...)（会拒 null）
         AiMessage message = run.getMessageId() == null ? null : messageMapper.selectById(run.getMessageId());
         fillRunTokens(detail, message);
-        AiAgent entry = run.getEntryAgentId() == null ? null : agentService.queryEntity(run.getEntryAgentId());
+        // 费用折算：入口智能体 + 各专家智能体一次批量装配
+        Set<Long> agentIds = new LinkedHashSet<>();
+        if (run.getEntryAgentId() != null) {
+            agentIds.add(run.getEntryAgentId());
+        }
+        calls.forEach(call -> {
+            if (call.getExpertAgentId() != null) {
+                agentIds.add(call.getExpertAgentId());
+            }
+        });
+        Map<Long, AiAgent> agents = loadAgents(agentIds);
+        Map<Long, AiModelConfig> prices = loadModelConfigs(agents.values());
+        fillRunCosts(detail, message, agents.get(run.getEntryAgentId()), agents, prices);
+        AiAgent entry = agents.get(run.getEntryAgentId());
         detail.setEntryAgentName(entry == null ? null : entry.getAgentName());
         AiSession session = run.getSessionId() == null ? null : sessionMapper.selectById(run.getSessionId());
         detail.setSessionTitle(session == null ? null : session.getSessionTitle());
@@ -128,7 +153,7 @@ public class AiRouteServiceImpl implements IAiRouteService {
     public AiRouteRunStatsVo queryStats(AiRouteRunBo bo) {
         LambdaQueryWrapper<AiRouteRun> lqw = buildQueryWrapper(bo);
         // 列裁剪：只取聚合所需列，避开 decision_json / task_context 两个大文本
-        lqw.select(AiRouteRun::getId, AiRouteRun::getMessageId, AiRouteRun::getAction,
+        lqw.select(AiRouteRun::getId, AiRouteRun::getMessageId, AiRouteRun::getEntryAgentId, AiRouteRun::getAction,
             AiRouteRun::getStatus, AiRouteRun::getExpertCallCount, AiRouteRun::getDurationMs);
         List<AiRouteRun> runs = routeRunMapper.selectList(lqw);
         AiRouteRunStatsVo vo = new AiRouteRunStatsVo();
@@ -188,11 +213,40 @@ public class AiRouteServiceImpl implements IAiRouteService {
         // Token 汇总：专家轮取自 ai_route_expert_call，入口轮取自 ai_message（含整合轮）
         List<Long> runIds = runs.stream().map(AiRouteRun::getId).toList();
         ExpertTokens expert = loadExpertTokens(runIds);
-        long entryTokens = loadEntryTokens(runs.stream().map(AiRouteRun::getMessageId).toList());
+        Map<Long, AiMessage> messages = loadMessages(runs.stream().map(AiRouteRun::getMessageId).toList());
+        long entryTokens = 0;
+        for (AiMessage message : messages.values()) {
+            entryTokens += message.getTotalTokens() == null ? 0 : message.getTotalTokens();
+        }
         vo.setExpertPromptTokens(expert.prompt());
         vo.setExpertCompletionTokens(expert.completion());
         vo.setEntryTokens(entryTokens);
         vo.setTotalTokens(expert.prompt() + expert.completion() + entryTokens);
+        // 费用汇总：入口轮（助手消息 × 入口智能体模型单价）+ 专家轮（专家调用 × 各专家模型单价）
+        Set<Long> agentIds = new LinkedHashSet<>();
+        runs.forEach(run -> {
+            if (run.getEntryAgentId() != null) {
+                agentIds.add(run.getEntryAgentId());
+            }
+        });
+        agentIds.addAll(expert.tokensByAgent().keySet());
+        Map<Long, AiAgent> agents = loadAgents(agentIds);
+        Map<Long, AiModelConfig> prices = loadModelConfigs(agents.values());
+        BigDecimal entryCostTotal = BigDecimal.ZERO;
+        for (AiRouteRun run : runs) {
+            AiMessage message = messages.get(run.getMessageId());
+            entryCostTotal = entryCostTotal.add(agentCost(agents.get(run.getEntryAgentId()),
+                message == null ? null : longOf(message.getPromptTokens()),
+                message == null ? null : longOf(message.getCompletionTokens()), prices));
+        }
+        BigDecimal expertCostTotal = BigDecimal.ZERO;
+        for (Map.Entry<Long, long[]> entry : expert.tokensByAgent().entrySet()) {
+            long[] tokens = entry.getValue();
+            expertCostTotal = expertCostTotal.add(agentCost(agents.get(entry.getKey()), tokens[0], tokens[1], prices));
+        }
+        vo.setEntryCost(entryCostTotal);
+        vo.setExpertCost(expertCostTotal);
+        vo.setTotalCost(entryCostTotal.add(expertCostTotal));
         return vo;
     }
 
@@ -247,7 +301,7 @@ public class AiRouteServiceImpl implements IAiRouteService {
             }
             runIds.add(vo.getId());
         }
-        Map<Long, AiAgent> agents = loadAgents(agentIds);
+        Set<Long> allAgentIds = new LinkedHashSet<>(agentIds);
         Map<Long, String> sessionTitles = new HashMap<>();
         for (AiSession session : sessionMapper.selectByIds(sessionIds)) {
             sessionTitles.put(session.getId(), session.getSessionTitle());
@@ -255,6 +309,14 @@ public class AiRouteServiceImpl implements IAiRouteService {
         // 注意：Map.of / 不可变 Map 对 null 键会抛 NPE，取值前必须先判空
         Map<Long, String> userNames = userIds.isEmpty() ? Map.of() : userService.selectUserNicksByIds(userIds);
         Map<Long, List<AiRouteExpertCallVo>> calls = loadExpertCalls(runIds);
+        // 费用折算：把专家智能体一并纳入装配，并按各智能体模型单价折算
+        calls.values().forEach(list -> list.forEach(call -> {
+            if (call.getExpertAgentId() != null) {
+                allAgentIds.add(call.getExpertAgentId());
+            }
+        }));
+        Map<Long, AiAgent> agents = loadAgents(allAgentIds);
+        Map<Long, AiModelConfig> prices = loadModelConfigs(agents.values());
         Map<Long, AiMessage> messages = loadMessages(records.stream().map(AiRouteRunVo::getMessageId).toList());
         Map<Long, Long> entryTokens = new HashMap<>();
         // ai_message 的 Token 列为 Integer，视图对象的 Token 列为 Long，此处显式转换
@@ -273,6 +335,23 @@ public class AiRouteServiceImpl implements IAiRouteService {
             vo.setEntryTokens(entry);
             vo.setExpertTokens(expert);
             vo.setTotalTokens(sum(entry, expert));
+            // 费用：入口轮按入口智能体模型单价、专家轮按各专家模型单价逐条折算
+            AiMessage message = vo.getMessageId() == null ? null : messages.get(vo.getMessageId());
+            BigDecimal entryCost = agentCost(agent, message == null ? null : longOf(message.getPromptTokens()),
+                message == null ? null : longOf(message.getCompletionTokens()), prices);
+            BigDecimal expertCost = BigDecimal.ZERO;
+            boolean priced = agentPriced(agent, prices);
+            for (AiRouteExpertCallVo call : runCalls) {
+                AiAgent expertAgent = agents.get(call.getExpertAgentId());
+                BigDecimal callCost = agentCost(expertAgent, call.getPromptTokens(), call.getCompletionTokens(), prices);
+                call.setCost(callCost);
+                expertCost = expertCost.add(callCost);
+                priced = priced && agentPriced(expertAgent, prices);
+            }
+            vo.setEntryCost(entryCost);
+            vo.setExpertCost(expertCost);
+            vo.setTotalCost(entryCost.add(expertCost));
+            vo.setPriceConfigured(priced);
         }
     }
 
@@ -362,54 +441,149 @@ public class AiRouteServiceImpl implements IAiRouteService {
     }
 
     /**
-     * 取一批编排下全部专家调用的 Token 汇总（输入 / 输出分别求和，用于统计卡分列展示）。
+     * 取一批编排下全部专家调用的 Token 汇总（输入 / 输出分别求和，用于统计卡分列展示），
+     * 并按专家智能体分组（供费用折算按各专家模型单价分别计算）。
      *
      * @param runIds 编排主键集合
      * @return 专家轮 Token 汇总
      */
     private ExpertTokens loadExpertTokens(List<Long> runIds) {
+        Map<Long, long[]> byAgent = new LinkedHashMap<>();
         if (runIds == null || runIds.isEmpty()) {
-            return new ExpertTokens(0L, 0L);
+            return new ExpertTokens(0L, 0L, byAgent);
         }
         LambdaQueryWrapper<AiRouteExpertCall> lqw = Wrappers.lambdaQuery();
         lqw.in(AiRouteExpertCall::getRouteRunId, runIds);
         // 必须带上主键：暂停中（pending_confirm）的调用两列 Token 均为空，
         // 而「只选可空列」时 MyBatis 会把整行判为 null 放进列表（实测踩坑）
-        lqw.select(AiRouteExpertCall::getId, AiRouteExpertCall::getPromptTokens,
-            AiRouteExpertCall::getCompletionTokens);
+        lqw.select(AiRouteExpertCall::getId, AiRouteExpertCall::getExpertAgentId,
+            AiRouteExpertCall::getPromptTokens, AiRouteExpertCall::getCompletionTokens);
         long prompt = 0;
         long completion = 0;
         for (AiRouteExpertCall call : expertCallMapper.selectList(lqw)) {
             if (call == null) {
                 continue;
             }
-            prompt += call.getPromptTokens() == null ? 0 : call.getPromptTokens();
-            completion += call.getCompletionTokens() == null ? 0 : call.getCompletionTokens();
+            long callPrompt = call.getPromptTokens() == null ? 0 : call.getPromptTokens();
+            long callCompletion = call.getCompletionTokens() == null ? 0 : call.getCompletionTokens();
+            prompt += callPrompt;
+            completion += callCompletion;
+            if (call.getExpertAgentId() != null) {
+                long[] acc = byAgent.computeIfAbsent(call.getExpertAgentId(), key -> new long[2]);
+                acc[0] += callPrompt;
+                acc[1] += callCompletion;
+            }
         }
-        return new ExpertTokens(prompt, completion);
+        return new ExpertTokens(prompt, completion, byAgent);
     }
 
     /**
-     * 专家轮 Token 汇总（输入 / 输出）。
+     * 专家轮 Token 汇总（输入 / 输出）与按专家分组的 Token（[0]=输入，[1]=输出）。
      *
-     * @param prompt     输入 Token 合计
-     * @param completion 输出 Token 合计
+     * @param prompt       输入 Token 合计
+     * @param completion   输出 Token 合计
+     * @param tokensByAgent 专家智能体主键 → 输入 / 输出 Token
      */
-    private record ExpertTokens(long prompt, long completion) {
+    private record ExpertTokens(long prompt, long completion, Map<Long, long[]> tokensByAgent) {
     }
 
     /**
-     * 取一批助手消息的 Token 之和（入口轮 + 整合轮口径）。
+     * 取一批编排涉及的全部智能体（入口智能体 + 各专家智能体）。
      *
-     * @param messageIds 助手消息主键集合（可含 null）
-     * @return Token 合计
+     * @param runs         编排运行列表
+     * @param groupedCalls 编排主键 → 专家调用明细
+     * @return 智能体主键 → 智能体
      */
-    private long loadEntryTokens(List<Long> messageIds) {
-        long tokens = 0;
-        for (AiMessage message : loadMessages(messageIds).values()) {
-            tokens += message.getTotalTokens() == null ? 0 : message.getTotalTokens();
+    private Map<Long, AiAgent> loadRunAgents(List<AiRouteRun> runs, Collection<List<AiRouteExpertCallVo>> groupedCalls) {
+        Set<Long> agentIds = new LinkedHashSet<>();
+        for (AiRouteRun run : runs) {
+            if (run.getEntryAgentId() != null) {
+                agentIds.add(run.getEntryAgentId());
+            }
         }
-        return tokens;
+        if (groupedCalls != null) {
+            for (List<AiRouteExpertCallVo> calls : groupedCalls) {
+                for (AiRouteExpertCallVo call : calls) {
+                    if (call.getExpertAgentId() != null) {
+                        agentIds.add(call.getExpertAgentId());
+                    }
+                }
+            }
+        }
+        return loadAgents(agentIds);
+    }
+
+    /**
+     * 批量取模型配置（按智能体绑定的模型主键集合）。
+     *
+     * @param agents 智能体集合
+     * @return 模型主键 → 模型配置（用于按单价折算费用）
+     */
+    private Map<Long, AiModelConfig> loadModelConfigs(Collection<AiAgent> agents) {
+        Map<Long, AiModelConfig> configs = new HashMap<>();
+        Set<Long> modelIds = new LinkedHashSet<>();
+        for (AiAgent agent : agents) {
+            if (agent != null && agent.getModelId() != null) {
+                modelIds.add(agent.getModelId());
+            }
+        }
+        if (modelIds.isEmpty()) {
+            return configs;
+        }
+        for (AiModelConfig model : modelConfigMapper.selectByIds(modelIds)) {
+            if (model != null) {
+                configs.put(model.getId(), model);
+            }
+        }
+        return configs;
+    }
+
+    /**
+     * 按智能体当前绑定的模型单价，把一组 Token 折算为费用（元）。
+     *
+     * <p>读时折算：路由表未落 modelId，故按**当前**模型单价回溯计算；未配置单价的模型按 0 计。</p>
+     *
+     * @param agent      智能体（可空）
+     * @param prompt     输入 Token（可空）
+     * @param completion 输出 Token（可空）
+     * @param prices     模型主键 → 模型配置
+     * @return 费用（元）
+     */
+    private BigDecimal agentCost(AiAgent agent, Long prompt, Long completion, Map<Long, AiModelConfig> prices) {
+        if (agent == null || agent.getModelId() == null) {
+            return BigDecimal.ZERO;
+        }
+        AiModelConfig model = prices.get(agent.getModelId());
+        if (model == null) {
+            return BigDecimal.ZERO;
+        }
+        return AiModelCost.cost(model.getInputPrice(), model.getOutputPrice(),
+            prompt == null ? 0L : prompt, completion == null ? 0L : completion);
+    }
+
+    /**
+     * 智能体绑定的模型是否已配置单价（任一单价非空即视为已配置）。
+     *
+     * @param agent  智能体（可空）
+     * @param prices 模型主键 → 模型配置
+     * @return 是否已配置单价
+     */
+    private boolean agentPriced(AiAgent agent, Map<Long, AiModelConfig> prices) {
+        if (agent == null || agent.getModelId() == null) {
+            return false;
+        }
+        AiModelConfig model = prices.get(agent.getModelId());
+        return model != null && (model.getInputPrice() != null || model.getOutputPrice() != null);
+    }
+
+    /**
+     * Integer Token 转 Long（可空）。
+     *
+     * @param value Token 数
+     * @return Long 值或 null
+     */
+    private Long longOf(Integer value) {
+        return value == null ? null : value.longValue();
     }
 
     /**
@@ -431,6 +605,38 @@ public class AiRouteServiceImpl implements IAiRouteService {
         detail.setEntryTokens(entry);
         detail.setExpertTokens(expert);
         detail.setTotalTokens(sum(entry, expert));
+    }
+
+    /**
+     * 详情视图的费用折算（入口轮按入口智能体模型单价、专家轮按各专家模型单价；逐条专家调用回填费用）。
+     *
+     * @param detail     详情视图对象（原地回填）
+     * @param message    本轮助手消息（可空）
+     * @param entryAgent 入口智能体（可空）
+     * @param agents     智能体主键 → 智能体（含各专家）
+     * @param prices     模型主键 → 模型配置
+     */
+    private void fillRunCosts(AiRouteRunDetailVo detail, AiMessage message, AiAgent entryAgent,
+                              Map<Long, AiAgent> agents, Map<Long, AiModelConfig> prices) {
+        BigDecimal entryCost = agentCost(entryAgent,
+            message == null ? null : longOf(message.getPromptTokens()),
+            message == null ? null : longOf(message.getCompletionTokens()), prices);
+        BigDecimal expertCost = BigDecimal.ZERO;
+        boolean priced = agentPriced(entryAgent, prices);
+        List<AiRouteExpertCallVo> calls = detail.getExpertCalls();
+        if (calls != null) {
+            for (AiRouteExpertCallVo call : calls) {
+                AiAgent expertAgent = agents.get(call.getExpertAgentId());
+                BigDecimal callCost = agentCost(expertAgent, call.getPromptTokens(), call.getCompletionTokens(), prices);
+                call.setCost(callCost);
+                expertCost = expertCost.add(callCost);
+                priced = priced && agentPriced(expertAgent, prices);
+            }
+        }
+        detail.setEntryCost(entryCost);
+        detail.setExpertCost(expertCost);
+        detail.setTotalCost(entryCost.add(expertCost));
+        detail.setPriceConfigured(priced);
     }
 
     /**

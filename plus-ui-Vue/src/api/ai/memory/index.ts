@@ -79,3 +79,41 @@ export const consolidateMemory = (agentId: string | number, userId: string | num
     params: { agentId, userId }
   });
 };
+
+/**
+ * 归档超期记忆流水（移动到记忆目录下的 archive/ 子目录）
+ * @param agentId 智能体主键
+ * @param userId 记忆归属用户主键
+ */
+export const archiveMemory = (agentId: string | number, userId: string | number): AxiosPromise<number> => {
+  return request({
+    url: '/ai/memory/archive',
+    method: 'post',
+    params: { agentId, userId }
+  });
+};
+
+/**
+ * 清理超期记忆文件与会话日志
+ * @param agentId 智能体主键
+ * @param userId 记忆归属用户主键
+ */
+export const cleanupMemory = (agentId: string | number, userId: string | number): AxiosPromise<number> => {
+  return request({
+    url: '/ai/memory/cleanup',
+    method: 'post',
+    params: { agentId, userId }
+  });
+};
+
+/**
+ * 删除某用户的全部长期记忆（回滚 / 合规删除）
+ * @param agentId 智能体主键
+ * @param userId 记忆归属用户主键
+ */
+export const removeMemory = (agentId: string | number, userId: string | number): AxiosPromise<void> => {
+  return request({
+    url: `/ai/memory/${agentId}/${userId}`,
+    method: 'delete'
+  });
+};

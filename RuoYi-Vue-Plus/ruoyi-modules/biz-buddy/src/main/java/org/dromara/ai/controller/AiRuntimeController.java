@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.domain.bo.AiCompactionConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
+import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -66,6 +67,26 @@ public class AiRuntimeController extends BaseController {
     @PutMapping("/plan")
     public R<Void> updatePlan(@Validated @RequestBody AiPlanConfigBo bo) {
         runtimeConfigStore.updatePlan(bo);
+        return R.ok();
+    }
+
+    /**
+     * 查询当前生效的编排预算配置
+     */
+    @SaCheckPermission("ai:runtime:route-budget:query")
+    @GetMapping("/route-budget")
+    public R<AiRouteBudgetConfigBo> getRouteBudget() {
+        return R.ok(runtimeConfigStore.routeBudget());
+    }
+
+    /**
+     * 保存编排预算配置（运行期生效，下一次编排即按新预算执行）
+     */
+    @SaCheckPermission("ai:runtime:route-budget:edit")
+    @Log(title = "AI编排预算配置", businessType = BusinessType.UPDATE)
+    @PutMapping("/route-budget")
+    public R<Void> updateRouteBudget(@Validated @RequestBody AiRouteBudgetConfigBo bo) {
+        runtimeConfigStore.updateRouteBudget(bo);
         return R.ok();
     }
 

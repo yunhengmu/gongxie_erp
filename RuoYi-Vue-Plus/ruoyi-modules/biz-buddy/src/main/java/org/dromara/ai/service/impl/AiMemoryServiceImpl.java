@@ -30,8 +30,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -57,6 +60,11 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
      * 长期记忆文件名
      */
     private static final String MEMORY_MD = "MEMORY.md";
+
+    /**
+     * 归档子目录（记忆目录下，用于存放超期的每日流水）
+     */
+    private static final String ARCHIVE_DIR = "archive";
 
     /**
      * 记忆控制台使用的固定会话标识（用户级隔离下与会话无关）
@@ -167,6 +175,179 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             System.currentTimeMillis() - started);
     }
 
+    @Override
+    public int archiveDaily(Long agentId, Long userId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        RuntimeContext ctx = contextOf(userId);
+        int days = Math.max(1, runtimeConfigStore.memory().getDailyFileRetentionDays());
+        LocalDate cutoff = LocalDate.now().minusDays(days);
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        if (!Files.isDirectory(memoryDir)) {
+            return 0;
+        }
+        Path archiveDir = memoryDir.resolve(ARCHIVE_DIR);
+        int moved = 0;
+        try (Stream<Path> files = Files.list(memoryDir)) {
+            List<Path> expired = files.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().endsWith(".md"))
+                .filter(path -> isOnOrBefore(path, cutoff))
+                .toList();
+            if (!expired.isEmpty()) {
+                Files.createDirectories(archiveDir);
+            }
+            for (Path file : expired) {
+                Files.move(file, archiveDir.resolve(file.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+                moved++;
+            }
+        } catch (IOException e) {
+            throw new ServiceException("记忆归档失败：" + e.getMessage());
+        }
+        log.info("长期记忆归档完成：agent={}, userId={}, 归档 {} 个流水文件（保留 {} 天）",
+            definition.getAgentCode(), userId, moved, days);
+        return moved;
+    }
+
+    @Override
+    public int cleanup(Long agentId, Long userId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        RuntimeContext ctx = contextOf(userId);
+        AiMemoryConfigBo policy = runtimeConfigStore.memory();
+        LocalDate dailyCutoff = LocalDate.now().minusDays(Math.max(1, policy.getDailyFileRetentionDays()));
+        int removed = 0;
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        removed += deleteExpiredMemoryFiles(memoryDir, dailyCutoff);
+        removed += deleteExpiredMemoryFiles(memoryDir.resolve(ARCHIVE_DIR), dailyCutoff);
+        // 会话态记忆（工作区 session 日志）：按会话保留天数清理
+        LocalDate sessionCutoff = LocalDate.now().minusDays(Math.max(1, policy.getSessionRetentionDays()));
+        removed += deleteExpiredSessionLogs(workspace, ctx, sessionCutoff);
+        // 水位一并清除：下次对话按新流水重新合并
+        RedisUtils.deleteObject(CONSOLIDATE_MARK_PREFIX + agentId + ":" + userId);
+        log.info("长期记忆清理完成：agent={}, userId={}, 删除 {} 个文件（流水 {} 天 / 会话 {} 天）",
+            definition.getAgentCode(), userId, removed, policy.getDailyFileRetentionDays(),
+            policy.getSessionRetentionDays());
+        return removed;
+    }
+
+    @Override
+    public void deleteAll(Long agentId, Long userId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        RuntimeContext ctx = contextOf(userId);
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        deleteRecursively(memoryDir);
+        try {
+            Files.deleteIfExists(workspace.resolveRuntimeDataPath(ctx, MEMORY_MD));
+        } catch (IOException e) {
+            throw new ServiceException("删除长期记忆失败：" + e.getMessage());
+        }
+        RedisUtils.deleteObject(CONSOLIDATE_MARK_PREFIX + agentId + ":" + userId);
+        log.info("长期记忆已删除：agent={}, userId={}", definition.getAgentCode(), userId);
+    }
+
+    /**
+     * 删除记忆目录下超过保留日期的每日流水（文件名形如 {@code YYYY-MM-DD.md}；其余文件跳过）。
+     *
+     * @param dir    记忆目录或归档目录
+     * @param cutoff 保留截止日期（早于或等于该日期的文件被删除）
+     * @return 删除的文件数
+     */
+    private int deleteExpiredMemoryFiles(Path dir, LocalDate cutoff) {
+        if (!Files.isDirectory(dir)) {
+            return 0;
+        }
+        int removed = 0;
+        try (Stream<Path> files = Files.list(dir)) {
+            List<Path> expired = files.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().endsWith(".md"))
+                .filter(path -> isOnOrBefore(path, cutoff))
+                .toList();
+            for (Path file : expired) {
+                Files.deleteIfExists(file);
+                removed++;
+            }
+        } catch (IOException e) {
+            log.warn("清理记忆流水失败：dir={}, err={}", dir, e.getMessage());
+        }
+        return removed;
+    }
+
+    /**
+     * 删除超过保留期的会话日志（工作区 session 日志，按文件修改时间判定）。
+     *
+     * @param workspace 工作区管理器
+     * @param ctx       运行上下文
+     * @param cutoff    保留截止日期
+     * @return 删除的文件数
+     */
+    private int deleteExpiredSessionLogs(WorkspaceManager workspace, RuntimeContext ctx, LocalDate cutoff) {
+        int removed = 0;
+        for (String relPath : safeSessionLogPaths(workspace, ctx)) {
+            try {
+                Path file = workspace.resolveRuntimeDataPath(ctx, relPath);
+                if (!Files.isRegularFile(file)) {
+                    continue;
+                }
+                LocalDate modified = LocalDate.ofInstant(
+                    Files.getLastModifiedTime(file).toInstant(), java.time.ZoneId.systemDefault());
+                if (!modified.isAfter(cutoff)) {
+                    Files.deleteIfExists(file);
+                    removed++;
+                }
+            } catch (Exception e) {
+                log.warn("清理会话日志失败：path={}, err={}", relPath, e.getMessage());
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * 列出会话日志相对路径（读取失败时返回空列表，不阻断清理）。
+     */
+    private List<String> safeSessionLogPaths(WorkspaceManager workspace, RuntimeContext ctx) {
+        try {
+            List<String> paths = workspace.listSessionLogFiles(ctx);
+            return paths == null ? List.of() : paths;
+        } catch (Exception e) {
+            log.warn("读取会话日志清单失败：{}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * 判断流水文件名（{@code YYYY-MM-DD.md}）是否早于或等于截止日期；无法解析时返回 false（保留）。
+     */
+    private boolean isOnOrBefore(Path file, LocalDate cutoff) {
+        String name = file.getFileName().toString();
+        if (!name.endsWith(".md")) {
+            return false;
+        }
+        try {
+            LocalDate date = LocalDate.parse(name.substring(0, name.length() - 3));
+            return !date.isAfter(cutoff);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 递归删除目录（不存在时静默返回）。
+     */
+    private void deleteRecursively(Path dir) {
+        if (dir == null || !Files.exists(dir)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(dir)) {
+            List<Path> paths = walk.sorted(Comparator.reverseOrder()).toList();
+            for (Path path : paths) {
+                Files.deleteIfExists(path);
+            }
+        } catch (IOException e) {
+            throw new ServiceException("删除记忆目录失败：" + e.getMessage());
+        }
+    }
+
     /**
      * 拼接全部每日流水正文（用于合并）。
      *
@@ -252,7 +433,16 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
      * @return 工作区管理器
      */
     private WorkspaceManager workspaceOf(AiAgent definition) {
-        return agentRegistry.get(definition).getWorkspaceManager();
+        // 专家与入口智能体共享同一份用户长期记忆（REQ-AI-09 扩展）：非入口定义一律取入口的工作区，
+        // 保证管理页读到的就是专家实际使用的那份（专家装配同样落在入口命名空间）
+        AiAgent memoryAgent = definition;
+        if (definition != null && !definition.isEntry()) {
+            AiAgent entry = agentService.getEntryAgent();
+            if (entry != null) {
+                memoryAgent = entry;
+            }
+        }
+        return agentRegistry.get(memoryAgent).getWorkspaceManager();
     }
 
     /**
