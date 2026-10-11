@@ -151,7 +151,7 @@ public class AiTurnFinisher {
      */
     void finishCancelled(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
                          Long resumeMessageId, AiRouteContext route) {
-        streamBridge.flushSafety(state);
+        streamBridge.flushSafety(emitter, state);
         traceService.appendTransition(state.traceId, "cancelled", CANCELLED_TEXT);
         traceService.accumulate(state.traceId, AiTrace.STATUS_ABORTED, durationMs, null,
             null, null, null, CANCELLED_TEXT);
@@ -184,7 +184,7 @@ public class AiTurnFinisher {
     AiMessage finish(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
                      Long resumeMessageId, AiRouteContext route) {
         // 安全合规：先冲刷尾部缓冲（与 SSE 同源），再对最终正文做一次完整守卫（含专家直答正文）
-        streamBridge.flushSafety(state);
+        streamBridge.flushSafety(emitter, state);
         List<AiToolCallLog> logs = buildToolLogs(state, route);
         String replyId = state.replyId;
         ChatTokenUsage tokens = state.toTokenUsage();
@@ -267,7 +267,7 @@ public class AiTurnFinisher {
      */
     Long finishPending(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
                        AiRouteContext route) {
-        streamBridge.flushSafety(state);
+        streamBridge.flushSafety(emitter, state);
         AiConfirmPendingStore.ExpertResume expertResume = route == null ? null : route.pendingResume;
         // 专家链路的暂停：正文用**平台文案**，不落入口智能体在暂停后可能续写的残句
         String content = expertResume == null ? state.answer.toString() : PENDING_EXPERT_TEXT;
@@ -302,7 +302,7 @@ public class AiTurnFinisher {
      */
     void finishPendingResume(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
                              Long messageId, AiRouteContext route) {
-        streamBridge.flushSafety(state);
+        streamBridge.flushSafety(emitter, state);
         AiConfirmPendingStore.ExpertResume expertResume = route == null ? null : route.pendingResume;
         // 专家链路的暂停文案在首次暂停时已写入同一条消息，再次暂停不再重复追加（空串＝只回写状态）
         String content = expertResume == null ? state.answer.toString() : "";

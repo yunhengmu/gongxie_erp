@@ -231,13 +231,15 @@ public class AiStreamEventBridge {
     }
 
     /**
-     * 冲刷安全尾部缓冲：把未下发的尾部按「输出」场景过守卫后并入正文（收尾落库前调用）。
+     * 冲刷安全尾部缓冲：把未下发的尾部按「输出」场景过守卫后**补发给前端**并入正文（收尾落库前调用）。
      *
-     * <p>与 {@link #onTextDelta} 同源，保证「落库内容 == 前端所见」。</p>
+     * <p>与 {@link #onTextDelta} 同源，保证「前端所见 == 落库内容」——若只并入正文而不下发，
+     * 界面会少掉最后 {@code holdBackChars} 个字（尾部缓冲的残留）。</p>
      *
-     * @param state 流式累积状态
+     * @param emitter SSE 发射器；为 null 时（无人值守链路）只并入正文
+     * @param state   流式累积状态
      */
-    void flushSafety(AiStreamState state) {
+    void flushSafety(SseEmitter emitter, AiStreamState state) {
         if (state.safetyBlocked || state.safetyPending.length() == 0) {
             return;
         }
@@ -245,12 +247,18 @@ public class AiStreamEventBridge {
         state.safetyPending.setLength(0);
         SafetyDecision decision = safetyGuard.guard(tail, SafetyScene.OUTPUT);
         if (decision.blocked()) {
-            state.safetyBlocked = true;
-            state.answer.setLength(0);
-            state.answer.append(AiSafetyGuard.REFUSAL_TEXT);
+            // 与 onTextDelta 同源：清屏 + 下发拒答文案，随后以拒答文案落库
+            blockAnswer(emitter, state);
             return;
         }
         state.answer.append(decision.text());
+        // 补发未下发的尾部，保证「前端所见 == 落库内容」
+        if (StringUtils.isNotBlank(decision.text())) {
+            Map<String, Object> payload = AiSseSupport.envelope(EVENT_TEXT_DELTA);
+            payload.put("replyId", state.replyId);
+            payload.put("delta", decision.text());
+            AiSseSupport.send(emitter, payload);
+        }
     }
 
     /**
