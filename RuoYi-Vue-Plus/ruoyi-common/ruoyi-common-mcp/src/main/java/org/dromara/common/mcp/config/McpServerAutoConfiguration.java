@@ -4,6 +4,7 @@ import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpStatelessServerFeatures;
 import io.modelcontextprotocol.server.McpStatelessSyncServer;
 import io.modelcontextprotocol.server.transport.HttpServletStatelessServerTransport;
+import io.modelcontextprotocol.spec.McpSchema;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -85,14 +86,22 @@ public class McpServerAutoConfiguration {
         if (StringUtils.isNotBlank(properties.getInstructions())) {
             specification.instructions(properties.getInstructions());
         }
-        List<McpStatelessServerFeatures.SyncToolSpecification> toolSpecifications = tools.orderedStream().toList();
-        if (!toolSpecifications.isEmpty()) {
-            specification.tools(toolSpecifications);
-        }
-        List<McpStatelessServerFeatures.SyncResourceSpecification> resourceSpecifications = resources.orderedStream().toList();
-        if (!resourceSpecifications.isEmpty()) {
-            specification.resources(resourceSpecifications);
-        }
+        // 必须**显式声明**工具 / 资源能力：官方 SDK 仅在对应 Specification 列表**非空**时才自动设置能力
+        // （见 McpStatelessServerFeatures：`!Utils.isEmpty(tools) ? ToolCapabilities : null`）。
+        // 而本项目的业务工具是**运行期**由 AiMcpServerServiceImpl#addTool 挂载的（无启动期 Bean），
+        // 若此处不显式开启，能力为 null，运行期 addTool 会抛
+        // 「Server must be configured with tool capabilities」，导致出口一个工具都挂不上。
+        // （历史上由 ruoyi-demo 的演示 Bean 兜底，移除该模块后该缺陷才暴露。）
+        specification.capabilities(new McpSchema.ServerCapabilities(
+            null,
+            null,
+            new McpSchema.ServerCapabilities.LoggingCapabilities(),
+            null,
+            new McpSchema.ServerCapabilities.ResourceCapabilities(false, false),
+            new McpSchema.ServerCapabilities.ToolCapabilities(false)));
+        // 启动期由 Bean 贡献的工具 / 资源（业务侧为运行期挂载，此处通常为空集）
+        specification.tools(tools.orderedStream().toList());
+        specification.resources(resources.orderedStream().toList());
         return specification.build();
     }
 }
