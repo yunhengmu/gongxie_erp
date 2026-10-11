@@ -195,6 +195,16 @@ insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component,
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020248, '场景包删除', 1761400000000020244, 4, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:pack:remove', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-09-30 22:04:38.242062', null, null, '') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020250, '编排运行详情', 1761400000000020249, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:audit:route:query', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-01 15:38:14.050332', null, null, '') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020252, '小Z配置修改', 1761400000000020251, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:agent:entry:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-03 06:34:12.337031', null, null, '') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020259, '敏感词库', 1761400000000020020, 5, 'safetyWord', 'ai/safety/word/index', '', 'N', 'Y', 'C', '0', '0', 'ai:safety:word:list', 'lock', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '敏感词库：普通词与正则的维护、分类与启停，供输入 / 输出 / 渠道出站安全校验') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020260, '安全事件', 1761400000000020020, 6, 'safetyEvent', 'ai/safety/event/index', '', 'N', 'Y', 'C', '0', '0', 'ai:safety:event:list', 'monitor', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '安全事件留痕：敏感词 / PII 命中与处置明细，可按场景、动作、用户与时间范围检索') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020261, '敏感词查询', 1761400000000020259, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:safety:word:query', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020262, '敏感词新增', 1761400000000020259, 2, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:safety:word:add', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020263, '敏感词修改', 1761400000000020259, 3, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:safety:word:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020264, '敏感词删除', 1761400000000020259, 4, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:safety:word:remove', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020265, '安全事件详情', 1761400000000020260, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:safety:event:query', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020266, '安全合规配置', 1761400000000020020, 7, 'security', 'ai/runtime/security/index', '', 'N', 'Y', 'C', '0', '0', 'ai:runtime:security', 'shield', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '安全合规总开关与各场景处置策略（只记录 / 脱敏放行 / 阻断）') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020267, '安全合规查询', 1761400000000020266, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:runtime:security:query', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020268, '安全合规修改', 1761400000000020266, 2, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:runtime:security:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '') on conflict (menu_id) do nothing;
 
 -- ============================================================
 -- 二、AI 业务表（36 张 ai_*）
@@ -1276,6 +1286,58 @@ create table if not exists ai_scenario_pack_skill (
 comment on table ai_scenario_pack_skill is '场景包 × 技能（叠加到智能体既有技能绑定之上，仍受技能生效范围过滤）';
 comment on column ai_scenario_pack_skill.skill_id is '技能主键（ai_skill.id）';
 create unique index if not exists uk_ai_scenario_pack_skill on ai_scenario_pack_skill (pack_id, skill_id);
+
+
+-- ============================================================
+-- 安全合规
+-- ============================================================
+
+create table if not exists ai_sensitive_word (
+    id          bigint       not null,
+    word        varchar(200) not null,
+    is_regex    char(1)      default '0',
+    category    varchar(50),
+    enabled     char(1)      default '1',
+    remark      varchar(255),
+    create_dept bigint,
+    create_by   bigint,
+    create_time timestamp,
+    update_by   bigint,
+    update_time timestamp,
+    del_flag    char(1)      default '0',
+    constraint pk_ai_sensitive_word primary key (id)
+);
+comment on table ai_sensitive_word is 'AI 敏感词库（支持普通词与正则，供输入 / 输出 / 渠道出站安全校验）';
+comment on column ai_sensitive_word.word is '敏感词或正则表达式';
+comment on column ai_sensitive_word.is_regex is '是否正则：0否（子串匹配） 1是';
+comment on column ai_sensitive_word.category is '分类（可空，供分组管理与统计）';
+comment on column ai_sensitive_word.enabled is '是否启用：1启用 0禁用';
+create index if not exists idx_ai_sensitive_word_enabled on ai_sensitive_word (del_flag, enabled);
+
+create table if not exists ai_safety_event (
+    id           bigint       not null,
+    scene        varchar(20),
+    action       varchar(20),
+    engine       varchar(20),
+    session_id   bigint,
+    message_id   bigint,
+    agent_id     bigint,
+    user_id      bigint,
+    hit_count    integer,
+    hits_json    text,
+    text_excerpt varchar(255),
+    create_time  timestamp,
+    constraint pk_ai_safety_event primary key (id)
+);
+comment on table ai_safety_event is 'AI 安全事件留痕（敏感词 / PII 命中与处置，追加型明细）';
+comment on column ai_safety_event.scene is '场景（input 用户输入 / output 模型输出 / channel_out 渠道出站）';
+comment on column ai_safety_event.action is '处置动作（log 只记录 / mask 脱敏放行 / block 阻断）';
+comment on column ai_safety_event.engine is '命中引擎（word 敏感词 / pii 隐私信息）';
+comment on column ai_safety_event.hit_count is '命中项数量';
+comment on column ai_safety_event.hits_json is '命中项 JSON 数组（命中词 / PII 类型）';
+comment on column ai_safety_event.text_excerpt is '触发文本摘要（截断至 200 字符）';
+create index if not exists idx_ai_safety_event_create_time on ai_safety_event (create_time);
+create index if not exists idx_ai_safety_event_scene on ai_safety_event (scene);
 
 
 -- ============================================================

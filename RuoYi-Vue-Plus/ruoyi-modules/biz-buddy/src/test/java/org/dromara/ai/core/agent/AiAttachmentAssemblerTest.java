@@ -77,7 +77,7 @@ class AiAttachmentAssemblerTest {
         assertEquals(2, blocks.size());
         assertInstanceOf(TextBlock.class, blocks.get(0));
         assertInstanceOf(ImageBlock.class, blocks.get(1));
-        assertEquals("【上传文档：doc.txt】\n正文", ((TextBlock) blocks.get(0)).getText());
+        assertEquals("【上传文档：doc.txt】\n<untrusted>\n正文\n</untrusted>", ((TextBlock) blocks.get(0)).getText());
     }
 
     @Test
@@ -115,7 +115,7 @@ class AiAttachmentAssemblerTest {
 
         String text = ((TextBlock) assembler.buildBlocks(message()).get(0)).getText();
 
-        assertEquals("【上传文档：doc.txt】\n01234\n……（文档过长，中段已省略）……\nbcdef", text);
+        assertEquals("【上传文档：doc.txt】\n<untrusted>\n01234\n……（文档过长，中段已省略）……\nbcdef\n</untrusted>", text);
     }
 
     @Test

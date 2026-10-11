@@ -4,12 +4,14 @@ import io.modelcontextprotocol.server.McpStatelessSyncServer;
 import io.modelcontextprotocol.spec.McpSchema;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.core.agent.AiToolFactory;
+import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiTool;
 import org.dromara.ai.domain.bo.AiMcpServerConfigBo;
 import org.dromara.ai.domain.vo.AiMcpServerToolVo;
 import org.dromara.ai.domain.vo.AiMcpServerVo;
 import org.dromara.ai.mapper.AiToolMapper;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.mcp.config.McpServerProperties;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,12 +56,18 @@ class AiMcpServerServiceImplTest {
     @Mock
     private ObjectProvider<McpServerProperties> mcpServerPropertiesProvider;
 
+    @Mock
+    private AiSafetyGuard safetyGuard;
+
+    @Mock
+    private IAiSafetyEventService safetyEventService;
+
     private AiMcpServerServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AiMcpServerServiceImpl(toolMapper, toolFactory, knowledgeBaseService,
-            runtimeConfigStore, mcpServerProvider, mcpServerPropertiesProvider);
+            runtimeConfigStore, mcpServerProvider, mcpServerPropertiesProvider, safetyGuard, safetyEventService);
     }
 
     private AiTool tool(Long id, String code, String exposed, String implName) {

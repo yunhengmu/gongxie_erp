@@ -11,11 +11,13 @@ import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.state.AgentState;
 import io.agentscope.harness.agent.HarnessAgent;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiExpertAgent;
 import org.dromara.ai.domain.AiRouteExpertCall;
 import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.dto.AiSessionResourceSet;
 import org.dromara.ai.service.IAiAgentService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSkillService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.test.AiTestSupport;
@@ -68,6 +70,10 @@ class AiRouteOrchestratorTest {
     private final AiProperties aiProperties = new AiProperties();
 
     private final AiRuntimeConfigStore runtimeConfigStore = mock(AiRuntimeConfigStore.class);
+
+    private final AiSafetyGuard safetyGuard = mock(AiSafetyGuard.class);
+
+    private final IAiSafetyEventService safetyEventService = mock(IAiSafetyEventService.class);
 
     private final IAiSkillService skillService = mock(IAiSkillService.class);
 
@@ -172,8 +178,8 @@ class AiRouteOrchestratorTest {
      */
     private AiRouteOrchestrator newOrchestratorWithRealBridge() {
         return new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
-            new AiStreamEventBridge(traceService, aiProperties), traceService, aiProperties,
-            runtimeConfigStore, skillService, agentService);
+            new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService), traceService,
+            aiProperties, runtimeConfigStore, skillService, agentService);
     }
 
     /** 专家定义（主键 10，与 {@link #candidate()} 对齐）。 */

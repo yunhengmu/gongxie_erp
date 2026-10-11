@@ -6,6 +6,7 @@ import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.message.Msg;
 import io.agentscope.harness.agent.HarnessAgent;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiMessage;
 import org.dromara.ai.domain.AiSession;
@@ -19,6 +20,7 @@ import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
 import org.dromara.ai.service.IAiQuotaService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiScenarioPackService;
 import org.dromara.ai.service.IAiSessionResourceService;
 import org.dromara.ai.service.IAiSessionService;
@@ -53,6 +55,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -119,6 +122,12 @@ class AiChatFacadeTest {
     private IAiChatAttachmentService attachmentService;
 
     @Mock
+    private AiSafetyGuard safetyGuard;
+
+    @Mock
+    private IAiSafetyEventService safetyEventService;
+
+    @Mock
     private AiRunRegistry runRegistry;
 
     private AiChatFacade facade;
@@ -133,7 +142,8 @@ class AiChatFacadeTest {
         AiRouteSupport routeSupport = new AiRouteSupport(skillService, scenarioPackService);
         AiTrustApplier trustApplier = new AiTrustApplier(agentRegistry, agentService);
         AiTurnFinisher turnFinisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
-            traceService, memoryService, aiProperties, routeRecorder, pendingStore);
+            traceService, memoryService, aiProperties, routeRecorder, pendingStore,
+            streamBridge, safetyGuard, safetyEventService);
         AiIntegrationDriver integrationDriver = new AiIntegrationDriver(sessionService, pendingStore, traceService,
             routeOrchestrator, streamBridge, runRegistry, turnFinisher);
         AiExpertResumeDriver expertResumeDriver = new AiExpertResumeDriver(sessionService, agentService, agentRegistry,
@@ -141,8 +151,12 @@ class AiChatFacadeTest {
             routeOrchestrator, runRegistry, turnFinisher, integrationDriver, routeSupport, trustApplier);
         facade = new AiChatFacade(sessionService, agentService, messageMapper, agentRegistry, aiProperties,
             pendingStore, permissionModeStore, decisionService, usageStatService, quotaService,
+            safetyGuard, safetyEventService,
             sessionResourceService, expertDirectory, routeRecorder, routeOrchestrator, assembler, routeSupport, trustApplier,
             slotStore, streamBridge, traceService, runRegistry, turnFinisher, integrationDriver, expertResumeDriver);
+        // 安全守卫默认「原样放行」，既有断言不受影响
+        lenient().when(safetyGuard.guard(any(), any()))
+            .thenAnswer(invocation -> org.dromara.ai.core.safety.SafetyDecision.pass(invocation.getArgument(0)));
     }
 
     @BeforeAll

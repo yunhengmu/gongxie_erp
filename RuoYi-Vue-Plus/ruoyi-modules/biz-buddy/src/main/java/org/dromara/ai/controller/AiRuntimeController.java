@@ -6,6 +6,7 @@ import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.domain.bo.AiCompactionConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
 import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
+import org.dromara.ai.domain.bo.AiSecurityConfigBo;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -87,6 +88,26 @@ public class AiRuntimeController extends BaseController {
     @PutMapping("/route-budget")
     public R<Void> updateRouteBudget(@Validated @RequestBody AiRouteBudgetConfigBo bo) {
         runtimeConfigStore.updateRouteBudget(bo);
+        return R.ok();
+    }
+
+    /**
+     * 查询当前生效的安全合规配置（脱敏 + 内容安全）
+     */
+    @SaCheckPermission("ai:runtime:security:query")
+    @GetMapping("/security")
+    public R<AiSecurityConfigBo> getSecurity() {
+        return R.ok(runtimeConfigStore.security());
+    }
+
+    /**
+     * 保存安全合规配置（运行期生效，下一次对话 / 编排即按新策略执行）
+     */
+    @SaCheckPermission("ai:runtime:security:edit")
+    @Log(title = "AI安全合规配置", businessType = BusinessType.UPDATE)
+    @PutMapping("/security")
+    public R<Void> updateSecurity(@Validated @RequestBody AiSecurityConfigBo bo) {
+        runtimeConfigStore.updateSecurity(bo);
         return R.ok();
     }
 

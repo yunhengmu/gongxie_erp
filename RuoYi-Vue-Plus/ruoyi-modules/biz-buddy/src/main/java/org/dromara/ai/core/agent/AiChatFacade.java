@@ -13,6 +13,9 @@ import io.agentscope.harness.agent.tool.AgentSpawnTool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
+import org.dromara.ai.core.safety.SafetyScene;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiMessage;
 import org.dromara.ai.domain.AiRouteRun;
@@ -28,6 +31,7 @@ import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
 import org.dromara.ai.service.IAiQuotaService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSessionService;
 import org.dromara.ai.service.IAiSessionResourceService;
 import org.dromara.ai.service.IAiTraceService;
@@ -171,6 +175,16 @@ public class AiChatFacade {
     private final IAiQuotaService quotaService;
 
     /**
+     * 安全合规守卫（用户输入审核；输出侧在事件桥与收尾处）
+     */
+    private final AiSafetyGuard safetyGuard;
+
+    /**
+     * 安全事件留痕
+     */
+    private final IAiSafetyEventService safetyEventService;
+
+    /**
      * 会话级资源集（REQ-AI-32）：实时对话链路每轮现读，小Z 与专家共用同一份
      */
     private final IAiSessionResourceService sessionResourceService;
@@ -279,6 +293,18 @@ public class AiChatFacade {
         Long userId = LoginHelper.getUserId();
         // 配额闸门：超限直接拒绝，避免产生「有提问无回答」的消耗
         quotaService.check(userId, definition);
+        // 安全合规（输入）：命中即留痕；BLOCK 直接回拒答、不调模型（避免「有提问无回答」的被动消耗）
+        SafetyDecision inputGuard = safetyGuard.guard(userMessage.getContent(), SafetyScene.INPUT);
+        if (inputGuard.hit()) {
+            safetyEventService.record(SafetyScene.INPUT, inputGuard, safetyGuard.engineName(),
+                sessionId, userMessageId, definition.getId(), userId, userMessage.getContent());
+        }
+        if (inputGuard.blocked()) {
+            sendRefusal(emitter, sessionId, userId, startNanos);
+            return;
+        }
+        // 过审后的用户内容（MASK 时为掩码文本）才是下发给模型与专家的口径
+        String userContent = inputGuard.text();
         // 链路追踪（REQ-AI-28）先建：编排运行状态需要它以建立「父链路 → 专家子链路」的关系
         Long traceId = traceService.start(sessionId, definition.getId(), userId, AiTrace.SOURCE_CHAT,
             agentRegistry.snapshotOf(definition, resources));
@@ -310,7 +336,7 @@ public class AiChatFacade {
                 // 指定专家可能 auto_route='0'（不在自动候选清单内），按「可见专家」单独解析其候选视图（回归 B2）
                 route.pinnedExpert = expertDirectory.visibleCandidate(userId, deptId, route.pinnedExpertId);
                 // task_context 取**用户原话 + 槽位**（P7：不做额外的任务提炼调用），模型无权改写
-                route.taskContext = AiRouteSupport.taskContext(userMessage.getContent(), slots, userId, deptId);
+                route.taskContext = AiRouteSupport.taskContext(userContent, slots, userId, deptId);
             }
         }
         HarnessAgent agent = agentRegistry.get(definition, resources);
@@ -356,7 +382,7 @@ public class AiChatFacade {
             AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
             // 单次执行句柄（AgentScope 2.0.4）：登记后可由「停止」/ SSE 断连取消本段后端执行
             AgentRun<AgentEvent> run = agent.prepareRun(
-                List.of(attachmentAssembler.buildUserMsg(userMessage.getContent(), attachmentBlocks)), ctx);
+                List.of(attachmentAssembler.buildUserMsg(userContent, attachmentBlocks)), ctx);
             AiRunRegistry.Cancelable cancelable = run::cancel;
             runRegistry.register(sessionId, cancelable);
             Disposable disposable = run.stream()
@@ -439,6 +465,29 @@ public class AiChatFacade {
             return;
         }
         streamBridge.handle(emitter, state, event);
+    }
+
+    /**
+     * 输入命中安全阻断：落库拒答助手消息并下发 start / text_delta / done，不调用模型。
+     *
+     * @param emitter     SSE 发射器
+     * @param sessionId   会话主键
+     * @param userId      提问用户
+     * @param startNanos  本轮起始纳秒（计耗时）
+     */
+    private void sendRefusal(SseEmitter emitter, Long sessionId, Long userId, long startNanos) {
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        try {
+            sessionService.persistAssistantTurn(sessionId, AiSafetyGuard.REFUSAL_TEXT, null, durationMs,
+                List.of(), null, userId);
+        } catch (Exception e) {
+            log.error("落库安全拒答消息异常，sessionId={}", sessionId, e);
+        }
+        AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
+        Map<String, Object> payload = AiSseSupport.envelope("text_delta");
+        payload.put("delta", AiSafetyGuard.REFUSAL_TEXT);
+        AiSseSupport.send(emitter, payload);
+        AiSseSupport.complete(emitter);
     }
 
     /**

@@ -7,12 +7,15 @@ import io.agentscope.harness.agent.gateway.channel.OutboundAddress;
 import io.agentscope.harness.agent.gateway.channel.Peer;
 import org.dromara.ai.core.agent.AiAgentTaskRunner;
 import org.dromara.ai.core.agent.AiChatFacade;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
 import org.dromara.ai.domain.AiChannelThread;
 import org.dromara.ai.domain.AiMessage;
 import org.dromara.ai.domain.AiSession;
 import org.dromara.ai.domain.dto.AiTaskExecution;
 import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.service.IAiChannelService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSessionService;
 import org.dromara.ai.test.AiTestSupport;
 import org.dromara.system.api.UserService;
@@ -66,6 +69,10 @@ class AiChannelInboundServiceTest {
     private AiAgentTaskRunner taskRunner;
     @Mock
     private AiChannelRuntime runtime;
+    @Mock
+    private AiSafetyGuard safetyGuard;
+    @Mock
+    private IAiSafetyEventService safetyEventService;
 
     private AiChannelInboundService service;
 
@@ -78,7 +85,11 @@ class AiChannelInboundServiceTest {
     void setUp() {
         service = new AiChannelInboundService(channelService, sessionService, chatFacade,
             userService, messageMapper, taskRunner,
-            new AiChannelMediaAssembler(new org.dromara.ai.config.AiProperties()));
+            new AiChannelMediaAssembler(new org.dromara.ai.config.AiProperties()),
+            safetyGuard, safetyEventService);
+        // 安全守卫默认「原样放行」，既有断言不受影响
+        when(safetyGuard.guard(any(), any()))
+            .thenAnswer(invocation -> SafetyDecision.pass(invocation.getArgument(0)));
         doAnswer(invocation -> {
             ((Runnable) invocation.getArgument(0)).run();
             return null;

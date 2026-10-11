@@ -1,5 +1,7 @@
 package org.dromara.ai.core.agent;
 
+import org.dromara.ai.util.AiUntrustedContent;
+
 import io.agentscope.core.message.Base64Source;
 import io.agentscope.core.message.ContentBlock;
 import io.agentscope.core.message.ImageBlock;
@@ -57,7 +59,7 @@ public class AiAttachmentAssembler {
             if (AiMessageAttachment.TYPE_DOCUMENT.equals(attachment.getFileType())) {
                 blocks.add(TextBlock.builder()
                     .text("【上传文档：" + attachment.getFileName() + "】\n"
-                        + truncateDocument(attachment.getParsedContent(), inlineMax))
+                        + AiUntrustedContent.wrap(truncateDocument(attachment.getParsedContent(), inlineMax)))
                     .build());
             }
         }

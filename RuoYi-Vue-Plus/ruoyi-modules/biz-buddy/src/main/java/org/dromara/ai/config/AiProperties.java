@@ -58,6 +58,11 @@ public class AiProperties {
     private Channel channel = new Channel();
 
     /**
+     * 安全合规配置（脱敏 + 内容安全）：默认值来源，可被「安全合规配置」页运行期覆盖
+     */
+    private Security security = new Security();
+
+    /**
      * Milvus 连接配置。
      */
     @Data
@@ -114,6 +119,104 @@ public class AiProperties {
          * 入站媒体单文件字节上限（默认 5MB）
          */
         private int mediaMaxBytes = 5 * 1024 * 1024;
+    }
+
+    /**
+     * 安全合规配置（脱敏 + 内容安全）。
+     *
+     * <p>默认值口径：内容审核 <b>默认关闭</b>（{@code enabled=false}）以免误杀；开启后默认
+     * {@code action=log}（只留痕不阻断）灰度。PII 脱敏 {@code maskPii} 独立开关、默认开启。</p>
+     */
+    @Data
+    public static class Security {
+
+        /**
+         * 内容安全审核总开关（默认关闭；开启后按 action 处置）
+         */
+        private boolean enabled = false;
+
+        /**
+         * 审核引擎：local（本地词库）/ external（外部内容安全 API，预留）
+         */
+        private String engine = "local";
+
+        /**
+         * 命中处置动作：log（只记录）/ mask（脱敏放行）/ block（阻断）
+         */
+        private String action = "log";
+
+        /**
+         * 是否审核用户输入
+         */
+        private boolean inputCheck = true;
+
+        /**
+         * 是否审核模型输出
+         */
+        private boolean outputCheck = true;
+
+        /**
+         * 是否审核渠道出站回复（对外发布，合规红线）
+         */
+        private boolean channelOutCheck = true;
+
+        /**
+         * 是否审核工具结果（落库留痕与前端下发；框架内部回填模型的环节平台不可见）
+         */
+        private boolean toolResultMask = true;
+
+        /**
+         * 是否审核知识库入库内容（切片送向量库前；BLOCK 则拒绝入库）
+         */
+        private boolean kbIngestCheck = true;
+
+        /**
+         * 是否审核 MCP 出口（对外暴露给第三方 AI 的只读工具：入参 / 出参）
+         */
+        private boolean mcpOutCheck = true;
+
+        /**
+         * 是否启用提示词注入防护（system prompt 加固 + 外部内容边界标记）
+         */
+        private boolean promptHardening = true;
+
+        /**
+         * 是否做 PII 脱敏（手机号 / 身份证 / 邮箱 / 银行卡 / IP），独立于内容审核开关
+         */
+        private boolean maskPii = true;
+
+        /**
+         * 流式输出的尾部缓冲字符数：保留尾部长度的文本待下一次拼接后再扫描，
+         * 避免 PII / 敏感词被切片切断（越大越安全、首字延迟略增）
+         */
+        private int holdBackChars = 32;
+
+        /**
+         * 安全事件留痕中的命中片段最大字符数
+         */
+        private int excerptChars = 200;
+
+        /**
+         * 外部审核引擎配置（engine=external 时使用；本轮仅占位）
+         */
+        private External external = new External();
+    }
+
+    /**
+     * 外部内容安全引擎配置（预留）。
+     */
+    @Data
+    public static class External {
+
+        /**
+         * 服务地址
+         */
+        private String endpoint = "";
+
+        /**
+         * 访问密钥
+         */
+        private String apiKey = "";
     }
 
     /**

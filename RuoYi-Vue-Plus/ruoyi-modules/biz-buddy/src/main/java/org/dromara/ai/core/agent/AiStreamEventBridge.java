@@ -13,6 +13,10 @@ import io.agentscope.core.message.ToolUseBlock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
+import org.dromara.ai.core.safety.SafetyScene;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Component;
@@ -45,6 +49,21 @@ public class AiStreamEventBridge {
     private final IAiTraceService traceService;
 
     private final AiProperties aiProperties;
+
+    /**
+     * 安全合规守卫（输出审核 + PII 脱敏；带尾部缓冲防跨片切断）
+     */
+    private final AiSafetyGuard safetyGuard;
+
+    /**
+     * 安全事件留痕（工具结果命中时按会话 / 消息 / 用户上下文记账）
+     */
+    private final IAiSafetyEventService safetyEventService;
+
+    /**
+     * SSE 事件：清空本轮已展示正文（安全拦截时丢弃已流出片段）
+     */
+    private static final String EVENT_ANSWER_RESET = "answer_reset";
 
     /**
      * 事件类型：正文增量
@@ -149,13 +168,89 @@ public class AiStreamEventBridge {
         if (StringUtils.isBlank(delta)) {
             return;
         }
-        state.answer.append(delta);
         captureReplyId(state, textDelta.getReplyId());
+        if (state.safetyBlocked) {
+            // 已被安全拦截：丢弃后续正文（最终以拒答文案收尾）
+            return;
+        }
+        if (!safetyGuard.anyActive()) {
+            // 快速路径：无安全能力时保持原行为（零额外开销）
+            state.answer.append(delta);
+            emitTextDelta(emitter, state, textDelta, delta);
+            return;
+        }
+        // 尾部缓冲防跨片切断：仅下发「安全头部」，尾部待下一次拼接后再扫描
+        state.safetyPending.append(delta);
+        int holdBack = Math.max(safetyGuard.holdBackChars(), 0);
+        if (state.safetyPending.length() <= holdBack) {
+            return;
+        }
+        int cut = state.safetyPending.length() - holdBack;
+        String head = state.safetyPending.substring(0, cut);
+        state.safetyPending.delete(0, cut);
+        SafetyDecision decision = safetyGuard.guard(head, SafetyScene.OUTPUT);
+        if (decision.blocked()) {
+            blockAnswer(emitter, state);
+            return;
+        }
+        state.answer.append(decision.text());
+        emitTextDelta(emitter, state, textDelta, decision.text());
+    }
+
+    /**
+     * 下发正文增量事件。
+     *
+     * @param emitter   SSE 发射器
+     * @param state     流式累积状态
+     * @param textDelta 原始事件（取 replyId / blockId）
+     * @param text      实际下发的正文（已过安全守卫）
+     */
+    private void emitTextDelta(SseEmitter emitter, AiStreamState state, TextBlockDeltaEvent textDelta, String text) {
         Map<String, Object> payload = AiSseSupport.envelope(EVENT_TEXT_DELTA);
         payload.put("replyId", textDelta.getReplyId());
         payload.put("blockId", textDelta.getBlockId());
-        payload.put("delta", delta);
+        payload.put("delta", text);
         AiSseSupport.send(emitter, payload);
+    }
+
+    /**
+     * 输出命中阻断：清空已展示正文并下发拒答文案，后续正文一律丢弃。
+     *
+     * @param emitter SSE 发射器
+     * @param state   流式累积状态
+     */
+    private void blockAnswer(SseEmitter emitter, AiStreamState state) {
+        state.safetyBlocked = true;
+        state.safetyPending.setLength(0);
+        state.answer.setLength(0);
+        state.answer.append(AiSafetyGuard.REFUSAL_TEXT);
+        AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_ANSWER_RESET));
+        Map<String, Object> payload = AiSseSupport.envelope(EVENT_TEXT_DELTA);
+        payload.put("delta", AiSafetyGuard.REFUSAL_TEXT);
+        AiSseSupport.send(emitter, payload);
+    }
+
+    /**
+     * 冲刷安全尾部缓冲：把未下发的尾部按「输出」场景过守卫后并入正文（收尾落库前调用）。
+     *
+     * <p>与 {@link #onTextDelta} 同源，保证「落库内容 == 前端所见」。</p>
+     *
+     * @param state 流式累积状态
+     */
+    void flushSafety(AiStreamState state) {
+        if (state.safetyBlocked || state.safetyPending.length() == 0) {
+            return;
+        }
+        String tail = state.safetyPending.toString();
+        state.safetyPending.setLength(0);
+        SafetyDecision decision = safetyGuard.guard(tail, SafetyScene.OUTPUT);
+        if (decision.blocked()) {
+            state.safetyBlocked = true;
+            state.answer.setLength(0);
+            state.answer.append(AiSafetyGuard.REFUSAL_TEXT);
+            return;
+        }
+        state.answer.append(decision.text());
     }
 
     /**
@@ -255,11 +350,17 @@ public class AiStreamEventBridge {
         }
         String output = AiSseSupport.abbreviate(acc.output.toString(),
             aiProperties.getChat().getToolOutputPreviewChars());
+        // 安全合规（TOOL_RESULT）：工具结果下发前过守卫；工具结果不允许阻断，BLOCK 时亦以拒答文案替代展示
+        SafetyDecision decision = safetyGuard.guard(output, SafetyScene.TOOL_RESULT);
+        if (decision.hit()) {
+            safetyEventService.record(SafetyScene.TOOL_RESULT, decision, safetyGuard.engineName(),
+                state.sessionId, null, state.agentId, state.userId, acc.toolName + "｜" + output);
+        }
         Map<String, Object> payload = AiSseSupport.envelope(EVENT_TOOL_RESULT);
         payload.put("toolCallId", resultEnd.getToolCallId());
         payload.put("toolName", acc.toolName);
         payload.put("state", acc.state == null ? null : acc.state.name());
-        payload.put("output", output);
+        payload.put("output", decision.blocked() ? AiSafetyGuard.REFUSAL_TEXT : decision.text());
         payload.put("durationMs", acc.durationMs);
         putSource(payload, acc.source);
         AiSseSupport.send(emitter, payload);

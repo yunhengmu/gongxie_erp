@@ -1,5 +1,7 @@
 package org.dromara.ai.core.agent.tools;
 
+import org.dromara.ai.util.AiUntrustedContent;
+
 import io.agentscope.core.message.ToolResultBlock;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.tool.ToolBase;
@@ -160,7 +162,7 @@ public class KnowledgeSearchTool extends ToolBase {
             if (hits.isEmpty()) {
                 return Mono.just(ToolResultBlock.text("未检索到相关内容。").withIdAndName(id, name));
             }
-            return Mono.just(ToolResultBlock.text(render(hits)).withIdAndName(id, name));
+            return Mono.just(ToolResultBlock.text(AiUntrustedContent.wrap(render(hits))).withIdAndName(id, name));
         } catch (ServiceException e) {
             // 检索失败不打断整轮对话，交由模型说明情况
             return Mono.just(ToolResultBlock.error(e.getMessage()).withIdAndName(id, name));

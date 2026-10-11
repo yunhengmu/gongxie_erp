@@ -18,11 +18,13 @@ import io.agentscope.core.permission.PermissionMode;
 import io.agentscope.core.state.AgentState;
 import io.agentscope.harness.agent.HarnessAgent;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiExpertAgent;
 import org.dromara.ai.domain.AiRouteExpertCall;
 import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.dto.AiSessionResourceSet;
 import org.dromara.ai.service.IAiAgentService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSkillService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.test.AiTestSupport;
@@ -97,6 +99,10 @@ class AiWriteChainTest {
 
     private final AiRuntimeConfigStore runtimeConfigStore = mock(AiRuntimeConfigStore.class);
 
+    private final AiSafetyGuard safetyGuard = mock(AiSafetyGuard.class);
+
+    private final IAiSafetyEventService safetyEventService = mock(IAiSafetyEventService.class);
+
     private final SseEmitter emitter = mock(SseEmitter.class);
 
     @BeforeAll
@@ -119,8 +125,8 @@ class AiWriteChainTest {
     void shouldCarryWriteToolThroughConfirmAndResume() throws Exception {
         // 装配真实编排器与真实路由工具（事件桥亦为真实实现）
         AiRouteOrchestrator orchestrator = new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
-            new AiStreamEventBridge(traceService, aiProperties), traceService, aiProperties,
-            runtimeConfigStore, skillService, agentService);
+            new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService), traceService,
+            aiProperties, runtimeConfigStore, skillService, agentService);
         RouteDecisionTool routeTool = new RouteDecisionTool(orchestrator);
 
         AiExpertAgent definition = expertDefinition();

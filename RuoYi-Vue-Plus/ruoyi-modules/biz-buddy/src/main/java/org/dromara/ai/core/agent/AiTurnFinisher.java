@@ -4,6 +4,9 @@ import io.agentscope.core.message.ToolResultState;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
+import org.dromara.ai.core.safety.SafetyScene;
 import org.dromara.ai.domain.AiMessage;
 import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.AiToolCallLog;
@@ -11,6 +14,7 @@ import org.dromara.ai.domain.AiTrace;
 import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSessionService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.service.IAiUsageStatService;
@@ -92,6 +96,21 @@ public class AiTurnFinisher {
     private final AiConfirmPendingStore pendingStore;
 
     /**
+     * 事件桥：收尾前冲刷安全尾部缓冲，保证「落库内容 == 前端所见」
+     */
+    private final AiStreamEventBridge streamBridge;
+
+    /**
+     * 安全合规守卫（输出审核 + PII 脱敏）
+     */
+    private final AiSafetyGuard safetyGuard;
+
+    /**
+     * 安全事件留痕
+     */
+    private final IAiSafetyEventService safetyEventService;
+
+    /**
      * 编排运行收尾（REQ-AI-30）：把决策动作、专家调用次数与最终状态写回 {@code ai_route_run}。
      *
      * <p>未调用过路由决策工具即 {@code action=self}（入口智能体自答）——自答同样落一行，
@@ -132,6 +151,7 @@ public class AiTurnFinisher {
      */
     void finishCancelled(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
                          Long resumeMessageId, AiRouteContext route) {
+        streamBridge.flushSafety(state);
         traceService.appendTransition(state.traceId, "cancelled", CANCELLED_TEXT);
         traceService.accumulate(state.traceId, AiTrace.STATUS_ABORTED, durationMs, null,
             null, null, null, CANCELLED_TEXT);
@@ -163,12 +183,24 @@ public class AiTurnFinisher {
      */
     AiMessage finish(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
                      Long resumeMessageId, AiRouteContext route) {
+        // 安全合规：先冲刷尾部缓冲（与 SSE 同源），再对最终正文做一次完整守卫（含专家直答正文）
+        streamBridge.flushSafety(state);
         List<AiToolCallLog> logs = buildToolLogs(state, route);
         String replyId = state.replyId;
         ChatTokenUsage tokens = state.toTokenUsage();
         // 专家直答接管态（REQ-AI-30 直答修订）：回答正文取专家完整正文，而非入口轮（已被丢弃的）正文
         String content = route != null && route.handoff && route.handoffAnswer.length() > 0
             ? route.handoffAnswer.toString() : state.answer.toString();
+        SafetyDecision outputGuard = safetyGuard.guard(content, SafetyScene.OUTPUT);
+        if (outputGuard.hit()) {
+            safetyEventService.record(SafetyScene.OUTPUT, outputGuard, safetyGuard.engineName(),
+                sessionId, null, state.agentId, state.userId, content);
+        }
+        if (outputGuard.blocked()) {
+            content = AiSafetyGuard.REFUSAL_TEXT;
+        } else if (outputGuard.text() != null) {
+            content = outputGuard.text();
+        }
         AiMessage assistant;
         try {
             if (resumeMessageId == null) {
@@ -235,6 +267,7 @@ public class AiTurnFinisher {
      */
     Long finishPending(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
                        AiRouteContext route) {
+        streamBridge.flushSafety(state);
         AiConfirmPendingStore.ExpertResume expertResume = route == null ? null : route.pendingResume;
         // 专家链路的暂停：正文用**平台文案**，不落入口智能体在暂停后可能续写的残句
         String content = expertResume == null ? state.answer.toString() : PENDING_EXPERT_TEXT;
@@ -269,6 +302,7 @@ public class AiTurnFinisher {
      */
     void finishPendingResume(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
                              Long messageId, AiRouteContext route) {
+        streamBridge.flushSafety(state);
         AiConfirmPendingStore.ExpertResume expertResume = route == null ? null : route.pendingResume;
         // 专家链路的暂停文案在首次暂停时已写入同一条消息，再次暂停不再重复追加（空串＝只回写状态）
         String content = expertResume == null ? state.answer.toString() : "";
@@ -413,6 +447,8 @@ public class AiTurnFinisher {
      * 工具明细累积到 {@link AiRouteContext#expertToolLogs}，在收尾时与入口轮明细**合并一次写入**
      * （同一助手消息、同一会话），使「专家执行了哪些写操作」可查、可归属于具体专家。</p>
      *
+     * <p>安全合规（TOOL_RESULT）：工具结果落库前统一过守卫脱敏，只脱敏不阻断。</p>
+     *
      * @param state 入口轮的流式累积状态
      * @param route 编排运行状态（可为 null：普通智能体对话与无人值守链路）
      * @return 工具调用明细列表
@@ -421,6 +457,9 @@ public class AiTurnFinisher {
         List<AiToolCallLog> logs = new ArrayList<>(buildToolLogs(state));
         if (route != null && !route.expertToolLogs.isEmpty()) {
             logs.addAll(route.expertToolLogs);
+        }
+        for (AiToolCallLog log : logs) {
+            log.setToolOutput(safetyGuard.mask(log.getToolOutput(), SafetyScene.TOOL_RESULT));
         }
         return logs;
     }

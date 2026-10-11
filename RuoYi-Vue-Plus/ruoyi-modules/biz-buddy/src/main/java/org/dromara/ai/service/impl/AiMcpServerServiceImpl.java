@@ -16,6 +16,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.core.agent.AiToolFactory;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
+import org.dromara.ai.core.safety.SafetyScene;
 import org.dromara.ai.domain.AiTool;
 import org.dromara.ai.domain.bo.AiMcpServerConfigBo;
 import org.dromara.ai.domain.vo.AiMcpServerToolVo;
@@ -23,6 +26,7 @@ import org.dromara.ai.domain.vo.AiMcpServerVo;
 import org.dromara.ai.mapper.AiToolMapper;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiMcpServerService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.json.utils.JsonUtils;
@@ -84,6 +88,16 @@ public class AiMcpServerServiceImpl implements IAiMcpServerService {
      * MCP 出口属性（用于回显端点路径）
      */
     private final ObjectProvider<McpServerProperties> mcpServerPropertiesProvider;
+
+    /**
+     * 安全合规守卫（MCP 出口入参 / 出参过审）
+     */
+    private final AiSafetyGuard safetyGuard;
+
+    /**
+     * 安全事件留痕
+     */
+    private final IAiSafetyEventService safetyEventService;
 
     /**
      * 已由本服务挂载到出口的业务工具名 → 挂载时的工具更新时间。
@@ -248,6 +262,16 @@ public class AiMcpServerServiceImpl implements IAiMcpServerService {
             return errorResult("工具实现未在代码侧登记：" + definition.getImplName());
         }
         Map<String, Object> arguments = request.arguments() == null ? Map.of() : request.arguments();
+        // 安全合规（MCP_OUT 入参）：序列化后过审，命中阻断则不执行工具
+        String argJson = JsonUtils.toJsonString(arguments);
+        SafetyDecision argDecision = safetyGuard.guard(argJson, SafetyScene.MCP_OUT);
+        if (argDecision.hit()) {
+            safetyEventService.record(SafetyScene.MCP_OUT, argDecision, safetyGuard.engineName(),
+                null, null, null, null, toolCode + "｜" + argJson);
+        }
+        if (argDecision.blocked()) {
+            return errorResult("请求包含不允许的内容，已拒绝");
+        }
         try {
             ToolUseBlock use = ToolUseBlock.builder()
                 .id("mcp-" + UUID.randomUUID())
@@ -260,11 +284,59 @@ public class AiMcpServerServiceImpl implements IAiMcpServerService {
             if (result == null) {
                 return errorResult("工具执行超时：" + toolCode);
             }
-            return toCallResult(result);
+            return guardOutput(toCallResult(result), toolCode);
         } catch (Exception e) {
             log.error("MCP 出口执行工具失败：code={}, args={}", toolCode, arguments, e);
             return errorResult("工具执行失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 对 MCP 出口结果文本过「MCP_OUT」守卫：阻断以拦截文案替代，命中脱敏后替换文本。
+     *
+     * @param callResult 工具执行结果
+     * @param toolCode   工具编码（留痕用）
+     * @return 过审后的结果
+     */
+    private McpSchema.CallToolResult guardOutput(McpSchema.CallToolResult callResult, String toolCode) {
+        String output = extractText(callResult);
+        SafetyDecision decision = safetyGuard.guard(output, SafetyScene.MCP_OUT);
+        if (decision.hit()) {
+            safetyEventService.record(SafetyScene.MCP_OUT, decision, safetyGuard.engineName(),
+                null, null, null, null, toolCode + "｜" + output);
+        }
+        if (decision.blocked()) {
+            return errorResult("结果包含不允许的内容，已拦截");
+        }
+        if (decision.text() == null || decision.text().equals(output)) {
+            return callResult;
+        }
+        return McpSchema.CallToolResult.builder()
+            .addTextContent(decision.text())
+            .isError(Boolean.TRUE.equals(callResult.isError()))
+            .build();
+    }
+
+    /**
+     * 提取 MCP 调用结果中的文本内容。
+     *
+     * @param callResult 工具执行结果
+     * @return 拼接后的文本（无文本时为空串）
+     */
+    private String extractText(McpSchema.CallToolResult callResult) {
+        if (callResult.content() == null) {
+            return "";
+        }
+        StringBuilder text = new StringBuilder();
+        for (McpSchema.Content content : callResult.content()) {
+            if (content instanceof McpSchema.TextContent textContent && textContent.text() != null) {
+                if (!text.isEmpty()) {
+                    text.append('\n');
+                }
+                text.append(textContent.text());
+            }
+        }
+        return text.toString();
     }
 
     /**

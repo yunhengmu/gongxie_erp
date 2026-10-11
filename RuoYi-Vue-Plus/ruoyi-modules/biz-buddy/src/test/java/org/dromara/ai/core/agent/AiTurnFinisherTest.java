@@ -2,12 +2,15 @@ package org.dromara.ai.core.agent;
 
 import io.agentscope.core.message.ToolResultState;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
 import org.dromara.ai.domain.AiMessage;
 import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.AiToolCallLog;
 import org.dromara.ai.domain.AiTrace;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSessionService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.service.IAiUsageStatService;
@@ -33,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -71,6 +75,12 @@ class AiTurnFinisherTest {
     private AiRouteRecorder routeRecorder;
     @Mock
     private AiConfirmPendingStore pendingStore;
+    @Mock
+    private AiStreamEventBridge streamBridge;
+    @Mock
+    private AiSafetyGuard safetyGuard;
+    @Mock
+    private IAiSafetyEventService safetyEventService;
 
     private final AiProperties aiProperties = new AiProperties();
 
@@ -84,7 +94,11 @@ class AiTurnFinisherTest {
     @BeforeEach
     void setUp() {
         finisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
-            traceService, memoryService, aiProperties, routeRecorder, pendingStore);
+            traceService, memoryService, aiProperties, routeRecorder, pendingStore,
+            streamBridge, safetyGuard, safetyEventService);
+        // 安全守卫默认「原样放行」（pass 回填原文），既有断言不受影响
+        lenient().when(safetyGuard.guard(any(), any()))
+            .thenAnswer(invocation -> SafetyDecision.pass(invocation.getArgument(0)));
     }
 
     // ---------------- finish ----------------

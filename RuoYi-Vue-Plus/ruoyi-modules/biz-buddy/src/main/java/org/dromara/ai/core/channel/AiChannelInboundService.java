@@ -9,12 +9,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.core.agent.AiAgentTaskRunner;
 import org.dromara.ai.core.agent.AiChatFacade;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
+import org.dromara.ai.core.safety.SafetyScene;
 import org.dromara.ai.domain.AiChannelThread;
 import org.dromara.ai.domain.AiMessage;
 import org.dromara.ai.domain.AiSession;
 import org.dromara.ai.domain.dto.AiTaskExecution;
 import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.service.IAiChannelService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSessionService;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.system.api.UserService;
@@ -89,6 +93,16 @@ public class AiChannelInboundService {
     private final AiChannelMediaAssembler mediaAssembler;
 
     /**
+     * 安全合规守卫（入站审核 + 出站脱敏/审核）
+     */
+    private final AiSafetyGuard safetyGuard;
+
+    /**
+     * 安全事件留痕
+     */
+    private final IAiSafetyEventService safetyEventService;
+
+    /**
      * 提交一次入站消息处理（异步，不阻塞 Webhook 应答）。
      *
      * @param runtime 渠道运行期装配
@@ -138,8 +152,19 @@ public class AiChannelInboundService {
 
         AiTaskExecution execution;
         try {
+            // 安全合规（入站）：命中即留痕；BLOCK 直接回拒答、不落库不执行
+            SafetyDecision inboundGuard = safetyGuard.guard(content.storedText(), SafetyScene.INPUT);
+            if (inboundGuard.hit()) {
+                safetyEventService.record(SafetyScene.INPUT, inboundGuard, safetyGuard.engineName(),
+                    session.getId(), null, runtime.getAgentId(), platformUserId, content.storedText());
+            }
+            if (inboundGuard.blocked()) {
+                reply(runtime, address, AiSafetyGuard.REFUSAL_TEXT, session.getId(), platformUserId,
+                    runtime.getAgentId());
+                return;
+            }
             AiMessage userMessage = sessionService.appendUserMessageUnattended(
-                session.getId(), content.storedText());
+                session.getId(), inboundGuard.text());
             execution = chatFacade.executeUnattended(session, userMessage, platformUserId, content.blocks());
         } catch (Exception e) {
             log.error("渠道入站执行异常：channelCode={}, sessionId={}", runtime.getChannelCode(), session.getId(), e);
@@ -147,7 +172,8 @@ public class AiChannelInboundService {
             return;
         }
         channelService.touchThread(runtime.getChannelId(), threadKey);
-        reply(runtime, address, resolveReplyText(execution));
+        reply(runtime, address, resolveReplyText(execution), session.getId(), platformUserId,
+            runtime.getAgentId());
     }
 
     /**
@@ -248,11 +274,32 @@ public class AiChannelInboundService {
      * @param text    回复正文
      */
     private void reply(AiChannelRuntime runtime, OutboundAddress address, String text) {
+        reply(runtime, address, text, null, null, null);
+    }
+
+    /**
+     * 出站回复（带留痕上下文）：对外发布是合规红线，统一过「渠道出站」安全守卫后再发送。
+     *
+     * @param runtime   渠道运行期装配
+     * @param address   出站地址
+     * @param text      回复正文
+     * @param sessionId 会话主键（可为 null：提示类回复无会话上下文）
+     * @param userId    平台用户主键（可为 null）
+     * @param agentId   智能体主键（可为 null）
+     */
+    private void reply(AiChannelRuntime runtime, OutboundAddress address, String text,
+                       Long sessionId, Long userId, Long agentId) {
         if (StringUtils.isBlank(text)) {
             return;
         }
+        SafetyDecision decision = safetyGuard.guard(text, SafetyScene.CHANNEL_OUT);
+        if (decision.hit()) {
+            safetyEventService.record(SafetyScene.CHANNEL_OUT, decision, safetyGuard.engineName(),
+                sessionId, null, agentId, userId, text);
+        }
+        String outbound = decision.blocked() ? AiSafetyGuard.REFUSAL_TEXT : decision.text();
         try {
-            runtime.send(address, List.of(Msg.builder().role(MsgRole.ASSISTANT).textContent(text).build()))
+            runtime.send(address, List.of(Msg.builder().role(MsgRole.ASSISTANT).textContent(outbound).build()))
                 .block(Duration.ofSeconds(REPLY_TIMEOUT_SECONDS));
         } catch (Exception e) {
             log.warn("渠道出站回复失败，channelCode={}：{}", runtime.getChannelCode(), e.getMessage());

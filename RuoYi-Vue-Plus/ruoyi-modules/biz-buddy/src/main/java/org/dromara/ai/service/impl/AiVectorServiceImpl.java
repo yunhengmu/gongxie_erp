@@ -7,6 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiEmbeddingClient;
 import org.dromara.ai.core.AiVectorStore;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
+import org.dromara.ai.core.safety.SafetyScene;
 import org.dromara.ai.domain.AiChunk;
 import org.dromara.ai.domain.AiDocument;
 import org.dromara.ai.domain.AiKnowledgeBase;
@@ -18,6 +21,7 @@ import org.dromara.ai.mapper.AiDocumentMapper;
 import org.dromara.ai.mapper.AiModelConfigMapper;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiModelConfigService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiVectorService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
@@ -83,6 +87,16 @@ public class AiVectorServiceImpl implements IAiVectorService {
 
     private final AiProperties aiProperties;
 
+    /**
+     * 安全合规守卫（入库审核 + PII 脱敏）
+     */
+    private final AiSafetyGuard safetyGuard;
+
+    /**
+     * 安全事件留痕
+     */
+    private final IAiSafetyEventService safetyEventService;
+
     @Override
     public AiDocumentVo vectorizeDocument(Long docId) {
         AiDocument document = documentMapper.selectById(docId);
@@ -103,6 +117,8 @@ public class AiVectorServiceImpl implements IAiVectorService {
         if (chunks.isEmpty()) {
             throw new ServiceException("文档切片为空，请先重新解析文档");
         }
+        // 安全合规（KB_INGEST）：入库前审核全部切片文本，命中阻断则拒绝入库（异常路径会把状态置 FAILED）
+        auditChunks(docId, chunks);
 
         markStatus(docId, STATUS_RUNNING, "");
         try {
@@ -114,7 +130,10 @@ public class AiVectorServiceImpl implements IAiVectorService {
                 int from = page * WRITE_PAGE_SIZE;
                 int to = Math.min(from + WRITE_PAGE_SIZE, chunks.size());
                 List<AiChunk> pageChunks = chunks.subList(from, to);
-                List<String> texts = pageChunks.stream().map(AiChunk::getContent).toList();
+                // 安全合规（KB_INGEST）：送 embedding 的文本过脱敏（不改 ai_document_chunk 原始文本）
+                List<String> texts = pageChunks.stream()
+                    .map(chunk -> safetyGuard.mask(chunk.getContent(), SafetyScene.KB_INGEST))
+                    .toList();
                 List<double[]> vectors = embeddingClient.embed(model, apiKey, texts);
                 validateDimension(vectors, knowledgeBase);
                 writePage(knowledgeBase, document, pageChunks, vectors);
@@ -263,6 +282,29 @@ public class AiVectorServiceImpl implements IAiVectorService {
             if (vector.length != knowledgeBase.getDimension()) {
                 throw new ServiceException("向量模型返回维度 " + vector.length
                     + "，与知识库配置的维度 " + knowledgeBase.getDimension() + " 不一致，请核对「模型配置」中的向量维度");
+            }
+        }
+    }
+
+    /**
+     * 入库前安全审核：逐片过「知识库入库」守卫，命中即留痕，阻断则拒绝入库。
+     *
+     * <p>按片审核并合并命中，避免超长文档整体拼接占内存，且能定位命中片段。</p>
+     *
+     * @param docId  文档主键
+     * @param chunks 全部切片
+     */
+    private void auditChunks(Long docId, List<AiChunk> chunks) {
+        for (AiChunk chunk : chunks) {
+            SafetyDecision decision = safetyGuard.guard(chunk.getContent(), SafetyScene.KB_INGEST);
+            if (!decision.hit()) {
+                continue;
+            }
+            safetyEventService.record(SafetyScene.KB_INGEST, decision, safetyGuard.engineName(),
+                null, null, null, null, "docId=" + docId + "｜" + chunk.getContent());
+            if (decision.blocked()) {
+                throw new ServiceException("文档内容命中安全规则（命中："
+                    + String.join("/", decision.hits()) + "），已拒绝入库");
             }
         }
     }

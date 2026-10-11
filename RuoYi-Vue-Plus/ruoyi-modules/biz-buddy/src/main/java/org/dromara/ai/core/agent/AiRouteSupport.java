@@ -1,5 +1,7 @@
 package org.dromara.ai.core.agent;
 
+import org.dromara.ai.util.AiUntrustedContent;
+
 import io.agentscope.core.skill.SkillFilter;
 import lombok.RequiredArgsConstructor;
 import org.dromara.ai.domain.AiScenarioPack;
@@ -109,7 +111,7 @@ public class AiRouteSupport {
      */
     static String taskContext(String question, AiSlotSet slots, Long userId, Long deptId) {
         StringBuilder sb = new StringBuilder();
-        sb.append("【用户原话】\n").append(question == null ? "" : question).append('\n');
+        sb.append("【用户原话】\n").append(AiUntrustedContent.wrap(question == null ? "" : question)).append('\n');
         if (slots != null && !slots.isEmpty()) {
             sb.append("\n【继承槽位（直接采用，无需向用户追问）】\n").append(slots.render()).append('\n');
         }

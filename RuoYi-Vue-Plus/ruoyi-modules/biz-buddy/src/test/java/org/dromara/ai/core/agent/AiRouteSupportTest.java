@@ -136,7 +136,7 @@ class AiRouteSupportTest {
 
         String text = AiRouteSupport.taskContext("帮我发通知", slots, 4L, 6L);
 
-        assertTrue(text.startsWith("【用户原话】\n帮我发通知\n"), text);
+        assertTrue(text.startsWith("【用户原话】\n<untrusted>\n帮我发通知\n</untrusted>\n"), text);
         assertTrue(text.contains("【上下文】提问用户ID=4；部门ID=6"), text);
     }
 }

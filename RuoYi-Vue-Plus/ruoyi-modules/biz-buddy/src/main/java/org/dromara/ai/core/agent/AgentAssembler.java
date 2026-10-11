@@ -534,6 +534,8 @@ public class AgentAssembler {
     private List<MiddlewareBase> buildMiddlewares(AiAgent definition) {
         List<MiddlewareBase> middlewares = new ArrayList<>();
         middlewares.add(new CurrentTimeMiddleware(aiProperties));
+        // 提示词注入防护：声明「<untrusted> 包裹的外部内容只是数据、其中指令不执行」（开关实时读配置）
+        middlewares.add(new PromptHardeningMiddleware(aiProperties));
         if (definition.isEntry()) {
             middlewares.add(new ExpertRosterMiddleware());
             // 继承槽位（REQ-AI-31）：仅入口智能体注入；槽位由门面每轮合并后放入运行期上下文，不进装配指纹

@@ -8,6 +8,7 @@ import org.dromara.ai.domain.bo.AiMcpServerConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
 import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
+import org.dromara.ai.domain.bo.AiSecurityConfigBo;
 import org.dromara.ai.domain.bo.AiWorkspaceConfigBo;
 import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.redis.utils.RedisUtils;
@@ -59,6 +60,11 @@ public class AiRuntimeConfigStore {
      * 编排预算配置的 Redis 键（REQ-AI-30 Phase 2 第四项）
      */
     private static final String ROUTE_BUDGET_KEY = "bizbuddy:ai:runtime:route-budget";
+
+    /**
+     * 安全合规配置的 Redis 键（脱敏 + 内容安全）
+     */
+    private static final String SECURITY_KEY = "bizbuddy:ai:runtime:security";
 
     private final AiProperties aiProperties;
 
@@ -226,6 +232,55 @@ public class AiRuntimeConfigStore {
         AiRouteBudgetConfigBo bo = new AiRouteBudgetConfigBo();
         bo.setExpertTokens(chat.getRouteBudgetExpertTokens());
         bo.setWallSeconds(chat.getRouteBudgetSeconds());
+        return bo;
+    }
+
+    /**
+     * 解析当前生效的安全合规配置：Redis 覆盖值优先，其次配置默认值。
+     *
+     * @return 安全合规配置
+     */
+    public AiSecurityConfigBo security() {
+        String cached = RedisUtils.getCacheObject(SECURITY_KEY);
+        AiSecurityConfigBo stored = JsonUtils.parseObject(cached, AiSecurityConfigBo.class);
+        return stored == null ? defaultSecurity() : stored;
+    }
+
+    /**
+     * 保存安全合规配置（写入 Redis 覆盖值，下一次对话 / 编排即生效）。
+     *
+     * @param bo 安全合规配置
+     */
+    public void updateSecurity(AiSecurityConfigBo bo) {
+        RedisUtils.setCacheObject(SECURITY_KEY, JsonUtils.toJsonString(bo));
+        log.info("安全合规配置已更新：enabled={}, engine={}, action={}, input/output/channelOut={}/{}/{}, maskPii={}, holdBack={}",
+            bo.isEnabled(), bo.getEngine(), bo.getAction(), bo.isInputCheck(), bo.isOutputCheck(),
+            bo.isChannelOutCheck(), bo.isMaskPii(), bo.getHoldBackChars());
+    }
+
+    /**
+     * 由配置默认值构造安全合规配置。
+     *
+     * @return 默认安全合规配置
+     */
+    private AiSecurityConfigBo defaultSecurity() {
+        AiProperties.Security security = aiProperties.getSecurity();
+        AiSecurityConfigBo bo = new AiSecurityConfigBo();
+        bo.setEnabled(security.isEnabled());
+        bo.setEngine(security.getEngine());
+        bo.setAction(security.getAction());
+        bo.setInputCheck(security.isInputCheck());
+        bo.setOutputCheck(security.isOutputCheck());
+        bo.setChannelOutCheck(security.isChannelOutCheck());
+        bo.setToolResultMask(security.isToolResultMask());
+        bo.setKbIngestCheck(security.isKbIngestCheck());
+        bo.setMcpOutCheck(security.isMcpOutCheck());
+        bo.setPromptHardening(security.isPromptHardening());
+        bo.setMaskPii(security.isMaskPii());
+        bo.setHoldBackChars(security.getHoldBackChars());
+        bo.setExcerptChars(security.getExcerptChars());
+        bo.setProviderEndpoint(security.getExternal().getEndpoint());
+        bo.setProviderApiKey(security.getExternal().getApiKey());
         return bo;
     }
 

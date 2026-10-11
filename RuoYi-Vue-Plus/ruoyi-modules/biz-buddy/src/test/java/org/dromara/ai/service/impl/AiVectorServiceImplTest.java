@@ -3,6 +3,8 @@ package org.dromara.ai.service.impl;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiEmbeddingClient;
 import org.dromara.ai.core.AiVectorStore;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
 import org.dromara.ai.domain.AiChunk;
 import org.dromara.ai.domain.AiDocument;
 import org.dromara.ai.domain.AiKnowledgeBase;
@@ -14,6 +16,7 @@ import org.dromara.ai.mapper.AiDocumentMapper;
 import org.dromara.ai.mapper.AiModelConfigMapper;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiModelConfigService;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -60,6 +63,12 @@ class AiVectorServiceImplTest {
     @Mock
     private AiVectorStore vectorStore;
 
+    @Mock
+    private AiSafetyGuard safetyGuard;
+
+    @Mock
+    private IAiSafetyEventService safetyEventService;
+
     private final AiProperties aiProperties = new AiProperties();
 
     private AiVectorServiceImpl service;
@@ -67,7 +76,12 @@ class AiVectorServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new AiVectorServiceImpl(chunkMapper, documentMapper, modelConfigMapper,
-            knowledgeBaseService, modelConfigService, embeddingClient, vectorStore, aiProperties);
+            knowledgeBaseService, modelConfigService, embeddingClient, vectorStore, aiProperties,
+            safetyGuard, safetyEventService);
+        // 安全守卫默认「原样放行 / 原样脱敏」，普通文本入参不变，既有断言不受影响
+        lenient().when(safetyGuard.guard(any(), any()))
+            .thenAnswer(invocation -> SafetyDecision.pass(invocation.getArgument(0)));
+        lenient().when(safetyGuard.mask(any(), any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private AiKnowledgeBase kb(Long id, Integer dimension, Long modelId) {

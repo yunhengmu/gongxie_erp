@@ -25,6 +25,17 @@ final class AiStreamState {
     /** 回答正文 */
     final StringBuilder answer = new StringBuilder();
 
+    /**
+     * 安全守卫的未下发尾部缓冲（跨片命中防切断）：内容安全开启时，正文先入此缓冲，
+     * 仅下发「安全的头部」，尾部保留待下一次拼接后再扫描；收尾由 {@code AiTurnFinisher} 冲刷。
+     */
+    final StringBuilder safetyPending = new StringBuilder();
+
+    /**
+     * 本轮是否已被安全拦截（命中 BLOCK）：为真时后续正文一律丢弃，最终以拒答文案落库
+     */
+    volatile boolean safetyBlocked;
+
     /** 工具调用累积（toolCallId → 累积项） */
     final Map<String, AiToolCallAcc> tools = new ConcurrentHashMap<>();
 

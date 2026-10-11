@@ -11,9 +11,13 @@ import io.agentscope.core.message.ToolResultState;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.model.ChatUsage;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyDecision;
+import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.test.AiTestSupport;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -25,7 +29,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -38,12 +44,23 @@ import static org.mockito.Mockito.verify;
 class AiStreamEventBridgeTest {
 
     private final IAiTraceService traceService = mock(IAiTraceService.class);
-    private final AiStreamEventBridge bridge = new AiStreamEventBridge(traceService, new AiProperties());
+    /** 安全守卫默认不生效（anyActive=false），走快速路径，保持既有断言 */
+    private final AiSafetyGuard safetyGuard = mock(AiSafetyGuard.class);
+    private final IAiSafetyEventService safetyEventService = mock(IAiSafetyEventService.class);
+    private final AiStreamEventBridge bridge =
+        new AiStreamEventBridge(traceService, new AiProperties(), safetyGuard, safetyEventService);
     private final SseEmitter emitter = mock(SseEmitter.class);
 
     @BeforeAll
     static void init() {
         AiTestSupport.initialize();
+    }
+
+    @BeforeEach
+    void stubSafety() {
+        // 工具结果守卫默认「原样放行」，既有断言不受影响
+        lenient().when(safetyGuard.guard(any(), any()))
+            .thenAnswer(invocation -> SafetyDecision.pass(invocation.getArgument(0)));
     }
 
     private static AiStreamState state(Long traceId) {
