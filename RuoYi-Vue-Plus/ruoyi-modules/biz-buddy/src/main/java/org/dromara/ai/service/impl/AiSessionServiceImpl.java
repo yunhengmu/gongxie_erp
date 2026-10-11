@@ -22,6 +22,7 @@ import org.dromara.ai.domain.vo.AiChatAttachmentVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
 import org.dromara.ai.domain.vo.AiSessionExportVo;
 import org.dromara.ai.domain.vo.AiSessionVo;
+import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.domain.vo.AiToolCallLogVo;
 import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.mapper.AiScenarioPackMapper;
@@ -34,6 +35,7 @@ import org.dromara.ai.service.IAiSessionService;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.api.DeptService;
@@ -436,7 +438,8 @@ public class AiSessionServiceImpl implements IAiSessionService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AiMessage persistAssistantTurn(Long sessionId, String content, String replyId, Long durationMs,
-                                          List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, Long userId) {
+                                          List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, Long userId,
+                                          List<AiSourceVo> sources) {
         AiMessage message = new AiMessage();
         message.setSessionId(sessionId);
         message.setRole(AiMessage.ROLE_ASSISTANT);
@@ -447,6 +450,7 @@ public class AiSessionServiceImpl implements IAiSessionService {
         message.setDurationMs(durationMs);
         message.setToolCallCount(toolLogs == null ? 0 : toolLogs.size());
         applyTokens(message, tokens);
+        applySources(message, sources);
         messageMapper.insert(message);
         insertToolLogs(sessionId, message.getId(), toolLogs, userId);
         touchSession(sessionId);
@@ -471,7 +475,8 @@ public class AiSessionServiceImpl implements IAiSessionService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AiMessage persistAssistantAborted(Long sessionId, String content, Long durationMs) {
+    public AiMessage persistAssistantAborted(Long sessionId, String content, Long durationMs,
+                                             List<AiSourceVo> sources) {
         AiMessage message = new AiMessage();
         message.setSessionId(sessionId);
         message.setRole(AiMessage.ROLE_ASSISTANT);
@@ -480,6 +485,7 @@ public class AiSessionServiceImpl implements IAiSessionService {
         message.setStatus(AiMessage.STATUS_ABORTED);
         message.setDurationMs(durationMs);
         message.setToolCallCount(0);
+        applySources(message, sources);
         messageMapper.insert(message);
         touchSession(sessionId);
         return message;
@@ -488,7 +494,8 @@ public class AiSessionServiceImpl implements IAiSessionService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AiMessage persistPendingTurn(Long sessionId, String content, String replyId, Long durationMs,
-                                        List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, Long userId) {
+                                        List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, Long userId,
+                                        List<AiSourceVo> sources) {
         AiMessage message = new AiMessage();
         message.setSessionId(sessionId);
         message.setRole(AiMessage.ROLE_ASSISTANT);
@@ -499,6 +506,7 @@ public class AiSessionServiceImpl implements IAiSessionService {
         message.setDurationMs(durationMs);
         message.setToolCallCount(toolLogs == null ? 0 : toolLogs.size());
         applyTokens(message, tokens);
+        applySources(message, sources);
         messageMapper.insert(message);
         insertToolLogs(sessionId, message.getId(), toolLogs, userId);
         touchSession(sessionId);
@@ -509,7 +517,7 @@ public class AiSessionServiceImpl implements IAiSessionService {
     @Transactional(rollbackFor = Exception.class)
     public AiMessage appendAssistantTurn(Long messageId, String appendContent, String status,
                                          Long additionalDurationMs, List<AiToolCallLog> toolLogs,
-                                         ChatTokenUsage tokens) {
+                                         ChatTokenUsage tokens, List<AiSourceVo> sources) {
         AiMessage exists = messageMapper.selectById(messageId);
         if (exists == null) {
             throw new ServiceException("助手消息不存在或已被删除");
@@ -526,6 +534,10 @@ public class AiSessionServiceImpl implements IAiSessionService {
         update.setPromptTokens(sumNullable(exists.getPromptTokens(), tokens == null ? null : tokens.promptTokens()));
         update.setCompletionTokens(sumNullable(exists.getCompletionTokens(), tokens == null ? null : tokens.completionTokens()));
         update.setTotalTokens(sumNullable(exists.getTotalTokens(), tokens == null ? null : tokens.totalTokens()));
+        // 来源为空时不动原值（MyBatis-Plus updateById 默认忽略 null），避免恢复段覆盖首段来源
+        if (sources != null && !sources.isEmpty()) {
+            update.setSources(JsonUtils.toJsonString(sources));
+        }
         messageMapper.updateById(update);
         AiSession session = baseMapper.selectById(exists.getSessionId());
         insertToolLogs(exists.getSessionId(), messageId, toolLogs, session == null ? null : session.getUserId());
@@ -555,6 +567,19 @@ public class AiSessionServiceImpl implements IAiSessionService {
         message.setPromptTokens(tokens.promptTokens());
         message.setCompletionTokens(tokens.completionTokens());
         message.setTotalTokens(tokens.totalTokens());
+    }
+
+    /**
+     * 写入回答参考来源（序列化为 JSON 字符串存库）。
+     *
+     * @param message 消息实体
+     * @param sources 参考来源（可为空）
+     */
+    private void applySources(AiMessage message, List<AiSourceVo> sources) {
+        if (sources == null || sources.isEmpty()) {
+            return;
+        }
+        message.setSources(JsonUtils.toJsonString(sources));
     }
 
     /**

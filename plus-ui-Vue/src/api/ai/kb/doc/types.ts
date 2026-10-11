@@ -80,6 +80,14 @@ export interface ChunkVO {
   charCount?: number;
   /** 向量库主键 */
   vectorId?: string;
+  /** 章节路径（各级标题用 > 连接，如 第2章 > 2.3 考勤） */
+  headingPath?: string;
+  /** 切片起始页码（PDF 等分页文档） */
+  pageNo?: number;
+  /** 切片在文档纯文本中的起始字符下标（含） */
+  charStart?: number;
+  /** 切片在文档纯文本中的结束字符下标（不含） */
+  charEnd?: number;
   /** 创建时间 */
   createTime?: string;
 }

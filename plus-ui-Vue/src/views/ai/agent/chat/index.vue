@@ -208,6 +208,39 @@
 
               <span v-if="msg.streaming" class="typing-cursor"></span>
 
+              <!-- 参考来源：回答用到知识库时展示（默认收起，点击标题展开 / 收起） -->
+              <div v-if="msg.sources && msg.sources.length" class="msg-sources">
+                <div
+                  class="msg-sources__head"
+                  role="button"
+                  tabindex="0"
+                  :aria-expanded="isSourcesExpanded(msg)"
+                  @click="toggleSources(msg)"
+                  @keydown.enter.prevent="toggleSources(msg)"
+                  @keydown.space.prevent="toggleSources(msg)"
+                >
+                  <el-icon class="msg-sources__arrow" :class="{ 'is-expanded': isSourcesExpanded(msg) }">
+                    <ArrowRight />
+                  </el-icon>
+                  <span class="msg-sources__title">参考来源</span>
+                </div>
+                <div v-show="isSourcesExpanded(msg)" class="msg-sources__body">
+                  <div v-for="(source, index) in msg.sources" :key="index" class="msg-sources__item">
+                    <el-tag :type="sourceScoreType(source.score)" size="small" effect="plain">
+                      {{ formatSourceScore(source.score) }}
+                    </el-tag>
+                    <span class="msg-sources__text">
+                      <el-icon class="msg-sources__icon"><Document /></el-icon>
+                      {{ source.docName || '未知文档' }}
+                      <template v-if="source.headingPath">· §{{ source.headingPath }}</template>
+                      <template v-if="source.pageNo !== undefined && source.pageNo !== null">
+                        · p.{{ source.pageNo }}
+                      </template>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <div v-if="msg.status === '1'" class="msg-error">
                 <el-icon><WarningFilled /></el-icon>
                 <span>{{ msg.errorMsg || '回复失败' }}</span>
@@ -384,6 +417,7 @@ import type {
   ChatResourceType,
   ChatResourceVO,
   ChatSessionVO,
+  ChatSourceItem,
   ChatStreamEvent
 } from '@/api/ai/chat/types';
 import { scenarioPackMcpOptions, scenarioPackOptions } from '@/api/ai/pack';
@@ -459,6 +493,8 @@ interface LocalMessage {
   totalTokens?: number;
   /** 随本条消息发送的附件（聊天上传的图片/文档） */
   attachments?: ChatAttachmentVO[];
+  /** 回答参考来源（知识库命中；流式与历史消息均可见） */
+  sources?: ChatSourceItem[];
 }
 
 /** 资源标签（REQ-AI-32）：+ 后面显示的选中项，悬停左侧出叉号可移除 */
@@ -721,6 +757,20 @@ const toggleTool = (part: MessagePart) => {
     : [...expandedToolKeys.value, key];
 };
 
+/** 参考来源区块展开态的键（按消息主键；默认收起） */
+const expandedSourceKeys = ref<string[]>([]);
+
+/** 参考来源区块是否已展开 */
+const isSourcesExpanded = (msg: LocalMessage) => expandedSourceKeys.value.includes(String(msg.id));
+
+/** 切换参考来源区块的展开 / 收起 */
+const toggleSources = (msg: LocalMessage) => {
+  const key = String(msg.id);
+  expandedSourceKeys.value = isSourcesExpanded(msg)
+    ? expandedSourceKeys.value.filter((item) => item !== key)
+    : [...expandedSourceKeys.value, key];
+};
+
 /** 工具状态标签颜色 */
 const toolStateType = (state?: string): ElTagType => {
   if (state === 'success') {
@@ -777,6 +827,57 @@ const formatToolInput = (input?: Record<string, any>) => {
     return JSON.stringify(input, null, 2);
   } catch {
     return String(input);
+  }
+};
+
+/** 参考来源相似度标签样式：越高越绿（与检索页一致） */
+const sourceScoreType = (score?: number): ElTagType => {
+  if (score === undefined || score === null) {
+    return 'info';
+  }
+  if (score >= 0.8) {
+    return 'success';
+  }
+  return score >= 0.6 ? 'warning' : 'info';
+};
+
+/** 参考来源相似度格式化 */
+const formatSourceScore = (score?: number) => (score === undefined || score === null ? '-' : score.toFixed(2));
+
+/**
+ * 累积参考来源：按 docId + chunkIndex 去重（保留最高 score），与后端口径一致。
+ */
+const mergeMessageSources = (msg: LocalMessage, items?: ChatSourceItem[]) => {
+  if (!items || !items.length) {
+    return;
+  }
+  if (!msg.sources) {
+    msg.sources = [];
+  }
+  items.forEach((item) => {
+    const exist = msg.sources!.find(
+      (s) => s.docId === item.docId && s.chunkIndex === item.chunkIndex
+    );
+    if (!exist) {
+      msg.sources!.push(item);
+    } else if (item.score !== undefined && item.score !== null && (exist.score === undefined || exist.score === null || item.score > exist.score)) {
+      exist.score = item.score;
+    }
+  });
+};
+
+/**
+ * 解析历史消息落库的参考来源（JSON 字符串）。
+ */
+const parseSources = (raw?: string): ChatSourceItem[] | undefined => {
+  if (!raw) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length ? (parsed as ChatSourceItem[]) : undefined;
+  } catch {
+    return undefined;
   }
 };
 
@@ -895,7 +996,8 @@ const toLocalMessage = (item: ChatMessageVO, tools: ToolCallLogVO[]): LocalMessa
     durationMs: item.durationMs,
     toolCallCount: item.toolCallCount,
     totalTokens: item.totalTokens,
-    attachments: item.attachments ?? []
+    attachments: item.attachments ?? [],
+    sources: parseSources(item.sources)
   };
 };
 
@@ -1608,12 +1710,19 @@ const handleStreamEvent = (raw: string) => {
       msg.content = '';
       break;
     }
+    case 'references': {
+      // 回答用到知识库：累积参考来源（去重后展示在助手气泡下方）
+      mergeMessageSources(msg, event.items);
+      break;
+    }
     case 'done': {
       msg.id = event.messageId ?? msg.id;
       msg.streaming = false;
       msg.durationMs = event.durationMs;
       msg.toolCallCount = event.toolCallCount;
       msg.totalTokens = event.totalTokens;
+      // done 载荷与 references 事件同结构：兜底回填（防 references 事件丢失）
+      mergeMessageSources(msg, event.references);
       finishStream();
       getSessions();
       // 编排轨迹回填：异步补齐专家原始结论，不阻塞本轮收尾
@@ -2148,6 +2257,66 @@ onMounted(() => {
 .msg-meta__ai {
   margin-left: auto;
   opacity: 0.75;
+}
+
+/* 参考来源：助手气泡下方的出处区块（默认收起，点击标题展开 / 收起） */
+.msg-sources {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--app-surface-border);
+}
+
+.msg-sources__head {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+
+.msg-sources__head:hover .msg-sources__title {
+  color: var(--el-color-primary);
+}
+
+.msg-sources__arrow {
+  font-size: 12px;
+  color: var(--app-text-muted);
+  transition: transform 0.2s ease;
+}
+
+.msg-sources__arrow.is-expanded {
+  transform: rotate(90deg);
+}
+
+.msg-sources__title {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.msg-sources__body {
+  margin-top: 6px;
+}
+
+.msg-sources__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+  color: var(--app-text-muted);
+}
+
+.msg-sources__text {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.msg-sources__icon {
+  font-size: 13px;
 }
 
 .msg-error {

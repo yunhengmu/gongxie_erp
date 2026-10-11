@@ -479,7 +479,7 @@ public class AiChatFacade {
         long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
         try {
             sessionService.persistAssistantTurn(sessionId, AiSafetyGuard.REFUSAL_TEXT, null, durationMs,
-                List.of(), null, userId);
+                List.of(), null, userId, List.of());
         } catch (Exception e) {
             log.error("落库安全拒答消息异常，sessionId={}", sessionId, e);
         }
@@ -754,7 +754,7 @@ public class AiChatFacade {
                         null, null, null, message);
                     try {
                         sessionService.appendAssistantTurn(messageId, "\n\n" + message,
-                            AiMessage.STATUS_ABORTED, durationMs, null, state.toTokenUsage());
+                            AiMessage.STATUS_ABORTED, durationMs, null, state.toTokenUsage(), state.sources);
                         usageStatService.accumulate(state.userId, state.agentId, state.modelId,
                             state.toTokenUsage(), 0, 0);
                     } catch (Exception e) {

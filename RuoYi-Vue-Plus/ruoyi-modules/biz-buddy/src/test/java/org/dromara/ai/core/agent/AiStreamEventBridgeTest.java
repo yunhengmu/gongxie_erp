@@ -11,8 +11,10 @@ import io.agentscope.core.message.ToolResultState;
 import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.model.ChatUsage;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.AiRetrievalSourceRegistry;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.core.safety.SafetyDecision;
+import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.test.AiTestSupport;
@@ -47,8 +49,10 @@ class AiStreamEventBridgeTest {
     /** 安全守卫默认不生效（anyActive=false），走快速路径，保持既有断言 */
     private final AiSafetyGuard safetyGuard = mock(AiSafetyGuard.class);
     private final IAiSafetyEventService safetyEventService = mock(IAiSafetyEventService.class);
+    private final AiRetrievalSourceRegistry retrievalSourceRegistry = new AiRetrievalSourceRegistry();
     private final AiStreamEventBridge bridge =
-        new AiStreamEventBridge(traceService, new AiProperties(), safetyGuard, safetyEventService);
+        new AiStreamEventBridge(traceService, new AiProperties(), safetyGuard, safetyEventService,
+            retrievalSourceRegistry);
     private final SseEmitter emitter = mock(SseEmitter.class);
 
     @BeforeAll
@@ -207,5 +211,74 @@ class AiStreamEventBridgeTest {
         bridge.flushSafety(emitter, state);
         assertEquals("正文", state.answer.toString());
         verify(emitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
+    @DisplayName("工具结果命中来源时下发 references 事件并累积")
+    void shouldEmitReferencesOnToolResult() throws Exception {
+        AiStreamState state = state(100L);
+        state.replyId = "reply-1";
+        retrievalSourceRegistry.put("c1", List.of(source(11L, 0, 0.8)));
+
+        bridge.handle(emitter, state, new ToolResultEndEvent("reply-1", "c1", "search", ToolResultState.SUCCESS));
+
+        assertEquals(1, state.sources.size());
+        String json = jsonOfType(emitter, "references");
+        assertTrue(json != null, "应下发 references 事件");
+        assertTrue(json.contains("\"docId\":11"), json);
+        assertTrue(json.contains("\"toolCallId\":\"c1\""), json);
+    }
+
+    @Test
+    @DisplayName("同 docId + chunkIndex 的来源去重并保留最高相似度")
+    void shouldDedupeSourcesKeepingMaxScore() {
+        AiStreamState state = state(100L);
+        retrievalSourceRegistry.put("c1", List.of(source(11L, 0, 0.5)));
+        bridge.handle(emitter, state, new ToolResultEndEvent("reply-1", "c1", "search", ToolResultState.SUCCESS));
+        retrievalSourceRegistry.put("c2", List.of(source(11L, 0, 0.9)));
+        bridge.handle(emitter, state, new ToolResultEndEvent("reply-1", "c2", "search", ToolResultState.SUCCESS));
+
+        assertEquals(1, state.sources.size());
+        assertEquals(Double.valueOf(0.9), state.sources.get(0).getScore());
+    }
+
+    @Test
+    @DisplayName("专家直答链路只累积来源不下发 references")
+    void shouldAccumulateSourcesWithoutForwarding() throws Exception {
+        AiStreamState state = state(100L);
+        retrievalSourceRegistry.put("c1", List.of(source(11L, 0, 0.8)));
+
+        bridge.handle(emitter, state,
+            new ToolResultEndEvent("reply-1", "c1", "search", ToolResultState.SUCCESS), false);
+
+        assertEquals(1, state.sources.size());
+        verify(emitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    private static AiSourceVo source(Long docId, Integer chunkIndex, double score) {
+        AiSourceVo vo = new AiSourceVo();
+        vo.setDocId(docId);
+        vo.setChunkIndex(chunkIndex);
+        vo.setDocName("文档" + docId);
+        vo.setScore(score);
+        return vo;
+    }
+
+    /**
+     * 解析指定类型的事件信封 JSON（对 {@code emitter.send} 的 {@code SseEventBuilder} 参数解析）。
+     */
+    private static String jsonOfType(SseEmitter emitter, String type) throws Exception {
+        org.mockito.ArgumentCaptor<SseEmitter.SseEventBuilder> cap =
+            org.mockito.ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(emitter, org.mockito.Mockito.atLeastOnce()).send(cap.capture());
+        for (SseEmitter.SseEventBuilder builder : cap.getAllValues()) {
+            for (org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter.DataWithMediaType data : builder.build()) {
+                String json = String.valueOf(data.getData());
+                if (json.contains("\"type\":\"" + type + "\"")) {
+                    return json;
+                }
+            }
+        }
+        return null;
     }
 }

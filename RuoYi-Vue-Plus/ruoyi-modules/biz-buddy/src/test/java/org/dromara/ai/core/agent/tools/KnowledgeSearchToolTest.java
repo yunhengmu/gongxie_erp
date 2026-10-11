@@ -1,7 +1,9 @@
 package org.dromara.ai.core.agent.tools;
 
 import io.agentscope.core.message.ToolResultBlock;
+import org.dromara.ai.core.AiRetrievalSourceRegistry;
 import org.dromara.ai.domain.vo.AiRetrievalHitVo;
+import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiVectorService;
 import org.dromara.ai.test.AiTestSupport;
@@ -16,6 +18,7 @@ import java.util.Map;
 import static org.dromara.ai.core.agent.ToolTestSupport.isError;
 import static org.dromara.ai.core.agent.ToolTestSupport.param;
 import static org.dromara.ai.core.agent.ToolTestSupport.text;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,6 +65,46 @@ class KnowledgeSearchToolTest {
         return vo;
     }
 
+    private static AiRetrievalHitVo hitWithTrace(Long docId, String docName, int chunkIndex, double score,
+                                                 String content, String headingPath, Integer pageNo) {
+        AiRetrievalHitVo vo = hit(docId, docName, chunkIndex, score, content);
+        vo.setHeadingPath(headingPath);
+        vo.setPageNo(pageNo);
+        return vo;
+    }
+
+    @Test
+    @DisplayName("出处行渲染章节路径与页码")
+    void shouldRenderSourceTrace() {
+        KnowledgeSearchTool tool =
+            new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+            .thenReturn(List.of(hitWithTrace(11L, "员工手册", 2, 0.9, "考勤正文。", "第2章 > 2.3 考勤", 12)));
+        ToolResultBlock result =
+            tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "考勤"), "100")).block();
+
+        assertFalse(isError(result));
+        assertTrue(text(result).contains("[1] 文档：员工手册 ｜ §第2章 > 2.3 考勤 ｜ p.12 ｜ 切片 #2 ｜ 相似度 0.90"));
+    }
+
+    @Test
+    @DisplayName("出处行：章节路径与页码为空时跳过对应段")
+    void shouldSkipBlankSourceTraceSegments() {
+        KnowledgeSearchTool tool =
+            new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+            .thenReturn(List.of(hit(11L, "员工手册", 0, 0.5, "正文。")));
+        ToolResultBlock result =
+            tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
+
+        assertFalse(isError(result));
+        assertTrue(text(result).contains("[1] 文档：员工手册 ｜ 切片 #0 ｜ 相似度 0.50"));
+        assertFalse(text(result).contains("§"));
+        assertFalse(text(result).contains("｜ p."));
+    }
+
     @Test
     @DisplayName("未绑定知识库时直接返回说明")
     void shouldReturnWhenNoKbBound() {
@@ -93,6 +136,41 @@ class KnowledgeSearchToolTest {
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
         assertFalse(isError(result));
         assertTrue(text(result).contains("均不在你的生效范围内"));
+    }
+
+    @Test
+    @DisplayName("命中时把结构化来源写入注册表（key 为 toolCallId）")
+    void shouldRegisterSourcesOnHit() {
+        AiRetrievalSourceRegistry registry = new AiRetrievalSourceRegistry();
+        KnowledgeSearchTool tool = new KnowledgeSearchTool(vectorService, List.of(1L), null,
+            knowledgeBaseService, false, false, null, registry);
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+            .thenReturn(List.of(hitWithTrace(11L, "员工手册", 2, 0.9, "考勤正文。", "第2章", 12)));
+
+        tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "考勤"), "100")).block();
+
+        List<AiSourceVo> sources = registry.drain("call-1");
+        assertEquals(1, sources.size());
+        assertEquals(11L, sources.get(0).getDocId());
+        assertEquals("员工手册", sources.get(0).getDocName());
+        assertEquals("第2章", sources.get(0).getHeadingPath());
+        assertEquals(12, sources.get(0).getPageNo());
+        assertEquals(Double.valueOf(0.9), sources.get(0).getScore());
+    }
+
+    @Test
+    @DisplayName("未命中时不写入注册表")
+    void shouldNotRegisterSourcesWhenNoHit() {
+        AiRetrievalSourceRegistry registry = new AiRetrievalSourceRegistry();
+        KnowledgeSearchTool tool = new KnowledgeSearchTool(vectorService, List.of(1L), null,
+            knowledgeBaseService, false, false, null, registry);
+        when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean())).thenReturn(List.of());
+
+        tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
+
+        assertTrue(registry.drain("call-1").isEmpty());
     }
 
     @Test

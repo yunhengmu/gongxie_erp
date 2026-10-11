@@ -56,6 +56,26 @@ public class AiChunkVo implements Serializable {
     private String vectorId;
 
     /**
+     * 章节路径（各级标题用 {@code >} 连接，如 第2章 > 2.3 考勤）
+     */
+    private String headingPath;
+
+    /**
+     * 切片起始页码（PDF 等分页文档）
+     */
+    private Integer pageNo;
+
+    /**
+     * 切片在文档纯文本中的起始字符下标（含）
+     */
+    private Integer charStart;
+
+    /**
+     * 切片在文档纯文本中的结束字符下标（不含）
+     */
+    private Integer charEnd;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;

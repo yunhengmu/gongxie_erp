@@ -125,7 +125,8 @@ class AiWriteChainTest {
     void shouldCarryWriteToolThroughConfirmAndResume() throws Exception {
         // 装配真实编排器与真实路由工具（事件桥亦为真实实现）
         AiRouteOrchestrator orchestrator = new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
-            new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService), traceService,
+            new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService,
+                new org.dromara.ai.core.AiRetrievalSourceRegistry()), traceService,
             aiProperties, runtimeConfigStore, skillService, agentService);
         RouteDecisionTool routeTool = new RouteDecisionTool(orchestrator);
 

@@ -343,22 +343,36 @@ create table if not exists ai_chunk (
     kb_id       bigint       not null,
     doc_id      bigint       not null,
     chunk_index integer      not null,
-    content     text,
-    char_count  integer      default 0,
-    vector_id   varchar(100),
-    create_dept bigint,
-    create_by   bigint,
-    create_time timestamp,
-    update_by   bigint,
-    update_time timestamp,
+    content      text,
+    char_count   integer      default 0,
+    vector_id    varchar(100),
+    heading_path varchar(500),
+    page_no      integer,
+    char_start   integer,
+    char_end     integer,
+    create_dept  bigint,
+    create_by    bigint,
+    create_time  timestamp,
+    update_by    bigint,
+    update_time  timestamp,
     constraint pk_ai_chunk primary key (id)
 );
 comment on table ai_chunk is 'AI 知识库文档切片表';
 comment on column ai_chunk.chunk_index is '切片序号（从 0 开始）';
 comment on column ai_chunk.content is '切片正文';
 comment on column ai_chunk.vector_id is 'Milvus 中的向量主键';
+comment on column ai_chunk.heading_path is '章节路径（各级标题用 > 连接，如 第2章 > 2.3 考勤）';
+comment on column ai_chunk.page_no is '切片起始页码（PDF 等分页文档）';
+comment on column ai_chunk.char_start is '切片在文档纯文本中的起始字符下标（含）';
+comment on column ai_chunk.char_end is '切片在文档纯文本中的结束字符下标（不含）';
 create index if not exists idx_ai_chunk_doc on ai_chunk (doc_id);
 create index if not exists idx_ai_chunk_kb on ai_chunk (kb_id);
+
+-- 存量库增量（幂等）：为已存在的 ai_chunk 补充溯源元数据列；全新库由上方建表语句已含这些列，可重复执行。
+alter table ai_chunk add column if not exists heading_path varchar(500);
+alter table ai_chunk add column if not exists page_no integer;
+alter table ai_chunk add column if not exists char_start integer;
+alter table ai_chunk add column if not exists char_end integer;
 
 -- ============================================================
 -- 智能体与会话
@@ -572,6 +586,7 @@ create table if not exists ai_message (
     completion_tokens integer,
     total_tokens      integer,
     duration_ms       bigint,
+    sources           text,
     remark            varchar(500),
     create_dept       bigint,
     create_by         bigint,
@@ -593,7 +608,11 @@ comment on column ai_message.prompt_tokens is '输入 Token 数';
 comment on column ai_message.completion_tokens is '输出 Token 数';
 comment on column ai_message.total_tokens is '总 Token 数';
 comment on column ai_message.duration_ms is '本轮耗时（毫秒）';
+comment on column ai_message.sources is '回答参考来源（JSON 字符串，知识库命中；可空）';
 create index if not exists idx_ai_message_session on ai_message (session_id, id);
+
+-- 存量库增量（幂等）：为已存在的 ai_message 补充「回答参考来源」列
+alter table ai_message add column if not exists sources text;
 
 create table if not exists ai_message_attachment (
     id             bigint       not null,

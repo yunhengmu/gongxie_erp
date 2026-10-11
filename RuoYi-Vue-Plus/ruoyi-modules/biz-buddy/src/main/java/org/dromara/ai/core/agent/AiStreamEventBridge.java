@@ -13,9 +13,11 @@ import io.agentscope.core.message.ToolUseBlock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.AiRetrievalSourceRegistry;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.core.safety.SafetyDecision;
 import org.dromara.ai.core.safety.SafetyScene;
+import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.common.core.utils.StringUtils;
@@ -23,7 +25,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * AgentScope 事件 → 流式状态与 SSE 信封的桥接器。
@@ -61,6 +65,11 @@ public class AiStreamEventBridge {
     private final IAiSafetyEventService safetyEventService;
 
     /**
+     * 检索来源注册表：知识库检索工具命中时暂存的结构化来源，按 toolCallId 取用
+     */
+    private final AiRetrievalSourceRegistry retrievalSourceRegistry;
+
+    /**
      * SSE 事件：清空本轮已展示正文（安全拦截时丢弃已流出片段）
      */
     private static final String EVENT_ANSWER_RESET = "answer_reset";
@@ -84,6 +93,11 @@ public class AiStreamEventBridge {
      * 事件类型：工具结果
      */
     private static final String EVENT_TOOL_RESULT = "tool_result";
+
+    /**
+     * 事件类型：回答参考来源（知识库命中）
+     */
+    private static final String EVENT_REFERENCES = "references";
 
     /**
      * 处理一个 AgentScope 事件：按事件类型分发（工具调用事件照常下发）。
@@ -353,6 +367,9 @@ public class AiStreamEventBridge {
             traceService.appendTransition(state.traceId, "tool_error",
                 acc.toolName + " → " + acc.state.name());
         }
+        // 参考来源：取出该工具调用暂存的来源并累积（去重），专家直答链路 forwardToolEvents=false 时同样累积
+        List<AiSourceVo> sources = retrievalSourceRegistry.drain(resultEnd.getToolCallId());
+        List<AiSourceVo> added = mergeSources(state, sources);
         if (!forwardToolEvents) {
             return;
         }
@@ -372,6 +389,61 @@ public class AiStreamEventBridge {
         payload.put("durationMs", acc.durationMs);
         putSource(payload, acc.source);
         AiSseSupport.send(emitter, payload);
+        if (!added.isEmpty()) {
+            // 新增参考来源事件：载荷结构与 done 载荷的 references 保持一致（同一 VO 序列化）
+            Map<String, Object> references = AiSseSupport.envelope(EVENT_REFERENCES);
+            references.put("replyId", state.replyId);
+            references.put("items", added);
+            references.put("toolCallId", resultEnd.getToolCallId());
+            AiSseSupport.send(emitter, references);
+        }
+    }
+
+    /**
+     * 把某次检索命中的来源去重后累加进状态，并返回本次新增（或相似度被刷新）的部分。
+     *
+     * <p>去重口径：{@code docId + chunkIndex} 相同视为同一条，保留最高 score。</p>
+     *
+     * <p>也供编排器把**专家子状态**的来源回填到入口状态（专家链路使用独立状态）。</p>
+     *
+     * @param state   流式累积状态
+     * @param sources 本次工具命中暂存的来源
+     * @return 本次实际新增或刷新得分的来源列表
+     */
+    public List<AiSourceVo> mergeSources(AiStreamState state, List<AiSourceVo> sources) {
+        List<AiSourceVo> added = new ArrayList<>();
+        if (state == null || sources == null || sources.isEmpty()) {
+            return added;
+        }
+        for (AiSourceVo source : sources) {
+            AiSourceVo existing = findSource(state.sources, source);
+            if (existing == null) {
+                state.sources.add(source);
+                added.add(source);
+            } else if (source.getScore() != null
+                && (existing.getScore() == null || source.getScore() > existing.getScore())) {
+                existing.setScore(source.getScore());
+                added.add(existing);
+            }
+        }
+        return added;
+    }
+
+    /**
+     * 在已累积来源中查找同一条（{@code docId + chunkIndex} 相同）。
+     *
+     * @param sources 已累积来源
+     * @param target  待查找来源
+     * @return 命中的已存在项；无则返回 null
+     */
+    private AiSourceVo findSource(List<AiSourceVo> sources, AiSourceVo target) {
+        for (AiSourceVo item : sources) {
+            if (Objects.equals(item.getDocId(), target.getDocId())
+                && Objects.equals(item.getChunkIndex(), target.getChunkIndex())) {
+                return item;
+            }
+        }
+        return null;
     }
 
     /**

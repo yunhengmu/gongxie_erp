@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -241,7 +242,8 @@ class AiDocumentServiceImplTest {
         try (MockedStatic<HttpUtil> hs = mockStatic(HttpUtil.class);
              MockedStatic<AiDocumentParser> ps = mockStatic(AiDocumentParser.class)) {
             hs.when(() -> HttpUtil.downloadBytes("http://minio/a")).thenReturn(new byte[]{1, 2, 3});
-            ps.when(() -> AiDocumentParser.extract(any(byte[].class), eq("txt"))).thenReturn("hello world");
+            ps.when(() -> AiDocumentParser.parse(any(byte[].class), eq("txt")))
+                .thenReturn(List.of(new AiDocumentParser.ParsedBlock("hello world", 0, null, null)));
 
             AiDocumentVo result = service.parse(1L);
 
@@ -263,7 +265,8 @@ class AiDocumentServiceImplTest {
         try (MockedStatic<HttpUtil> hs = mockStatic(HttpUtil.class);
              MockedStatic<AiDocumentParser> ps = mockStatic(AiDocumentParser.class)) {
             hs.when(() -> HttpUtil.downloadBytes("http://minio/a")).thenReturn(new byte[]{1});
-            ps.when(() -> AiDocumentParser.extract(any(byte[].class), eq("txt"))).thenReturn("  ");
+            ps.when(() -> AiDocumentParser.parse(any(byte[].class), eq("txt")))
+                .thenReturn(List.of(new AiDocumentParser.ParsedBlock("  ", 0, null, null)));
 
             assertThrows(ServiceException.class, () -> service.parse(1L));
         }
@@ -343,6 +346,69 @@ class AiDocumentServiceImplTest {
         huge.setContent("a".repeat(200_001));
         when(baseMapper.selectById(4L)).thenReturn(huge);
         assertTrue(service.queryContent(4L).contains("内容过长"));
+    }
+
+    @Test
+    @DisplayName("拼块与块定位：跨块切片的元数据取起始块")
+    void shouldLocateStartBlockForCrossBlockSlice() {
+        AiDocumentServiceImpl.TextAndRanges parsed = AiDocumentServiceImpl.joinBlocks(List.of(
+            new AiDocumentParser.ParsedBlock("AAA", 0, "第1章", null),
+            new AiDocumentParser.ParsedBlock("BBB", 0, "第2章", 3)));
+
+        assertEquals("AAA\nBBB", parsed.text());
+        assertEquals(0, parsed.ranges().get(0).start());
+        assertEquals(3, parsed.ranges().get(0).end());
+        assertEquals(4, parsed.ranges().get(1).start());
+        // 起点落在第 1 块，即便切片跨越到第 2 块也取起始块
+        assertEquals("第1章", AiDocumentServiceImpl.locateBlock(parsed.ranges(), 2).headingPath());
+        assertEquals("第2章", AiDocumentServiceImpl.locateBlock(parsed.ranges(), 4).headingPath());
+        assertEquals(3, AiDocumentServiceImpl.locateBlock(parsed.ranges(), 4).pageNo());
+    }
+
+    @Test
+    @DisplayName("切片附带全文中的字符区间")
+    void shouldAttachCharRangeToSlices() {
+        List<AiDocumentServiceImpl.SlicePiece> pieces = AiDocumentServiceImpl.splitPieces("abcdefghij", 4, 0);
+
+        assertEquals(3, pieces.size());
+        assertEquals(0, pieces.get(0).start());
+        assertEquals(4, pieces.get(0).end());
+        assertEquals(8, pieces.get(2).start());
+        assertEquals(10, pieces.get(2).end());
+    }
+
+    @Test
+    @DisplayName("解析文档：切片写入章节路径 / 页码 / 字符区间")
+    void shouldWriteChunkMetadata() {
+        AiDocument doc = document(1L, 2L, "txt", 5L, "0");
+        when(baseMapper.selectById(1L)).thenReturn(doc);
+        when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb(2L, 5, 0));
+        when(chunkMapper.selectList(any())).thenReturn(List.of());
+        when(ossService.selectInternalUrlByIds("5")).thenReturn("http://minio/a");
+        when(baseMapper.selectVoById(1L)).thenReturn(new AiDocumentVo());
+        try (MockedStatic<HttpUtil> hs = mockStatic(HttpUtil.class);
+             MockedStatic<AiDocumentParser> ps = mockStatic(AiDocumentParser.class)) {
+            hs.when(() -> HttpUtil.downloadBytes("http://minio/a")).thenReturn(new byte[]{1});
+            ps.when(() -> AiDocumentParser.parse(any(byte[].class), eq("txt"))).thenReturn(List.of(
+                new AiDocumentParser.ParsedBlock("AAAA", 1, "第1章", null),
+                new AiDocumentParser.ParsedBlock("BBBB", 0, "第2章", 2)));
+
+            service.parse(1L);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<AiChunk>> captor = ArgumentCaptor.forClass(List.class);
+            verify(chunkMapper).insertBatch(captor.capture());
+            List<AiChunk> chunks = captor.getValue();
+            assertEquals(2, chunks.size());
+            assertEquals("第1章", chunks.get(0).getHeadingPath());
+            assertNull(chunks.get(0).getPageNo());
+            assertEquals(0, chunks.get(0).getCharStart());
+            assertEquals(5, chunks.get(0).getCharEnd());
+            assertEquals("第2章", chunks.get(1).getHeadingPath());
+            assertEquals(2, chunks.get(1).getPageNo());
+            assertEquals(5, chunks.get(1).getCharStart());
+            assertEquals(9, chunks.get(1).getCharEnd());
+        }
     }
 
     @Test

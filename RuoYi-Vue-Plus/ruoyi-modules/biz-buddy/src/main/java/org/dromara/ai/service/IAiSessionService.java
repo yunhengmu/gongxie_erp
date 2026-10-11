@@ -9,6 +9,7 @@ import org.dromara.ai.domain.vo.AiAgentVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
 import org.dromara.ai.domain.vo.AiSessionExportVo;
 import org.dromara.ai.domain.vo.AiSessionVo;
+import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.domain.vo.AiToolCallLogVo;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -148,10 +149,12 @@ public interface IAiSessionService {
      * @param toolLogs   工具调用明细（可为空）
      * @param tokens     本轮 Token 用量（可为空）
      * @param userId     触发用户（工具明细的归属用户；无人值守链路为运行身份用户）
+     * @param sources    回答参考来源（知识库命中；可空）
      * @return 助手消息实体
      */
     AiMessage persistAssistantTurn(Long sessionId, String content, String replyId, Long durationMs,
-                                   List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, Long userId);
+                                   List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, Long userId,
+                                   List<AiSourceVo> sources);
 
     /**
      * 落库助手失败消息。
@@ -169,9 +172,11 @@ public interface IAiSessionService {
      * @param sessionId  会话主键
      * @param content    停止前已产生的回答正文（可为空）
      * @param durationMs 本轮耗时（毫秒）
+     * @param sources    回答参考来源（知识库命中；可空）
      * @return 助手消息实体
      */
-    AiMessage persistAssistantAborted(Long sessionId, String content, Long durationMs);
+    AiMessage persistAssistantAborted(Long sessionId, String content, Long durationMs,
+                                      List<AiSourceVo> sources);
 
     /**
      * 落库「等待人工确认」的助手消息（HITL 暂停），状态为待确认。
@@ -183,10 +188,12 @@ public interface IAiSessionService {
      * @param toolLogs   待确认工具调用明细（可为空）
      * @param tokens     暂停前 Token 用量（可为空）
      * @param userId     触发用户（工具明细的归属用户）
+     * @param sources    回答参考来源（知识库命中；可空）
      * @return 助手消息实体
      */
     AiMessage persistPendingTurn(Long sessionId, String content, String replyId, Long durationMs,
-                                 List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, Long userId);
+                                 List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, Long userId,
+                                 List<AiSourceVo> sources);
 
     /**
      * 追加更新同一条助手消息（HITL 确认后恢复生成时使用，避免一次问答拆成两条消息）。
@@ -199,10 +206,11 @@ public interface IAiSessionService {
      * @param additionalDurationMs 追加耗时（毫秒）
      * @param toolLogs           追加的工具调用明细（可为空）
      * @param tokens             追加的 Token 用量（可为空）
+     * @param sources            回答参考来源（知识库命中；可空：为空时保留原值）
      * @return 更新后的助手消息实体
      */
     AiMessage appendAssistantTurn(Long messageId, String appendContent, String status, Long additionalDurationMs,
-                                  List<AiToolCallLog> toolLogs, ChatTokenUsage tokens);
+                                  List<AiToolCallLog> toolLogs, ChatTokenUsage tokens, List<AiSourceVo> sources);
 
     /**
      * 查询会话内仍处于「等待确认」状态的助手消息（供刷新页面后恢复确认卡片）。

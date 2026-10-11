@@ -8,6 +8,7 @@ import org.dromara.ai.domain.AiMessage;
 import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.AiToolCallLog;
 import org.dromara.ai.domain.AiTrace;
+import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
 import org.dromara.ai.service.IAiSafetyEventService;
@@ -107,7 +108,7 @@ class AiTurnFinisherTest {
     @DisplayName("finish：非恢复段落库新助手消息")
     void shouldPersistNewAssistantTurn() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         SseEmitter emitter = mock(SseEmitter.class);
@@ -115,15 +116,15 @@ class AiTurnFinisherTest {
         AiMessage result = finisher.finish(emitter, SESSION_ID, state, 10L, null, null);
 
         assertEquals(200L, result.getId());
-        verify(sessionService).persistAssistantTurn(eq(SESSION_ID), any(), any(), any(), any(), any(), any());
-        verify(sessionService, never()).appendAssistantTurn(any(), any(), any(), any(), any(), any());
+        verify(sessionService).persistAssistantTurn(eq(SESSION_ID), any(), any(), any(), any(), any(), any(), any());
+        verify(sessionService, never()).appendAssistantTurn(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("finish：恢复段追加更新同一条消息且请求数计 0")
     void shouldAppendAssistantTurnForResume() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any()))
+        when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         SseEmitter emitter = mock(SseEmitter.class);
@@ -132,9 +133,9 @@ class AiTurnFinisherTest {
 
         assertEquals(200L, result.getId());
         ArgumentCaptor<String> status = ArgumentCaptor.forClass(String.class);
-        verify(sessionService).appendAssistantTurn(eq(MESSAGE_ID), any(), status.capture(), any(), any(), any());
+        verify(sessionService).appendAssistantTurn(eq(MESSAGE_ID), any(), status.capture(), any(), any(), any(), any());
         assertEquals(AiMessage.STATUS_NORMAL, status.getValue());
-        verify(sessionService, never()).persistAssistantTurn(any(), any(), any(), any(), any(), any(), any());
+        verify(sessionService, never()).persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any());
         verify(usageStatService).accumulate(eq(USER_ID), eq(AGENT_ID), eq(MODEL_ID), any(), eq(0), eq(0));
     }
 
@@ -142,7 +143,7 @@ class AiTurnFinisherTest {
     @DisplayName("finish：专家直答接管态正文取 handoffAnswer")
     void shouldPreferHandoffAnswerWhenPresent() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         state.answer.append("入口正文");
@@ -154,7 +155,7 @@ class AiTurnFinisherTest {
         finisher.finish(emitter, SESSION_ID, state, 10L, null, route);
 
         ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
-        verify(sessionService).persistAssistantTurn(eq(SESSION_ID), content.capture(), any(), any(), any(), any(), any());
+        verify(sessionService).persistAssistantTurn(eq(SESSION_ID), content.capture(), any(), any(), any(), any(), any(), any());
         assertEquals("专家正文", content.getValue());
     }
 
@@ -162,7 +163,7 @@ class AiTurnFinisherTest {
     @DisplayName("finish：接管态但专家缓冲为空时回落入口正文")
     void shouldFallBackToStateAnswerWhenHandoffBufferEmpty() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         state.answer.append("入口正文");
@@ -173,7 +174,7 @@ class AiTurnFinisherTest {
         finisher.finish(emitter, SESSION_ID, state, 10L, null, route);
 
         ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
-        verify(sessionService).persistAssistantTurn(eq(SESSION_ID), content.capture(), any(), any(), any(), any(), any());
+        verify(sessionService).persistAssistantTurn(eq(SESSION_ID), content.capture(), any(), any(), any(), any(), any(), any());
         assertEquals("入口正文", content.getValue());
     }
 
@@ -181,7 +182,7 @@ class AiTurnFinisherTest {
     @DisplayName("finish：恢复段跳过入口轮决策补写")
     void shouldSkipEntryAllowDecisionsForResume() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any()))
+        when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         state.tools.put("c1", acc("create_notice", ToolResultState.SUCCESS));
@@ -196,7 +197,7 @@ class AiTurnFinisherTest {
     @DisplayName("finish：专家调用决策留痕跳过未执行/被拒的工具")
     void shouldRecordExpertAllowOnlyForExecutedTools() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         AiRouteContext route = route();
@@ -216,7 +217,7 @@ class AiTurnFinisherTest {
     @DisplayName("finish：入参决策留痕记录已执行工具（非恢复段）")
     void shouldRecordEntryAllowDecisionsForExecutedTools() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         state.tools.put("c1", acc("create_notice", ToolResultState.SUCCESS));
@@ -233,7 +234,7 @@ class AiTurnFinisherTest {
     @DisplayName("finish：tokens 为空时 done 信封不含 totalTokens 且请求数计 1")
     void shouldOmitTotalTokensAndCountFirstRequest() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         SseEmitter emitter = mock(SseEmitter.class);
@@ -249,7 +250,7 @@ class AiTurnFinisherTest {
     @DisplayName("finish：tokens 非空时 done 信封含 totalTokens")
     void shouldIncludeTotalTokensWhenPresent() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         state.promptTokens = 3;
@@ -263,9 +264,35 @@ class AiTurnFinisherTest {
     }
 
     @Test
+    @DisplayName("finish：有参考来源时 done 载荷含 references 且落库携带来源")
+    void shouldIncludeReferencesWhenSourcesPresent() throws Exception {
+        AiMessage assistant = mockAssistant(200L);
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
+            .thenReturn(assistant);
+        AiStreamState state = state();
+        AiSourceVo source = new AiSourceVo();
+        source.setDocId(11L);
+        source.setDocName("员工手册");
+        state.sources.add(source);
+        SseEmitter emitter = mock(SseEmitter.class);
+
+        finisher.finish(emitter, SESSION_ID, state, 10L, null, null);
+
+        String done = jsonOfType(emitter, "done");
+        assertTrue(done.contains("\"references\""), done);
+        assertTrue(done.contains("\"docId\":11"), done);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<AiSourceVo>> sources = ArgumentCaptor.forClass(List.class);
+        verify(sessionService).persistAssistantTurn(eq(SESSION_ID), any(), any(), any(), any(), any(), any(), sources.capture());
+        assertEquals(1, sources.getValue().size());
+        assertEquals(11L, sources.getValue().get(0).getDocId());
+    }
+
+    @Test
     @DisplayName("finish：落库失败发错误信封并关闭流，返回 null")
     void shouldSendErrorAndReturnNullWhenPersistFails() throws Exception {
-        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenThrow(new RuntimeException("db down"));
         AiStreamState state = state();
         SseEmitter emitter = mock(SseEmitter.class);
@@ -288,8 +315,8 @@ class AiTurnFinisherTest {
 
         finisher.finishCancelled(emitter, SESSION_ID, state, 10L, null, null);
 
-        verify(sessionService).persistAssistantAborted(eq(SESSION_ID), any(), eq(10L));
-        verify(sessionService, never()).appendAssistantTurn(any(), any(), any(), any(), any(), any());
+        verify(sessionService).persistAssistantAborted(eq(SESSION_ID), any(), eq(10L), any());
+        verify(sessionService, never()).appendAssistantTurn(any(), any(), any(), any(), any(), any(), any());
         verify(traceService).accumulate(eq(TRACE_ID), eq(AiTrace.STATUS_ABORTED), eq(10L), any(), any(), any(), any(), any());
         assertTrue(jsonOfType(emitter, "aborted") != null);
         verify(emitter).complete();
@@ -304,7 +331,7 @@ class AiTurnFinisherTest {
         finisher.finishCancelled(emitter, SESSION_ID, state, 10L, MESSAGE_ID, null);
 
         ArgumentCaptor<String> status = ArgumentCaptor.forClass(String.class);
-        verify(sessionService).appendAssistantTurn(eq(MESSAGE_ID), any(), status.capture(), any(), any(), any());
+        verify(sessionService).appendAssistantTurn(eq(MESSAGE_ID), any(), status.capture(), any(), any(), any(), any());
         assertEquals(AiMessage.STATUS_ABORTED, status.getValue());
         verify(traceService).accumulate(eq(TRACE_ID), eq(AiTrace.STATUS_ABORTED), eq(10L), any(), any(), any(), any(), any());
         assertTrue(jsonOfType(emitter, "aborted") != null);
@@ -316,7 +343,7 @@ class AiTurnFinisherTest {
     @DisplayName("finishPending：专家暂停落平台文案并回填消息主键")
     void shouldUsePlatformTextWhenExpertPaused() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistPendingTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistPendingTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         state.answer.append("残句");
@@ -328,7 +355,7 @@ class AiTurnFinisherTest {
 
         assertEquals(200L, result);
         ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
-        verify(sessionService).persistPendingTurn(eq(SESSION_ID), content.capture(), any(), any(), any(), any(), any());
+        verify(sessionService).persistPendingTurn(eq(SESSION_ID), content.capture(), any(), any(), any(), any(), any(), any());
         assertEquals("专家准备执行的操作需要你确认后才会继续，请在下方确认卡片中处置。\n\n", content.getValue());
         verify(usageStatService).accumulate(eq(USER_ID), eq(AGENT_ID), eq(MODEL_ID), any(), eq(0), eq(1));
     }
@@ -337,7 +364,7 @@ class AiTurnFinisherTest {
     @DisplayName("finishPending：入口暂停落累积正文")
     void shouldUseStateAnswerWhenEntryPaused() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistPendingTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistPendingTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         state.answer.append("入口暂停正文");
@@ -346,7 +373,7 @@ class AiTurnFinisherTest {
         finisher.finishPending(emitter, SESSION_ID, state, 10L, null);
 
         ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
-        verify(sessionService).persistPendingTurn(eq(SESSION_ID), content.capture(), any(), any(), any(), any(), any());
+        verify(sessionService).persistPendingTurn(eq(SESSION_ID), content.capture(), any(), any(), any(), any(), any(), any());
         assertEquals("入口暂停正文", content.getValue());
     }
 
@@ -354,7 +381,7 @@ class AiTurnFinisherTest {
     @DisplayName("finishPending：只落已产生结果的工具明细")
     void shouldOnlyPersistFinishedToolLogs() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.persistPendingTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistPendingTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         state.tools.put("c1", acc("done_tool", ToolResultState.SUCCESS));
@@ -365,7 +392,7 @@ class AiTurnFinisherTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<AiToolCallLog>> logs = ArgumentCaptor.forClass(List.class);
-        verify(sessionService).persistPendingTurn(eq(SESSION_ID), any(), any(), any(), logs.capture(), any(), any());
+        verify(sessionService).persistPendingTurn(eq(SESSION_ID), any(), any(), any(), logs.capture(), any(), any(), any());
         assertEquals(1, logs.getValue().size());
         assertEquals("done_tool", logs.getValue().get(0).getToolName());
     }
@@ -373,7 +400,7 @@ class AiTurnFinisherTest {
     @Test
     @DisplayName("finishPending：落库失败发等待确认失败信封")
     void shouldSendPendingSaveErrorWhenPersistFails() throws Exception {
-        when(sessionService.persistPendingTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistPendingTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenThrow(new RuntimeException("boom"));
         AiStreamState state = state();
         SseEmitter emitter = mock(SseEmitter.class);
@@ -390,7 +417,7 @@ class AiTurnFinisherTest {
     @DisplayName("finishPendingResume：专家再次暂停正文为空串且状态为待确认")
     void shouldClearContentAndMarkPendingOnResumePause() throws Exception {
         AiMessage assistant = mockAssistant(200L);
-        when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any()))
+        when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         AiStreamState state = state();
         state.answer.append("不应落库");
@@ -402,7 +429,7 @@ class AiTurnFinisherTest {
 
         ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> status = ArgumentCaptor.forClass(String.class);
-        verify(sessionService).appendAssistantTurn(eq(MESSAGE_ID), content.capture(), status.capture(), any(), any(), any());
+        verify(sessionService).appendAssistantTurn(eq(MESSAGE_ID), content.capture(), status.capture(), any(), any(), any(), any());
         assertEquals("", content.getValue());
         assertEquals(AiMessage.STATUS_PENDING_CONFIRM, status.getValue());
         verify(usageStatService).accumulate(eq(USER_ID), eq(AGENT_ID), eq(MODEL_ID), any(), eq(0), eq(0));

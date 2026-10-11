@@ -385,6 +385,10 @@ public class AiVectorServiceImpl implements IAiVectorService {
             vo.setContent(chunk.getContent());
             vo.setDocId(chunk.getDocId());
             vo.setDocName(docNames.get(chunk.getDocId()));
+            vo.setHeadingPath(chunk.getHeadingPath());
+            vo.setPageNo(chunk.getPageNo());
+            vo.setCharStart(chunk.getCharStart());
+            vo.setCharEnd(chunk.getCharEnd());
             vo.setScore(hit.score());
             result.add(vo);
         }

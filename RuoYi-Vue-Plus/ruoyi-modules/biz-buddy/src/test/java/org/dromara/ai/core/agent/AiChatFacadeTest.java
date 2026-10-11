@@ -427,7 +427,7 @@ class AiChatFacadeTest {
         when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
             .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>empty()));
         when(aiProperties.getChat()).thenReturn(new AiProperties.Chat());
-        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any()))
+        when(sessionService.persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any()))
             .thenReturn(assistant);
         when(assistant.getId()).thenReturn(200L);
         SseEmitter emitter = mock(SseEmitter.class);
@@ -437,7 +437,7 @@ class AiChatFacadeTest {
             facade.streamChat(SESSION_ID, MESSAGE_ID, emitter);
         }
 
-        verify(sessionService).persistAssistantTurn(any(), any(), any(), any(), any(), any(), any());
+        verify(sessionService).persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any());
         verify(emitter).complete();
     }
 
@@ -568,13 +568,13 @@ class AiChatFacadeTest {
         when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
             .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>empty()));
         when(aiProperties.getChat()).thenReturn(new AiProperties.Chat());
-        when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any())).thenReturn(assistant);
+        when(sessionService.appendAssistantTurn(any(), any(), any(), any(), any(), any(), any())).thenReturn(assistant);
         when(assistant.getId()).thenReturn(200L);
         SseEmitter emitter = mock(SseEmitter.class);
 
         facade.streamResume(SESSION_ID, MESSAGE_ID, emitter);
 
-        verify(sessionService).appendAssistantTurn(any(), any(), any(), any(), any(), any());
+        verify(sessionService).appendAssistantTurn(any(), any(), any(), any(), any(), any(), any());
         verify(emitter).complete();
     }
 

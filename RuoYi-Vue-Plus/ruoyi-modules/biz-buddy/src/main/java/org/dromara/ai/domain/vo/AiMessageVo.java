@@ -87,6 +87,11 @@ public class AiMessageVo implements Serializable {
     private Long durationMs;
 
     /**
+     * 回答参考来源（JSON 字符串，前端自行解析；可空）
+     */
+    private String sources;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createTime;
