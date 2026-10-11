@@ -394,3 +394,19 @@ bizbuddy:
       username: ${MILVUS_USERNAME:root}
       password: ${MILVUS_PASSWORD:Milvus}
       connect-timeout-ms: 10000
+    # RAG 检索重排（Rerank）：默认关闭；开启后检索走「稠密召回(max(topK,rerankTopN)) → 文本重排 → 截断 topK」。
+    # 密钥复用知识库向量模型（dashscope）的 api_key；未配密钥/非 2xx/超时/结构异常一律降级为原顺序。
+    rag:
+      rerank-enabled: false
+      rerank-model: gte-rerank-v2
+      rerank-endpoint: https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank
+      rerank-top-n: 20
+      rerank-timeout-ms: 12000
+    # 上下文装配（P0-③）：对「已排序命中」做确定性去重 + 相邻切片合并 + 字符上限，只作用于返回集后处理、不改排序。
+    # 去重判据：规范化空白后互为子串，或字符 n-gram Jaccard ≥ assemble-dedup-jaccard；默认整体开启。
+    # 新增字段位于 rag 段内（assemble-* 前缀），其上为检索重排（Rerank）配置。
+      assemble-dedup-enabled: true
+      assemble-merge-adjacent-enabled: true
+      assemble-merge-window: 1
+      assemble-dedup-jaccard: 0.9
+      assemble-max-chars: 6000

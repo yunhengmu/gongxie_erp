@@ -63,6 +63,11 @@ public class AiProperties {
     private Security security = new Security();
 
     /**
+     * RAG 检索增强配置（当前仅检索重排 Rerank）：默认关闭，可按需开启并对 A/B
+     */
+    private Rag rag = new Rag();
+
+    /**
      * Milvus 连接配置。
      */
     @Data
@@ -485,6 +490,72 @@ public class AiProperties {
          * 聊天上传：单条用户消息允许携带的附件数量上限，默认 5。
          */
         private int maxAttachmentsPerMessage = 5;
+    }
+
+    /**
+     * RAG 检索增强配置（当前仅「检索重排 Rerank」）。
+     *
+     * <p>口径：<b>默认关闭</b>（{@code rerankEnabled=false}），开启后检索走「稠密召回 → 文本重排 → 截断 topK」，
+     * 可经「检索测试」接口的 {@code rerank} 参数或本开关按需对 A/B。</p>
+     *
+     * <p>降级：未配密钥 / HTTP 非 2xx / 超时 / 响应结构不符时，<b>一律保持原顺序</b>，绝不阻断检索。</p>
+     */
+    @Data
+    public static class Rag {
+
+        /**
+         * 是否启用检索重排（默认关闭）
+         */
+        private boolean rerankEnabled = false;
+
+        /**
+         * 重排模型标识（DashScope 文本重排）
+         */
+        private String rerankModel = "gte-rerank-v2";
+
+        /**
+         * 重排服务端点（DashScope 原生文本重排接口，完整 URL）
+         */
+        private String rerankEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank";
+
+        /**
+         * 重排前的稠密召回条数（先按 max(topK, rerankTopN) 召回再重排）
+         */
+        private int rerankTopN = 20;
+
+        /**
+         * 重排调用超时（毫秒），超时即降级为原顺序
+         */
+        private int rerankTimeoutMs = 12000;
+
+        /**
+         * 是否启用**检索结果内容去重**（P0-③ 上下文装配）：内容重复 / 高度重叠的命中只保留首个。
+         *
+         * <p>确定性纯文本判据（不调模型）：规范化空白后互为子串，或字符 n-gram Jaccard ≥
+         * {@link #assembleDedupJaccard}。默认开启，只作用于返回集后处理、不改排序。</p>
+         */
+        private boolean assembleDedupEnabled = true;
+
+        /**
+         * 是否启用**相邻切片合并**（P0-③ 上下文装配）：同一文档且切片号相邻（差 ≤
+         * {@link #assembleMergeWindow}）的命中合并为一个片段。
+         */
+        private boolean assembleMergeAdjacentEnabled = true;
+
+        /**
+         * 相邻切片合并的窗口（切片号差值的绝对值上限）：1 表示相邻切片合并。
+         */
+        private int assembleMergeWindow = 1;
+
+        /**
+         * 内容去重的字符 n-gram Jaccard 阈值：达到即视为重复（0~1，越大越严格）。
+         */
+        private double assembleDedupJaccard = 0.9;
+
+        /**
+         * 装配后片段总正文的字符上限（与工具现状一致，默认 6000）：超限时按相关度优先保留。
+         */
+        private int assembleMaxChars = 6000;
     }
 
 }

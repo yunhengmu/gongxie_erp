@@ -34,6 +34,21 @@ public interface IAiVectorService {
     List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold);
 
     /**
+     * 检索测试：按查询文本召回切片，可选开启重排（Rerank）。
+     *
+     * <p>{@code rerank=true} 时先按 {@code max(topK, rerankTopN)} 稠密召回，再调重排模型重排后截取 topK；
+     * 重排失败（未配密钥 / 非 2xx / 超时 / 结构异常）时保持原顺序与原文分数，不阻断检索。</p>
+     *
+     * @param kbId      知识库主键
+     * @param query     查询文本
+     * @param topK      召回条数，为空取知识库配置
+     * @param threshold 相似度阈值，为空取知识库配置
+     * @param rerank    是否开启重排
+     * @return 命中切片（重排成功时按重排分降序，否则按相似度降序）
+     */
+    List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, boolean rerank);
+
+    /**
      * 清理向量库中的切片向量（文档重新解析或删除时调用）。
      *
      * @param kbId      知识库主键

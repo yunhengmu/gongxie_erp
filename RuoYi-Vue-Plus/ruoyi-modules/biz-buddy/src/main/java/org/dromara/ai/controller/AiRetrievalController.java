@@ -8,6 +8,8 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.AiRetrievalContextAssembler;
 import org.dromara.ai.domain.vo.AiRetrievalHitVo;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiVectorService;
@@ -40,6 +42,8 @@ public class AiRetrievalController extends BaseController {
 
     private final IAiKnowledgeBaseService aiKnowledgeBaseService;
 
+    private final AiProperties aiProperties;
+
     /**
      * 检索测试：按查询文本召回切片，用于上线前验证问答质量
      *
@@ -49,6 +53,8 @@ public class AiRetrievalController extends BaseController {
      * @param query     查询文本
      * @param topK      召回条数，为空取知识库配置
      * @param threshold 相似度阈值，为空取知识库配置
+     * @param rerank    是否开启重排，为空时跟随平台配置（{@code bizbuddy.ai.rag.rerank-enabled}）
+     * @param assemble  是否对命中应用上下文装配（P0-③ 去重 + 相邻合并 + 字符上限）；为空 / false 时保持原始命中
      */
     @SaCheckPermission("ai:kb:retrieval")
     @Log(title = "AI检索测试", businessType = BusinessType.OTHER)
@@ -60,9 +66,17 @@ public class AiRetrievalController extends BaseController {
                                           @RequestParam(required = false) Integer topK,
                                           @DecimalMin(value = "0.000", message = "相似度阈值不能小于 0")
                                           @DecimalMax(value = "1.000", message = "相似度阈值不能大于 1")
-                                          @RequestParam(required = false) BigDecimal threshold) {
+                                          @RequestParam(required = false) BigDecimal threshold,
+                                          @RequestParam(required = false) Boolean rerank,
+                                          @RequestParam(required = false) Boolean assemble) {
         aiKnowledgeBaseService.validateVisible(kbId, LoginHelper.getUserId(), "检索");
-        return R.ok(aiVectorService.retrieve(kbId, query, topK, threshold));
+        boolean useRerank = rerank != null ? rerank : aiProperties.getRag().isRerankEnabled();
+        List<AiRetrievalHitVo> hits = aiVectorService.retrieve(kbId, query, topK, threshold, useRerank);
+        if (Boolean.TRUE.equals(assemble)) {
+            return R.ok(AiRetrievalContextAssembler.assemble(hits,
+                AiRetrievalContextAssembler.Options.from(aiProperties.getRag())));
+        }
+        return R.ok(hits);
     }
 
 }

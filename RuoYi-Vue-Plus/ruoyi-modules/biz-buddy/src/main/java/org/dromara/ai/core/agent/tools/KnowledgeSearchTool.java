@@ -1,5 +1,6 @@
 package org.dromara.ai.core.agent.tools;
 
+import org.dromara.ai.core.AiRetrievalContextAssembler;
 import org.dromara.ai.util.AiUntrustedContent;
 
 import io.agentscope.core.message.ToolResultBlock;
@@ -47,9 +48,9 @@ public class KnowledgeSearchTool extends ToolBase {
     private static final int DEFAULT_TOP_K = 5;
 
     /**
-     * 检索结果回填给模型的最大字符数
+     * 检索结果回填给模型的最大字符数（未注入装配配置时的兜底值）
      */
-    private static final int MAX_RESULT_CHARS = 6000;
+    private static final int DEFAULT_MAX_RESULT_CHARS = 6000;
 
     private final IAiVectorService vectorService;
 
@@ -65,6 +66,16 @@ public class KnowledgeSearchTool extends ToolBase {
     private final boolean platformScope;
 
     /**
+     * 是否开启检索重排（Rerank），来自平台配置
+     */
+    private final boolean rerank;
+
+    /**
+     * 上下文装配参数（P0-③ 去重 + 相邻合并 + 字符上限），来自平台配置；为 null 时取默认值
+     */
+    private final AiRetrievalContextAssembler.Options assembleOptions;
+
+    /**
      * 智能体场景构造：知识库绑定来自智能体定义，调用时按提问用户过滤生效范围。
      *
      * @param vectorService        向量检索服务
@@ -74,7 +85,7 @@ public class KnowledgeSearchTool extends ToolBase {
      */
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
                                IAiKnowledgeBaseService knowledgeBaseService) {
-        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, false);
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, false, false, null);
     }
 
     /**
@@ -92,6 +103,38 @@ public class KnowledgeSearchTool extends ToolBase {
      */
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
                                IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope) {
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, false, null);
+    }
+
+    /**
+     * 完整构造。
+     *
+     * @param vectorService        向量检索服务
+     * @param kbIds                知识库主键集合
+     * @param defaultTopK          默认召回条数，留空取 5
+     * @param knowledgeBaseService 知识库服务
+     * @param platformScope        是否平台出口模式
+     * @param rerank               是否开启检索重排
+     */
+    public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
+                               IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope, boolean rerank) {
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, rerank, null);
+    }
+
+    /**
+     * 完整构造（含上下文装配参数，P0-③）。
+     *
+     * @param vectorService        向量检索服务
+     * @param kbIds                知识库主键集合
+     * @param defaultTopK          默认召回条数，留空取 5
+     * @param knowledgeBaseService 知识库服务
+     * @param platformScope        是否平台出口模式
+     * @param rerank               是否开启检索重排
+     * @param assembleOptions      上下文装配参数；为 null 取默认值
+     */
+    public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
+                               IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope, boolean rerank,
+                               AiRetrievalContextAssembler.Options assembleOptions) {
         super(ToolBase.builder()
             .name(TOOL_NAME)
             .description(DESCRIPTION)
@@ -103,6 +146,8 @@ public class KnowledgeSearchTool extends ToolBase {
         this.defaultTopK = defaultTopK;
         this.knowledgeBaseService = knowledgeBaseService;
         this.platformScope = platformScope;
+        this.rerank = rerank;
+        this.assembleOptions = assembleOptions;
     }
 
     /**
@@ -150,7 +195,7 @@ public class KnowledgeSearchTool extends ToolBase {
         try {
             List<AiRetrievalHitVo> hits = new ArrayList<>();
             for (Long kbId : accessible) {
-                List<AiRetrievalHitVo> part = vectorService.retrieve(kbId, query, topK, null);
+                List<AiRetrievalHitVo> part = vectorService.retrieve(kbId, query, topK, null, rerank);
                 if (part != null) {
                     hits.addAll(part);
                 }
@@ -219,26 +264,48 @@ public class KnowledgeSearchTool extends ToolBase {
     }
 
     /**
-     * 渲染检索结果文本（总长截断）。
+     * 渲染检索结果文本。
      *
-     * @param hits 命中切片
+     * <p>先经上下文装配（P0-③ 去重 + 相邻合并 + 字符上限），再按「文档名 / 切片号 / 相似度」逐条渲染；
+     * 末尾仍以配置的字符上限做一次安全截断。编号、格式与安全包裹保持原样。</p>
+     *
+     * @param hits 命中切片（已按相关度降序）
      * @return 结果文本
      */
     private String render(List<AiRetrievalHitVo> hits) {
+        int maxChars = assembleOptions == null || assembleOptions.maxChars() <= 0
+            ? DEFAULT_MAX_RESULT_CHARS : assembleOptions.maxChars();
+        List<AiRetrievalHitVo> fragments = AiRetrievalContextAssembler.assemble(hits, assembleOptions);
         StringBuilder sb = new StringBuilder();
-        sb.append("【知识库检索结果】共 ").append(hits.size()).append(" 条\n");
+        sb.append("【知识库检索结果】共 ").append(fragments.size()).append(" 条\n");
         int index = 1;
-        for (AiRetrievalHitVo hit : hits) {
+        for (AiRetrievalHitVo hit : fragments) {
             sb.append("\n[").append(index++).append("] 文档：")
                 .append(StringUtils.isBlank(hit.getDocName()) ? "未知文档" : hit.getDocName())
-                .append(" ｜ 切片 #").append(hit.getChunkIndex() == null ? "-" : hit.getChunkIndex())
+                .append(" ｜ 切片 #").append(sliceLabel(hit))
                 .append(" ｜ 相似度 ").append(hit.getScore() == null ? "-" : String.format("%.4f", hit.getScore()))
                 .append("\n").append(StringUtils.trim(hit.getContent())).append("\n");
-            if (sb.length() > MAX_RESULT_CHARS) {
+            if (sb.length() > maxChars) {
                 break;
             }
         }
-        return sb.length() > MAX_RESULT_CHARS ? sb.substring(0, MAX_RESULT_CHARS) : sb.toString();
+        return sb.length() > maxChars ? sb.substring(0, maxChars) : sb.toString();
+    }
+
+    /**
+     * 切片号展示：相邻合并后显示区间（如 {@code 2-4}），单条显示单号。
+     *
+     * @param hit 命中片段
+     * @return 切片号标签
+     */
+    private String sliceLabel(AiRetrievalHitVo hit) {
+        if (hit.getChunkIndex() == null) {
+            return "-";
+        }
+        if (hit.getChunkIndexEnd() != null && !hit.getChunkIndexEnd().equals(hit.getChunkIndex())) {
+            return hit.getChunkIndex() + "-" + hit.getChunkIndexEnd();
+        }
+        return String.valueOf(hit.getChunkIndex());
     }
 
 }
