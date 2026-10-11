@@ -37,7 +37,7 @@ class AiExpertPromptServiceImplTest {
     @Test
     @DisplayName("生成成功解析两项建议值")
     void shouldGenerateSuccessfully() {
-        when(modelConfigService.queryById(1L)).thenReturn(chatModel("deepseek-v4-flash-0731"));
+        when(modelConfigService.queryById(1L)).thenReturn(chatModel("deepseek-v4-pro-0813"));
         when(modelConfigService.decryptApiKey(1L)).thenReturn("sk-1");
         try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
             String content = "{\"description\":\"财务专家，擅长报销与预算口径\",\"sysPrompt\":\"你负责财务口径\"}";
@@ -52,14 +52,14 @@ class AiExpertPromptServiceImplTest {
             assertTrue(result.getSuccess());
             assertEquals("财务专家，擅长报销与预算口径", result.getDescription());
             assertEquals("你负责财务口径", result.getSysPrompt());
-            assertEquals("deepseek-v4-flash-0731", result.getModelName());
+            assertEquals("deepseek-v4-pro-0813", result.getModelName());
         }
     }
 
     @Test
     @DisplayName("模型密钥为空时生成失败")
     void shouldFailWhenApiKeyBlank() {
-        when(modelConfigService.queryById(1L)).thenReturn(chatModel("deepseek-v4-flash-0731"));
+        when(modelConfigService.queryById(1L)).thenReturn(chatModel("deepseek-v4-pro-0813"));
         when(modelConfigService.decryptApiKey(1L)).thenReturn("");
 
         AiExpertPromptVo result = service.generate(bo(1L));
@@ -87,7 +87,7 @@ class AiExpertPromptServiceImplTest {
         assertFalse(noModel.getSuccess());
         assertTrue(noModel.getMessage().contains("暂无启用的对话模型"));
 
-        when(modelConfigService.queryOptions("chat")).thenReturn(List.of(chatModel("deepseek-v4-flash-0731")));
+        when(modelConfigService.queryOptions("chat")).thenReturn(List.of(chatModel("deepseek-v4-pro-0813")));
         when(modelConfigService.decryptApiKey(1L)).thenReturn("sk-1");
         try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
             stubHttp(http, 200, chatBody("{\"sysPrompt\":\"内容\"}"));
@@ -100,7 +100,7 @@ class AiExpertPromptServiceImplTest {
     @Test
     @DisplayName("非 2xx 响应时生成失败并给出 HTTP 状态")
     void shouldFailOnNon2xx() {
-        when(modelConfigService.queryById(1L)).thenReturn(chatModel("deepseek-v4-flash-0731"));
+        when(modelConfigService.queryById(1L)).thenReturn(chatModel("deepseek-v4-pro-0813"));
         when(modelConfigService.decryptApiKey(1L)).thenReturn("sk-1");
         try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
             stubHttp(http, 401, "{\"error\":{\"message\":\"invalid key\"}}");
