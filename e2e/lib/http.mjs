@@ -31,6 +31,42 @@ export const createThrottle = (minIntervalMs) => {
 };
 
 /**
+ * 解析 JSON-RPC 响应体：兼容「直出 JSON」与「SSE（`data:` 帧）」两种。
+ *
+ * <p>MCP 无状态传输下单次 POST 可能以 `text/event-stream` 回包，故两种都要认。</p>
+ *
+ * @param {string} text 响应原文
+ * @returns {any|null} 解析出的对象；无法解析时返回 null
+ */
+const parseJsonRpc = (text) => {
+  const trimmed = (text ?? '').trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return null;
+    }
+  }
+  for (const line of trimmed.split('\n')) {
+    const candidate = line.trim();
+    if (candidate.startsWith('data:')) {
+      const data = candidate.slice(5).trim();
+      if (data && data !== '[DONE]') {
+        try {
+          return JSON.parse(data);
+        } catch {
+          // 继续找下一帧
+        }
+      }
+    }
+  }
+  return null;
+};
+
+/**
  * 极简 HTTP 客户端：统一鉴权头、`R{code,msg,data}` 解包、429 退避。
  */
 export class HttpClient {
@@ -172,6 +208,37 @@ export class HttpClient {
       payload = null;
     }
     return { status: response.status, payload, text };
+  }
+
+  /**
+   * 调用 MCP 出口（默认 `/mcp`）的 JSON-RPC 方法。
+   *
+   * <p>用于 MCP 层 e2e：发 `initialize` / `tools/list` / `tools/call`。出口自带口令校验
+   * （`Authorization: Bearer <口令>`），stateless 传输下**可能以 SSE 帧回包**，故响应体两种格式都兼容。</p>
+   *
+   * @param {string} method JSON-RPC 方法名
+   * @param {object} [params] 方法参数
+   * @param {{ token?: string, endpoint?: string, timeoutMs?: number }} [options] 选项
+   *        {@code token} 出口访问口令（空则不带头，用于断言 401）；{@code endpoint} 默认 `/mcp`
+   * @returns {Promise<{ status: number, payload: any, text: string }>} HTTP 状态、解析后的 JSON-RPC 对象与其原文
+   */
+  async mcpCall(method, params = {}, options = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream'
+    };
+    if (options.token) {
+      headers.Authorization = `Bearer ${options.token}`;
+    }
+    const body = JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method, params });
+    const response = await this.fetchWithTimeout(this.buildUrl(options.endpoint ?? '/mcp'), {
+      method: 'POST',
+      headers,
+      body,
+      timeoutMs: options.timeoutMs
+    });
+    const text = await response.text();
+    return { status: response.status, payload: parseJsonRpc(text), text };
   }
 
   /**

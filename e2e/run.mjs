@@ -2,7 +2,7 @@
 /**
  * BizBuddy 端到端集成测试脚本（外部驱动）。
  *
- * 对**已运行**的容器栈发真实 HTTP 请求做断言，覆盖 L1~L9；不参与 `mvn test`、不引 Testcontainers。
+ * 对**已运行**的容器栈发真实 HTTP 请求做断言，覆盖 L1~L11；不参与 `mvn test`、不引 Testcontainers。
  * 详细设计见 `.trae/documents/端到端集成测试脚本方案.md`。</p>
  *
  * <p>用法：
@@ -30,8 +30,10 @@ import * as l6 from './cases/l6.mjs';
 import * as l7 from './cases/l7.mjs';
 import * as l8 from './cases/l8.mjs';
 import * as l9 from './cases/l9.mjs';
+import * as l10 from './cases/l10.mjs';
+import * as l11 from './cases/l11.mjs';
 
-const CASES = [l1, l2, l3, l4, l5, l6, l7, l8, l9];
+const CASES = [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11];
 const EXIT = { OK: 0, FAIL: 1, PREFLIGHT: 2, USAGE: 3 };
 
 /** 参数错误 */
@@ -122,7 +124,8 @@ const usage = () => `BizBuddy 端到端集成测试（e2e）
   --report <path>     指定报告输出路径
 
 说明：L7 会临时开启内容审核并新增一条临时敏感词，收尾**无条件恢复原配置并删除该词**；
-     L1~L6 需模型密钥，L7~L9 不需要（走拒答 / 失败路径，不触发模型调用）。
+     L1~L6 需模型密钥，L7~L11 不需要（走拒答 / 失败路径或只读协议调用，不触发模型调用）。
+     L10/L11 为 MCP 层：出口未挂系统信息工具（运行 jar 陈旧）或口令未配时 SKIP。
 
 环境变量：见 e2e/.env.example（机密仅 BIZBUDDY_LLM_API_KEY）
 
