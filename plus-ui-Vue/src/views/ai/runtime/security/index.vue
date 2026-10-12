@@ -1,12 +1,13 @@
 <template>
   <div class="p-2 app-container">
+    <!-- 区域一：内容审核（敏感词 / 正则的检测与处置） -->
     <el-card shadow="hover" class="table-panel" v-loading="loading">
       <template #header>
         <div class="toolbar-shell">
           <div class="table-heading">
-            <h3>安全合规配置</h3>
+            <h3>内容审核</h3>
             <p>
-              对用户输入、模型输出与渠道出站内容做敏感词与 PII 检测，命中后按动作「只记录 / 脱敏 / 阻断」处理。
+              对用户输入、模型输出与渠道出站等内容做敏感词 / 正则检测，命中后按动作「只记录 / 脱敏 / 阻断」处理。
               保存后写入运行期配置，下一次对话 / 编排即按新策略生效。
             </p>
           </div>
@@ -24,13 +25,13 @@
         type="info"
         :closable="false"
         show-icon
-        title="默认关闭；默认「只记录」（灰度观察），PII 脱敏默认开启。开启阻断前建议先以「只记录」跑一段时间，评估误伤后再生效。"
+        title="内容审核默认关闭；建议先以「只记录」灰度观察，评估误伤后再切「脱敏放行 / 阻断」。本区域与下方「PII 脱敏」相互独立。"
       />
 
       <el-form ref="formRef" :model="form" :rules="rules" label-width="220px" class="config-form">
-        <el-form-item label="启用安全合规" prop="enabled">
+        <el-form-item label="启用内容审核" prop="enabled">
           <el-switch v-model="form.enabled" />
-          <span class="form-tip">关闭后所有场景的检测与拦截全部停用</span>
+          <span class="form-tip">仅控制本区域的敏感词 / 正则检测；不影响下方「PII 脱敏」与「提示词注入防护」</span>
         </el-form-item>
 
         <el-form-item label="检测引擎" prop="engine">
@@ -101,6 +102,7 @@
           </template>
           <el-switch v-model="form.mcpOutCheck" />
         </el-form-item>
+
         <el-form-item label="提示词注入防护" prop="promptHardening">
           <template #label>
             <span class="label-tip">
@@ -114,22 +116,7 @@
             </span>
           </template>
           <el-switch v-model="form.promptHardening" />
-        </el-form-item>
-
-        <el-form-item label="PII 脱敏" prop="maskPii">
-          <template #label>
-            <span class="label-tip">
-              PII 脱敏
-              <el-tooltip placement="top">
-                <template #content>
-                  <div class="tip-content">对手机号 / 身份证 / 邮箱 / 银行卡 / IP 做掩码脱敏。</div>
-                </template>
-                <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
-              </el-tooltip>
-            </span>
-          </template>
-          <el-switch v-model="form.maskPii" />
-          <span class="form-tip">手机号 / 身份证 / 邮箱 / 银行卡 / IP</span>
+          <span class="form-tip">同样不受「启用内容审核」控制</span>
         </el-form-item>
 
         <el-form-item label="流式回退字符数" prop="holdBackChars">
@@ -166,6 +153,54 @@
             />
           </el-form-item>
         </template>
+      </el-form>
+    </el-card>
+
+    <!-- 区域二：PII 脱敏（独立开关，不受「启用内容审核」控制） -->
+    <el-card shadow="hover" class="table-panel pii-panel" v-loading="loading">
+      <template #header>
+        <div class="toolbar-shell">
+          <div class="table-heading">
+            <h3>PII 脱敏</h3>
+            <p>
+              对会外流或落库的文本做掩码脱敏（手机号 / 身份证 / 邮箱 / 银行卡 / IP）。
+              <b>独立开关</b>，不受上方「启用内容审核」影响。
+            </p>
+          </div>
+          <div class="toolbar-actions">
+            <el-button v-hasPermi="['ai:runtime:security:edit']" type="primary" icon="Check" :loading="saving" @click="handleSave">
+              保存
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <el-alert
+        class="security-alert"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="默认开启；关闭「启用内容审核」不会停用本项。两个区域共用同一份配置，保存任一处即整份生效。"
+      />
+
+      <el-form :model="form" label-width="220px" class="config-form">
+        <el-form-item label="PII 脱敏" prop="maskPii">
+          <el-switch v-model="form.maskPii" />
+          <span class="form-tip">手机号 / 身份证 / 邮箱 / 银行卡 / IP</span>
+        </el-form-item>
+
+        <el-form-item label="生效范围">
+          <span class="form-tip-block">
+            模型输出、渠道出站、工具结果、知识库入库、MCP 出口 —— 这些会外流或落库的文本会被掩码；<br />
+            <b>不作用于用户输入原话</b>（对话与渠道入站的原始输入保持原样）。
+          </span>
+        </el-form-item>
+
+        <el-form-item label="结构化决策出境">
+          <span class="form-tip-block">
+            外呼决策模型的 <code>state</code> <b>恒定脱敏</b>（口径强制、无开关），也不受本项控制。
+          </span>
+        </el-form-item>
       </el-form>
     </el-card>
   </div>
@@ -217,7 +252,7 @@ const loadConfig = async () => {
   }
 };
 
-/** 保存配置 */
+/** 保存配置（两个区域共用同一份配置，整份提交） */
 const handleSave = async () => {
   await formRef.value?.validate();
   saving.value = true;
@@ -249,5 +284,15 @@ onMounted(() => {
   margin-left: 10px;
   color: var(--app-text-muted);
   font-size: 12px;
+}
+
+.form-tip-block {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.pii-panel {
+  margin-top: 16px;
 }
 </style>

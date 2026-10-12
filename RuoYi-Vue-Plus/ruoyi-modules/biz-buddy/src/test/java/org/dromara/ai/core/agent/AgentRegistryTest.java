@@ -133,7 +133,7 @@ class AgentRegistryTest {
      * 故装配主流程用例（模型缺失、指纹重建）仍走真实装配路径。
      */
     private AgentAssembler assembler() {
-        return new AgentAssembler(modelFactory, aiProperties, stateStore, toolFactory, writeDedupStore,
+        return new AgentAssembler(modelFactory, aiProperties, runtimeConfigStore, stateStore, toolFactory, writeDedupStore,
             mcpClientService, aiSkillRepository, permissionModeStore, snapshotFactory, subagentAssembler,
             routeOrchestrator);
     }
