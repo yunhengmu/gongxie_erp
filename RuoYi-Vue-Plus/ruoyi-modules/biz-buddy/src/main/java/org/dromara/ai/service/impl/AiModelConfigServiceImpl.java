@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.config.AiSecretManager;
+import org.dromara.ai.core.route.JevSystemOneSupport;
+import org.dromara.ai.core.route.RouteJudgeVerdict;
 import org.dromara.ai.domain.AiKnowledgeBase;
 import org.dromara.ai.domain.AiModelConfig;
 import org.dromara.ai.domain.bo.AiModelConfigBo;
@@ -43,11 +45,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Service
 public class AiModelConfigServiceImpl implements IAiModelConfigService {
-
-    /**
-     * 模型类型：向量
-     */
-    private static final String TYPE_EMBEDDING = "embedding";
 
     /**
      * 副本名称后缀：重名时继续追加（原名copy → 原名copycopy）
@@ -261,32 +258,23 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
                 apiKey = decryptApiKey(bo.getId());
             }
             validateEndpoint(bo.getBaseUrl());
-            boolean embedding = isEmbedding(bo.getModelType());
-            String url = resolveEndpoint(bo.getBaseUrl(), embedding);
-            String body = buildTestBody(bo.getModelCode(), embedding, bo.getDimension(), isDashScopeHost(bo.getBaseUrl()));
             int timeout = bo.getTimeoutSeconds() != null ? bo.getTimeoutSeconds() : aiProperties.getTestTimeoutSeconds();
-
-            HttpRequest request = HttpUtil.createPost(url)
-                .header("Content-Type", "application/json")
-                .timeout(timeout * 1000)
-                .body(body);
-            if (StringUtils.isNotBlank(apiKey)) {
-                request.header("Authorization", "Bearer " + apiKey);
-            }
-            int status;
-            String responseBody;
-            try (HttpResponse response = request.execute()) {
-                status = response.getStatus();
-                responseBody = response.body();
-            }
-
-            if (status < 200 || status >= 300) {
-                result.setSuccess(false);
-                result.setMessage(buildHttpErrorMessage(status, responseBody));
-            } else if (embedding) {
-                fillEmbeddingResult(result, bo, responseBody);
+            if (isDecision(bo.getModelType())) {
+                fillDecisionResult(result, bo, apiKey, timeout);
             } else {
-                fillChatResult(result, responseBody);
+                boolean embedding = isEmbedding(bo.getModelType());
+                String url = resolveEndpoint(bo.getBaseUrl(), embedding);
+                String body = buildTestBody(bo.getModelCode(), embedding, bo.getDimension(),
+                    isDashScopeHost(bo.getBaseUrl()));
+                HttpCall call = post(url, body, apiKey, timeout);
+                if (call.status() < 200 || call.status() >= 300) {
+                    result.setSuccess(false);
+                    result.setMessage(buildHttpErrorMessage(call.status(), call.body()));
+                } else if (embedding) {
+                    fillEmbeddingResult(result, bo, call.body());
+                } else {
+                    fillChatResult(result, call.body());
+                }
             }
         } catch (ServiceException e) {
             result.setSuccess(false);
@@ -297,6 +285,71 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
         }
         result.setElapsedMs(System.currentTimeMillis() - start);
         return result;
+    }
+
+    /**
+     * 一次连通性外呼（只发请求与收报文，不做结果判定）。
+     *
+     * @param url            完整端点地址
+     * @param body           请求体 JSON
+     * @param apiKey         密钥（为空则不带鉴权头）
+     * @param timeoutSeconds 超时（秒）
+     * @return HTTP 状态与响应体
+     * @throws Exception 传输层异常（超时 / 连接失败等）
+     */
+    private HttpCall post(String url, String body, String apiKey, int timeoutSeconds) throws Exception {
+        HttpRequest request = HttpUtil.createPost(url)
+            .header("Content-Type", "application/json")
+            .timeout(timeoutSeconds * 1000)
+            .body(body);
+        if (StringUtils.isNotBlank(apiKey)) {
+            request.header("Authorization", "Bearer " + apiKey);
+        }
+        try (HttpResponse response = request.execute()) {
+            return new HttpCall(response.getStatus(), response.body());
+        }
+    }
+
+    /**
+     * 校验决策模型（TypeSafe System One 协议）的连通性：发一次最小判定请求并宽松解析结果。
+     *
+     * <p>判据与运行期判定同源（同一套协议工具），故「测试连接通过」即意味着该模型能被路由判断正常调用。
+     * 请求体用 {@link JevSystemOneSupport#probeCandidates()} 的固定候选，与运行期候选无关。</p>
+     *
+     * @param result         测试结果（就地填充）
+     * @param bo             业务对象（取服务地址与模型标识）
+     * @param apiKey         密钥密文解密后的明文
+     * @param timeoutSeconds 超时（秒）
+     * @throws Exception 传输层异常（由调用方统一归一化）
+     */
+    private void fillDecisionResult(AiModelTestVo result, AiModelConfigBo bo, String apiKey, int timeoutSeconds)
+        throws Exception {
+        Map<String, Object> criteria = JevSystemOneSupport.buildCriteria(JevSystemOneSupport.probeCandidates());
+        String body = JevSystemOneSupport.buildRequestJson(bo.getModelCode(), "这是一次连通性探测", criteria);
+        HttpCall call = post(JevSystemOneSupport.endpoint(bo.getBaseUrl()), body, apiKey, timeoutSeconds);
+        if (call.status() < 200 || call.status() >= 300) {
+            result.setSuccess(false);
+            result.setMessage(buildHttpErrorMessage(call.status(), call.body())
+                + "；决策模型走 TypeSafe System One 协议（由服务地址自动拼 /v1/systemone），"
+                + "服务地址请填百炼 compatible-mode 根地址");
+            return;
+        }
+        RouteJudgeVerdict verdict;
+        try {
+            verdict = JevSystemOneSupport.parseLeniently(call.body(), criteria.keySet(), 0L);
+        } catch (Exception e) {
+            result.setSuccess(false);
+            result.setMessage("响应解析失败：" + e.getMessage() + "，响应体=" + abbreviate(call.body()));
+            return;
+        }
+        if (StringUtils.isNotBlank(verdict.error())) {
+            result.setSuccess(false);
+            result.setMessage("决策模型判定不可用：" + verdict.error() + "，响应体=" + abbreviate(call.body()));
+            return;
+        }
+        result.setSuccess(true);
+        result.setMessage("连通性正常，判定选项 " + verdict.choice()
+            + (verdict.confidence() == null ? "" : "（置信度 " + verdict.confidence() + "）"));
     }
 
     @Override
@@ -500,6 +553,12 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
      * @param entity 实体数据
      */
     private void validEntityBeforeSave(AiModelConfig entity) {
+        String modelType = StringUtils.trim(entity.getModelType());
+        if (!AiModelConfig.TYPE_CHAT.equalsIgnoreCase(modelType)
+            && !AiModelConfig.TYPE_EMBEDDING.equalsIgnoreCase(modelType)
+            && !AiModelConfig.TYPE_DECISION.equalsIgnoreCase(modelType)) {
+            throw new ServiceException("模型类型只能是 chat（对话）/ embedding（向量）/ decision（决策）");
+        }
         if (isEmbedding(entity.getModelType()) && entity.getDimension() == null) {
             throw new ServiceException("向量模型必须填写向量维度");
         }
@@ -518,7 +577,17 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
      * @return 是否向量模型
      */
     private boolean isEmbedding(String modelType) {
-        return TYPE_EMBEDDING.equalsIgnoreCase(StringUtils.trim(modelType));
+        return AiModelConfig.TYPE_EMBEDDING.equalsIgnoreCase(StringUtils.trim(modelType));
+    }
+
+    /**
+     * 是否决策模型（结构化决策 / 专家路由判断，走 TypeSafe System One 协议，见 docs/21）。
+     *
+     * @param modelType 模型类型
+     * @return 是否决策模型
+     */
+    private boolean isDecision(String modelType) {
+        return AiModelConfig.TYPE_DECISION.equalsIgnoreCase(StringUtils.trim(modelType));
     }
 
     /**
@@ -529,6 +598,15 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
      */
     private String maskOf(String cipherText) {
         return StringUtils.isNotBlank(cipherText) ? KEY_MASK : "";
+    }
+
+    /**
+     * 一次 HTTP 外呼的原始结果（状态 + 响应体），供各类型自行判定。
+     *
+     * @param status HTTP 状态码
+     * @param body   响应体
+     */
+    private record HttpCall(int status, String body) {
     }
 
     /**

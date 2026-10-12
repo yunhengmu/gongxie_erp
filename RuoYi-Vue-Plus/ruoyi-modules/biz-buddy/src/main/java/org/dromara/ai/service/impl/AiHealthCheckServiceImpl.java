@@ -7,9 +7,16 @@ import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiMilvusProbe;
 import org.dromara.ai.core.AiVectorStore;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
+import org.dromara.ai.core.route.JevSystemOneSupport;
+import org.dromara.ai.core.route.RouteJudge;
+import org.dromara.ai.core.route.RouteJudgeMode;
+import org.dromara.ai.core.route.RouteJudgeRequest;
+import org.dromara.ai.core.route.RouteJudgeVerdict;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiMcpClient;
+import org.dromara.ai.domain.AiModelConfig;
 import org.dromara.ai.domain.bo.AiHealthProbeBo;
+import org.dromara.ai.domain.bo.AiJevConfigBo;
 import org.dromara.ai.domain.bo.AiMcpClientBo;
 import org.dromara.ai.domain.bo.AiModelConfigBo;
 import org.dromara.ai.domain.bo.AiSecurityConfigBo;
@@ -43,6 +50,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TimeZone;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -122,6 +130,8 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
 
     private final OssService ossService;
 
+    private final RouteJudge routeJudge;
+
     @Override
     public AiHealthReportVo check() {
         List<AiHealthCheckVo> items = new ArrayList<>();
@@ -137,6 +147,7 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
         items.add(safe("safety.engine", "内容安全引擎", CATEGORY_RUNTIME, this::checkSafetyEngine));
         items.add(safe("rag.rerank", "检索重排（Rerank）", CATEGORY_RUNTIME, this::checkRerank));
         items.add(safe("runtime.timezone", "时区一致性", CATEGORY_RUNTIME, this::checkTimezone));
+        items.add(safe("structured-decision", "结构化决策连通性", CATEGORY_RUNTIME, this::checkStructuredDecision));
         items.add(safe("storage.domain", "对象存储对外域名", CATEGORY_STORAGE, this::checkStorageDomain));
         items.add(safe("crypto.key", "加密根密钥收口", CATEGORY_RUNTIME, this::checkCryptoKey));
 
@@ -163,6 +174,9 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
         }
         if (AiHealthCheckVo.TARGET_MCP_CLIENT.equals(target)) {
             return probeMcpClient(bo.getId());
+        }
+        if (AiHealthCheckVo.TARGET_JEV.equals(target)) {
+            return probeJev();
         }
         throw new ServiceException("不支持的探测目标：" + target);
     }
@@ -364,7 +378,7 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
             return fail(key, name, CATEGORY_AGENT, "未查询到启用中的智能体",
                 "到「小Z配置」完成入口智能体配置");
         }
-        Map<Long, AiModelConfigVo> available = modelConfigService.queryOptions(null).stream()
+        Map<Long, AiModelConfigVo> available = modelConfigService.queryOptions(AiModelConfig.TYPE_CHAT).stream()
             .filter(model -> model.getId() != null)
             .collect(Collectors.toMap(AiModelConfigVo::getId, model -> model, (left, right) -> left,
                 LinkedHashMap::new));
@@ -527,6 +541,76 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
     }
 
     /**
+     * 结构化决策（专家路由判断）连通性：本地只判定配置形态，真实连通由「测试」探测。
+     *
+     * <p>本项<b>绝不外呼</b>（与 {@link #check()} 的契约一致）：关闭态直接判通过；开启后按所选决策模型的
+     * 形态给 PASS / WARN / FAIL（见 {@link #resolveDecisionModelShape(AiJevConfigBo)}）；
+     * 形态齐全时返回 UNKNOWN 并标记可探测。</p>
+     */
+    private AiHealthCheckVo checkStructuredDecision() {
+        String key = "structured-decision";
+        String name = "结构化决策连通性";
+        AiJevConfigBo jev = runtimeConfigStore.jev();
+        DecisionModelShape shape = resolveDecisionModelShape(jev);
+        if (shape.status() != null) {
+            return item(key, name, CATEGORY_RUNTIME, shape.status(), shape.detail(), shape.suggestion());
+        }
+        AiHealthCheckVo vo = unknown(key, name, CATEGORY_RUNTIME,
+            "已启用（决策模型「" + shape.model().getConfigName() + "」，模式="
+                + RouteJudgeMode.parse(jev.getMode()).label()
+                + "，阈值=" + jev.getConfidenceThreshold() + "），需探测确认连通性",
+            "点「测试」发起一次真实判定；判定不可用时会自动回落工具决策，不影响对话");
+        vo.setProbeSupported(true);
+        vo.setProbeTarget(AiHealthCheckVo.TARGET_JEV);
+        return vo;
+    }
+
+    /**
+     * 解析所选决策模型的形态（「模型配置」中类型为 {@code decision} 的记录），并给出本地可定的结论。
+     *
+     * <p>决策模型的连接信息统一由「模型配置」管理，本配置只持有 {@code modelConfigId}，故形态校验覆盖：
+     * 未启用 → 通过；未选模型 / 模型不存在 / 已停用 / 类型不符 → 失败；密钥为空 → 告警；
+     * 全部满足 → 需探测（{@code status} 返回 {@code null}）。</p>
+     *
+     * @param jev 结构化决策运行期配置
+     * @return 形态判定结果
+     */
+    private DecisionModelShape resolveDecisionModelShape(AiJevConfigBo jev) {
+        if (!jev.isEnabled()) {
+            return new DecisionModelShape(null, AiHealthCheckVo.STATUS_PASS,
+                "未启用，路由由小Z 自行判定（关闭态零外呼）", "");
+        }
+        Long modelConfigId = jev.getModelConfigId();
+        if (modelConfigId == null) {
+            return new DecisionModelShape(null, AiHealthCheckVo.STATUS_FAIL,
+                "已开启但未选择决策模型，判定不可用",
+                "到「安全合规配置 → 结构化决策路由」选择一条决策模型（需先在「模型配置」登记，类型选「决策模型」）");
+        }
+        AiModelConfigVo model = modelConfigService.queryById(modelConfigId);
+        if (model == null) {
+            return new DecisionModelShape(null, AiHealthCheckVo.STATUS_FAIL,
+                "已开启但所选决策模型已不存在（id=" + modelConfigId + "），判定不可用",
+                "到「安全合规配置 → 结构化决策路由」重新选择决策模型");
+        }
+        if (!"0".equals(model.getStatus())) {
+            return new DecisionModelShape(null, AiHealthCheckVo.STATUS_FAIL,
+                "所选决策模型「" + model.getConfigName() + "」已停用，判定不可用",
+                "到「模型配置」启用该模型，或改选其他决策模型");
+        }
+        if (!AiModelConfig.TYPE_DECISION.equalsIgnoreCase(model.getModelType())) {
+            return new DecisionModelShape(null, AiHealthCheckVo.STATUS_FAIL,
+                "所选模型「" + model.getConfigName() + "」类型不是决策模型（实际 " + model.getModelType() + "）",
+                "到「安全合规配置 → 结构化决策路由」改选类型为「决策模型」的记录");
+        }
+        if (StringUtils.isBlank(modelConfigService.decryptApiKey(modelConfigId))) {
+            return new DecisionModelShape(model, AiHealthCheckVo.STATUS_WARN,
+                "所选决策模型「" + model.getConfigName() + "」未配置 API 密钥，判定将不可用（自动回落工具决策）",
+                "到「模型配置」补全该模型的 API 密钥");
+        }
+        return new DecisionModelShape(model, null, "", "");
+    }
+
+    /**
      * 对象存储对外域名（未配置时前端附件预览/下载会失败，后端不受影响）。
      */
     private AiHealthCheckVo checkStorageDomain() {
@@ -641,6 +725,64 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
                 CATEGORY_INTEGRATION, AiHealthCheckVo.STATUS_FAIL, "探测异常：" + e.getMessage(),
                 "核对地址、传输方式与请求头凭据", System.currentTimeMillis() - start);
         }
+    }
+
+    /**
+     * 探测结构化决策连通性（真实调一次判定；这是本项唯一允许外呼的入口）。
+     *
+     * <p>未启用时无需探测直接判通过；所选决策模型形态不满足（未选 / 不存在 / 停用 / 类型不符 / 无密钥）时
+     * 直接返回形态结论（不做无谓外呼）；调用结果按「可用 / 不可用」给 PASS / WARN——判定不可用时按口径 P3
+     * 会自动回落工具决策，不影响对话，故不作为 FAIL。</p>
+     */
+    private AiHealthCheckVo probeJev() {
+        String key = "probe:" + AiHealthCheckVo.TARGET_JEV;
+        String name = "结构化决策连通性";
+        AiJevConfigBo jev = runtimeConfigStore.jev();
+        DecisionModelShape shape = resolveDecisionModelShape(jev);
+        if (!jev.isEnabled()) {
+            return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_PASS, "未启用，无需探测", "", 0L);
+        }
+        if (shape.status() != null && !AiHealthCheckVo.STATUS_PASS.equals(shape.status())) {
+            // 形态已不满足（未选模型 / 不存在 / 停用 / 类型不符 / 无密钥）：直接返回形态结论，不做无谓外呼
+            return probed(key, name, CATEGORY_RUNTIME, shape.status(), shape.detail(), shape.suggestion(), 0L);
+        }
+        long start = System.currentTimeMillis();
+        try {
+            // 最小请求：固定假候选（self / other 由实现补充），仅验证连通性，不参与真实路由
+            RouteJudgeRequest request = new RouteJudgeRequest("这是一次连通性探测",
+                JevSystemOneSupport.probeCandidates());
+            Optional<RouteJudgeVerdict> verdictOpt = routeJudge.judge(request);
+            long elapsed = System.currentTimeMillis() - start;
+            if (verdictOpt.isEmpty()) {
+                return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_WARN,
+                    "判定不可用：未返回判定结果",
+                    "判定不可用时会自动回落工具决策，不影响对话；到「模型配置」核对所选决策模型的服务地址、密钥与模型标识", elapsed);
+            }
+            RouteJudgeVerdict verdict = verdictOpt.get();
+            if (StringUtils.isNotBlank(verdict.error())) {
+                return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_WARN,
+                    "判定不可用：" + verdict.error(),
+                    "判定不可用时会自动回落工具决策，不影响对话；到「模型配置」核对所选决策模型的服务地址、密钥与模型标识", elapsed);
+            }
+            return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_PASS,
+                "判定可用（耗时 " + verdict.latencyMs() + " ms，输入 Token " + verdict.inputTokens()
+                    + "，选择 " + verdict.choice() + "）", "", elapsed);
+        } catch (Exception e) {
+            return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_WARN,
+                "探测异常：" + e.getMessage(),
+                "判定不可用时会自动回落工具决策，不影响对话", System.currentTimeMillis() - start);
+        }
+    }
+
+    /**
+     * 所选决策模型的形态判定结果。
+     *
+     * @param model      模型配置（形态可用、需探测时非空）
+     * @param status     本地已可定论的状态（PASS / WARN / FAIL）；{@code null} 表示形态可用、需探测
+     * @param detail     说明
+     * @param suggestion 修复建议
+     */
+    private record DecisionModelShape(AiModelConfigVo model, String status, String detail, String suggestion) {
     }
 
     // ---------------------------------------------------------------- 工具方法

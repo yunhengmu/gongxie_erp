@@ -205,6 +205,11 @@ public class AiChatFacade {
     private final AiRouteOrchestrator routeOrchestrator;
 
     /**
+     * 结构化决策影子判定（docs/21，T5）：默认关闭（关闭态零外呼）；影子态只留痕、不接管编排
+     */
+    private final RouteJudgeService routeJudgeService;
+
+    /**
      * 附件多模态装配（聊天上传图片/文档 → 内容块）
      */
     private final AiAttachmentAssembler attachmentAssembler;
@@ -380,6 +385,19 @@ public class AiChatFacade {
         AtomicBoolean finished = new AtomicBoolean(false);
         try {
             AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
+            // 结构化决策闸门前置判定（docs/21 §5.4 / §5.7，T9）：在入口轮 ReAct **之前**判定，高置信且
+            // 选项合法即采信并**短路到专家直答**（不再跑入口轮）。pinned 已指定专家，按口径跳过判定；
+            // 关闭 / 非 gate 档 / 未采信时 takeOver=false，照常跑入口轮，行为与现状逐项等价。
+            if (route != null && route.pinnedExpertId == null) {
+                RouteJudgeService.JudgeGateOutcome gate =
+                    routeJudgeService.judgeGate(route, userContent, userId, deptId, userMessageId);
+                if (gate.takeOver()) {
+                    // agent / ctx / session 一并传入：短路路径没有入口轮，专家未接管正文时需用它们补跑整合轮
+                    runJudgeTakeover(emitter, sessionId, state, route, slots, userContent, deptId, userId,
+                        gate.expertCode(), startNanos, agent, ctx, session);
+                    return;
+                }
+            }
             // 单次执行句柄（AgentScope 2.0.4）：登记后可由「停止」/ SSE 断连取消本段后端执行
             AgentRun<AgentEvent> run = agent.prepareRun(
                 List.of(attachmentAssembler.buildUserMsg(userContent, attachmentBlocks)), ctx);
@@ -432,6 +450,14 @@ public class AiChatFacade {
                         return;
                     }
                     AiMessage assistant = turnFinisher.finish(emitter, sessionId, state, durationMs, null, route);
+                    // 结构化决策影子判定（docs/21 §5.7，T5）：放在 finish 之后——用户答案与 done 已下发，
+                    // 判定外呼既不拖慢用户可见耗时，又能在紧随其后的 finishRoute 同一次落库更新里带上审计字段。
+                    // 默认关闭（零外呼）；pinned 已指定专家，按口径跳过判定；结果只写审计，不改编排走向。
+                    // 闸门档在**入口轮之前**已做过前置判定（judgeMode='G'），此处不再重复判定，避免同一轮双跑。
+                    if (route != null && route.pinnedExpertId == null
+                        && !RouteJudgeService.MODE_CODE_GATE.equals(route.judgeMode)) {
+                        routeJudgeService.judgeShadow(route, userContent, userId, deptId, userMessageId);
+                    }
                     turnFinisher.finishRoute(route, assistant == null ? null : assistant.getId(),
                         route != null && route.degraded ? AiRouteRun.STATUS_DEGRADED : AiRouteRun.STATUS_SUCCESS,
                         null, durationMs);
@@ -445,6 +471,116 @@ public class AiChatFacade {
             throw e instanceof ServiceException serviceException
                 ? serviceException : new ServiceException("对话启动失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 闸门采信后的**专家直答短路收尾**（docs/21 §5.7，T9）。
+     *
+     * <p>形态照抄入口轮收尾的**非 pinned 分支**，但没有入口轮：直接调 {@link AiRouteOrchestrator#execute}
+     * 让专家把回答**直接交付用户**（REQ-AI-30 专家直答口径），随后按同款收尾落库。
+     * <b>刻意不调用</b> {@link AiIntegrationDriver#drivePinnedFallback}——它是「服务端强制编排 +
+     * 小Z 整合轮」的旧形态，与本任务的「专家直答」口径不符。</p>
+     *
+     * <p><b>专家未接管正文的兜底</b>：短路路径没有入口轮，若专家失败 / 超时 / 空正文
+     * （编排器把 {@code handoff} 置回 false 且 {@code degraded=true}），照常收尾会取不到正文而让用户
+     * 收到空回答。故此时**只复用** {@link AiIntegrationDriver#driveIntegration} 这一步补跑整合轮，
+     * 让小Z 基于降级报告产出兜底回答（整合轮内部自带收尾，本方法该分支不再重复收尾）。</p>
+     *
+     * <p>本方法在 servlet 请求线程同步执行（同 {@code executeUnattended} 的阻塞口径），
+     * 故专家编排的阻塞等待无需切换调度线程。</p>
+     *
+     * @param emitter     SSE 发射器
+     * @param sessionId   会话主键
+     * @param state       入口轮流式累积状态（未跑入口轮，正文由专家直答承担）
+     * @param route       编排运行状态
+     * @param slots       继承槽位（构造 task_context 用）
+     * @param userContent 本轮用户原话
+     * @param deptId      提问用户部门
+     * @param userId      提问用户
+     * @param expertCode  判定选中的候选专家 {@code agent_code}
+     * @param startNanos  本轮起始纳秒（计耗时）
+     * @param agent       入口智能体（已装配；专家未接管时供整合轮兜底作答，不重新装配）
+     * @param ctx         入口智能体的运行期上下文（已带编排上下文，整合轮不再允许路由）
+     * @param session     会话（整合轮经 {@link AiIntegrationDriver#driveIntegration} 取会话主键）
+     */
+    private void runJudgeTakeover(SseEmitter emitter, Long sessionId, AiStreamState state, AiRouteContext route,
+                                  AiSlotSet slots, String userContent, Long deptId, Long userId,
+                                  String expertCode, long startNanos, HarnessAgent agent, RuntimeContext ctx,
+                                  AiSession session) {
+        AiExpertCandidate candidate = route.candidateByKey.get(expertCode);
+        if (candidate == null) {
+            // 防御性：前置已校验 choice 命中候选，此处兜底按自答收尾，避免把整轮打挂
+            log.warn("闸门采信但候选缺失，按自答兜底收尾：sessionId={}, expertCode={}", sessionId, expertCode);
+            long fallbackMs = (System.nanoTime() - startNanos) / 1_000_000;
+            route.action = AiRouteRun.ACTION_SELF;
+            AiMessage fallback = turnFinisher.finish(emitter, sessionId, state, fallbackMs, null, route);
+            turnFinisher.finishRoute(route, fallback == null ? null : fallback.getId(),
+                AiRouteRun.STATUS_SUCCESS, null, fallbackMs);
+            return;
+        }
+        // 编排动作与任务片段由服务端设置：task_context 取「用户原话 + 槽位」模板（与 pinned 同源，P7）
+        route.action = AiRouteRun.ACTION_ROUTE;
+        route.taskContext = AiRouteSupport.taskContext(userContent, slots, userId, deptId);
+        // 语义：路由已发生，避免收尾的兜底分支再次发起编排
+        route.routeInvoked = true;
+        route.decisionJson = judgeDecisionJson(route, expertCode);
+        String report;
+        try {
+            report = routeOrchestrator.execute(route, candidate);
+        } catch (Exception e) {
+            // 专家编排异常不得把 SSE 线程打挂：按失败收尾（同 onError 分支），异常不外抛
+            long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+            String message = AiSseSupport.rootCauseMessage(e);
+            log.error("闸门采信后专家编排失败，sessionId={}", sessionId, e);
+            traceService.appendTransition(state.traceId, "error", message);
+            turnFinisher.failStream(emitter, message, e);
+            turnFinisher.finishRoute(route, null, AiRouteRun.STATUS_ABORTED, message, durationMs);
+            return;
+        }
+        log.info("闸门采信短路：sessionId={}, expert={}, report={}", sessionId, expertCode,
+            AiSseSupport.abbreviate(report, 200));
+        long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        if (state.pendingConfirm) {
+            // 专家命中「需确认」：暂停并落确认卡片，用户确认后由恢复段续跑（与入口轮同款）
+            Long pausedMessageId = turnFinisher.finishPending(emitter, sessionId, state, durationMs, route);
+            turnFinisher.finishRoute(route, pausedMessageId, AiRouteRun.STATUS_PENDING, "等待人工确认", durationMs);
+            return;
+        }
+        if (!route.handoff) {
+            // 专家**未接管正文**（失败 / 超时 / 空正文：编排器已把 handoff 置回 false 且 degraded=true）。
+            // 短路路径没有入口轮可续写，若照常 finish 会取不到正文 → 用户收到空回答。
+            // 故补一次整合轮，复用既有整合轮驱动让小Z 基于降级报告产出兜底回答；
+            // messageId 传 null（本轮尚未落库助手消息，故无可追加/可清理的暂存）。
+            // driveIntegration 内部自带收尾（finish / failStream + finishRoute，取消走 finishCancelled），
+            // 故此分支不再重复收尾，避免双重落库与重复 done。
+            integrationDriver.driveIntegration(agent, ctx, session, null, route, state, report,
+                AiIntegrationDriver.INTEGRATION_INTRO_JUDGE_DEGRADED, startNanos, emitter);
+            return;
+        }
+        AiMessage assistant = turnFinisher.finish(emitter, sessionId, state, durationMs, null, route);
+        turnFinisher.finishRoute(route, assistant == null ? null : assistant.getId(),
+            route.degraded ? AiRouteRun.STATUS_DEGRADED : AiRouteRun.STATUS_SUCCESS, null, durationMs);
+    }
+
+    /**
+     * 闸门采信段的决策留档（服务端构造，无模型决策原文）：便于事后复盘「以何阈值、选了谁」。
+     *
+     * <p>不含密钥、不含 {@code state}；含来源 / 动作 / 选中专家 / 判定选项与置信度 / 阈值 / 模式。</p>
+     *
+     * @param route      编排运行状态（判定字段已写入）
+     * @param expertCode 判定选中的候选专家 {@code agent_code}
+     * @return 决策原文（JSON）
+     */
+    private String judgeDecisionJson(AiRouteContext route, String expertCode) {
+        Map<String, Object> decision = new LinkedHashMap<>();
+        decision.put("source", "judge");
+        decision.put("action", AiRouteRun.ACTION_ROUTE);
+        decision.put("expert_agent_key", expertCode);
+        decision.put("judge_choice", route.judgeChoice);
+        decision.put("judge_confidence", route.judgeConfidence);
+        decision.put("threshold", route.judgeThreshold);
+        decision.put("mode", route.judgeMode);
+        return JsonUtils.toJsonString(decision);
     }
 
     /**

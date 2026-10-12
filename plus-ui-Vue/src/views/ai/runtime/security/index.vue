@@ -230,7 +230,9 @@ const handleSave = async () => {
   }
 };
 
-onMounted(loadConfig);
+onMounted(() => {
+  loadConfig();
+});
 </script>
 
 <style scoped lang="scss">

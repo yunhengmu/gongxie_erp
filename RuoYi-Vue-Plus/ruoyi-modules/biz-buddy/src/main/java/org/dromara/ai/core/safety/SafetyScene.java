@@ -35,7 +35,12 @@ public enum SafetyScene {
     /**
      * MCP 出口（对外暴露给第三方 AI 的只读工具：入参 / 出参）
      */
-    MCP_OUT("mcp_out", "MCP 出口");
+    MCP_OUT("mcp_out", "MCP 出口"),
+
+    /**
+     * 结构化决策出境（外呼决策模型的 {@code state}；出境前强制 PII 脱敏，命中即留痕）
+     */
+    JEV_OUTBOUND("jev_outbound", "结构化决策出境");
 
     private final String code;
 

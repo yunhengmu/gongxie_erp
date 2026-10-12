@@ -1,4 +1,4 @@
-import type { CompactionConfig, PlanConfig, RouteBudgetConfig, SecurityConfig } from '@/api/ai/runtime/types';
+import type { CompactionConfig, JevConfig, PlanConfig, RouteBudgetConfig, SecurityConfig } from '@/api/ai/runtime/types';
 import type { AxiosPromise } from '@/utils/api-types';
 import request from '@/utils/request';
 
@@ -85,6 +85,28 @@ export const getSecurityConfig = (): AxiosPromise<SecurityConfig> => {
 export const updateSecurityConfig = (data: SecurityConfig): AxiosPromise<void> => {
   return request({
     url: '/ai/runtime/security',
+    method: 'put',
+    data
+  });
+};
+
+/**
+ * 查询当前生效的结构化决策路由配置（不回显密钥，只返回是否已配置）
+ */
+export const getJevConfig = (): AxiosPromise<JevConfig> => {
+  return request({
+    url: '/ai/runtime/jev',
+    method: 'get'
+  });
+};
+
+/**
+ * 保存结构化决策路由配置（运行期生效；密钥留空表示不修改已保存密钥）
+ * @param data 结构化决策配置
+ */
+export const updateJevConfig = (data: JevConfig): AxiosPromise<void> => {
+  return request({
+    url: '/ai/runtime/jev',
     method: 'put',
     data
   });

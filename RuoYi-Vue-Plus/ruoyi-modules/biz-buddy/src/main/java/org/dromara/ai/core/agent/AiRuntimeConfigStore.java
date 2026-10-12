@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.domain.bo.AiCompactionConfigBo;
+import org.dromara.ai.domain.bo.AiJevConfigBo;
 import org.dromara.ai.domain.bo.AiMcpServerConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
@@ -65,6 +66,11 @@ public class AiRuntimeConfigStore {
      * 安全合规配置的 Redis 键（脱敏 + 内容安全）
      */
     private static final String SECURITY_KEY = "bizbuddy:ai:runtime:security";
+
+    /**
+     * 结构化决策（专家路由判断）配置的 Redis 键（docs/21 §7）
+     */
+    private static final String JEV_KEY = "bizbuddy:ai:runtime:jev";
 
     private final AiProperties aiProperties;
 
@@ -275,12 +281,62 @@ public class AiRuntimeConfigStore {
         bo.setToolResultMask(security.isToolResultMask());
         bo.setKbIngestCheck(security.isKbIngestCheck());
         bo.setMcpOutCheck(security.isMcpOutCheck());
+        bo.setJevOutboundCheck(security.isJevOutboundCheck());
         bo.setPromptHardening(security.isPromptHardening());
         bo.setMaskPii(security.isMaskPii());
         bo.setHoldBackChars(security.getHoldBackChars());
         bo.setExcerptChars(security.getExcerptChars());
         bo.setProviderEndpoint(security.getExternal().getEndpoint());
         bo.setProviderApiKey(security.getExternal().getApiKey());
+        return bo;
+    }
+
+    /**
+     * 解析当前生效的结构化决策配置：Redis 覆盖值优先，其次配置默认值。
+     *
+     * <p>切换 {@code mode} 与阈值可即时生效，避免改配置要重启（docs/21 §7）。</p>
+     *
+     * @return 结构化决策配置
+     */
+    public AiJevConfigBo jev() {
+        String cached = RedisUtils.getCacheObject(JEV_KEY);
+        AiJevConfigBo stored = JsonUtils.parseObject(cached, AiJevConfigBo.class);
+        AiJevConfigBo policy = stored == null ? defaultJev() : stored;
+        if (StringUtils.isBlank(policy.getMode())) {
+            policy.setMode(aiProperties.getJev().getMode());
+        }
+        return policy;
+    }
+
+    /**
+     * 保存结构化决策配置（写入 Redis 覆盖值，下一次编排即生效）。
+     *
+     * @param bo 结构化决策配置
+     */
+    public void updateJev(AiJevConfigBo bo) {
+        RedisUtils.setCacheObject(JEV_KEY, JsonUtils.toJsonString(bo));
+        // 决策模型的连接信息（地址 / 模型标识 / 密钥）不在此配置内，故只记录策略字段
+        log.info("结构化决策配置已更新：enabled={}, modelConfigId={}, mode={}, timeout={}s, threshold={}, persistProbabilities={}",
+            bo.isEnabled(), bo.getModelConfigId(), bo.getMode(), bo.getTimeoutSeconds(),
+            bo.getConfidenceThreshold(), bo.isPersistProbabilities());
+    }
+
+    /**
+     * 由配置默认值构造结构化决策配置。
+     *
+     * @return 默认结构化决策配置
+     */
+    private AiJevConfigBo defaultJev() {
+        AiProperties.Jev jev = aiProperties.getJev();
+        AiJevConfigBo bo = new AiJevConfigBo();
+        bo.setEnabled(jev.isEnabled());
+        bo.setModelConfigId(jev.getModelConfigId());
+        bo.setTimeoutSeconds(jev.getTimeoutSeconds());
+        bo.setMode(jev.getMode());
+        bo.setConfidenceThreshold(jev.getConfidenceThreshold());
+        bo.setFailOpen(jev.isFailOpen());
+        bo.setStateMaxChars(jev.getStateMaxChars());
+        bo.setPersistProbabilities(jev.isPersistProbabilities());
         return bo;
     }
 

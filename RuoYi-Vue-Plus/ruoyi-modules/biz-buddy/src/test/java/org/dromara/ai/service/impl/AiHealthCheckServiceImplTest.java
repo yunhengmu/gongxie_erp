@@ -4,9 +4,14 @@ import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiMilvusProbe;
 import org.dromara.ai.core.AiVectorStore;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
+import org.dromara.ai.core.route.RouteJudge;
+import org.dromara.ai.core.route.RouteJudgeRequest;
+import org.dromara.ai.core.route.RouteJudgeVerdict;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiMcpClient;
+import org.dromara.ai.domain.AiModelConfig;
 import org.dromara.ai.domain.bo.AiHealthProbeBo;
+import org.dromara.ai.domain.bo.AiJevConfigBo;
 import org.dromara.ai.domain.bo.AiMcpClientBo;
 import org.dromara.ai.domain.bo.AiModelConfigBo;
 import org.dromara.ai.domain.bo.AiSecurityConfigBo;
@@ -40,6 +45,8 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -86,6 +93,8 @@ class AiHealthCheckServiceImplTest {
 
     private final OssService ossService = mock(OssService.class);
 
+    private final RouteJudge routeJudge = mock(RouteJudge.class);
+
     private AiHealthCheckServiceImpl service;
 
     private MockedStatic<RedisUtils> redisUtils;
@@ -103,7 +112,7 @@ class AiHealthCheckServiceImplTest {
         aiProperties.getChat().setCurrentTimeZone(TimeZone.getDefault().getID());
         service = new AiHealthCheckServiceImpl(dataSource, modelConfigService, knowledgeBaseService,
             agentService, mcpServerService, mcpClientService, mcpClientMapper, runtimeConfigStore,
-            aiProperties, vectorStore, milvusProbe, ossService);
+            aiProperties, vectorStore, milvusProbe, ossService, routeJudge);
         stubHealthy();
     }
 
@@ -118,7 +127,7 @@ class AiHealthCheckServiceImplTest {
     @DisplayName("全部就绪时整体通过，且项数与计数自洽")
     void shouldPassWhenEverythingReady() {
         AiHealthReportVo report = service.check();
-        assertEquals(14, report.getTotal());
+        assertEquals(15, report.getTotal());
         assertEquals(report.getTotal(),
             report.getPassCount() + report.getWarnCount() + report.getFailCount() + report.getUnknownCount());
         assertEquals(AiHealthCheckVo.STATUS_PASS, report.getOverall(), "失败原因：" + report.getItems());
@@ -343,7 +352,147 @@ class AiHealthCheckServiceImplTest {
         assertThrows(ServiceException.class, () -> service.probe(probeBo("unknown", null)));
     }
 
+    // ---------------------------------------------------------------- 结构化决策
+
+    @Test
+    @DisplayName("结构化决策未启用时判通过（关闭态零外呼）")
+    void shouldPassStructuredDecisionWhenDisabled() {
+        when(runtimeConfigStore.jev()).thenReturn(jev(false, null));
+        AiHealthCheckVo item = itemOf(service.check(), "structured-decision");
+        assertEquals(AiHealthCheckVo.STATUS_PASS, item.getStatus());
+    }
+
+    @Test
+    @DisplayName("结构化决策已开启但未选择决策模型时判失败")
+    void shouldFailStructuredDecisionWithoutModel() {
+        when(runtimeConfigStore.jev()).thenReturn(jev(true, null));
+        AiHealthCheckVo item = itemOf(service.check(), "structured-decision");
+        assertEquals(AiHealthCheckVo.STATUS_FAIL, item.getStatus());
+        assertTrue(item.getDetail().contains("未选择决策模型"));
+    }
+
+    @Test
+    @DisplayName("所选决策模型已停用时判失败")
+    void shouldFailStructuredDecisionWhenModelDisabled() {
+        when(runtimeConfigStore.jev()).thenReturn(jev(true, 9L));
+        when(modelConfigService.queryById(9L)).thenReturn(decisionModel("1"));
+        AiHealthCheckVo item = itemOf(service.check(), "structured-decision");
+        assertEquals(AiHealthCheckVo.STATUS_FAIL, item.getStatus());
+        assertTrue(item.getDetail().contains("已停用"));
+    }
+
+    @Test
+    @DisplayName("所选模型类型不是 decision 时判失败")
+    void shouldFailStructuredDecisionWhenModelTypeMismatch() {
+        AiModelConfigVo wrongType = decisionModel("0");
+        wrongType.setModelType(AiModelConfig.TYPE_CHAT);
+        when(runtimeConfigStore.jev()).thenReturn(jev(true, 9L));
+        when(modelConfigService.queryById(9L)).thenReturn(wrongType);
+        AiHealthCheckVo item = itemOf(service.check(), "structured-decision");
+        assertEquals(AiHealthCheckVo.STATUS_FAIL, item.getStatus());
+        assertTrue(item.getDetail().contains("类型不是决策模型"));
+    }
+
+    @Test
+    @DisplayName("所选决策模型未配置密钥时告警（判定不可用但会自动回落）")
+    void shouldWarnStructuredDecisionWithoutKey() {
+        when(runtimeConfigStore.jev()).thenReturn(jev(true, 9L));
+        when(modelConfigService.queryById(9L)).thenReturn(decisionModel("0"));
+        when(modelConfigService.decryptApiKey(9L)).thenReturn(null);
+        AiHealthCheckVo item = itemOf(service.check(), "structured-decision");
+        assertEquals(AiHealthCheckVo.STATUS_WARN, item.getStatus());
+        assertTrue(item.getDetail().contains("未配置 API 密钥"));
+    }
+
+    @Test
+    @DisplayName("决策模型配置齐全时待探测并标记可探测")
+    void shouldUnknownStructuredDecisionWhenReady() {
+        when(runtimeConfigStore.jev()).thenReturn(jev(true, 9L));
+        when(modelConfigService.queryById(9L)).thenReturn(decisionModel("0"));
+        when(modelConfigService.decryptApiKey(9L)).thenReturn("sk-test");
+        AiHealthCheckVo item = itemOf(service.check(), "structured-decision");
+        assertEquals(AiHealthCheckVo.STATUS_UNKNOWN, item.getStatus());
+        assertTrue(item.isProbeSupported());
+        assertEquals(AiHealthCheckVo.TARGET_JEV, item.getProbeTarget());
+        assertTrue(item.getDetail().contains("影子"));
+        assertTrue(item.getDetail().contains("百炼决策模型"));
+    }
+
+    @Test
+    @DisplayName("探测结构化决策：未启用直接判通过且不发起判定")
+    void shouldProbeJevPassWhenDisabled() {
+        when(runtimeConfigStore.jev()).thenReturn(jev(false, null));
+        AiHealthCheckVo result = service.probe(probeBo(AiHealthCheckVo.TARGET_JEV, null));
+        assertEquals(AiHealthCheckVo.STATUS_PASS, result.getStatus());
+        verify(routeJudge, never()).judge(any(RouteJudgeRequest.class));
+    }
+
+    @Test
+    @DisplayName("探测结构化决策：所选模型形态不满足时直接返回形态结论且不外呼")
+    void shouldProbeJevRejectWhenShapeInvalid() {
+        when(runtimeConfigStore.jev()).thenReturn(jev(true, null));
+        AiHealthCheckVo result = service.probe(probeBo(AiHealthCheckVo.TARGET_JEV, null));
+        assertEquals(AiHealthCheckVo.STATUS_FAIL, result.getStatus());
+        verify(routeJudge, never()).judge(any(RouteJudgeRequest.class));
+    }
+
+    @Test
+    @DisplayName("探测结构化决策：判定可用判通过并带耗时与 Token")
+    void shouldProbeJevPassWhenAvailable() {
+        when(runtimeConfigStore.jev()).thenReturn(jev(true, 9L));
+        when(modelConfigService.queryById(9L)).thenReturn(decisionModel("0"));
+        when(modelConfigService.decryptApiKey(9L)).thenReturn("sk-test");
+        when(routeJudge.judge(any(RouteJudgeRequest.class)))
+            .thenReturn(Optional.of(new RouteJudgeVerdict("probe_expert_a", 0.9, Map.of(), 62L, 159L, null)));
+        AiHealthCheckVo result = service.probe(probeBo(AiHealthCheckVo.TARGET_JEV, null));
+        assertEquals(AiHealthCheckVo.STATUS_PASS, result.getStatus());
+        assertTrue(result.getDetail().contains("62"));
+        assertTrue(result.getDetail().contains("159"));
+    }
+
+    @Test
+    @DisplayName("探测结构化决策：判定不可用判告警并说明回落不影响对话")
+    void shouldWarnProbeJevWhenUnavailable() {
+        when(runtimeConfigStore.jev()).thenReturn(jev(true, 9L));
+        when(modelConfigService.queryById(9L)).thenReturn(decisionModel("0"));
+        when(modelConfigService.decryptApiKey(9L)).thenReturn("sk-test");
+        when(routeJudge.judge(any(RouteJudgeRequest.class)))
+            .thenReturn(Optional.of(new RouteJudgeVerdict(null, null, null, 12L, 0L, "调用超时")));
+        AiHealthCheckVo result = service.probe(probeBo(AiHealthCheckVo.TARGET_JEV, null));
+        assertEquals(AiHealthCheckVo.STATUS_WARN, result.getStatus());
+        assertTrue(result.getSuggestion().contains("回落"));
+    }
+
     // ---------------------------------------------------------------- 造数据
+
+    /**
+     * 构造结构化决策配置（仅用于判定分支测试）。
+     *
+     * @param enabled       总开关
+     * @param modelConfigId 所选决策模型主键（「模型配置」）
+     */
+    private AiJevConfigBo jev(boolean enabled, Long modelConfigId) {
+        AiJevConfigBo bo = new AiJevConfigBo();
+        bo.setEnabled(enabled);
+        bo.setModelConfigId(modelConfigId);
+        return bo;
+    }
+
+    /**
+     * 构造决策模型配置（「模型配置」中类型 decision、地址与标识齐备）。
+     *
+     * @param status 状态（0 正常 / 1 停用）
+     */
+    private AiModelConfigVo decisionModel(String status) {
+        AiModelConfigVo vo = new AiModelConfigVo();
+        vo.setId(9L);
+        vo.setConfigName("百炼决策模型");
+        vo.setModelType(AiModelConfig.TYPE_DECISION);
+        vo.setModelCode("decision-model-preview");
+        vo.setBaseUrl("https://ws.cn-beijing.maas.aliyuncs.com/compatible-mode");
+        vo.setStatus(status);
+        return vo;
+    }
 
     private void stubHealthy() throws Exception {
         Connection connection = mock(Connection.class);
@@ -365,7 +514,6 @@ class AiHealthCheckServiceImplTest {
         AiModelConfigVo embedding = embeddingModel(10L, "******", 1024);
         when(modelConfigService.queryOptions("chat")).thenReturn(List.of(chat));
         when(modelConfigService.queryOptions("embedding")).thenReturn(List.of(embedding));
-        when(modelConfigService.queryOptions(null)).thenReturn(List.of(chat, embedding));
         when(knowledgeBaseService.queryOptions()).thenReturn(List.of());
         when(agentService.queryOptions())
             .thenReturn(List.of(agent(AiAgent.ROLE_ENTRY, "小Z", 1L, null, null, null)));
@@ -384,6 +532,9 @@ class AiHealthCheckServiceImplTest {
         security.setAction("log");
         security.setMaskPii(true);
         when(runtimeConfigStore.security()).thenReturn(security);
+
+        // 结构化决策默认关闭（关闭态判通过、零外呼）
+        when(runtimeConfigStore.jev()).thenReturn(jev(false, null));
 
         when(ossService.selectDomainUrl()).thenReturn("http://localhost:9000");
     }

@@ -75,3 +75,23 @@ export interface SecurityConfig {
   /** 外部引擎接口密钥（engine=external 时使用） */
   providerApiKey: string;
 }
+
+/** 结构化决策路由配置（docs/21；决策模型连接信息统一由「模型配置」管理，此处只引用模型主键） */
+export interface JevConfig {
+  /** 总开关：关闭＝零外呼、路由完全由小Z 负责 */
+  enabled: boolean;
+  /** 所选决策模型（「模型配置」主键，类型 decision）；开启时必填 */
+  modelConfigId?: string | number | null;
+  /** 判定超时（秒；与「模型配置」的通用超时无关——判定在路由关键路径上，需要更短超时） */
+  timeoutSeconds: number;
+  /** 执行模式：shadow 影子 / gate 闸门 / preselect 候选预筛 */
+  mode: string;
+  /** 闸门模式的置信度阈值（0~1） */
+  confidenceThreshold: number;
+  /** 决策不可用时是否回落工具决策 */
+  failOpen: boolean;
+  /** 外呼 state 的字符上限（前置保护） */
+  stateMaxChars: number;
+  /** 是否落库概率分布 */
+  persistProbabilities: boolean;
+}

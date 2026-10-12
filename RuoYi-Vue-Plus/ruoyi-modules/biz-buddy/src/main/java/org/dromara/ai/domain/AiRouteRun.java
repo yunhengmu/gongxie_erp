@@ -136,6 +136,49 @@ public class AiRouteRun extends BaseEntity {
     private String warningText;
 
     /**
+     * 结构化决策（docs/21 §6）：本轮判定来源——{@code L} 工具决策 / {@code J} 决策模型 / {@code F} 回落（工具决策兜底）。
+     *
+     * <p>本批次（影子）不接管路由，取值由判定结果推导：得到可用判定记 {@code J}，判定不可用（异常 / 越界）记 {@code F}；
+     * 未启用时不写（NULL）。</p>
+     */
+    private String decisionSource;
+
+    /**
+     * 结构化决策：决策模型选择的选项（{@code agent_code} / {@code self} / {@code other}）
+     */
+    private String judgeChoice;
+
+    /**
+     * 结构化决策：判定置信度（choice 类别才有；noul 类别不带）
+     */
+    private Double judgeConfidence;
+
+    /**
+     * 结构化决策：概率分布（JSON 文本，影子校准用；persistProbabilities=false 时不落）
+     */
+    private String judgeProbabilities;
+
+    /**
+     * 结构化决策：判定耗时（毫秒）
+     */
+    private Integer judgeLatencyMs;
+
+    /**
+     * 结构化决策：判定输入 Token（费用口径；{@code outputTokens} 恒 0 不参与计算）
+     */
+    private Integer judgeTokens;
+
+    /**
+     * 结构化决策：判定不可用原因（超时 / 报错 / 越界）；可用时为空
+     */
+    private String judgeError;
+
+    /**
+     * 结构化决策：本轮执行模式（{@code S} 影子 / {@code G} 闸门）
+     */
+    private String judgeMode;
+
+    /**
      * 编排总耗时（毫秒）
      */
     private Long durationMs;

@@ -3,6 +3,7 @@ package org.dromara.ai.controller;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.domain.bo.AiCompactionConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
+import org.dromara.ai.service.IAiModelConfigService;
 import org.dromara.ai.test.AiTestSupport;
 import org.dromara.common.core.domain.R;
 import org.junit.jupiter.api.BeforeAll;
@@ -23,7 +24,9 @@ class AiRuntimeControllerTest {
 
     private final AiRuntimeConfigStore store = mock(AiRuntimeConfigStore.class);
 
-    private final AiRuntimeController controller = new AiRuntimeController(store);
+    private final IAiModelConfigService modelConfigService = mock(IAiModelConfigService.class);
+
+    private final AiRuntimeController controller = new AiRuntimeController(store, modelConfigService);
 
     @BeforeAll
     static void beforeAll() {

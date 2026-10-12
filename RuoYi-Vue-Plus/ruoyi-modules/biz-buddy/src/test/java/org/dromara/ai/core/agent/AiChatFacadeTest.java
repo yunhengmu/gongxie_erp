@@ -53,12 +53,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -115,6 +120,8 @@ class AiChatFacadeTest {
     @Mock
     private AiRouteOrchestrator routeOrchestrator;
     @Mock
+    private RouteJudgeService routeJudgeService;
+    @Mock
     private AiStreamEventBridge streamBridge;
     @Mock
     private IAiTraceService traceService;
@@ -130,6 +137,12 @@ class AiChatFacadeTest {
     @Mock
     private AiRunRegistry runRegistry;
 
+    /**
+     * 整合轮驱动（真实实例的 spy）：仅用于断言「短路 + 专家未接管 → 走整合轮」这一协作调用，
+     * 其内部收尾行为由 {@code AiIntegrationDriverTest} 单独覆盖，此处桩为空操作以避免重复执行。
+     */
+    private AiIntegrationDriver integrationDriver;
+
     private AiChatFacade facade;
 
     /**
@@ -144,15 +157,15 @@ class AiChatFacadeTest {
         AiTurnFinisher turnFinisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
             traceService, memoryService, aiProperties, routeRecorder, pendingStore,
             streamBridge, safetyGuard, safetyEventService);
-        AiIntegrationDriver integrationDriver = new AiIntegrationDriver(sessionService, pendingStore, traceService,
-            routeOrchestrator, streamBridge, runRegistry, turnFinisher);
+        integrationDriver = spy(new AiIntegrationDriver(sessionService, pendingStore, traceService,
+            routeOrchestrator, streamBridge, runRegistry, turnFinisher));
         AiExpertResumeDriver expertResumeDriver = new AiExpertResumeDriver(sessionService, agentService, agentRegistry,
             pendingStore, traceService, sessionResourceService, expertDirectory, slotStore, permissionModeStore,
             routeOrchestrator, runRegistry, turnFinisher, integrationDriver, routeSupport, trustApplier);
         facade = new AiChatFacade(sessionService, agentService, messageMapper, agentRegistry, aiProperties,
             pendingStore, permissionModeStore, decisionService, usageStatService, quotaService,
             safetyGuard, safetyEventService,
-            sessionResourceService, expertDirectory, routeRecorder, routeOrchestrator, assembler, routeSupport, trustApplier,
+            sessionResourceService, expertDirectory, routeRecorder, routeOrchestrator, routeJudgeService, assembler, routeSupport, trustApplier,
             slotStore, streamBridge, traceService, runRegistry, turnFinisher, integrationDriver, expertResumeDriver);
         // 安全守卫默认「原样放行」，既有断言不受影响
         lenient().when(safetyGuard.guard(any(), any()))
@@ -466,6 +479,59 @@ class AiChatFacadeTest {
         }
 
         verify(emitter).completeWithError(any());
+    }
+
+    @Test
+    @DisplayName("streamChat：闸门短路且专家未接管正文 → 改用整合轮兜底且不二次收尾")
+    void shouldDriveIntegrationWhenJudgeTakeoverExpertNotHandoff() throws Exception {
+        AiSession session = session("0");
+        AiMessage message = userMessage(SESSION_ID);
+        AiAgent definition = mock(AiAgent.class);
+        AiSessionResourceSet resources = AiSessionResourceSet.empty();
+        HarnessAgent agent = mock(HarnessAgent.class);
+        AiExpertCandidate candidate = AiExpertCandidate.of(8L, "fin", "财务专家", "财务", "擅长财务", "财务答疑");
+        String report = "【专家结论不可用】编排侧原因：专家调用超时\n请如实告知用户。";
+        when(sessionService.getOwnedSession(SESSION_ID)).thenReturn(session);
+        when(messageMapper.selectById(MESSAGE_ID)).thenReturn(message);
+        when(agentService.getEnabledAgent(7L)).thenReturn(definition);
+        when(definition.isEntry()).thenReturn(true);
+        when(sessionResourceService.resolveForSession(session)).thenReturn(resources);
+        // 入口智能体本轮才需要槽位合并；userId 为空（LoginHelper 未登录口径）使信任落位直接早退
+        when(slotStore.merge(any(), any())).thenReturn(AiSlotSet.empty());
+        when(expertDirectory.candidates(any(), any())).thenReturn(List.of(candidate));
+        when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
+        when(agentRegistry.get(definition, resources)).thenReturn(agent);
+        when(attachmentService.listByMessageId(any())).thenReturn(List.of());
+        // 闸门采信：短路到专家直答
+        when(routeJudgeService.judgeGate(any(), any(), any(), any(), any()))
+            .thenReturn(new RouteJudgeService.JudgeGateOutcome(true, "fin"));
+        // 专家失败/超时/空正文：正文未接管（handoff=false）且降级
+        when(routeOrchestrator.execute(any(), any())).thenAnswer(invocation -> {
+            AiRouteContext routeCtx = invocation.getArgument(0);
+            routeCtx.handoff = false;
+            routeCtx.degraded = true;
+            return report;
+        });
+        // 整合轮的内部收尾行为由 AiIntegrationDriverTest 覆盖，此处只验证门面是否正确触发整合轮
+        doNothing().when(integrationDriver).driveIntegration(any(), any(), any(), any(), any(), any(),
+            anyString(), anyString(), anyLong(), any());
+        SseEmitter emitter = mock(SseEmitter.class);
+
+        try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
+            login.when(LoginHelper::getUserId).thenReturn(null);
+            facade.streamChat(SESSION_ID, MESSAGE_ID, emitter);
+        }
+
+        // 短路：入口轮 ReAct 被跳过
+        verify(agent, never()).prepareRun(anyList(), any(RuntimeContext.class));
+        // 专家编排发生且返回降级报告
+        verify(routeOrchestrator).execute(any(), eq(candidate));
+        // 专家未接管正文 → 门面改用整合轮兜底：入参为降级报告 + 「平台判定」开场指令，messageId 为 null
+        verify(integrationDriver).driveIntegration(eq(agent), any(RuntimeContext.class), eq(session),
+            isNull(), any(), any(AiStreamState.class), eq(report),
+            eq(AiIntegrationDriver.INTEGRATION_INTRO_JUDGE_DEGRADED), anyLong(), eq(emitter));
+        // 整合轮自带收尾，门面不得重复落库助手消息（避免双重落库 / 重复 done）
+        verify(sessionService, never()).persistAssistantTurn(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     // ---------------- streamResume：前置校验 / 早退 ----------------

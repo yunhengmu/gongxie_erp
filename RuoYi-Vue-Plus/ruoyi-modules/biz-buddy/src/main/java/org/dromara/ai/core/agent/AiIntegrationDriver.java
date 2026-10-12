@@ -55,6 +55,19 @@ public class AiIntegrationDriver {
     private static final String INTEGRATION_INTRO_PINNED =
         "本轮用户已指定专家。以下是该专家返回的结论，请按整合纪律输出最终回答：\n\n";
 
+    /**
+     * 整合轮开场指令：闸门短路「专家未接管」降级段（docs/21 §5.7）。
+     *
+     * <p>与 {@link #INTEGRATION_INTRO_PINNED}（用户主动指定专家）刻意区分措辞：本段是**平台判定**
+     * 交由专家处理、但该专家失败 / 超时 / 空正文未给出结论（{@code handoff=false}），
+     * 故须如实说明是「平台判定」而非「用户指定」，并要求小Z 据降级报告告知用户、尽量自行作答。</p>
+     *
+     * <p>可见性为**包级**（同包的 {@link AiChatFacade} 需引用）：闸门短路路径没有入口轮，
+     * 专家未接管时由门面把本常量作为 {@link #driveIntegration} 的开场指令传入。</p>
+     */
+    static final String INTEGRATION_INTRO_JUDGE_DEGRADED =
+        "本轮由平台判定交由专家处理，但该专家未能给出结论。以下是平台返回的说明，请据此如实告知用户并尽量自行回答：\n\n";
+
     private final IAiSessionService sessionService;
 
     private final AiConfirmPendingStore pendingStore;

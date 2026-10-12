@@ -182,6 +182,7 @@ public class AiSafetyGuard {
             case TOOL_RESULT -> cfg.isToolResultMask();
             case KB_INGEST -> cfg.isKbIngestCheck();
             case MCP_OUT -> cfg.isMcpOutCheck();
+            case JEV_OUTBOUND -> cfg.isJevOutboundCheck();
         };
     }
 
