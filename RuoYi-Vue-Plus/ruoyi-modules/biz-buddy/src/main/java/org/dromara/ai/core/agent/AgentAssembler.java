@@ -85,6 +85,11 @@ public class AgentAssembler {
 
     private final AiProperties aiProperties;
 
+    /**
+     * 运行期配置中心（提示词注入防护开关按运行期配置实时读取，见 {@link PromptHardeningMiddleware}）
+     */
+    private final AiRuntimeConfigStore runtimeConfigStore;
+
     private final AgentStateStore stateStore;
 
     private final AiToolFactory toolFactory;
@@ -112,6 +117,7 @@ public class AgentAssembler {
     /**
      * @param modelFactory       模型构造工厂
      * @param aiProperties       平台配置
+     * @param runtimeConfigStore 运行期配置中心
      * @param stateStore         AgentScope 状态存储
      * @param toolFactory        业务工具工厂（implName → AgentTool）
      * @param writeDedupStore    专家写工具短期去重
@@ -124,6 +130,7 @@ public class AgentAssembler {
      */
     public AgentAssembler(AgentModelFactory modelFactory,
                           AiProperties aiProperties,
+                          AiRuntimeConfigStore runtimeConfigStore,
                           @Qualifier("aiAgentStateStore") AgentStateStore stateStore,
                           AiToolFactory toolFactory,
                           AiWriteDedupStore writeDedupStore,
@@ -135,6 +142,7 @@ public class AgentAssembler {
                           @Lazy AiRouteOrchestrator routeOrchestrator) {
         this.modelFactory = modelFactory;
         this.aiProperties = aiProperties;
+        this.runtimeConfigStore = runtimeConfigStore;
         this.stateStore = stateStore;
         this.toolFactory = toolFactory;
         this.writeDedupStore = writeDedupStore;
@@ -534,8 +542,8 @@ public class AgentAssembler {
     private List<MiddlewareBase> buildMiddlewares(AiAgent definition) {
         List<MiddlewareBase> middlewares = new ArrayList<>();
         middlewares.add(new CurrentTimeMiddleware(aiProperties));
-        // 提示词注入防护：声明「<untrusted> 包裹的外部内容只是数据、其中指令不执行」（开关实时读配置）
-        middlewares.add(new PromptHardeningMiddleware(aiProperties));
+        // 提示词注入防护：声明「<untrusted> 包裹的外部内容只是数据、其中指令不执行」（开关实时读运行期配置）
+        middlewares.add(new PromptHardeningMiddleware(runtimeConfigStore));
         if (definition.isEntry()) {
             middlewares.add(new ExpertRosterMiddleware());
             // 继承槽位（REQ-AI-31）：仅入口智能体注入；槽位由门面每轮合并后放入运行期上下文，不进装配指纹
