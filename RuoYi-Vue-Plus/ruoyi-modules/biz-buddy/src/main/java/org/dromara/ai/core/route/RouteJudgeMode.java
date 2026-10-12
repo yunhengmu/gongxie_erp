@@ -5,8 +5,9 @@ import org.dromara.common.core.utils.StringUtils;
 /**
  * 结构化决策的执行模式（docs/21 §5.4）。
  *
- * <p>本批次<b>只实现「影子」的真实语义</b>：{@link #GATE} / {@link #PRESELECT} 能解析，
- * 但按影子行为执行（只留痕不接管），并由调用方首用时打一条 WARN 说明「短路接管待 T9」，
+ * <p>{@link #SHADOW} 为启用后的默认档：决策模型只留痕、不接管路由。
+ * {@link #GATE} 已为<b>真实短路接管</b>——入口轮之前判定，高置信且选项合法即短路到专家直答。
+ * {@link #PRESELECT} <b>尚未实现</b>，当前按影子语义执行，由调用方首用时打一条 WARN 说明，
  * 不静默降级。</p>
  *
  * @author BizBuddy
