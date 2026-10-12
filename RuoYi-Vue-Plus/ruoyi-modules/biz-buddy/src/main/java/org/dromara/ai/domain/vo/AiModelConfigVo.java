@@ -38,7 +38,7 @@ public class AiModelConfigVo implements Serializable {
     private String provider;
 
     /**
-     * 模型类型（chat 对话 / embedding 向量）
+     * 模型类型（chat 对话 / embedding 向量 / decision 决策）
      */
     private String modelType;
 

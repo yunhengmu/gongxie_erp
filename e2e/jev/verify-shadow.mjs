@@ -2,13 +2,18 @@
 /**
  * 结构化决策「影子档」运行时验证（docs/21 落地进展 T5 的实机验证）。
  *
- * <p>一次跑完五步：读配置 → 打开影子档 → 探测连通性 → 真实对话一轮 → 回读编排运行 → 恢复关闭。
+ * <p>一次跑完五步：读配置 → 选决策模型 → 打开影子档 → 探测连通性 → 真实对话一轮 → 回读编排运行 → 恢复关闭。
  * 脚本只做「开启 + 触发 + 回读接口」，**判定审计列（judge_*）用 SQL 复核**，脚本末尾会打印复核命令。</p>
+ *
+ * <p><b>决策模型来源</b>：结构化决策配置不再直填地址 / 模型 / 密钥，改为引用「模型配置」里
+ * {@code modelType=decision} 的启用记录。本脚本默认取第一条可用决策模型，也可用
+ * {@code --model-config-id} 显式指定。</p>
  *
  * <p>用法：
  * <pre>
- *   node e2e/jev/verify-shadow.mjs                  # 用 e2e/.env.local 的密钥与业务空间地址
+ *   node e2e/jev/verify-shadow.mjs                   # 用 e2e/.env.local 的业务空间地址，自动选决策模型
  *   node e2e/jev/verify-shadow.mjs --keep-enabled    # 跑完不恢复「关闭」（留着采集影子数据）
+ *   node e2e/jev/verify-shadow.mjs --model-config-id 9
  *   node e2e/jev/verify-shadow.mjs --base-url http://localhost:8081
  *   node e2e/jev/verify-shadow.mjs --message "帮我看看有哪些公告"
  * </pre></p>
@@ -16,10 +21,7 @@
  * <p>退出码：{@code 0} 全流程通过 / {@code 1} 有断言失败 / {@code 2} 配置缺失 / {@code 3} 参数错误。</p>
  */
 
-import path from 'node:path';
-import url from 'node:url';
-
-import { loadConfig, parseEnvFile } from '../lib/env.mjs';
+import { loadConfig } from '../lib/env.mjs';
 import { HttpClient } from '../lib/http.mjs';
 import { readSse } from '../lib/sse.mjs';
 
@@ -32,7 +34,7 @@ const EXIT = { OK: 0, FAIL: 1, USAGE: 2 };
  * @returns {object} 选项
  */
 const parseArgs = (argv) => {
-  const args = { baseUrl: '', jevBaseUrl: '', message: '', keepEnabled: false, mode: '', threshold: null };
+  const args = { baseUrl: '', modelConfigId: '', message: '', keepEnabled: false, mode: '', threshold: null };
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
     if (token === '--keep-enabled') {
@@ -51,8 +53,8 @@ const parseArgs = (argv) => {
       args.baseUrl = argv[++i] ?? '';
       continue;
     }
-    if (token === '--jev-base-url') {
-      args.jevBaseUrl = argv[++i] ?? '';
+    if (token === '--model-config-id') {
+      args.modelConfigId = argv[++i] ?? '';
       continue;
     }
     if (token === '--message') {
@@ -65,38 +67,40 @@ const parseArgs = (argv) => {
 };
 
 /**
- * 载入决策模型侧配置（地址 / 模型名 / 密钥）：环境变量 > e2e/.env.local > 后端配置里的对话模型密钥。
+ * 从「模型配置」里选一条启用中的决策模型（{@code modelType=decision}）。
  *
- * @param {object} cfg e2e 配置
- * @param {object} args 命令行选项
- * @returns {object} { baseUrl, model, apiKey }
+ * @param {HttpClient} http HTTP 客户端
+ * @param {string} explicitId 显式指定的模型主键（空表示自动取第一条）
+ * @returns {Promise<object>} 决策模型选项（含 id / configName / modelCode）
  */
-const loadJudgeConfig = (cfg, args) => {
-  const here = path.dirname(url.fileURLToPath(import.meta.url));
-  const localEnv = parseEnvFile(path.resolve(here, '..', '.env.local'));
-  const workspaceId = process.env.BIZBUDDY_JEV_WORKSPACE_ID || localEnv.BIZBUDDY_JEV_WORKSPACE_ID || '';
-  const derived = workspaceId
-    ? `https://${workspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode`
-    : '';
-  return {
-    baseUrl: args.jevBaseUrl || process.env.BIZBUDDY_JEV_BASE_URL || localEnv.BIZBUDDY_JEV_BASE_URL || derived,
-    model: process.env.BIZBUDDY_JEV_MODEL || localEnv.BIZBUDDY_JEV_MODEL || 'decision-model-preview',
-    apiKey: process.env.BIZBUDDY_JEV_API_KEY || localEnv.BIZBUDDY_JEV_API_KEY || cfg.llmApiKey
-  };
+const resolveDecisionModel = async (http, explicitId) => {
+  const options = await http.request('GET', '/ai/model/options', { query: { modelType: 'decision' } });
+  const list = options ?? [];
+  if (explicitId !== '' && explicitId != null) {
+    const hit = list.find((item) => String(item.id) === String(explicitId));
+    if (!hit) {
+      throw new Error(`指定的决策模型 #${explicitId} 不在可用选项内（需为启用中的 decision 类型模型）`);
+    }
+    return hit;
+  }
+  if (!list.length) {
+    throw new Error('「模型配置」里没有启用中的决策模型，请先新增一条 decision 类型模型');
+  }
+  return list[0];
 };
 
 /**
- * 组装保存用的配置体（只含后端 Bo 的字段，不带只读的 apiKeyConfigured）。
+ * 组装保存用的配置体（只含后端 Bo 的字段）：连接信息不再直填，只带所选决策模型主键。
  *
- * @param {object} judge 决策模型侧配置
+ * @param {number|string} modelConfigId 所选决策模型主键
  * @param {boolean} enabled 是否开启
+ * @param {string} mode 判定档（shadow / gate）
+ * @param {number} threshold 置信度阈值
  * @returns {object} 配置体
  */
-const jevPayload = (judge, enabled, mode = 'shadow', threshold = 0.75) => ({
+const jevPayload = (modelConfigId, enabled, mode = 'shadow', threshold = 0.75) => ({
   enabled,
-  baseUrl: judge.baseUrl,
-  model: judge.model,
-  apiKey: enabled ? judge.apiKey : '',
+  modelConfigId,
   timeoutSeconds: 5,
   mode,
   confidenceThreshold: threshold,
@@ -143,15 +147,21 @@ const main = async () => {
   }
 
   const cfg = loadConfig({ baseUrl: args.baseUrl });
-  const judge = loadJudgeConfig(cfg, args);
-  if (!judge.baseUrl || !judge.apiKey) {
-    console.error('✗ 缺少决策模型地址或密钥：请设置 BIZBUDDY_JEV_WORKSPACE_ID（或 BIZBUDDY_JEV_BASE_URL）与 BIZBUDDY_LLM_API_KEY');
+  const http = new HttpClient(cfg, { timeoutMs: 20000, verbose: false, log: () => {} });
+  await http.login();
+
+  // 选决策模型（「模型配置」里的 decision 类型启用记录）
+  let decisionModel;
+  try {
+    decisionModel = await resolveDecisionModel(http, args.modelConfigId);
+  } catch (error) {
+    console.error(`✗ ${error.message}`);
     process.exit(EXIT.USAGE);
   }
+  const modelConfigId = decisionModel.id;
 
-  const http = new HttpClient(cfg, { timeoutMs: 20000, verbose: false, log: () => {} });
   console.log(`结构化决策影子档运行时验证｜${cfg.baseUrl}`);
-  console.log(`决策模型｜${judge.baseUrl}｜${judge.model}｜密钥 ${judge.apiKey.slice(0, 5)}***（长度 ${judge.apiKey.length}）`);
+  console.log(`决策模型｜#${modelConfigId}｜${decisionModel.configName}｜${decisionModel.modelCode}`);
 
   let failed = false;
   const check = (ok, label, detail) => {
@@ -161,19 +171,22 @@ const main = async () => {
     }
   };
 
-  // 1. 登录 + 读取当前配置（验证密钥不回显）
-  await http.login();
+  // 1. 读取当前配置（验证连接信息不经本接口下发）
   const before = await http.request('GET', '/ai/runtime/jev');
-  check(before.apiKey === undefined, 'GET /ai/runtime/jev 不回显密钥', `apiKeyConfigured=${before.apiKeyConfigured}｜enabled=${before.enabled}｜mode=${before.mode}`);
+  check(
+    before.baseUrl === undefined && before.model === undefined && before.apiKey === undefined,
+    'GET /ai/runtime/jev 不下载连接信息',
+    `enabled=${before.enabled}｜mode=${before.mode}｜modelConfigId=${before.modelConfigId ?? '(未选)'}`
+  );
 
-  // 2. 打开配置（地址 / 模型 / 密钥走运行期配置，存 Redis）；模式与阈值可命令行覆盖
+  // 2. 打开配置（选中决策模型，走运行期配置存 Redis）；模式与阈值可命令行覆盖
   const mode = args.mode || 'shadow';
   const threshold = args.threshold ?? 0.75;
   const modeLabel = mode === 'gate' ? '接管（置信度闸门）' : '影子（只留痕）';
-  await http.request('PUT', '/ai/runtime/jev', { body: jevPayload(judge, true, mode, threshold) });
+  await http.request('PUT', '/ai/runtime/jev', { body: jevPayload(modelConfigId, true, mode, threshold) });
   const applied = await http.request('GET', '/ai/runtime/jev');
-  check(applied.enabled === true && applied.mode === mode, `已切换为「${modeLabel}」档`, `enabled=${applied.enabled}｜mode=${applied.mode}｜阈值=${applied.confidenceThreshold}｜model=${applied.model}`);
-  check(applied.apiKeyConfigured === true, '密钥已配置（不回显）', `apiKeyConfigured=${applied.apiKeyConfigured}`);
+  check(applied.enabled === true && applied.mode === mode, `已切换为「${modeLabel}」档`, `enabled=${applied.enabled}｜mode=${applied.mode}｜阈值=${applied.confidenceThreshold}｜modelConfigId=${applied.modelConfigId}`);
+  check(String(applied.modelConfigId) === String(modelConfigId), '所选决策模型已生效', `modelConfigId=${applied.modelConfigId}`);
 
   // 3. 连通性探测（走健康自检的探测通道，真实调一次判定）
   const probe = await http.request('POST', '/ai/health/probe', { body: { target: 'jev' } });
@@ -211,9 +224,9 @@ const main = async () => {
 
   // 6. 恢复「关闭」（默认；--keep-enabled 时保留影子档继续采集）
   if (!args.keepEnabled) {
-    await http.request('PUT', '/ai/runtime/jev', { body: jevPayload(judge, false) });
+    await http.request('PUT', '/ai/runtime/jev', { body: jevPayload(modelConfigId, false) });
     const restored = await http.request('GET', '/ai/runtime/jev');
-    check(restored.enabled === false, '已恢复「关闭」档', `enabled=${restored.enabled}｜密钥保留=${restored.apiKeyConfigured}`);
+    check(restored.enabled === false, '已恢复「关闭」档', `enabled=${restored.enabled}｜modelConfigId=${restored.modelConfigId}`);
   } else {
     console.log('  · 按 --keep-enabled 保留影子档（继续采集对照语料）');
   }

@@ -8,20 +8,22 @@
  * <p><b>桩必须跑进 compose 网络</b>：容器解析不到 {@code host.docker.internal}（docker 网关是 WSL 主机），
  * 故桩不能跑在 Windows 上。操作者需**先在 WSL 内**启动桩（用例本身不 shell out，保持纯 HTTP）：</p>
  * <pre>
- *   wsl -d Ubuntu-22.04 -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \
- *     -v /mnt/d/test/mybuddy/biz-buddy/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080
+ *   wsl -d Ubuntu-24.04 -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \
+ *     -v /mnt/d/trae/BizBuddy/biz-buddy/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080
  * </pre>
  *
- * <p>前置不满足（桩不可达 / 运行期配置接口不可读 / 平台无对话密钥）→ {@code SKIP}，不判 {@code FAIL}。
- * <b>收尾无条件恢复</b>：开始前先 {@code GET /ai/runtime/jev} **快照原配置**，{@code finally} 里把
- * <b>除密钥之外</b>的所有字段（{@code baseUrl} / {@code model} / {@code timeoutSeconds} / {@code mode} /
- * {@code confidenceThreshold} / {@code failOpen} / {@code stateMaxChars} / {@code persistProbabilities}）
- * 连同 {@code enabled=false} 一起 PUT 回去，避免把地址与模型清空；密钥传空串＝不修改。
- * 会话登记到 {@code registry.sessions} 以便统一清理。</p>
+ * <p><b>决策模型从「模型配置」取</b>：结构化决策配置只带「是否启用 + 所选模型主键」，连接信息（地址 / 模型标识 /
+ * 密钥）全部来自「模型配置」里的 {@code decision} 类型记录。故本层开始前先<b>建一条临时决策模型</b>
+ * （{@code baseUrl} 指向桩、{@code apiKey} 随便填——桩不校验鉴权），选中它跑四分支。</p>
  *
- * <p><b>已知取舍 / 密钥处置</b>：本层<b>不写密钥</b>——测试配置与收尾的 {@code apiKey} 一律传空串
- * （＝不修改已保存密钥），且桩服务不校验 {@code Authorization}，故原有密钥始终不被覆盖，
- * 无需事后手工恢复。收尾只把**非密钥字段**按快照回填并置 {@code enabled=false}。</p>
+ * <p>前置不满足（桩不可达 / 运行期配置接口不可读 / 平台无对话密钥）→ {@code SKIP}，不判 {@code FAIL}。
+ * <b>收尾无条件恢复</b>：开始前先 {@code GET /ai/runtime/jev} <b>快照原配置</b>，{@code finally} 里把
+ * {@code modelConfigId} 与策略字段（{@code timeoutSeconds} / {@code mode} / {@code confidenceThreshold} /
+ * {@code failOpen} / {@code stateMaxChars} / {@code persistProbabilities}）连同 {@code enabled=false}
+ * 一起 PUT 回去，并<b>删除临时决策模型</b>。会话登记到 {@code registry.sessions} 以便统一清理。</p>
+ *
+ * <p><b>密钥处置</b>：本层不再写任何真实密钥——临时模型自带一把不被校验的占位密钥，收尾随模型一并删除，
+ * 故平台已保存的密钥始终不被触碰。</p>
  */
 
 import { readSse, lastOfType } from '../lib/sse.mjs';
@@ -34,10 +36,13 @@ const STUB_HEALTH_URL = 'http://localhost:18080/health';
 /** 桩地址（容器内服务名，供后端外呼） */
 const STUB_BASE_URL = 'http://jev-stub:8080/compatible-mode';
 
+/** 临时决策模型固定模型标识（桩按 state 标记分支，与模型标识无关） */
+const STUB_MODEL_CODE = 'decision-model-preview';
+
 /** 桩启动命令（写进 SKIP 提示；操作者需先在 WSL 内执行） */
 const STUB_START_COMMAND = [
-  'wsl -d Ubuntu-22.04 -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \\',
-  '  -v /mnt/d/test/mybuddy/biz-buddy/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080'
+  'wsl -d Ubuntu-24.04 -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \\',
+  '  -v /mnt/d/trae/BizBuddy/biz-buddy/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080'
 ].join('\n');
 
 /** 五个子场景：前四条依赖桩（gate 档四分支），最后一条关闭档零写入（不依赖桩） */
@@ -72,28 +77,32 @@ export const run = async (ctx) => {
       evidence: { status: probe.status }
     };
   }
-  // 前置 2b：已配置决策模型密钥（未配置则不会外呼判定；本层不写密钥，故需环境已有密钥）
-  if (probe.payload?.data?.apiKeyConfigured !== true) {
-    return {
-      status: 'SKIP',
-      detail: '未配置决策模型密钥，无法触发判定；请在「安全合规配置 → 结构化决策路由」填入密钥，'
-        + '或先跑一次 node e2e/jev/verify-shadow.mjs --keep-enabled'
-    };
-  }
   // 前置 3：平台对话密钥已配置（回落分支要跑入口轮，缺密钥会拿不到 done）
   if (!resolved.platformChatKeyReady) {
     return { status: 'SKIP', detail: '平台未为对话模型配置 API 密钥（「模型配置」页补全后可跑）' };
   }
 
+  // 建临时决策模型（连接信息指向桩）：决策模型只能从「模型配置」引用，故本层先造一条
+  let tempModel;
+  try {
+    tempModel = await createTempDecisionModel(http, registry.stamp);
+    log(`  ✓ 已建临时决策模型「${tempModel.configName}」#${tempModel.id}（baseUrl=${STUB_BASE_URL}）`);
+  } catch (error) {
+    return {
+      status: 'SKIP',
+      detail: `创建临时决策模型失败（${error.message}）——「模型配置」接口不可用（jar 陈旧）或无新增权限`
+    };
+  }
+
   // 原配置快照：须在改测试配置之前读取，供 finally 恢复（声明在 try 之外以便 finally 可见）
   let snapshot = null;
   try {
-    // 快照原配置（必须在改测试配置之前）：收尾据此回填 baseUrl / model 等，避免被清空
+    // 快照原配置（必须在改测试配置之前）：收尾据此回填 modelConfigId 与策略字段，避免被清空
     snapshot = await http.request('GET', '/ai/runtime/jev');
     const observations = [];
     const failures = [];
     for (const spec of SCENARIOS) {
-      const observed = await runScenario(ctx, spec);
+      const observed = await runScenario(ctx, spec, tempModel.id);
       const check = evaluate(spec, observed);
       observations.push({ spec, observed });
       log(`  ${check.ok ? '✓' : '✗'} ${spec.key}（${spec.label}）｜${check.detail}`);
@@ -112,27 +121,75 @@ export const run = async (ctx) => {
     }
     return { status: 'PASS', detail: `四分支与关闭档全部通过：${summary}`, evidence: { observations: observations.map((item) => item.observed.evidence) } };
   } finally {
-    // 无条件恢复：回填快照里的地址 / 模型等字段并强制关闭档（密钥留空＝不修改）；即便上面抛异常也要执行
+    // 无条件恢复：先回填快照里的 modelConfigId 与策略字段并强制关闭档，再删临时模型；即便上面抛异常也要执行
     try {
       await restoreJev(http, snapshot);
-      log('  ✓ 已恢复结构化决策原配置（enabled=false，baseUrl/model 等按快照回填；密钥留空不修改）');
+      log('  ✓ 已恢复结构化决策原配置（enabled=false，modelConfigId 等按快照回填）');
     } catch (error) {
       log(`  ! 恢复结构化决策配置失败：${error.message}`);
     }
+    try {
+      await deleteTempDecisionModel(http, tempModel.id);
+      log(`  ✓ 已删除临时决策模型 #${tempModel.id}`);
+    } catch (error) {
+      log(`  ! 删除临时决策模型 #${tempModel.id} 失败：${error.message}`);
+    }
   }
 };
+
+/**
+ * 建一条指向桩的临时决策模型，并回查其主键。
+ *
+ * <p>桩不校验 {@code Authorization}，故密钥填占位值即可；收尾随模型一并删除。</p>
+ *
+ * @param {import('../lib/http.mjs').HttpClient} http HTTP 客户端
+ * @param {string} stamp 运行戳（拼接唯一配置名）
+ * @returns {Promise<{ id: number|string, configName: string }>} 临时模型
+ */
+const createTempDecisionModel = async (http, stamp) => {
+  const configName = `E2E_L12_决策模型_${stamp}`;
+  await http.request('POST', '/ai/model', {
+    body: {
+      configName,
+      provider: 'aliyun',
+      modelType: 'decision',
+      modelCode: STUB_MODEL_CODE,
+      baseUrl: STUB_BASE_URL,
+      apiKey: 'sk-e2e-stub',
+      timeoutSeconds: 10,
+      status: '0',
+      remark: 'E2E L12 临时决策模型（用例收尾自动删除）'
+    }
+  });
+  const options = await http.request('GET', '/ai/model/options', { query: { modelType: 'decision' } });
+  const created = (options ?? []).find((item) => item.configName === configName);
+  if (!created) {
+    throw new Error(`临时决策模型创建后未在选项中查到：${configName}`);
+  }
+  return { id: created.id, configName };
+};
+
+/**
+ * 删除临时决策模型。
+ *
+ * @param {import('../lib/http.mjs').HttpClient} http HTTP 客户端
+ * @param {number|string} id 模型主键
+ * @returns {Promise<void>}
+ */
+const deleteTempDecisionModel = (http, id) => http.request('DELETE', `/ai/model/${id}`);
 
 /**
  * 跑一个子场景：改配置 → 新建会话（不指定专家）→ 发消息 → 读 SSE → 轮询编排运行。
  *
  * @param {object} ctx 运行上下文
  * @param {object} spec 子场景定义
+ * @param {number|string} modelConfigId 所选决策模型主键
  * @returns {Promise<object>} 观测结果（含 evidence）
  */
-const runScenario = async (ctx, spec) => {
+const runScenario = async (ctx, spec, modelConfigId) => {
   const { http, args, resolved, registry, detail, throttle } = ctx;
 
-  await http.request('PUT', '/ai/runtime/jev', { body: jevPayload(spec) });
+  await http.request('PUT', '/ai/runtime/jev', { body: jevPayload(spec, modelConfigId) });
   const session = await http.request('POST', '/ai/chat/session', {
     query: { agentId: resolved.entryAgentId, title: `E2E_L12_${spec.key}_${registry.stamp}` }
   });
@@ -173,6 +230,7 @@ const runScenario = async (ctx, spec) => {
       key: spec.key,
       label: spec.label,
       sessionId: session.id,
+      modelConfigId,
       threshold: spec.threshold,
       enabled: spec.enabled,
       stopReason,
@@ -301,17 +359,15 @@ const evaluateDisabled = (observed) => {
 };
 
 /**
- * 组装保存用的配置体（只含后端 Bo 的字段，不带只读的 apiKeyConfigured）。
+ * 组装保存用的配置体（只含后端 Bo 的字段）：连接信息不再直填，只带所选决策模型主键。
  *
  * @param {object} spec 子场景定义
+ * @param {number|string} modelConfigId 所选决策模型主键
  * @returns {object} 配置体
  */
-const jevPayload = (spec) => ({
+const jevPayload = (spec, modelConfigId) => ({
   enabled: spec.enabled,
-  baseUrl: STUB_BASE_URL,
-  model: 'decision-model-preview',
-  // 密钥一律留空＝不修改已保存密钥（桩不校验 Authorization，本层无需自带密钥，也避免污染真实密钥）
-  apiKey: '',
+  modelConfigId,
   timeoutSeconds: 5,
   mode: spec.mode,
   confidenceThreshold: spec.threshold,
@@ -321,19 +377,18 @@ const jevPayload = (spec) => ({
 });
 
 /**
- * 恢复运行期配置：以快照回填**除密钥外**的所有字段并强制关闭档。
+ * 恢复运行期配置：以快照回填 {@code modelConfigId} 与策略字段，并强制关闭档。
  *
- * <p>密钥传空串（＝不修改）——本层全程未改动密钥，故保持原值即可；快照缺失时退化为「只关闭」。</p>
+ * <p>快照缺失时退化为「只关闭」（{@code enabled=false}，模型主键留空）。</p>
  *
  * @param {import('../lib/http.mjs').HttpClient} http HTTP 客户端
  * @param {object|null} snapshot 开始前的配置快照
  * @returns {Promise<void>}
  */
 const restoreJev = (http, snapshot) => {
-  const body = { enabled: false, apiKey: '' };
+  const body = { enabled: false };
   if (snapshot) {
-    body.baseUrl = snapshot.baseUrl ?? '';
-    body.model = snapshot.model ?? '';
+    body.modelConfigId = snapshot.modelConfigId ?? null;
     body.timeoutSeconds = snapshot.timeoutSeconds ?? 5;
     body.mode = snapshot.mode ?? 'shadow';
     body.confidenceThreshold = snapshot.confidenceThreshold ?? 0.75;

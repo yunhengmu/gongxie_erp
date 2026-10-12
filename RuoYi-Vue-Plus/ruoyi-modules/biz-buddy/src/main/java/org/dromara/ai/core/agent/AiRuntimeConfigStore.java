@@ -315,9 +315,9 @@ public class AiRuntimeConfigStore {
      */
     public void updateJev(AiJevConfigBo bo) {
         RedisUtils.setCacheObject(JEV_KEY, JsonUtils.toJsonString(bo));
-        // 不打印 apiKey（密钥），只记录定位问题需要的字段
-        log.info("结构化决策配置已更新：enabled={}, mode={}, baseUrl={}, model={}, timeout={}s, threshold={}, persistProbabilities={}",
-            bo.isEnabled(), bo.getMode(), bo.getBaseUrl(), bo.getModel(), bo.getTimeoutSeconds(),
+        // 决策模型的连接信息（地址 / 模型标识 / 密钥）不在此配置内，故只记录策略字段
+        log.info("结构化决策配置已更新：enabled={}, modelConfigId={}, mode={}, timeout={}s, threshold={}, persistProbabilities={}",
+            bo.isEnabled(), bo.getModelConfigId(), bo.getMode(), bo.getTimeoutSeconds(),
             bo.getConfidenceThreshold(), bo.isPersistProbabilities());
     }
 
@@ -330,9 +330,7 @@ public class AiRuntimeConfigStore {
         AiProperties.Jev jev = aiProperties.getJev();
         AiJevConfigBo bo = new AiJevConfigBo();
         bo.setEnabled(jev.isEnabled());
-        bo.setBaseUrl(jev.getBaseUrl());
-        bo.setModel(jev.getModel());
-        bo.setApiKey(jev.getApiKey());
+        bo.setModelConfigId(jev.getModelConfigId());
         bo.setTimeoutSeconds(jev.getTimeoutSeconds());
         bo.setMode(jev.getMode());
         bo.setConfidenceThreshold(jev.getConfidenceThreshold());

@@ -49,7 +49,7 @@ class RouteJudgeServiceTest {
     private static final Long USER_ID = 100L;
     private static final Long ENTRY_AGENT_ID = 5L;
     private static final Long MESSAGE_ID = 2L;
-    private static final String API_KEY = "sk-x";
+    private static final Long MODEL_ID = 9L;
 
     /**
      * 影子档下判定的实际决策来源恒为工具决策（L）：判定只作旁路观测
@@ -83,12 +83,16 @@ class RouteJudgeServiceTest {
     }
 
     /**
-     * 构造结构化决策配置。
+     * 构造结构化决策配置（连接信息不回填，只带「是否启用 + 所选模型主键」）。
+     *
+     * @param enabled       是否启用
+     * @param modelConfigId 所选决策模型主键（null 表示未选）
+     * @return 配置
      */
-    private AiJevConfigBo cfg(boolean enabled, String apiKey) {
+    private AiJevConfigBo cfg(boolean enabled, Long modelConfigId) {
         AiJevConfigBo cfg = new AiJevConfigBo();
         cfg.setEnabled(enabled);
-        cfg.setApiKey(apiKey);
+        cfg.setModelConfigId(modelConfigId);
         cfg.setMode("shadow");
         return cfg;
     }
@@ -101,7 +105,7 @@ class RouteJudgeServiceTest {
     @Test
     @DisplayName("关闭态：完全不外呼、不构造状态、判定结果为空")
     void shouldNotCallJudgeWhenDisabled() {
-        when(runtimeConfigStore.jev()).thenReturn(cfg(false, API_KEY));
+        when(runtimeConfigStore.jev()).thenReturn(cfg(false, MODEL_ID));
         AiRouteContext route = route();
         route.action = "route";
         route.taskContext = "task";
@@ -117,9 +121,9 @@ class RouteJudgeServiceTest {
     }
 
     @Test
-    @DisplayName("apiKey 为空：与关闭态等价（零外呼）")
-    void shouldNotCallJudgeWhenApiKeyBlank() {
-        when(runtimeConfigStore.jev()).thenReturn(cfg(true, ""));
+    @DisplayName("未选模型：与关闭态等价（零外呼）")
+    void shouldNotCallJudgeWhenModelNotSelected() {
+        when(runtimeConfigStore.jev()).thenReturn(cfg(true, null));
         AiRouteContext route = route();
         route.action = "route";
 
@@ -133,7 +137,7 @@ class RouteJudgeServiceTest {
     @Test
     @DisplayName("影子不接管：写入 8 个审计字段但不改变编排走向")
     void shouldRecordVerdictWithoutTakingOver() {
-        when(runtimeConfigStore.jev()).thenReturn(cfg(true, API_KEY));
+        when(runtimeConfigStore.jev()).thenReturn(cfg(true, MODEL_ID));
         when(routeJudge.judge(any())).thenReturn(Optional.of(usableVerdict()));
         AiRouteContext route = route();
         route.action = "route";
@@ -158,7 +162,7 @@ class RouteJudgeServiceTest {
     @Test
     @DisplayName("出境前强制 PII 脱敏并留痕：送出的 state 已掩码")
     void shouldMaskPiiBeforeOutboundAndRecordEvent() {
-        when(runtimeConfigStore.jev()).thenReturn(cfg(true, API_KEY));
+        when(runtimeConfigStore.jev()).thenReturn(cfg(true, MODEL_ID));
         when(routeJudge.judge(any())).thenReturn(Optional.of(usableVerdict()));
 
         service.judgeShadow(route(), "我的手机号是13800001111，帮我看看公告", USER_ID, 4L, MESSAGE_ID);
@@ -177,7 +181,7 @@ class RouteJudgeServiceTest {
     @Test
     @DisplayName("choice 越界：记 judgeError、来源仍是工具决策、编排走向不变")
     void shouldRejectOutOfRangeChoice() {
-        when(runtimeConfigStore.jev()).thenReturn(cfg(true, API_KEY));
+        when(runtimeConfigStore.jev()).thenReturn(cfg(true, MODEL_ID));
         when(routeJudge.judge(any())).thenReturn(Optional.of(
             new RouteJudgeVerdict("ghost_expert", 0.9, Map.of(), 10L, 5L, null)));
         AiRouteContext route = route();
@@ -194,7 +198,7 @@ class RouteJudgeServiceTest {
     @Test
     @DisplayName("判定 error 非空：不抛异常、异常落 judgeError")
     void shouldNotThrowWhenVerdictHasError() {
-        when(runtimeConfigStore.jev()).thenReturn(cfg(true, API_KEY));
+        when(runtimeConfigStore.jev()).thenReturn(cfg(true, MODEL_ID));
         when(routeJudge.judge(any())).thenReturn(Optional.of(
             new RouteJudgeVerdict(null, null, null, 1200L, 0L, "决策模型调用失败：timeout")));
         AiRouteContext route = route();
@@ -208,7 +212,7 @@ class RouteJudgeServiceTest {
     @Test
     @DisplayName("判定抛异常：被吞掉、不影响编排且不写判定来源")
     void shouldSwallowJudgeException() {
-        when(runtimeConfigStore.jev()).thenReturn(cfg(true, API_KEY));
+        when(runtimeConfigStore.jev()).thenReturn(cfg(true, MODEL_ID));
         when(routeJudge.judge(any())).thenThrow(new RuntimeException("boom"));
         AiRouteContext route = route();
         route.action = "self";
@@ -225,7 +229,7 @@ class RouteJudgeServiceTest {
      * 构造闸门档配置（含阈值）。
      */
     private AiJevConfigBo gateCfg(double threshold) {
-        AiJevConfigBo cfg = cfg(true, API_KEY);
+        AiJevConfigBo cfg = cfg(true, MODEL_ID);
         cfg.setMode("gate");
         cfg.setConfidenceThreshold(threshold);
         return cfg;
@@ -317,16 +321,16 @@ class RouteJudgeServiceTest {
     }
 
     @Test
-    @DisplayName("闸门关闭态零外呼：关闭 / 无密钥 / 影子档 均不调用判定")
+    @DisplayName("闸门关闭态零外呼：关闭 / 未选模型 / 影子档 均不调用判定")
     void shouldNotCallJudgeWhenGateDisabled() {
         // 关闭
-        when(runtimeConfigStore.jev()).thenReturn(cfg(false, API_KEY));
+        when(runtimeConfigStore.jev()).thenReturn(cfg(false, MODEL_ID));
         assertFalse(service.judgeGate(route(), "问题", USER_ID, 4L, MESSAGE_ID).takeOver());
-        // 无密钥
-        when(runtimeConfigStore.jev()).thenReturn(cfg(true, ""));
+        // 未选模型
+        when(runtimeConfigStore.jev()).thenReturn(cfg(true, null));
         assertFalse(service.judgeGate(route(), "问题", USER_ID, 4L, MESSAGE_ID).takeOver());
         // 影子档：走收尾判定，前置判定不接管且不外呼
-        when(runtimeConfigStore.jev()).thenReturn(cfg(true, API_KEY));
+        when(runtimeConfigStore.jev()).thenReturn(cfg(true, MODEL_ID));
         assertFalse(service.judgeGate(route(), "问题", USER_ID, 4L, MESSAGE_ID).takeOver());
 
         verify(routeJudge, never()).judge(any());

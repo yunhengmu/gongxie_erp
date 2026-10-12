@@ -76,15 +76,13 @@ export interface SecurityConfig {
   providerApiKey: string;
 }
 
-/** 结构化决策路由配置（docs/21；服务端不回显密钥，仅返回是否已配置） */
+/** 结构化决策路由配置（docs/21；决策模型连接信息统一由「模型配置」管理，此处只引用模型主键） */
 export interface JevConfig {
   /** 总开关：关闭＝零外呼、路由完全由小Z 负责 */
   enabled: boolean;
-  /** 决策模型服务地址（百炼 compatible-mode 基址） */
-  baseUrl: string;
-  /** 决策模型标识 */
-  model: string;
-  /** 外呼超时（秒） */
+  /** 所选决策模型（「模型配置」主键，类型 decision）；开启时必填 */
+  modelConfigId?: string | number | null;
+  /** 判定超时（秒；与「模型配置」的通用超时无关——判定在路由关键路径上，需要更短超时） */
   timeoutSeconds: number;
   /** 执行模式：shadow 影子 / gate 闸门 / preselect 候选预筛 */
   mode: string;
@@ -96,8 +94,4 @@ export interface JevConfig {
   stateMaxChars: number;
   /** 是否落库概率分布 */
   persistProbabilities: boolean;
-  /** 是否已配置密钥（服务端仅返回该布尔值，不回显密钥明文） */
-  apiKeyConfigured?: boolean;
-  /** 待保存的密钥：留空表示不修改已保存密钥（仅提交用，读取时无此字段） */
-  apiKey?: string;
 }

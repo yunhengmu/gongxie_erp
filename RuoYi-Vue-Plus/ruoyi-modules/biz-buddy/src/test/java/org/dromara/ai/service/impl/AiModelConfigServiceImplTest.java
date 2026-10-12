@@ -57,6 +57,14 @@ class AiModelConfigServiceImplTest {
 
     private MockedStatic<MapstructUtils> mapstruct;
 
+    /**
+     * 合法的 TypeSafe System One 响应：{@code choice} 落在探测候选闭集内，概率和精确为 1。
+     */
+    private static final String DECISION_OK_BODY = """
+        {"answers":{"expert":{"type":"choice","choice":"probe_expert_a","confidence":0.9,
+        "probabilities":{"self":0.1,"probe_expert_a":0.7,"probe_expert_b":0.1,"other":0.1}}},
+        "usage":{"input_tokens":20}}""";
+
     @BeforeAll
     static void initContext() {
         AiServiceTestContext.initialize();
@@ -355,6 +363,75 @@ class AiModelConfigServiceImplTest {
             assertFalse(result.getSuccess());
             assertTrue(result.getMessage().contains("HTTP 500"));
         }
+    }
+
+    @Test
+    @DisplayName("决策模型连通性测试：地址自动拼 /v1/systemone 并解析判定选项")
+    void shouldTestDecisionConnectionSuccessfully() {
+        String baseUrl = "https://ws.cn-beijing.maas.aliyuncs.com/compatible-mode";
+        try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
+            stubHttp(http, 200, DECISION_OK_BODY);
+            AiModelConfigBo bo = new AiModelConfigBo();
+            bo.setBaseUrl(baseUrl);
+            bo.setModelType(AiModelConfig.TYPE_DECISION);
+            bo.setModelCode("decision-model-preview");
+            bo.setApiKey("sk-1");
+
+            AiModelTestVo result = service.testConnection(bo);
+
+            assertTrue(result.getSuccess());
+            assertTrue(result.getMessage().contains("probe_expert_a"));
+            // 决策模型走 TypeSafe System One 协议：根地址后自动补 /v1/systemone
+            http.verify(() -> HttpUtil.createPost(baseUrl + "/v1/systemone"));
+        }
+    }
+
+    @Test
+    @DisplayName("决策模型连通性测试：报文可解析但判定不可用时失败并给出原因")
+    void shouldFailDecisionWhenVerdictInvalid() {
+        try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
+            // choice 越界：不在闭集内，宽松校验会判为不可用
+            stubHttp(http, 200, """
+                {"answers":{"expert":{"type":"choice","choice":"not_in_set",
+                "probabilities":{"self":0.5,"other":0.5}}}}""");
+            AiModelConfigBo bo = new AiModelConfigBo();
+            bo.setBaseUrl("https://ws.cn-beijing.maas.aliyuncs.com/compatible-mode");
+            bo.setModelType(AiModelConfig.TYPE_DECISION);
+            bo.setModelCode("decision-model-preview");
+            bo.setApiKey("sk-1");
+
+            AiModelTestVo result = service.testConnection(bo);
+
+            assertFalse(result.getSuccess());
+            assertTrue(result.getMessage().contains("choice 越界"));
+        }
+    }
+
+    @Test
+    @DisplayName("决策模型连通性测试：非 2xx 失败并提示 System One 协议口径")
+    void shouldFailDecisionOnNon2xx() {
+        try (MockedStatic<HttpUtil> http = mockStatic(HttpUtil.class)) {
+            stubHttp(http, 404, "");
+            AiModelConfigBo bo = new AiModelConfigBo();
+            bo.setBaseUrl("https://ws.cn-beijing.maas.aliyuncs.com/compatible-mode");
+            bo.setModelType(AiModelConfig.TYPE_DECISION);
+            bo.setModelCode("decision-model-preview");
+
+            AiModelTestVo result = service.testConnection(bo);
+
+            assertFalse(result.getSuccess());
+            assertTrue(result.getMessage().contains("HTTP 404"));
+            assertTrue(result.getMessage().contains("System One"));
+        }
+    }
+
+    @Test
+    @DisplayName("保存时模型类型必须落在 chat / embedding / decision 白名单内")
+    void shouldRejectUnknownModelTypeOnSave() {
+        AiModelConfigBo bo = new AiModelConfigBo();
+        bo.setConfigName("未知类型模型");
+        bo.setModelType("unknown");
+        assertThrows(ServiceException.class, () -> service.insertByBo(bo));
     }
 
     private static void stubHttp(MockedStatic<HttpUtil> http, int status, String body) {

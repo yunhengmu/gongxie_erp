@@ -618,9 +618,12 @@ public class AiProperties {
      * 结构化决策（专家路由判断）配置。
      *
      * <p>口径（见 docs/21 §1.3 / §7）：<b>默认关闭</b>（{@code enabled=false}）——关闭时零外呼、
-     * 不构造 {@code state}、不新增耗时，路由完全由小Z 自己的 {@code route_decision} 工具完成，与现状逐项等价；
-     * {@code apiKey} 为空同样视为未启用。{@code mode} 仅在启用后有语义（关闭时不校验、不报错）。
+     * 不构造 {@code state}、不新增耗时，路由完全由小Z 自己的 {@code route_decision} 工具完成，与现状逐项等价。
+     * {@code mode} 仅在启用后有语义（关闭时不校验、不报错）。
      * 出境前的 PII 脱敏为合规强制项，<b>不在此提供开关</b>。</p>
+     *
+     * <p><b>决策模型的连接信息不在此处</b>：服务地址 / 模型标识 / 密钥统一由「模型配置」
+     * （{@code ai_model_config}，类型 {@code decision}）管理，此处只引用 {@code modelConfigId}。</p>
      */
     @Data
     public static class Jev {
@@ -631,23 +634,13 @@ public class AiProperties {
         private boolean enabled = false;
 
         /**
-         * 决策模型服务地址（百炼 compatible-mode 基址，
-         * 如 {@code https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode}）
+         * 所选决策模型（「模型配置」主键，类型 {@code decision}）；
+         * 为空时等同未启用（没有可用的决策模型，无法外呼）
          */
-        private String baseUrl = "";
+        private Long modelConfigId;
 
         /**
-         * 决策模型标识（默认百炼决策模型；微调产物则填 {@code ...-ft-xxxxxxxx}）
-         */
-        private String model = "decision-model-preview";
-
-        /**
-         * 访问密钥；为空则视为未启用（等价 {@code enabled=false}）
-         */
-        private String apiKey = "";
-
-        /**
-         * 外呼超时（秒）
+         * 判定超时（秒；与「模型配置」的通用超时无关——判定在路由关键路径上，需要更短的超时）
          */
         private int timeoutSeconds = 5;
 

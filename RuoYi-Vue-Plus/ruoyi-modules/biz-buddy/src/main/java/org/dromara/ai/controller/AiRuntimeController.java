@@ -4,13 +4,17 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
+import org.dromara.ai.domain.AiModelConfig;
 import org.dromara.ai.domain.bo.AiCompactionConfigBo;
 import org.dromara.ai.domain.bo.AiJevConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
 import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.bo.AiSecurityConfigBo;
 import org.dromara.ai.domain.vo.AiJevConfigVo;
+import org.dromara.ai.domain.vo.AiModelConfigVo;
+import org.dromara.ai.service.IAiModelConfigService;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.log.annotation.Log;
 import org.dromara.common.log.enums.BusinessType;
@@ -38,6 +42,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class AiRuntimeController extends BaseController {
 
     private final AiRuntimeConfigStore runtimeConfigStore;
+
+    private final IAiModelConfigService modelConfigService;
 
     /**
      * 查询当前生效的上下文压缩策略
@@ -120,9 +126,12 @@ public class AiRuntimeController extends BaseController {
     }
 
     /**
-     * 查询当前生效的结构化决策路由配置（不回显密钥，只返回是否已配置）
+     * 查询当前生效的结构化决策路由配置
+     *
+     * <p>决策模型的连接信息（服务地址 / 模型标识 / 密钥）统一由「模型配置」管理，故此处只回带
+     * 所选模型的 {@code modelConfigId} 与判定策略。</p>
      */
-    @SaCheckPermission("ai:runtime:security:query")
+    @SaCheckPermission("ai:runtime:jev:query")
     @GetMapping("/jev")
     public R<AiJevConfigVo> getJev() {
         return R.ok(toJevVo(runtimeConfigStore.jev()));
@@ -131,26 +140,55 @@ public class AiRuntimeController extends BaseController {
     /**
      * 保存结构化决策路由配置（运行期生效，下一次编排即按新模式 / 阈值执行）
      *
-     * <p>密钥留空表示<b>不修改已保存的密钥</b>（与「模型配置」口径一致）：为空时回填当前值再保存。</p>
+     * <p><b>决策模型只能从「模型配置」里选</b>：开启时强校验所选模型「存在 + 启用 + decision 类型 +
+     * 已配置密钥」，任一条不满足即报错，避免「打开了开关但没有可用决策模型」的半残状态。</p>
      */
-    @SaCheckPermission("ai:runtime:security:edit")
+    @SaCheckPermission("ai:runtime:jev:edit")
     @Log(title = "AI结构化决策配置", businessType = BusinessType.UPDATE)
     @PutMapping("/jev")
     public R<Void> updateJev(@Validated @RequestBody AiJevConfigBo bo) {
-        if (StringUtils.isBlank(bo.getApiKey())) {
-            // 留空 = 不修改密钥：沿用当前已保存值，避免误清空导致半残状态（enabled=true 但无密钥）
-            bo.setApiKey(runtimeConfigStore.jev().getApiKey());
-        }
-        // 不打印密钥，只记录定位问题需要的字段
-        log.info("保存结构化决策配置：enabled={}, mode={}, baseUrl={}, model={}, threshold={}, apiKey={}",
-            bo.isEnabled(), bo.getMode(), bo.getBaseUrl(), bo.getModel(), bo.getConfidenceThreshold(),
-            StringUtils.isBlank(bo.getApiKey()) ? "未配置" : "已配置");
+        validateDecisionModel(bo);
+        log.info("保存结构化决策配置：enabled={}, modelConfigId={}, mode={}, timeout={}s, threshold={}",
+            bo.isEnabled(), bo.getModelConfigId(), bo.getMode(), bo.getTimeoutSeconds(),
+            bo.getConfidenceThreshold());
         runtimeConfigStore.updateJev(bo);
         return R.ok();
     }
 
     /**
-     * 把业务对象映射为视图对象：不回显密钥，只暴露「是否已配置」。
+     * 校验所选决策模型可用。
+     *
+     * @param bo 结构化决策配置
+     */
+    private void validateDecisionModel(AiJevConfigBo bo) {
+        if (!bo.isEnabled()) {
+            // 关闭态不校验：允许保留一个已选 id 供下次开启
+            return;
+        }
+        Long modelConfigId = bo.getModelConfigId();
+        if (modelConfigId == null) {
+            throw new ServiceException("已开启结构化决策，请先选择一条决策模型"
+                + "（可到「模型配置」新增，类型选「决策模型」）");
+        }
+        AiModelConfigVo model = modelConfigService.queryById(modelConfigId);
+        if (model == null) {
+            throw new ServiceException("所选决策模型不存在或已被删除，请重新选择");
+        }
+        if (!"0".equals(model.getStatus())) {
+            throw new ServiceException("所选决策模型「" + model.getConfigName() + "」已停用，请启用后再保存");
+        }
+        if (!AiModelConfig.TYPE_DECISION.equalsIgnoreCase(model.getModelType())) {
+            throw new ServiceException("所选模型「" + model.getConfigName() + "」不是决策模型（实际类型 "
+                + model.getModelType() + "），请在「模型配置」中改选类型为「决策模型」的记录");
+        }
+        if (StringUtils.isBlank(modelConfigService.decryptApiKey(modelConfigId))) {
+            throw new ServiceException("所选决策模型「" + model.getConfigName()
+                + "」未配置 API 密钥，请先到「模型配置」补全后再保存");
+        }
+    }
+
+    /**
+     * 把业务对象映射为视图对象。
      *
      * @param bo 结构化决策配置
      * @return 视图对象
@@ -158,15 +196,13 @@ public class AiRuntimeController extends BaseController {
     private AiJevConfigVo toJevVo(AiJevConfigBo bo) {
         AiJevConfigVo vo = new AiJevConfigVo();
         vo.setEnabled(bo.isEnabled());
-        vo.setBaseUrl(bo.getBaseUrl());
-        vo.setModel(bo.getModel());
+        vo.setModelConfigId(bo.getModelConfigId());
         vo.setTimeoutSeconds(bo.getTimeoutSeconds());
         vo.setMode(bo.getMode());
         vo.setConfidenceThreshold(bo.getConfidenceThreshold());
         vo.setFailOpen(bo.isFailOpen());
         vo.setStateMaxChars(bo.getStateMaxChars());
         vo.setPersistProbabilities(bo.isPersistProbabilities());
-        vo.setApiKeyConfigured(StringUtils.isNotBlank(bo.getApiKey()));
         return vo;
     }
 

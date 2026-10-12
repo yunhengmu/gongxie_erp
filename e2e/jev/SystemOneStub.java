@@ -34,8 +34,8 @@ import java.util.regex.Pattern;
  *
  * <p>启动方式（在 WSL 内跑进 compose 网络；容器解析不到 {@code host.docker.internal}，桩必须与服务同网）：</p>
  * <pre>
- *   wsl -d Ubuntu-22.04 -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \
- *     -v /mnt/d/test/mybuddy/biz-buddy/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080
+ *   wsl -d Ubuntu-24.04 -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \
+ *     -v /mnt/d/trae/BizBuddy/biz-buddy/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080
  * </pre>
  * <p>端口从 {@code args[0]} 取（默认 8080）；启动后打印 {@code stub listening on <port>}。</p>
  */

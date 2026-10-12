@@ -8,9 +8,10 @@ import java.io.Serializable;
 /**
  * 结构化决策（专家路由判断）配置视图对象。
  *
- * <p>与 {@code AiJevConfigBo} 的业务字段一一对应，但<b>不含 {@code apiKey} 明文</b>：
- * 只回显 {@link #apiKeyConfigured}（是否已配置密钥），避免密钥下发前端。
- * 风格同 {@code AiModelConfigVo.apiKeyMask}——只暴露「是否已配置」这一事实。</p>
+ * <p>与 {@code AiJevConfigBo} 的业务字段一一对应。**不含任何连接信息**——决策模型的
+ * 服务地址 / 模型标识 / 密钥统一由「模型配置」管理（{@code ai_model_config}，密钥密文落库、
+ * 掩码回显），本对象只回带所选模型的 {@link #modelConfigId}；页面展示模型名称由前端用
+ * 「模型配置」下拉的本地数据渲染。</p>
  *
  * @author BizBuddy
  */
@@ -26,17 +27,12 @@ public class AiJevConfigVo implements Serializable {
     private boolean enabled;
 
     /**
-     * 决策模型服务地址（百炼 compatible-mode 基址）
+     * 所选决策模型（「模型配置」主键，{@code model_type='decision'}）；{@code enabled=true} 时必填
      */
-    private String baseUrl;
+    private Long modelConfigId;
 
     /**
-     * 决策模型标识（默认百炼决策模型；微调产物则填 {@code ...-ft-xxxxxxxx}）
-     */
-    private String model;
-
-    /**
-     * 外呼超时（秒）
+     * 判定超时（秒；与「模型配置」的通用超时无关——判定在路由关键路径上，需要更短的超时）
      */
     private int timeoutSeconds;
 
@@ -64,10 +60,5 @@ public class AiJevConfigVo implements Serializable {
      * 是否落库概率分布
      */
     private boolean persistProbabilities;
-
-    /**
-     * 是否已配置访问密钥（不回显密钥明文本身）
-     */
-    private boolean apiKeyConfigured;
 
 }

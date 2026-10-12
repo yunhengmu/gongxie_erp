@@ -126,8 +126,8 @@ public class RouteJudgeService {
         }
         try {
             AiJevConfigBo cfg = runtimeConfigStore.jev();
-            // 关闭态零外呼：未启用 / 无密钥 一律短路，连 state 都不构造（口径 P7、§1.3）
-            if (!cfg.isEnabled() || StringUtils.isBlank(cfg.getApiKey())) {
+            // 关闭态零外呼：未启用 / 未选决策模型 一律短路，连 state 都不构造（口径 P7、§1.3）
+            if (!cfg.isEnabled() || cfg.getModelConfigId() == null) {
                 return;
             }
             if (route.candidates == null || route.candidates.isEmpty()) {
@@ -172,8 +172,8 @@ public class RouteJudgeService {
         }
         try {
             AiJevConfigBo cfg = runtimeConfigStore.jev();
-            // 关闭态零外呼：未启用 / 无密钥 一律短路，连 state 都不构造（口径 P7、§1.3）
-            if (!cfg.isEnabled() || StringUtils.isBlank(cfg.getApiKey())) {
+            // 关闭态零外呼：未启用 / 未选决策模型 一律短路，连 state 都不构造（口径 P7、§1.3）
+            if (!cfg.isEnabled() || cfg.getModelConfigId() == null) {
                 return JudgeGateOutcome.notTakeOver();
             }
             // 仅闸门档做前置判定：影子档维持「收尾处判定」，preselect 维持「只解析 + WARN」

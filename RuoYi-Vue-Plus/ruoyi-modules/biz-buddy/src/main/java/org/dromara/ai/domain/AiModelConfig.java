@@ -30,6 +30,21 @@ public class AiModelConfig extends BaseEntity {
      */
     public static final String VISION_UNSUPPORTED = "0";
 
+    /**
+     * 模型类型：对话模型
+     */
+    public static final String TYPE_CHAT = "chat";
+
+    /**
+     * 模型类型：向量模型
+     */
+    public static final String TYPE_EMBEDDING = "embedding";
+
+    /**
+     * 模型类型：决策模型（结构化决策 / 专家路由判断，TypeSafe System One 协议，见 docs/21）
+     */
+    public static final String TYPE_DECISION = "decision";
+
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -50,7 +65,7 @@ public class AiModelConfig extends BaseEntity {
     private String provider;
 
     /**
-     * 模型类型（chat 对话 / embedding 向量）
+     * 模型类型（chat 对话 / embedding 向量 / decision 决策）
      */
     private String modelType;
 

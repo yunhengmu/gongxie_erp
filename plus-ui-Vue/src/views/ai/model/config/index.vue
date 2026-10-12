@@ -77,7 +77,7 @@
         </el-table-column>
         <el-table-column label="类型" align="center" width="100">
           <template #default="scope">
-            <el-tag :type="scope.row.modelType === 'embedding' ? 'warning' : 'primary'" effect="plain">
+            <el-tag :type="modelTypeTag(scope.row.modelType)" effect="plain">
               {{ modelTypeLabel(scope.row.modelType) }}
             </el-tag>
           </template>
@@ -85,7 +85,7 @@
         <el-table-column label="模型标识" align="center" prop="modelCode" :show-overflow-tooltip="true" />
         <el-table-column label="支持视觉" align="center" width="100">
           <template #default="scope">
-            <span v-if="scope.row.modelType === 'embedding'" class="text-muted">-</span>
+            <span v-if="scope.row.modelType !== 'chat'" class="text-muted">-</span>
             <el-tag v-else :type="scope.row.supportsVision === '0' ? 'info' : 'success'" effect="plain">
               {{ scope.row.supportsVision === '0' ? '否' : '是' }}
             </el-tag>
@@ -180,14 +180,17 @@
           </el-select>
         </el-form-item>
         <el-form-item label="模型类型" prop="modelType">
-          <el-radio-group v-model="form.modelType">
+          <el-radio-group v-model="form.modelType" @change="handleModelTypeChange">
             <el-radio v-for="item in modelTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="模型标识" prop="modelCode">
-          <el-input v-model="form.modelCode" placeholder="如：qwen-plus、text-embedding-v3" />
+          <el-input
+            v-model="form.modelCode"
+            :placeholder="isDecisionForm ? 'decision-model-preview' : '如：qwen-plus、text-embedding-v3'"
+          />
         </el-form-item>
-        <el-form-item v-if="!isEmbeddingForm" label="支持视觉" prop="supportsVision">
+        <el-form-item v-if="isChatForm" label="支持视觉" prop="supportsVision">
           <template #label>
             <span class="label-tip">
               支持视觉
@@ -214,7 +217,15 @@
               <el-tooltip placement="top">
                 <template #content>
                   <div class="tip-content">
-                    统一填 <b>OpenAI 兼容根地址</b>，不用自己拼 /embeddings 或 /chat/completions。
+                    <template v-if="isDecisionForm">
+                      决策模型走 <b>TypeSafe System One</b> 协议，<b>平台自动拼 /v1/systemone</b>，无需自己拼。<br />
+                      地址必须填<b>业务空间专属域名</b>（如
+                      <code>https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode</code>）；
+                      通用的 <code>dashscope.aliyuncs.com/compatible-mode</code> 上<b>没有该接口</b>（实测返回 404）。
+                    </template>
+                    <template v-else>
+                      统一填 <b>OpenAI 兼容根地址</b>，不用自己拼 /embeddings 或 /chat/completions。
+                    </template>
                     <span v-if="baseUrlWarning" class="tip-warn">{{ baseUrlWarning }}</span>
                     <span v-else-if="recommendedBaseUrl && recommendedBaseUrl !== form.baseUrl">推荐：{{ recommendedBaseUrl }}</span>
                   </div>
@@ -223,7 +234,12 @@
               </el-tooltip>
             </span>
           </template>
-          <el-input v-model="form.baseUrl" placeholder="OpenAI 兼容根地址，如 https://api.deepseek.com/v1" />
+          <el-input
+            v-model="form.baseUrl"
+            :placeholder="isDecisionForm
+              ? '业务空间专属域名，如 https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode'
+              : 'OpenAI 兼容根地址，如 https://api.deepseek.com/v1'"
+          />
         </el-form-item>
         <el-form-item label="API 密钥" prop="apiKey">
           <el-input
@@ -313,7 +329,7 @@
           <el-descriptions-item label="模型类型">{{ modelTypeLabel(detail.record.modelType) }}</el-descriptions-item>
           <el-descriptions-item label="模型标识">{{ detail.record.modelCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="支持视觉">
-            {{ detail.record.modelType === 'embedding'
+            {{ detail.record.modelType !== 'chat'
               ? '-'
               : (detail.record.supportsVision === '0' ? '否' : '是') }}
           </el-descriptions-item>
@@ -368,7 +384,8 @@ const PROVIDER_OPTIONS = [
 
 const MODEL_TYPE_OPTIONS = [
   { label: '对话模型', value: 'chat' },
-  { label: '向量模型', value: 'embedding' }
+  { label: '向量模型', value: 'embedding' },
+  { label: '决策模型', value: 'decision' }
 ];
 
 const providerOptions = PROVIDER_OPTIONS;
@@ -420,6 +437,12 @@ const { queryParams, form } = toRefs(data);
 /** 向量模型才需要填写向量维度 */
 const isEmbeddingForm = computed(() => form.value.modelType === 'embedding');
 
+/** 仅对话模型有「支持视觉」能力（向量 / 决策模型无） */
+const isChatForm = computed(() => form.value.modelType === 'chat');
+
+/** 决策模型：走 TypeSafe System One 协议，服务地址由后端自动拼 /v1/systemone */
+const isDecisionForm = computed(() => form.value.modelType === 'decision');
+
 /** 表单校验规则：向量维度按类型动态必填 */
 const rules = computed<ElFormRules>(() => ({
   configName: [{ required: true, message: '配置名称不能为空', trigger: 'blur' }],
@@ -442,8 +465,13 @@ const rules = computed<ElFormRules>(() => ({
   dimension: isEmbeddingForm.value ? [{ required: true, message: '向量模型必须填写向量维度', trigger: 'blur' }] : []
 }));
 
-/** 当前提供商推荐的兼容地址 */
-const recommendedBaseUrl = computed(() => providerOptions.find((item) => item.value === form.value.provider)?.baseUrl ?? '');
+/** 当前提供商推荐的兼容地址（决策模型不推荐：业务空间专属域名无法预知，通用域名又不可用） */
+const recommendedBaseUrl = computed(() => {
+  if (isDecisionForm.value) {
+    return '';
+  }
+  return providerOptions.find((item) => item.value === form.value.provider)?.baseUrl ?? '';
+});
 
 /** 服务地址写法提示（不阻塞提交，只做引导） */
 const baseUrlWarning = computed(() => {
@@ -456,6 +484,10 @@ const baseUrlWarning = computed(() => {
   }
   if (value.includes('aliyuncs.com') && value.includes('/api/v1') && !value.includes('/compatible-mode')) {
     return '⚠ 这是 DashScope 原生接口地址，请改用 .../compatible-mode/v1';
+  }
+  // 决策模型必须用业务空间专属域名：通用域名上没有 /v1/systemone（实测 404）
+  if (isDecisionForm.value && /(^|\/\/)dashscope(-intl)?\.aliyuncs\.com\//.test(value)) {
+    return '⚠ 决策模型须用业务空间专属域名（https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode），通用域名上没有该接口';
   }
   if (value.includes('/embeddings') || value.includes('/chat/completions')) {
     return '⚠ 只需填到根地址（.../v1），不用带 /embeddings 或 /chat/completions';
@@ -488,8 +520,30 @@ const providerLabel = (value?: string) => providerOptions.find((item) => item.va
 /** 模型类型名称 */
 const modelTypeLabel = (value?: string) => modelTypeOptions.find((item) => item.value === value)?.label ?? value ?? '-';
 
-/** 切换提供商时按需补全服务地址 */
+/** 模型类型标签配色：对话 / 向量 / 决策 三色区分 */
+const modelTypeTag = (value?: string): 'primary' | 'warning' | 'success' => {
+  if (value === 'embedding') {
+    return 'warning';
+  }
+  return value === 'decision' ? 'success' : 'primary';
+};
+
+/** 切换模型类型：切到决策模型时清掉「提供商默认回填」的通用地址（通用域名上没有 System One 接口） */
+const handleModelTypeChange = (value: string) => {
+  if (value !== 'decision') {
+    return;
+  }
+  const providerDefault = providerOptions.find((item) => item.value === form.value.provider)?.baseUrl;
+  if (providerDefault && form.value.baseUrl === providerDefault) {
+    form.value.baseUrl = '';
+  }
+};
+
+/** 切换提供商时按需补全服务地址（决策模型不回填：通用域名上没有 System One 接口） */
 const handleProviderChange = (value: string) => {
+  if (isDecisionForm.value) {
+    return;
+  }
   const matched = providerOptions.find((item) => item.value === value);
   if (matched?.baseUrl && !form.value.baseUrl) {
     form.value.baseUrl = matched.baseUrl;
