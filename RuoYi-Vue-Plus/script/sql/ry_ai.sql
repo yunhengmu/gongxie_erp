@@ -1169,7 +1169,7 @@ create table if not exists ai_safety_event (
 -- ============================================================
 --   预置三个**示例模型**（提供商：阿里云百炼 / DashScope）：
 --     ① deepseek-v4-pro-0813     对话模型（model_type=chat）
---     ② qwen3.7-text-embedding  向量模型（model_type=embedding，维度 1024）
+--     ② qwen3.7-text-embedding-flash  向量模型（model_type=embedding，维度 1024）
 --     ③ decision-model-preview  决策模型（model_type=decision，供「安全合规配置 → 结构化决策路由」引用）
 --   注意：
 --   a. **api_key 一律留空** —— 部署后请到「模型配置」换成本人的阿里云百炼密钥；
@@ -1195,7 +1195,7 @@ on duplicate key update id = id;
 insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
                              base_url, api_key,
                              dimension, status, remark, create_dept, create_by, create_time, del_flag)
-values (1761400000000020401, 'qwen3.7-text-embedding', 'dashscope', 'embedding', 'qwen3.7-text-embedding', '1',
+values (1761400000000020401, 'qwen3.7-text-embedding-flash', 'dashscope', 'embedding', 'qwen3.7-text-embedding-flash', '1',
         'https://dashscope.aliyuncs.com/compatible-mode/v1', null,
         1024, '0',
         '预置示例（向量模型，阿里云百炼）：维度须与模型实际输出一致；部署后请换密钥或另行新建模型',
@@ -1693,7 +1693,7 @@ values (1761400000000021001, 'BizBuddy介绍演示库', 'bizbuddy_demo_kb',
         '演示知识库：收录 BizBuddy 平台的简介，供「BizBuddy项目介绍专家」检索回答',
         1761400000000020401, 'kb_bizbuddy_demo_kb',
         1024, 500, 50, 5, 0.500,
-        '0', '平台预置演示知识库（向量模型同预置 qwen3.7-text-embedding，公开可用）',
+        '0', '平台预置演示知识库（向量模型同预置 qwen3.7-text-embedding-flash，公开可用）',
         1761000000000000103, 1761100000000000001, now(), null, now(),
         '0', null, '0')
 on duplicate key update id = id;
