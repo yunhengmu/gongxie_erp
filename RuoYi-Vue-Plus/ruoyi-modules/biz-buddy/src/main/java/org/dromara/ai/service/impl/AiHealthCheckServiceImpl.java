@@ -7,9 +7,14 @@ import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiMilvusProbe;
 import org.dromara.ai.core.AiVectorStore;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
+import org.dromara.ai.core.route.RouteJudge;
+import org.dromara.ai.core.route.RouteJudgeMode;
+import org.dromara.ai.core.route.RouteJudgeRequest;
+import org.dromara.ai.core.route.RouteJudgeVerdict;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiMcpClient;
 import org.dromara.ai.domain.bo.AiHealthProbeBo;
+import org.dromara.ai.domain.bo.AiJevConfigBo;
 import org.dromara.ai.domain.bo.AiMcpClientBo;
 import org.dromara.ai.domain.bo.AiModelConfigBo;
 import org.dromara.ai.domain.bo.AiSecurityConfigBo;
@@ -43,6 +48,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TimeZone;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -122,6 +128,8 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
 
     private final OssService ossService;
 
+    private final RouteJudge routeJudge;
+
     @Override
     public AiHealthReportVo check() {
         List<AiHealthCheckVo> items = new ArrayList<>();
@@ -137,6 +145,7 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
         items.add(safe("safety.engine", "内容安全引擎", CATEGORY_RUNTIME, this::checkSafetyEngine));
         items.add(safe("rag.rerank", "检索重排（Rerank）", CATEGORY_RUNTIME, this::checkRerank));
         items.add(safe("runtime.timezone", "时区一致性", CATEGORY_RUNTIME, this::checkTimezone));
+        items.add(safe("structured-decision", "结构化决策连通性", CATEGORY_RUNTIME, this::checkStructuredDecision));
         items.add(safe("storage.domain", "对象存储对外域名", CATEGORY_STORAGE, this::checkStorageDomain));
         items.add(safe("crypto.key", "加密根密钥收口", CATEGORY_RUNTIME, this::checkCryptoKey));
 
@@ -163,6 +172,9 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
         }
         if (AiHealthCheckVo.TARGET_MCP_CLIENT.equals(target)) {
             return probeMcpClient(bo.getId());
+        }
+        if (AiHealthCheckVo.TARGET_JEV.equals(target)) {
+            return probeJev();
         }
         throw new ServiceException("不支持的探测目标：" + target);
     }
@@ -527,6 +539,36 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
     }
 
     /**
+     * 结构化决策（专家路由判断）连通性：本地只判定配置形态，真实连通由「测试」探测。
+     *
+     * <p>本项<b>绝不外呼</b>（与 {@link #check()} 的契约一致）：关闭态直接判通过；启用但缺配置按形态给 WARN / FAIL；
+     * 配置齐全时返回 UNKNOWN 并标记可探测。</p>
+     */
+    private AiHealthCheckVo checkStructuredDecision() {
+        String key = "structured-decision";
+        String name = "结构化决策连通性";
+        AiJevConfigBo jev = runtimeConfigStore.jev();
+        if (!jev.isEnabled()) {
+            return pass(key, name, CATEGORY_RUNTIME, "未启用，路由由小Z 自行判定（关闭态零外呼）");
+        }
+        if (StringUtils.isBlank(jev.getApiKey())) {
+            return warn(key, name, CATEGORY_RUNTIME, "已开启但未配置密钥，按未启用处理（等价关闭）",
+                "到「安全合规配置」补全决策模型密钥，或关闭该开关");
+        }
+        if (StringUtils.isBlank(jev.getBaseUrl())) {
+            return fail(key, name, CATEGORY_RUNTIME, "已启用但未配置服务地址，判定将不可用",
+                "到「安全合规配置」填写决策模型服务地址（base-url）");
+        }
+        AiHealthCheckVo vo = unknown(key, name, CATEGORY_RUNTIME,
+            "已启用（模式=" + RouteJudgeMode.parse(jev.getMode()).label()
+                + "，阈值=" + jev.getConfidenceThreshold() + "），需探测确认连通性",
+            "点「测试」发起一次真实判定；判定不可用时会自动回落工具决策，不影响对话");
+        vo.setProbeSupported(true);
+        vo.setProbeTarget(AiHealthCheckVo.TARGET_JEV);
+        return vo;
+    }
+
+    /**
      * 对象存储对外域名（未配置时前端附件预览/下载会失败，后端不受影响）。
      */
     private AiHealthCheckVo checkStorageDomain() {
@@ -640,6 +682,48 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
             return probed("probe:" + AiHealthCheckVo.TARGET_MCP_CLIENT + ":" + clientId, name,
                 CATEGORY_INTEGRATION, AiHealthCheckVo.STATUS_FAIL, "探测异常：" + e.getMessage(),
                 "核对地址、传输方式与请求头凭据", System.currentTimeMillis() - start);
+        }
+    }
+
+    /**
+     * 探测结构化决策连通性（真实调一次判定；这是本项唯一允许外呼的入口）。
+     *
+     * <p>未启用（或密钥为空，按未启用处理）时无需探测直接判通过；调用结果按「可用 / 不可用」给 PASS / WARN——
+     * 判定不可用时按口径 P3 会自动回落工具决策，不影响对话，故不作为 FAIL。</p>
+     */
+    private AiHealthCheckVo probeJev() {
+        String key = "probe:" + AiHealthCheckVo.TARGET_JEV;
+        String name = "结构化决策连通性";
+        AiJevConfigBo jev = runtimeConfigStore.jev();
+        if (!jev.isEnabled() || StringUtils.isBlank(jev.getApiKey())) {
+            return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_PASS, "未启用，无需探测", "", 0L);
+        }
+        long start = System.currentTimeMillis();
+        try {
+            // 最小请求：固定假候选（self / other 由实现补充），仅验证连通性，不参与真实路由
+            RouteJudgeRequest request = new RouteJudgeRequest("这是一次连通性探测",
+                List.of(new RouteJudgeRequest.Candidate("probe_expert_a", "探测候选A", "用于连通性探测的固定候选"),
+                    new RouteJudgeRequest.Candidate("probe_expert_b", "探测候选B", "用于连通性探测的固定候选")));
+            Optional<RouteJudgeVerdict> verdictOpt = routeJudge.judge(request);
+            long elapsed = System.currentTimeMillis() - start;
+            if (verdictOpt.isEmpty()) {
+                return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_WARN,
+                    "判定不可用：未返回判定结果",
+                    "判定不可用时会自动回落工具决策，不影响对话；核对服务地址、密钥与模型标识", elapsed);
+            }
+            RouteJudgeVerdict verdict = verdictOpt.get();
+            if (StringUtils.isNotBlank(verdict.error())) {
+                return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_WARN,
+                    "判定不可用：" + verdict.error(),
+                    "判定不可用时会自动回落工具决策，不影响对话；核对服务地址、密钥与模型标识", elapsed);
+            }
+            return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_PASS,
+                "判定可用（耗时 " + verdict.latencyMs() + " ms，输入 Token " + verdict.inputTokens()
+                    + "，选择 " + verdict.choice() + "）", "", elapsed);
+        } catch (Exception e) {
+            return probed(key, name, CATEGORY_RUNTIME, AiHealthCheckVo.STATUS_WARN,
+                "探测异常：" + e.getMessage(),
+                "判定不可用时会自动回落工具决策，不影响对话", System.currentTimeMillis() - start);
         }
     }
 

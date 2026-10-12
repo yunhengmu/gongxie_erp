@@ -21,13 +21,13 @@ public class AiHealthProbeBo implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 探测目标：model（模型连通性）/ milvus（向量库连接）/ mcp-client（外部 MCP 连接）
+     * 探测目标：model（模型连通性）/ milvus（向量库连接）/ mcp-client（外部 MCP 连接）/ jev（结构化决策连通性）
      */
     @NotBlank(message = "探测目标不能为空")
     private String target;
 
     /**
-     * 探测对象主键（model / mcp-client 必填；milvus 忽略）
+     * 探测对象主键（model / mcp-client 必填；milvus / jev 忽略）
      */
     private Long id;
 

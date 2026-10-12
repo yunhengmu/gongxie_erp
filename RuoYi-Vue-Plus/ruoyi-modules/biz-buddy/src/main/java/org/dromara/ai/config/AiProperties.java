@@ -68,6 +68,12 @@ public class AiProperties {
     private Rag rag = new Rag();
 
     /**
+     * 结构化决策（百炼决策模型 / TypeSafe System One 协议）配置：默认值来源，
+     * 可被「安全合规配置」页运行期覆盖（Redis 键 {@code bizbuddy:ai:runtime:jev}）
+     */
+    private Jev jev = new Jev();
+
+    /**
      * Milvus 连接配置。
      */
     @Data
@@ -179,6 +185,11 @@ public class AiProperties {
          * 是否审核 MCP 出口（对外暴露给第三方 AI 的只读工具：入参 / 出参）
          */
         private boolean mcpOutCheck = true;
+
+        /**
+         * 是否审核「结构化决策出境」（外呼决策模型的 {@code state}；PII 脱敏为强制项、不在此开关内）
+         */
+        private boolean jevOutboundCheck = true;
 
         /**
          * 是否启用提示词注入防护（system prompt 加固 + 外部内容边界标记）
@@ -601,6 +612,69 @@ public class AiProperties {
          * 调小即可更早收敛上下文。有效字符上限 = min({@link #assembleMaxChars}, 本预算折算出的字符上限)。</p>
          */
         private int assembleMaxTokens = 6000;
+    }
+
+    /**
+     * 结构化决策（专家路由判断）配置。
+     *
+     * <p>口径（见 docs/21 §1.3 / §7）：<b>默认关闭</b>（{@code enabled=false}）——关闭时零外呼、
+     * 不构造 {@code state}、不新增耗时，路由完全由小Z 自己的 {@code route_decision} 工具完成，与现状逐项等价；
+     * {@code apiKey} 为空同样视为未启用。{@code mode} 仅在启用后有语义（关闭时不校验、不报错）。
+     * 出境前的 PII 脱敏为合规强制项，<b>不在此提供开关</b>。</p>
+     */
+    @Data
+    public static class Jev {
+
+        /**
+         * 总开关：关闭＝零外呼、路由完全由小Z 负责（默认）
+         */
+        private boolean enabled = false;
+
+        /**
+         * 决策模型服务地址（百炼 compatible-mode 基址，
+         * 如 {@code https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode}）
+         */
+        private String baseUrl = "";
+
+        /**
+         * 决策模型标识（默认百炼决策模型；微调产物则填 {@code ...-ft-xxxxxxxx}）
+         */
+        private String model = "decision-model-preview";
+
+        /**
+         * 访问密钥；为空则视为未启用（等价 {@code enabled=false}）
+         */
+        private String apiKey = "";
+
+        /**
+         * 外呼超时（秒）
+         */
+        private int timeoutSeconds = 5;
+
+        /**
+         * 执行模式：shadow 影子（只留痕不接管）/ gate 闸门（高置信接管）/ preselect 候选预筛（可选）
+         */
+        private String mode = "shadow";
+
+        /**
+         * 闸门模式的置信度阈值（0~1；官方示例值 0.75，需按自有样本校准）
+         */
+        private double confidenceThreshold = 0.75;
+
+        /**
+         * 决策不可用时是否回落工具决策（恒定回落，不新增失败面）
+         */
+        private boolean failOpen = true;
+
+        /**
+         * 外呼 {@code state} 的字符上限（前置保护，远低于协议 65536 token 上限）
+         */
+        private int stateMaxChars = 4000;
+
+        /**
+         * 是否落库概率分布（影子期开启供校准；闸门稳定后可关以省存储）
+         */
+        private boolean persistProbabilities = true;
     }
 
 }

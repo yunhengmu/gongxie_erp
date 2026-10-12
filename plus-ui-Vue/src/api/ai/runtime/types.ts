@@ -75,3 +75,29 @@ export interface SecurityConfig {
   /** 外部引擎接口密钥（engine=external 时使用） */
   providerApiKey: string;
 }
+
+/** 结构化决策路由配置（docs/21；服务端不回显密钥，仅返回是否已配置） */
+export interface JevConfig {
+  /** 总开关：关闭＝零外呼、路由完全由小Z 负责 */
+  enabled: boolean;
+  /** 决策模型服务地址（百炼 compatible-mode 基址） */
+  baseUrl: string;
+  /** 决策模型标识 */
+  model: string;
+  /** 外呼超时（秒） */
+  timeoutSeconds: number;
+  /** 执行模式：shadow 影子 / gate 闸门 / preselect 候选预筛 */
+  mode: string;
+  /** 闸门模式的置信度阈值（0~1） */
+  confidenceThreshold: number;
+  /** 决策不可用时是否回落工具决策 */
+  failOpen: boolean;
+  /** 外呼 state 的字符上限（前置保护） */
+  stateMaxChars: number;
+  /** 是否落库概率分布 */
+  persistProbabilities: boolean;
+  /** 是否已配置密钥（服务端仅返回该布尔值，不回显密钥明文） */
+  apiKeyConfigured?: boolean;
+  /** 待保存的密钥：留空表示不修改已保存密钥（仅提交用，读取时无此字段） */
+  apiKey?: string;
+}

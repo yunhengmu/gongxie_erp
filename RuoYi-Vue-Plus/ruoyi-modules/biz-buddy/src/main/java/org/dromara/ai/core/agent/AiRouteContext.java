@@ -19,8 +19,9 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <p>由 {@link AiChatFacade} 在入口智能体（{@code ai_entry_agent}）的一轮对话开始时建立，
  * 随 {@code RuntimeContext} 传给 {@link RouteDecisionTool}；工具在编排过程中读写，
- * 收尾由门面落库。字段为**包级可见**：这是「一次编排运行的共享可变状态」，写入方（工具执行线程）
- * 与读取方（收尾，订阅回调线程）分处两个类，故与 {@link AiStreamState} 同款不做样板访问器。</p>
+ * 收尾由门面落库。字段为**包级 / 公有直接字段**：这是「一次编排运行的共享可变状态」，写入方（工具执行线程）
+ * 与读取方（收尾，订阅回调线程）分处两个类，故与 {@link AiStreamState} 同款不做样板访问器；
+ * 其中结构化决策的影子判定组件（{@code RouteJudgeService}）与本类同包，判定结果直接写包级字段，无需放宽可见性。</p>
  *
  * <p>没有实例即「当前不在编排链路」：普通智能体对话与无人值守链路（Phase 1 不启用编排）
  * 都不会放置本对象，{@link RouteDecisionTool} 据此回绝并让模型照常作答。</p>
@@ -28,7 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author BizBuddy
  */
 @Slf4j
-final class AiRouteContext {
+ final class AiRouteContext {
 
     /** 本次编排主键（ai_route_run.id，开始即落库便于中途失败可查） */
     final Long routeRunId;
@@ -149,6 +150,43 @@ final class AiRouteContext {
     /** 下发给专家的任务片段（原样留档） */
     volatile String taskContext;
 
+    /**
+     * 结构化决策（docs/21 §6）：本轮**实际判定来源**。
+     *
+     * <p>取值口径：{@code L} 工具决策 / {@code J} 决策模型 / {@code F} 回落（工具决策兜底）。
+     * 影子模式不接管路由（{@link #action} 不变），本字段记录判定来源供事后聚合。</p>
+     */
+    volatile String decisionSource;
+
+    /** 结构化决策：决策模型选择的选项（{@code agent_code} / {@code self} / {@code other}） */
+    volatile String judgeChoice;
+
+    /** 结构化决策：判定置信度（choice 类别才有） */
+    volatile Double judgeConfidence;
+
+    /** 结构化决策：概率分布（JSON 文本，影子校准用；persistProbabilities=false 时不落） */
+    volatile String judgeProbabilities;
+
+    /** 结构化决策：判定耗时（毫秒） */
+    volatile Long judgeLatencyMs;
+
+    /** 结构化决策：判定输入 Token（费用口径；outputTokens 恒 0 不参与） */
+    volatile Long judgeTokens;
+
+    /** 结构化决策：判定不可用原因（超时 / 报错 / 越界）；可用时为空 */
+    volatile String judgeError;
+
+    /** 结构化决策：本轮执行模式（{@code S} 影子 / {@code G} 闸门） */
+    volatile String judgeMode;
+
+    /**
+     * 结构化决策：闸门档本次采信所用的置信度阈值。
+     *
+     * <p>仅供收尾写入 {@code decision_json} 用于复盘「以什么阈值采信」，**不落独立审计列**
+     * （阈值属运行期配置，随判定结果一并归档即可）。影子档为 null。</p>
+     */
+    volatile Double judgeThreshold;
+
     /** 是否调用过路由决策工具（未调用＝入口智能体自答） */
     volatile boolean routeInvoked;
 
@@ -220,7 +258,7 @@ final class AiRouteContext {
      * @param traceId        编排链路主键
      * @param emitter        SSE 发射器（可空）
      */
-    AiRouteContext(Long routeRunId, Long sessionId, Long userId, Long deptId, Long entryAgentId,
+     AiRouteContext(Long routeRunId, Long sessionId, Long userId, Long deptId, Long entryAgentId,
                    List<AiExpertCandidate> candidates, Long traceId, SseEmitter emitter) {
         this.routeRunId = routeRunId;
         this.sessionId = sessionId;

@@ -106,6 +106,19 @@
             <artifactId>agentscope-harness</artifactId>
         </dependency>
         <!--
+          结构化决策（TypeSafe System One 协议）：用于「专家路由判断」。
+          此处仅复用本构件的协议 DTO（SystemOneRequest / SystemOneResult / ChoiceQuestion / ChoiceAnswer 等）
+          做报文序列化与反序列化；出网调用与结果校验由本模块自建（见 core/route/JevRouteJudge），
+          不再调用框架的 JevClient.systemOneBlocking——其概率和校验容差（1e-6 × 选项数）严于提供方
+          （百炼两位小数，和可能为 0.99/1.01），且校验异常为单参构造、不带响应体，无法兜底解析。
+          生产代码（core/route）依赖本构件，故为 compile 作用域。
+        -->
+        <dependency>
+            <groupId>io.agentscope</groupId>
+            <artifactId>agentscope-extensions-jev</artifactId>
+            <version>${agentscope.version}</version>
+        </dependency>
+        <!--
           RAG：知识库向量化与检索。
           本模块只使用其中的 MilvusStore（仅依赖 milvus-sdk-java + gson + agentscope-core），
           故排除全部无关传递依赖，避免引入 ES 客户端（与本项目 7.17.x 互斥）、PG 驱动、

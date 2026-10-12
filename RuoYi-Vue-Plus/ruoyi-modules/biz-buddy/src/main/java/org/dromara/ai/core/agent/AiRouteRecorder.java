@@ -88,6 +88,16 @@ public class AiRouteRecorder {
                 .set(StringUtils.isNotBlank(route.action), AiRouteRun::getAction, route.action)
                 .set(StringUtils.isNotBlank(route.decisionJson), AiRouteRun::getDecisionJson, route.decisionJson)
                 .set(StringUtils.isNotBlank(route.taskContext), AiRouteRun::getTaskContext, route.taskContext)
+                // 结构化决策审计（docs/21 §6）：仅当本轮确实判定过（decisionSource 非空）才写，
+                // 避免 HITL 恢复段的新上下文（判定字段为空）把首段的判定审计清空
+                .set(StringUtils.isNotBlank(route.decisionSource), AiRouteRun::getDecisionSource, route.decisionSource)
+                .set(StringUtils.isNotBlank(route.decisionSource), AiRouteRun::getJudgeChoice, route.judgeChoice)
+                .set(StringUtils.isNotBlank(route.decisionSource), AiRouteRun::getJudgeConfidence, route.judgeConfidence)
+                .set(StringUtils.isNotBlank(route.decisionSource), AiRouteRun::getJudgeProbabilities, route.judgeProbabilities)
+                .set(StringUtils.isNotBlank(route.decisionSource), AiRouteRun::getJudgeLatencyMs, route.judgeLatencyMs)
+                .set(StringUtils.isNotBlank(route.decisionSource), AiRouteRun::getJudgeTokens, route.judgeTokens)
+                .set(StringUtils.isNotBlank(route.decisionSource), AiRouteRun::getJudgeError, route.judgeError)
+                .set(StringUtils.isNotBlank(route.decisionSource), AiRouteRun::getJudgeMode, route.judgeMode)
                 .set(AiRouteRun::getExpertCallCount, route.expertCallCount.get())
                 .set(AiRouteRun::getStatus, status)
                 .set(AiRouteRun::getDegradeReason, truncateReason(degradeReason))

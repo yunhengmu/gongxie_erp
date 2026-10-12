@@ -55,6 +55,11 @@ public class AiHealthCheckVo implements Serializable {
     public static final String TARGET_MCP_CLIENT = "mcp-client";
 
     /**
+     * 探测目标：结构化决策（决策模型）连通性
+     */
+    public static final String TARGET_JEV = "jev";
+
+    /**
      * 体检项标识（稳定不变，供前端定位）
      */
     private String key;

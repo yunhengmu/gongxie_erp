@@ -70,6 +70,11 @@ public class AiSecurityConfigBo implements Serializable {
     private boolean mcpOutCheck = true;
 
     /**
+     * 是否审核「结构化决策出境」（外呼决策模型的 {@code state}；PII 脱敏为强制项、不在此开关内）
+     */
+    private boolean jevOutboundCheck = true;
+
+    /**
      * 是否启用提示词注入防护（system prompt 加固 + 外部内容边界标记）
      */
     private boolean promptHardening = true;
