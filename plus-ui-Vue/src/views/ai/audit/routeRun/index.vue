@@ -138,6 +138,22 @@
             </el-tooltip>
           </template>
         </el-table-column>
+        <el-table-column label="结构化决策" align="center" width="185">
+          <template #default="scope">
+            <span v-if="!scope.row.judgeMode" class="text-muted">-</span>
+            <el-tooltip v-else :content="judgeTooltip(scope.row)" placement="top">
+              <span class="judge-cell">
+                <el-tag :type="judgeModeTagType(scope.row.judgeMode)" effect="plain" size="small">
+                  {{ judgeModeLabel(scope.row.judgeMode) }}
+                </el-tag>
+                <span class="judge-text">{{ judgeChoiceLabel(scope.row.judgeChoice) }}</span>
+                <span v-if="scope.row.judgeConfidence !== null && scope.row.judgeConfidence !== undefined" class="judge-text">
+                  {{ scope.row.judgeConfidence }}
+                </span>
+              </span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
         <el-table-column label="专家" align="center" width="180" :show-overflow-tooltip="true">
           <template #default="scope">{{ scope.row.expertAgentNames || '-' }}</template>
         </el-table-column>
@@ -249,6 +265,28 @@
             <div class="context-block">
               <div class="context-title">决策原文</div>
               <pre class="detail-pre">{{ detail.record.decisionJson || '-' }}</pre>
+            </div>
+          </el-card>
+
+          <el-card shadow="never" class="detail-card">
+            <template #header><span class="detail-card-title">结构化决策判定</span></template>
+            <el-descriptions v-if="detail.record?.judgeMode" :column="3" border size="small">
+              <el-descriptions-item label="判定模式">
+                <el-tag :type="judgeModeTagType(detail.record.judgeMode)" effect="plain" size="small">
+                  {{ judgeModeLabel(detail.record.judgeMode) }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="判定来源">{{ decisionSourceLabel(detail.record.decisionSource) }}</el-descriptions-item>
+              <el-descriptions-item label="判定选项">{{ judgeChoiceLabel(detail.record.judgeChoice) }}</el-descriptions-item>
+              <el-descriptions-item label="置信度">{{ detail.record.judgeConfidence ?? '-' }}</el-descriptions-item>
+              <el-descriptions-item label="判定耗时">{{ formatDuration(detail.record.judgeLatencyMs) }}</el-descriptions-item>
+              <el-descriptions-item label="判定 Token">{{ formatNumber(detail.record.judgeTokens) }}</el-descriptions-item>
+              <el-descriptions-item v-if="detail.record.judgeError" label="判定异常" :span="3">
+                <span class="detail-error">{{ detail.record.judgeError }}</span>
+              </el-descriptions-item>
+            </el-descriptions>
+            <div v-else class="context-block">
+              <span class="text-muted">本轮无判定数据（结构化决策未启用，或本轮为「指定专家」跳过判定）。</span>
             </div>
           </el-card>
 
@@ -381,6 +419,54 @@ const decisionFields = computed<Array<{ label: string; value: string }>>(() => {
     return [];
   }
 });
+
+/** 结构化决策：判定模式（S 影子 / G 闸门） */
+const judgeModeLabel = (mode?: string | null): string => {
+  if (mode === 'S') return '影子';
+  if (mode === 'G') return '闸门';
+  return mode || '-';
+};
+
+/** 结构化决策：判定模式标签配色（闸门为接管档，用 warning 区分影子） */
+const judgeModeTagType = (mode?: string | null): 'info' | 'warning' => (mode === 'G' ? 'warning' : 'info');
+
+/** 结构化决策：本轮判定来源（L 工具决策 / J 决策模型 / F 回落兜底） */
+const decisionSourceLabel = (source?: string | null): string => {
+  if (source === 'L') return '工具决策（L）';
+  if (source === 'J') return '决策模型（J）';
+  if (source === 'F') return '回落工具决策（F）';
+  return source ? String(source) : '-';
+};
+
+/** 结构化决策：判定选项（self / other 为不路由，其余为专家编码） */
+const judgeChoiceLabel = (choice?: string | null): string => {
+  if (!choice) return '-';
+  if (choice === 'self') return '自答';
+  if (choice === 'other') return '无法归属';
+  return choice;
+};
+
+/** 结构化决策：列表单元格悬浮说明（判定明细一次看全） */
+const judgeTooltip = (row: RouteRunVO): string => {
+  const parts = [
+    `模式：${judgeModeLabel(row.judgeMode)}`,
+    `来源：${decisionSourceLabel(row.decisionSource)}`,
+    `选项：${judgeChoiceLabel(row.judgeChoice)}`
+  ];
+  if (row.judgeConfidence !== null && row.judgeConfidence !== undefined) {
+    parts.push(`置信度：${row.judgeConfidence}`);
+  }
+  if (row.judgeLatencyMs !== null && row.judgeLatencyMs !== undefined) {
+    parts.push(`耗时：${formatDuration(row.judgeLatencyMs)}`);
+  }
+  if (row.judgeTokens !== null && row.judgeTokens !== undefined) {
+    parts.push(`Token：${formatNumber(row.judgeTokens)}`);
+  }
+  if (row.judgeError) {
+    parts.push(`异常：${row.judgeError}`);
+  }
+  return parts.join('　');
+};
 
 /** 耗时展示：小于 1000ms 显示毫秒，否则显示秒（保留 1 位小数） */
 const formatDuration = (ms?: number | null): string => {
@@ -591,6 +677,18 @@ onMounted(() => {
   cursor: help;
   vertical-align: middle;
 }
+
+.judge-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.judge-text {
+  color: var(--app-text-muted, #909399);
+  font-size: 12px;
+}
+
 
 .stat-panel {
   margin-bottom: 12px;

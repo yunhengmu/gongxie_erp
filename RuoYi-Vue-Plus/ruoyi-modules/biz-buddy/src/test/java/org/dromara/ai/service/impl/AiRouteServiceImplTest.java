@@ -207,6 +207,32 @@ class AiRouteServiceImplTest {
     }
 
     @Test
+    @DisplayName("查询详情回填结构化决策判定列（影子 / 闸门留痕）")
+    void shouldQueryDetailWithJudgeFields() {
+        AiRouteRun run = new AiRouteRun();
+        run.setId(11L);
+        run.setAction(AiRouteRun.ACTION_ROUTE);
+        run.setDecisionSource("L");
+        run.setJudgeMode("S");
+        run.setJudgeChoice("notice_admin_expert");
+        run.setJudgeConfidence(0.86D);
+        run.setJudgeLatencyMs(62);
+        run.setJudgeTokens(159);
+        run.setJudgeError(null);
+        when(routeRunMapper.selectById(11L)).thenReturn(run);
+
+        AiRouteRunDetailVo detail = service.queryById(11L);
+
+        assertEquals("L", detail.getDecisionSource());
+        assertEquals("S", detail.getJudgeMode());
+        assertEquals("notice_admin_expert", detail.getJudgeChoice());
+        assertEquals(0.86D, detail.getJudgeConfidence());
+        assertEquals(62, detail.getJudgeLatencyMs());
+        assertEquals(159, detail.getJudgeTokens());
+        assertNull(detail.getJudgeError());
+    }
+
+    @Test
     @DisplayName("详情费用折算：按入口与各专家模型单价计算")
     void shouldComputeCostByModelPrice() {
         AiRouteRun run = new AiRouteRun();
