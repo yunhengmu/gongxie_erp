@@ -197,9 +197,10 @@ class RouteDecisionTool extends ToolBase {
             "type", "string",
             "description", "action=route 时必填：候选清单里的 key"));
         properties.put("task_context", Map.of(
-            "type", "object",
-            "description", "本任务片段，建议含 goal（目标）/ facts（已知事实）/ constraints（约束）/"
-                + "expected（期望产出）。只写本任务必需的事实，不要把整段对话历史与无关个人信息搬进去"));
+            "type", "string",
+            "description", "本任务片段：**必须是一个字符串**，用一段文本写清目标 / 已知事实 / 约束 / 期望产出"
+                + "（例：目标：…；已知事实：…；约束：…；期望产出：…），不要写成 JSON 对象。"
+                + "只写本任务必需的事实，不要把整段对话历史搬进去；宁可少写"));
         properties.put("reason", Map.of(
             "type", "string",
             "description", "决策理由（仅留档，用于复盘路由质量）"));

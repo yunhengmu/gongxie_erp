@@ -96,6 +96,17 @@ class RouteDecisionToolTest {
     }
 
     @Test
+    @DisplayName("task_context 声明为字符串参数")
+    @SuppressWarnings("unchecked")
+    void shouldDeclareTaskContextAsString() {
+        Map<String, Object> properties = (Map<String, Object>) tool.getParameters().get("properties");
+        Map<String, Object> taskContext = (Map<String, Object>) properties.get("task_context");
+        // 声明成 object 会诱导模型把值写成「未加引号的裸文本」，整段入参因此不是合法 JSON，
+        // 框架解析失败后入参被清空、校验报「required property 'action' not found」（2026-10-13 实测）
+        assertEquals("string", taskContext.get("type"));
+    }
+
+    @Test
     @DisplayName("action=self 时记录自答决定")
     void shouldRecordSelfDecision() {
         AiRouteContext route = newRoute();
