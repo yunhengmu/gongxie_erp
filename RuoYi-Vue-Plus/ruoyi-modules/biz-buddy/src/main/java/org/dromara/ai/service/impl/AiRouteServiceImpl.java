@@ -734,6 +734,14 @@ public class AiRouteServiceImpl implements IAiRouteService {
         vo.setDurationMs(run.getDurationMs());
         vo.setCreateTime(run.getCreateTime());
         vo.setExpertCalls(calls);
+        // 结构化决策判定（docs/21 §6）：影子 / 闸门两档都留痕，详情页据此展示判定明细
+        vo.setDecisionSource(run.getDecisionSource());
+        vo.setJudgeMode(run.getJudgeMode());
+        vo.setJudgeChoice(run.getJudgeChoice());
+        vo.setJudgeConfidence(run.getJudgeConfidence());
+        vo.setJudgeLatencyMs(run.getJudgeLatencyMs());
+        vo.setJudgeTokens(run.getJudgeTokens());
+        vo.setJudgeError(run.getJudgeError());
         return vo;
     }
 }

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -129,11 +130,15 @@ public class AiEmbeddingClient {
     }
 
     /**
-     * 解析向量响应，按 index 排序保证顺序与入参一致。
+     * 解析向量响应。
+     *
+     * <p>OpenAI 规范要求响应项带 `index` 标明其在入参中的位置，但部分网关（如百炼
+     * `qwen3.7-text-embedding-flash`）对批量输入**只回 `index=0`**。故此处两遍解析：
+     * `index` 完整且互不重复时按 `index` 归位，缺失 / 越界 / 重复时退回「响应顺序＝入参顺序」。</p>
      *
      * @param responseBody 响应体
      * @param expected     期望条数
-     * @return 向量列表
+     * @return 向量列表，与入参顺序一致
      */
     private List<double[]> parseVectors(String responseBody, int expected) {
         JsonNode data = JsonUtils.getJsonMapper().readTree(responseBody).path("data");
@@ -141,27 +146,30 @@ public class AiEmbeddingClient {
             throw new ServiceException("向量化返回条数与请求不一致（期望 " + expected
                 + "，实际 " + (data.isArray() ? data.size() : 0) + "）：" + abbreviate(responseBody));
         }
-        double[][] ordered = new double[expected][];
-        for (JsonNode item : data) {
-            int index = item.path("index").asInt(-1);
-            JsonNode embedding = item.path("embedding");
-            if (index < 0 || index >= expected || !embedding.isArray() || embedding.size() == 0) {
+        // 第一遍：按响应顺序取出向量（顺带校验结构）
+        double[][] vectors = new double[expected][];
+        for (int i = 0; i < expected; i++) {
+            JsonNode embedding = data.get(i).path("embedding");
+            if (!embedding.isArray() || embedding.size() == 0) {
                 throw new ServiceException("向量化返回结构异常：" + abbreviate(responseBody));
             }
             double[] vector = new double[embedding.size()];
-            for (int i = 0; i < embedding.size(); i++) {
-                vector[i] = embedding.get(i).asDouble();
+            for (int j = 0; j < embedding.size(); j++) {
+                vector[j] = embedding.get(j).asDouble();
             }
-            ordered[index] = vector;
+            vectors[i] = vector;
         }
-        List<double[]> result = new ArrayList<>(expected);
-        for (double[] vector : ordered) {
-            if (vector == null) {
-                throw new ServiceException("向量化返回缺少部分结果：" + abbreviate(responseBody));
+        // 第二遍：index 可用则按 index 归位，否则按响应顺序归位
+        double[][] ordered = new double[expected][];
+        for (int i = 0; i < expected; i++) {
+            int index = data.get(i).path("index").asInt(-1);
+            if (index < 0 || index >= expected || ordered[index] != null) {
+                log.debug("向量化响应 index 不可用（缺失 / 越界 / 重复），按响应顺序归位");
+                return Arrays.asList(vectors);
             }
-            result.add(vector);
+            ordered[index] = vectors[i];
         }
-        return result;
+        return Arrays.asList(ordered);
     }
 
     /**

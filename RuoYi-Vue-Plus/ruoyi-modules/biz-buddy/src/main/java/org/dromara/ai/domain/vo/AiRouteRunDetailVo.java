@@ -154,4 +154,41 @@ public class AiRouteRunDetailVo implements Serializable {
      */
     private Boolean priceConfigured;
 
+    /**
+     * 结构化决策（docs/21 §6）：本轮判定来源——{@code L} 工具决策 / {@code J} 决策模型 / {@code F} 回落（工具决策兜底）。
+     *
+     * <p>影子期实际路由仍由工具决策完成，故本批次恒为 {@code L}；未启用时不写（NULL）。</p>
+     */
+    private String decisionSource;
+
+    /**
+     * 结构化决策：本轮执行模式（{@code S} 影子 / {@code G} 闸门）；为空表示本轮无判定数据
+     */
+    private String judgeMode;
+
+    /**
+     * 结构化决策：决策模型选中的选项（专家 {@code agent_code} / {@code self} 自答 / {@code other} 无法归属）
+     */
+    private String judgeChoice;
+
+    /**
+     * 结构化决策：判定置信度（0~1；仅 choice 类别带值，缺失或非 choice 时为空）
+     */
+    private Double judgeConfidence;
+
+    /**
+     * 结构化决策：判定耗时（毫秒）
+     */
+    private Integer judgeLatencyMs;
+
+    /**
+     * 结构化决策：判定输入 Token（费用口径；输出 Token 恒 0，不参与计算）
+     */
+    private Integer judgeTokens;
+
+    /**
+     * 结构化决策：判定不可用原因（超时 / 报错 / 越界）；判定可用时为空
+     */
+    private String judgeError;
+
 }

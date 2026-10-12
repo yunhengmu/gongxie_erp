@@ -61,6 +61,20 @@ export interface RouteRunVO {
   entryPromptTokens?: number | null;
   /** 仅详情接口返回：入口轮输出 Token */
   entryCompletionTokens?: number | null;
+  /** 结构化决策：本轮判定来源（L 工具决策 / J 决策模型 / F 回落兜底；未启用为空） */
+  decisionSource?: string | null;
+  /** 结构化决策：本轮执行模式（S 影子 / G 闸门） */
+  judgeMode?: string | null;
+  /** 结构化决策：决策模型选中的选项（专家 agent_code / self / other） */
+  judgeChoice?: string | null;
+  /** 结构化决策：判定置信度（0~1） */
+  judgeConfidence?: number | null;
+  /** 结构化决策：判定耗时（毫秒） */
+  judgeLatencyMs?: number | null;
+  /** 结构化决策：判定输入 Token */
+  judgeTokens?: number | null;
+  /** 结构化决策：判定不可用原因（超时 / 报错 / 越界） */
+  judgeError?: string | null;
 }
 
 export interface RouteExpertCallVO {

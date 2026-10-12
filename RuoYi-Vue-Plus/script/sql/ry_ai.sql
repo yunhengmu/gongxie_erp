@@ -1169,7 +1169,7 @@ create table if not exists ai_safety_event (
 -- ============================================================
 --   预置三个**示例模型**（提供商：阿里云百炼 / DashScope）：
 --     ① deepseek-v4-pro-0813     对话模型（model_type=chat）
---     ② qwen3.7-text-embedding  向量模型（model_type=embedding，维度 1024）
+--     ② qwen3.7-text-embedding-flash  向量模型（model_type=embedding，维度 1024）
 --     ③ decision-model-preview  决策模型（model_type=decision，供「安全合规配置 → 结构化决策路由」引用）
 --   注意：
 --   a. **api_key 一律留空** —— 部署后请到「模型配置」换成本人的阿里云百炼密钥；
@@ -1195,7 +1195,7 @@ on duplicate key update id = id;
 insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
                              base_url, api_key,
                              dimension, status, remark, create_dept, create_by, create_time, del_flag)
-values (1761400000000020401, 'qwen3.7-text-embedding', 'dashscope', 'embedding', 'qwen3.7-text-embedding', '1',
+values (1761400000000020401, 'qwen3.7-text-embedding-flash', 'dashscope', 'embedding', 'qwen3.7-text-embedding-flash', '1',
         'https://dashscope.aliyuncs.com/compatible-mode/v1', null,
         1024, '0',
         '预置示例（向量模型，阿里云百炼）：维度须与模型实际输出一致；部署后请换密钥或另行新建模型',
@@ -1543,7 +1543,7 @@ values (1761400000000020302, '小Z（入口智能体）', 'entry_agent',
 2. 每轮会给你一份「候选专家清单」（含 key / 名称 / 擅长）。只能从清单里选，清单里没有的一律不要编造。
 3. 调用 route_decision 时：
    - expert_agent_key 必须是清单中的 key；
-   - task_context 只写本任务必需的事实，含 goal（目标）/ facts（已知事实）/ constraints（约束）/ expected（期望产出）；不要把整段对话历史、无关个人信息搬进去，宁可少写；
+   - task_context 用**一段文本**写清本任务必需的事实（如：目标…；已知事实…；约束…；期望产出…），**必须是一个字符串、不要写成 JSON 对象**；不要把整段对话历史、无关个人信息搬进去，宁可少写；
    - reason 写一句决策理由。
 4. 候选清单为空、或你不确定该找谁时，倾向自己回答：宁可自己答，也不要误路由。
 5. 涉及今天、本周、距今多久等时间语义时，可调用 get_current_time 获取精确时间；需要判断当前是谁在问时，可用 get_current_user 或 get_current_dept。
@@ -1693,7 +1693,7 @@ values (1761400000000021001, 'BizBuddy介绍演示库', 'bizbuddy_demo_kb',
         '演示知识库：收录 BizBuddy 平台的简介，供「BizBuddy项目介绍专家」检索回答',
         1761400000000020401, 'kb_bizbuddy_demo_kb',
         1024, 500, 50, 5, 0.500,
-        '0', '平台预置演示知识库（向量模型同预置 qwen3.7-text-embedding，公开可用）',
+        '0', '平台预置演示知识库（向量模型同预置 qwen3.7-text-embedding-flash，公开可用）',
         1761000000000000103, 1761100000000000001, now(), null, now(),
         '0', null, '0')
 on duplicate key update id = id;

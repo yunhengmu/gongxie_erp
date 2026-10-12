@@ -244,9 +244,9 @@ class AiEmbeddingClientTest {
     }
 
     @Test
-    @DisplayName("返回结构异常（index 越界）时抛出异常")
+    @DisplayName("返回结构异常（embedding 为空数组）时抛出异常")
     void shouldRejectInvalidIndex() {
-        String body = "{\"data\":[{\"index\":-1,\"embedding\":[0.1]}]}";
+        String body = "{\"data\":[{\"index\":0,\"embedding\":[]}]}";
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(200, body));
             ServiceException ex = assertThrows(ServiceException.class,
@@ -256,14 +256,28 @@ class AiEmbeddingClientTest {
     }
 
     @Test
-    @DisplayName("返回缺少部分结果时抛出异常")
-    void shouldRejectMissingResult() {
+    @DisplayName("index 全为 0（批量网关不复位）时按响应顺序归位")
+    void shouldFallbackToResponseOrderWhenIndexDuplicated() {
         String body = "{\"data\":[{\"index\":0,\"embedding\":[0.1]},{\"index\":0,\"embedding\":[0.2]}]}";
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(200, body));
-            ServiceException ex = assertThrows(ServiceException.class,
-                () -> client.embed(config("https://api.test/v1"), "key", List.of("a", "b")));
-            assertTrue(ex.getMessage().contains("缺少部分结果"));
+            List<double[]> result = client.embed(config("https://api.test/v1"), "key", List.of("a", "b"));
+            assertEquals(2, result.size());
+            assertArrayEquals(new double[]{0.1}, result.get(0));
+            assertArrayEquals(new double[]{0.2}, result.get(1));
+        }
+    }
+
+    @Test
+    @DisplayName("index 缺失时按响应顺序归位")
+    void shouldFallbackToResponseOrderWhenIndexMissing() {
+        String body = "{\"data\":[{\"embedding\":[0.1]},{\"embedding\":[0.2]}]}";
+        try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
+            requestWith(httpUtil, response(200, body));
+            List<double[]> result = client.embed(config("https://api.test/v1"), "key", List.of("a", "b"));
+            assertEquals(2, result.size());
+            assertArrayEquals(new double[]{0.1}, result.get(0));
+            assertArrayEquals(new double[]{0.2}, result.get(1));
         }
     }
 
