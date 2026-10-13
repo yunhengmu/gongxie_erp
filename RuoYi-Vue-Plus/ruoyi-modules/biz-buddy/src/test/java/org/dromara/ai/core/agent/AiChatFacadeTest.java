@@ -435,7 +435,8 @@ class AiChatFacadeTest {
         when(agentService.getEnabledAgent(7L)).thenReturn(definition);
         when(sessionResourceService.resolveForSession(session)).thenReturn(resources);
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
-        when(agentRegistry.get(definition, resources)).thenReturn(agent);
+        when(agentRegistry.holder(definition, resources))
+            .thenReturn(new AgentRegistry.AgentHolder(null, agent, "fp", null));
         when(attachmentService.listByMessageId(any())).thenReturn(List.of());
         when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
             .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>empty()));
@@ -467,7 +468,8 @@ class AiChatFacadeTest {
         when(agentService.getEnabledAgent(7L)).thenReturn(definition);
         when(sessionResourceService.resolveForSession(session)).thenReturn(resources);
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
-        when(agentRegistry.get(definition, resources)).thenReturn(agent);
+        when(agentRegistry.holder(definition, resources))
+            .thenReturn(new AgentRegistry.AgentHolder(null, agent, "fp", null));
         when(attachmentService.listByMessageId(any())).thenReturn(List.of());
         when(agent.prepareRun(anyList(), any(RuntimeContext.class)))
             .thenReturn(AgentRun.create("test", () -> Flux.<AgentEvent>error(new RuntimeException("boom"))));
@@ -500,7 +502,8 @@ class AiChatFacadeTest {
         when(slotStore.merge(any(), any())).thenReturn(AiSlotSet.empty());
         when(expertDirectory.candidates(any(), any())).thenReturn(List.of(candidate));
         when(skillService.resolveRuntimeSkillFilterKeys(any(), any(), any())).thenReturn(List.of());
-        when(agentRegistry.get(definition, resources)).thenReturn(agent);
+        when(agentRegistry.holder(definition, resources))
+            .thenReturn(new AgentRegistry.AgentHolder(null, agent, "fp", null));
         when(attachmentService.listByMessageId(any())).thenReturn(List.of());
         // 闸门采信：短路到专家直答
         when(routeJudgeService.judgeGate(any(), any(), any(), any(), any()))

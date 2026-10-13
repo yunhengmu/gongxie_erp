@@ -5,7 +5,9 @@ import org.dromara.ai.core.route.RouteJudgeRequest;
 import org.dromara.ai.core.route.RouteJudgeVerdict;
 import org.dromara.ai.core.safety.SafetyDecision;
 import org.dromara.ai.core.safety.SafetyScene;
+import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.bo.AiJevConfigBo;
+import org.dromara.ai.mapper.AiRouteRunMapper;
 import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.test.AiTestSupport;
 import org.junit.jupiter.api.BeforeAll;
@@ -19,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -65,6 +68,9 @@ class RouteJudgeServiceTest {
     @Mock
     private IAiSafetyEventService safetyEventService;
 
+    @Mock
+    private AiRouteRunMapper routeRunMapper;
+
     @InjectMocks
     private RouteJudgeService service;
 
@@ -77,9 +83,35 @@ class RouteJudgeServiceTest {
      * 构造带一个候选专家的编排上下文。
      */
     private AiRouteContext route() {
-        List<AiExpertCandidate> candidates = List.of(
-            new AiExpertCandidate(11L, "notice_admin_expert", "公告专家", null, "公告的创建、查询与维护"));
+        return route(1);
+    }
+
+    /**
+     * 构造带指定候选数（首项恒为 {@code notice_admin_expert}）的编排上下文。
+     *
+     * @param candidateCount 候选数量
+     */
+    private AiRouteContext route(int candidateCount) {
+        List<AiExpertCandidate> candidates = new ArrayList<>();
+        candidates.add(new AiExpertCandidate(11L, "notice_admin_expert", "公告专家", null, "公告的创建、查询与维护"));
+        for (int i = 2; i <= candidateCount; i++) {
+            candidates.add(new AiExpertCandidate(10L + i, "expert_" + i, "专家" + i, null, "候选能力" + i));
+        }
         return new AiRouteContext(9L, SESSION_ID, USER_ID, 4L, ENTRY_AGENT_ID, candidates, 6L, null);
+    }
+
+    /**
+     * 构造一条「上轮判定采信」的编排运行行（粘性路由的取数来源）。
+     */
+    private static AiRouteRun lastJudge(String choice, double confidence) {
+        AiRouteRun run = new AiRouteRun();
+        run.setId(8L);
+        run.setSessionId(SESSION_ID);
+        run.setStatus(AiRouteRun.STATUS_SUCCESS);
+        run.setDecisionSource("J");
+        run.setJudgeChoice(choice);
+        run.setJudgeConfidence(confidence);
+        return run;
     }
 
     /**
@@ -350,6 +382,212 @@ class RouteJudgeServiceTest {
         // 前置判定只写判定与审计字段，编排动作仍由门面的短路路径决定
         assertEquals("self", route.action);
         assertEquals("task", route.taskContext);
+    }
+
+    // ---------------- 措施 A：分桶基础阈值 + margin 二次过滤 ----------------
+
+    @Test
+    @DisplayName("分桶阈值：候选 11 个走「大规模」档（0.55），top1=0.6 达标即采信")
+    void shouldUseLargeBucketThresholdWhenManyCandidates() {
+        when(runtimeConfigStore.jev()).thenReturn(gateCfg(0.75));
+        when(routeJudge.judge(any())).thenReturn(Optional.of(
+            new RouteJudgeVerdict("notice_admin_expert", 0.6,
+                Map.of("notice_admin_expert", 0.6, "expert_2", 0.05), 50L, 100L, null)));
+        AiRouteContext route = route(11);
+
+        RouteJudgeService.JudgeGateOutcome outcome =
+            service.judgeGate(route, "问题", USER_ID, 4L, MESSAGE_ID);
+
+        assertTrue(outcome.takeOver());
+        assertEquals("J", route.decisionSource);
+        // 审计记录的是本轮实际使用的分桶阈值（0.55），不是配置里的 0.75
+        assertEquals(0.55, route.judgeThreshold);
+    }
+
+    @Test
+    @DisplayName("分桶阈值：候选 6 个走「中规模」档（0.65）")
+    void shouldUseMediumBucketThresholdWhenSixCandidates() {
+        when(runtimeConfigStore.jev()).thenReturn(gateCfg(0.75));
+        when(routeJudge.judge(any())).thenReturn(Optional.of(
+            new RouteJudgeVerdict("notice_admin_expert", 0.7,
+                Map.of("notice_admin_expert", 0.7, "expert_2", 0.05), 50L, 100L, null)));
+        AiRouteContext route = route(6);
+
+        assertTrue(service.judgeGate(route, "问题", USER_ID, 4L, MESSAGE_ID).takeOver());
+        assertEquals(0.65, route.judgeThreshold);
+    }
+
+    @Test
+    @DisplayName("margin 不足：基础阈值达标但 top1/top2 < r → 回落、留痕 margin_rejected")
+    void shouldFallBackWhenMarginRejected() {
+        when(runtimeConfigStore.jev()).thenReturn(gateCfg(0.75));
+        // 11 个候选 → 基础阈值 0.55；top1=0.6 达标，但 0.6/0.4=1.5 < 2.0 → margin 拒绝
+        when(routeJudge.judge(any())).thenReturn(Optional.of(
+            new RouteJudgeVerdict("notice_admin_expert", 0.6,
+                Map.of("notice_admin_expert", 0.6, "self", 0.4), 50L, 100L, null)));
+        AiRouteContext route = route(11);
+
+        RouteJudgeService.JudgeGateOutcome outcome =
+            service.judgeGate(route, "问题", USER_ID, 4L, MESSAGE_ID);
+
+        assertFalse(outcome.takeOver());
+        assertEquals("F", route.decisionSource);
+        assertEquals("margin_rejected", route.judgeError);
+        // 判定本身仍被留痕（供校准）
+        assertEquals("notice_admin_expert", route.judgeChoice);
+        assertEquals(0.6, route.judgeConfidence);
+    }
+
+    @Test
+    @DisplayName("未达基础阈值时不误记 margin_rejected")
+    void shouldNotRecordMarginRejectedWhenBelowThreshold() {
+        when(runtimeConfigStore.jev()).thenReturn(gateCfg(0.75));
+        when(routeJudge.judge(any())).thenReturn(Optional.of(
+            new RouteJudgeVerdict("notice_admin_expert", 0.6,
+                Map.of("notice_admin_expert", 0.6, "self", 0.4), 50L, 100L, null)));
+        AiRouteContext route = route();
+
+        service.judgeGate(route, "问题", USER_ID, 4L, MESSAGE_ID);
+
+        assertEquals("F", route.decisionSource);
+        assertNull(route.judgeError);
+    }
+
+    // ---------------- 措施 F：粘性路由（跳过判定，来源 K） ----------------
+
+    @Test
+    @DisplayName("粘性命中：短句 + 上轮 J 高置信 + 候选有效 → 跳过判定直接接管、来源 K、零外呼")
+    void shouldStickyRouteWithoutJudging() {
+        AiJevConfigBo cfg = gateCfg(0.75);
+        cfg.setStickyRoutingEnabled(true);
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        when(routeRunMapper.selectOne(any())).thenReturn(lastJudge("notice_admin_expert", 0.97));
+        AiRouteContext route = route();
+
+        RouteJudgeService.JudgeGateOutcome outcome =
+            service.judgeGate(route, "继续", USER_ID, 4L, MESSAGE_ID);
+
+        assertTrue(outcome.takeOver());
+        assertEquals("notice_admin_expert", outcome.expertCode());
+        assertEquals("K", route.decisionSource);
+        assertEquals("G", route.judgeMode);
+        assertEquals("notice_admin_expert", route.judgeChoice);
+        assertEquals(0.97, route.judgeConfidence);
+        assertEquals(0.75, route.judgeThreshold);
+        // 粘性档不外呼、不构造出境文本，故无 PII 留痕
+        verify(routeJudge, never()).judge(any());
+        verifyNoInteractions(safetyEventService);
+    }
+
+    @Test
+    @DisplayName("粘性未命中：本轮原话过长 → 不查上轮、走正常判定")
+    void shouldSkipStickyWhenQueryTooLong() {
+        AiJevConfigBo cfg = gateCfg(0.75);
+        cfg.setStickyRoutingEnabled(true);
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        when(routeJudge.judge(any())).thenReturn(Optional.of(usableVerdict()));
+        AiRouteContext route = route();
+
+        service.judgeGate(route, "帮我看看最近的公告有哪些需要处理", USER_ID, 4L, MESSAGE_ID);
+
+        verify(routeRunMapper, never()).selectOne(any());
+        verify(routeJudge).judge(any());
+        assertEquals("J", route.decisionSource);
+    }
+
+    @Test
+    @DisplayName("粘性未命中：短句里显式点名了候选专家名 → 不粘、直接走正常判定")
+    void shouldSkipStickyWhenCandidateNamed() {
+        AiJevConfigBo cfg = gateCfg(0.75);
+        cfg.setStickyRoutingEnabled(true);
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        when(routeJudge.judge(any())).thenReturn(Optional.of(usableVerdict()));
+        AiRouteContext route = route();
+
+        service.judgeGate(route, "找公告专家", USER_ID, 4L, MESSAGE_ID);
+
+        // 点名即短路在「查上轮」之前：连上轮都不查
+        verify(routeRunMapper, never()).selectOne(any());
+        verify(routeJudge).judge(any());
+        assertEquals("J", route.decisionSource);
+    }
+
+    @Test
+    @DisplayName("粘性未命中：短句里出现候选 agent_code 字面 → 不粘（字数上限放宽后同样成立）")
+    void shouldSkipStickyWhenCandidateKeyNamed() {
+        AiJevConfigBo cfg = gateCfg(0.75);
+        cfg.setStickyRoutingEnabled(true);
+        // 默认上限 12 字时 agent_code（19 字符）不可能整串出现，故放宽上限以覆盖该分支
+        cfg.setStickyMaxQueryLength(30);
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        when(routeJudge.judge(any())).thenReturn(Optional.of(usableVerdict()));
+        AiRouteContext route = route();
+
+        service.judgeGate(route, "notice_admin_expert 那个", USER_ID, 4L, MESSAGE_ID);
+
+        verify(routeRunMapper, never()).selectOne(any());
+        verify(routeJudge).judge(any());
+    }
+
+    @Test
+    @DisplayName("粘性未命中：上轮来源不是 J → 走正常判定")
+    void shouldSkipStickyWhenLastTurnNotJudge() {
+        AiJevConfigBo cfg = gateCfg(0.75);
+        cfg.setStickyRoutingEnabled(true);
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        AiRouteRun last = lastJudge("notice_admin_expert", 0.97);
+        last.setDecisionSource("L");
+        when(routeRunMapper.selectOne(any())).thenReturn(last);
+        when(routeJudge.judge(any())).thenReturn(Optional.of(usableVerdict()));
+        AiRouteContext route = route();
+
+        service.judgeGate(route, "继续", USER_ID, 4L, MESSAGE_ID);
+
+        verify(routeJudge).judge(any());
+        assertEquals("J", route.decisionSource);
+    }
+
+    @Test
+    @DisplayName("粘性未命中：上轮置信度低于门槛 → 走正常判定")
+    void shouldSkipStickyWhenLastConfidenceLow() {
+        AiJevConfigBo cfg = gateCfg(0.75);
+        cfg.setStickyRoutingEnabled(true);
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        when(routeRunMapper.selectOne(any())).thenReturn(lastJudge("notice_admin_expert", 0.6));
+        when(routeJudge.judge(any())).thenReturn(Optional.of(usableVerdict()));
+        AiRouteContext route = route();
+
+        service.judgeGate(route, "继续", USER_ID, 4L, MESSAGE_ID);
+
+        verify(routeJudge).judge(any());
+    }
+
+    @Test
+    @DisplayName("粘性未命中：上轮专家已不在本轮候选内（删除 / 停用 / 不再可见）→ 走正常判定")
+    void shouldSkipStickyWhenLastExpertNoLongerCandidate() {
+        AiJevConfigBo cfg = gateCfg(0.75);
+        cfg.setStickyRoutingEnabled(true);
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        when(routeRunMapper.selectOne(any())).thenReturn(lastJudge("ghost_expert", 0.97));
+        when(routeJudge.judge(any())).thenReturn(Optional.of(usableVerdict()));
+        AiRouteContext route = route();
+
+        service.judgeGate(route, "继续", USER_ID, 4L, MESSAGE_ID);
+
+        verify(routeJudge).judge(any());
+        assertEquals("J", route.decisionSource);
+    }
+
+    @Test
+    @DisplayName("粘性关闭（默认）：不查上轮，行为与现状等价")
+    void shouldNotQueryPreviousRunWhenStickyDisabled() {
+        when(runtimeConfigStore.jev()).thenReturn(gateCfg(0.75));
+        when(routeJudge.judge(any())).thenReturn(Optional.of(usableVerdict()));
+
+        service.judgeGate(route(), "继续", USER_ID, 4L, MESSAGE_ID);
+
+        verifyNoInteractions(routeRunMapper);
+        verify(routeJudge).judge(any());
     }
 
 }

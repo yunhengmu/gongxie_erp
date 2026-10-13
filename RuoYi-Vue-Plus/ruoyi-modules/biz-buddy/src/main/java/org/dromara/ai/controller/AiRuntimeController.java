@@ -200,9 +200,18 @@ public class AiRuntimeController extends BaseController {
         vo.setTimeoutSeconds(bo.getTimeoutSeconds());
         vo.setMode(bo.getMode());
         vo.setConfidenceThreshold(bo.getConfidenceThreshold());
+        vo.setConfidenceThresholdMedium(bo.getConfidenceThresholdMedium());
+        vo.setConfidenceThresholdLarge(bo.getConfidenceThresholdLarge());
+        vo.setMarginRatio(bo.getMarginRatio());
         vo.setFailOpen(bo.isFailOpen());
         vo.setStateMaxChars(bo.getStateMaxChars());
         vo.setPersistProbabilities(bo.isPersistProbabilities());
+        vo.setCircuitBreakerEnabled(bo.isCircuitBreakerEnabled());
+        vo.setCircuitBreakerThreshold(bo.getCircuitBreakerThreshold());
+        vo.setCircuitBreakerPauseSeconds(bo.getCircuitBreakerPauseSeconds());
+        vo.setStickyRoutingEnabled(bo.isStickyRoutingEnabled());
+        vo.setStickyMinConfidence(bo.getStickyMinConfidence());
+        vo.setStickyMaxQueryLength(bo.getStickyMaxQueryLength());
         return vo;
     }
 

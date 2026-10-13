@@ -28,7 +28,9 @@ import java.util.regex.Pattern;
  * </ul>
  *
  * <p><b>响应概率和精确为 1.00</b>：{@code probabilities} 只包含请求 {@code criteria} 里真实存在的键，
- * 选中项填 1.0、其余填 0.0，避免触发应用侧宽松校验的 warn 日志。{@code criteria} 的键以极简正则 +
+ * 选中项取其 {@code confidence}、其余键平分余量（末位取余量以免二进制尾差），既与真实提供方形态一致
+ * （实测 {@code choice} 恒为分布最大项），又让「分桶基础阈值 / margin 二次过滤」两条分支可被覆盖。
+ * {@code criteria} 的键以极简正则 +
  * 字符串扫描解析（先定位 {@code "criteria"} 后配对的 {@code {...}} 子串，再取其中的键）；
  * 解析失败安全回退为 {@code self}。</p>
  *
@@ -180,11 +182,18 @@ public class SystemOneStub {
     }
 
     /**
-     * 组装 System One 响应：概率分布只含 criteria 真实键，选中项 1.0、其余 0.0（和精确为 1.00）。
+     * 组装 System One 响应：概率分布只含 criteria 真实键，**选中项取 {@code confidence}、其余平分余量**
+     * （和精确为 1.00，不触发应用侧宽松校验的告警）。
+     *
+     * <p><b>为什么不再把选中项写成 1.0</b>：应用侧的闸门判定要求 {@code top1}
+     * （概率分布的最大值）达分桶基础阈值，且 {@code top1 / top2 ≥ marginRatio}。若选中项恒为 1.0、
+     * 其余恒为 0.0，则 {@code top1} 恒为 1.0 且 margin 恒被放行——「低置信」与「margin 拒绝」两条
+     * 分支将永远无法被覆盖。真实提供方（百炼）返回的是完整分布（实测 {@code choice} 恒为分布的最大项、
+     * {@code confidence ≈ top1}），此处对齐该形态。</p>
      *
      * @param keys       闭集键（解析失败为空）
-     * @param choice     选中的选项（越界时不在 keys 中）
-     * @param confidence 置信度
+     * @param choice     选中的选项（越界时不在 keys 中，质量让给 self / 首个键）
+     * @param confidence 置信度（即选中项的概率）
      * @return 响应 JSON
      */
     private static String buildResponse(List<String> keys, String choice, double confidence) {
@@ -193,11 +202,23 @@ public class SystemOneStub {
             // 解析失败的安全回退：只给闭集固定项 self 挂 1.0（不引入任何未知键）
             probabilities.put(CHOICE_SELF, 1.0);
         } else {
-            // 选中项在闭集内即给它 1.0；越界（OUT）或解析异常则把 1.0 让给 self（无 self 时让给首个键）
+            // 选中项在闭集内即以 confidence 作为其概率；越界（OUT）或解析异常则把质量让给 self（无 self 时让给首个键）
             String massKey = keys.contains(choice) ? choice
                 : (keys.contains(CHOICE_SELF) ? CHOICE_SELF : keys.get(0));
+            int others = keys.size() - 1;
+            double share = others <= 0 ? 0D : round4((1D - confidence) / others);
+            double assigned = 0D;
+            int index = 0;
             for (String key : keys) {
-                probabilities.put(key, key.equals(massKey) ? 1.0 : 0.0);
+                if (key.equals(massKey)) {
+                    probabilities.put(key, confidence);
+                    continue;
+                }
+                index++;
+                // 最后一个非选中键取「余量」而非等分值，保证概率和精确为 1.00
+                double value = index == others ? round4(1D - confidence - assigned) : share;
+                assigned += value;
+                probabilities.put(key, Math.max(0D, value));
             }
         }
         StringBuilder probabilitiesJson = new StringBuilder("{");
@@ -208,13 +229,18 @@ public class SystemOneStub {
             }
             first = false;
             probabilitiesJson.append('"').append(escape(entry.getKey())).append("\":")
-                .append(entry.getValue() == 1.0 ? "1.0" : "0.0");
+                .append(String.valueOf(entry.getValue()));
         }
         probabilitiesJson.append('}');
         return "{\"model\":\"decision-model-preview\",\"request_id\":\"stub\",\"latency_ms\":5,"
             + "\"answers\":{\"expert\":{\"type\":\"choice\",\"choice\":\"" + escape(choice) + "\","
             + "\"confidence\":" + confidence + ",\"probabilities\":" + probabilitiesJson + "}},"
             + "\"usage\":{\"input_tokens\":42}}";
+    }
+
+    /** 四舍五入到 4 位小数（与提供方两位小数量级一致，且避免二进制尾差触发校验告警）。 */
+    private static double round4(double value) {
+        return Math.round(value * 10000D) / 10000D;
     }
 
     /** 读取请求体（UTF-8）。 */

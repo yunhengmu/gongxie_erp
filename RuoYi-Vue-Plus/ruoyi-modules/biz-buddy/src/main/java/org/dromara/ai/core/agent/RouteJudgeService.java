@@ -1,5 +1,7 @@
 package org.dromara.ai.core.agent;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.core.route.RouteJudge;
@@ -9,7 +11,9 @@ import org.dromara.ai.core.route.RouteJudgeVerdict;
 import org.dromara.ai.core.safety.SafetyAction;
 import org.dromara.ai.core.safety.SafetyDecision;
 import org.dromara.ai.core.safety.SafetyScene;
+import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.bo.AiJevConfigBo;
+import org.dromara.ai.mapper.AiRouteRunMapper;
 import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.util.AiPiiMasker;
 import org.dromara.common.core.utils.StringUtils;
@@ -68,6 +72,29 @@ public class RouteJudgeService {
     private static final String SOURCE_FALLBACK = "F";
 
     /**
+     * 判定来源：粘性路由命中——**跳过判定**、直接复用上轮专家（docs/22 §3.3 F）。
+     *
+     * <p>刻意不用 {@code S}：{@code S} 已被 {@link #MODE_CODE_SHADOW} 占用，
+     * 两字段共用同一字母会造成审计误读。</p>
+     */
+    private static final String SOURCE_STICKY = "K";
+
+    /**
+     * 判定不可用原因：达基础阈值但 margin 不足（docs/22 §5.1）。
+     */
+    private static final String ERROR_MARGIN_REJECTED = "margin_rejected";
+
+    /**
+     * 基础阈值分档边界：候选数 ≤该值用「小规模」阈值。
+     */
+    private static final int BUCKET_SMALL_MAX = 5;
+
+    /**
+     * 基础阈值分档边界：候选数 ≤该值用「中规模」阈值，超出用「大规模」阈值。
+     */
+    private static final int BUCKET_MEDIUM_MAX = 10;
+
+    /**
      * 闭集固定项：入口智能体直接回答
      */
     private static final String CHOICE_SELF = "self";
@@ -106,6 +133,11 @@ public class RouteJudgeService {
     private final RouteJudge routeJudge;
 
     private final IAiSafetyEventService safetyEventService;
+
+    /**
+     * 编排运行表（只读）：粘性路由按会话取**上轮**编排结果（docs/22 §3.3 F）。
+     */
+    private final AiRouteRunMapper routeRunMapper;
 
     /**
      * 影子判定：并联调一次决策模型，结果只写回审计字段，不改变编排走向。
@@ -183,6 +215,12 @@ public class RouteJudgeService {
             if (route.candidates == null || route.candidates.isEmpty()) {
                 return JudgeGateOutcome.notTakeOver();
             }
+            // 粘性路由（docs/22 §3.3 F）：追问场景跳过判定、直接复用上轮专家。命中即不外呼、
+            // 不构造 state（无出境文本），故与 PII 脱敏无关；未命中返回 null 继续走正常判定
+            JudgeGateOutcome sticky = tryStickyRouting(route, userContent, cfg);
+            if (sticky != null) {
+                return sticky;
+            }
             RouteJudgeRequest request = new RouteJudgeRequest(
                 outboundState(route, userContent, cfg, userId, messageId), toCandidates(route.candidates));
             Optional<RouteJudgeVerdict> verdictOpt = routeJudge.judge(request);
@@ -197,17 +235,116 @@ public class RouteJudgeService {
     }
 
     /**
+     * 粘性路由（docs/22 §3.3 F）：追问场景**跳过判定**、直接复用上轮专家。
+     *
+     * <p>命中条件（全部满足）：① 开关打开；② 本轮原话非空且字数 ≤ {@code stickyMaxQueryLength}；
+     * ③ 本轮原话**未显式点名**任何候选（不含其 {@code agent_name} / {@code agent_code} 字面子串）；
+     * ④ 上轮编排已收尾且 {@code decision_source='J'}、上轮判定置信度 ≥ {@code stickyMinConfidence}；
+     * ⑤ 上轮所选专家**仍在本轮候选内**（候选项即「启用 ∩ 可见 ∩ 自动路由」，故同时覆盖
+     * 「已删除 / 停用 / 不再可见」三种失效）。</p>
+     *
+     * <p><b>不外呼</b>：本档不构造 {@code state}、不调决策模型，故不产生出境文本，与 PII 脱敏无关。</p>
+     *
+     * @param route       编排运行状态
+     * @param userContent 本轮用户原话
+     * @param cfg         结构化决策配置（取粘性开关与阈值）
+     * @return 命中返回接管结果；未命中返回 {@code null}（调用方继续正常判定）
+     */
+    private JudgeGateOutcome tryStickyRouting(AiRouteContext route, String userContent, AiJevConfigBo cfg) {
+        if (!cfg.isStickyRoutingEnabled()) {
+            return null;
+        }
+        if (StringUtils.isBlank(userContent)
+            || userContent.trim().length() > Math.max(1, cfg.getStickyMaxQueryLength())) {
+            return null;
+        }
+        // 显式点名即不粘（docs/22 §3.2 D 的「未显式点名」判据，此处复用）：用户已指明找谁，
+        // 交给正常判定按点名走，避免「短句换话题 / 换专家」被粘到上轮专家
+        if (mentionsAnyCandidate(userContent, route.candidates)) {
+            return null;
+        }
+        AiRouteRun last = previousCompletedRun(route);
+        if (last == null || !SOURCE_JUDGE.equals(last.getDecisionSource())) {
+            return null;
+        }
+        Double confidence = last.getJudgeConfidence();
+        if (confidence == null || confidence < cfg.getStickyMinConfidence()) {
+            return null;
+        }
+        String choice = last.getJudgeChoice();
+        if (StringUtils.isBlank(choice) || !route.candidateByKey.containsKey(choice)) {
+            return null;
+        }
+        route.judgeMode = MODE_CODE_GATE;
+        route.decisionSource = SOURCE_STICKY;
+        route.judgeChoice = choice;
+        route.judgeConfidence = confidence;
+        route.judgeThreshold = baseThreshold(cfg, route.candidates.size());
+        log.info("粘性路由命中（跳过判定）：sessionId={}, expert={}, 上轮置信度={}",
+            route.sessionId, choice, confidence);
+        return new JudgeGateOutcome(true, choice);
+    }
+
+    /**
+     * 取**上轮**编排运行（同会话、主键小于本轮、已收尾）。
+     *
+     * <p>刻意不在 SQL 里过滤 {@code decision_source}：需保证取到的是**紧邻的上一轮**——
+     * 若隔着若干轮再回捞历史 J，会把「已换话题」误判为追问（近因偏置）。</p>
+     *
+     * @param route 编排运行状态（提供会话主键与本轮主键）
+     * @return 上轮编排运行；无上轮（首轮）返回 {@code null}
+     */
+    private AiRouteRun previousCompletedRun(AiRouteContext route) {
+        LambdaQueryWrapper<AiRouteRun> lqw = Wrappers.lambdaQuery();
+        lqw.eq(AiRouteRun::getSessionId, route.sessionId);
+        lqw.lt(AiRouteRun::getId, route.routeRunId);
+        // 过滤中间态：本轮 startRun 已先落一行 status=running（其主键大于本轮之前的所有行），其余
+        // running 行说明上一轮未收尾（异常 / 被停止），不足以作为粘性依据
+        lqw.ne(AiRouteRun::getStatus, AiRouteRun.STATUS_RUNNING);
+        lqw.orderByDesc(AiRouteRun::getId);
+        lqw.last("limit 1");
+        return routeRunMapper.selectOne(lqw);
+    }
+
+    /**
+     * 本轮原话是否**显式点名**了任一候选专家（其 {@code agent_code} 或 {@code agent_name} 的字面子串）。
+     *
+     * <p>只用结构化字段做字面匹配，不引入关键词表——{@code capability_desc} 是自由文本、不保证含关键词，
+     * 靠它判定「是否点题」并不可行（同 docs/22 §3.2 D 的取舍）。</p>
+     *
+     * @param userContent 本轮用户原话
+     * @param candidates  本轮候选清单
+     * @return 点名了任一候选返回 true
+     */
+    private static boolean mentionsAnyCandidate(String userContent, List<AiExpertCandidate> candidates) {
+        for (AiExpertCandidate candidate : candidates) {
+            if (StringUtils.isNotBlank(candidate.agentKey()) && userContent.contains(candidate.agentKey())) {
+                return true;
+            }
+            if (StringUtils.isNotBlank(candidate.agentName()) && userContent.contains(candidate.agentName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * 由判定结果推导闸门处置与审计来源（口径 6）。
      *
+     * <p><b>采信条件两段式</b>（docs/22 §3.1 A，顺序固定不可颠倒）：先按候选数取**分桶基础阈值**
+     * 比较 {@code top1}，达标后再用 **margin**（{@code top1 / top2}）做二次过滤。分桶阈值解决
+     * 「尺子刻度」问题（候选越多单选概率天然越低），margin 解决「相邻选项是否难以区分」问题。</p>
+     *
      * <ul>
-     *   <li>达阈值 且 命中本轮候选 → 采信并短路（{@code takeOver=true}，来源 {@code J}）；</li>
-     *   <li>达阈值 且 决定不路由（{@code self} / {@code other}）→ 不短路，判定仍被采信（来源 {@code J}）；</li>
-     *   <li>未达阈值 / 越界 / 判定不可用 → 回落工具决策（来源 {@code F}）。</li>
+     *   <li>两段均过 且 命中本轮候选 → 采信并短路（{@code takeOver=true}，来源 {@code J}）；</li>
+     *   <li>两段均过 且 决定不路由（{@code self} / {@code other}）→ 不短路，判定仍被采信（来源 {@code J}）；</li>
+     *   <li>基础阈值达标但 margin 不足 → 留痕 {@code margin_rejected}，回落（来源 {@code F}）；</li>
+     *   <li>未达基础阈值 / 越界 / 判定不可用 → 回落工具决策（来源 {@code F}）。</li>
      * </ul>
      *
      * @param route      编排运行状态（已写入判定字段）
      * @param verdictOpt 判定结果（空表示不可用）
-     * @param cfg        结构化决策配置（取阈值）
+     * @param cfg        结构化决策配置（取阈值与 margin 比值）
      * @return 采信结果
      */
     private JudgeGateOutcome decideGate(AiRouteContext route, Optional<RouteJudgeVerdict> verdictOpt,
@@ -217,16 +354,90 @@ public class RouteJudgeService {
             return JudgeGateOutcome.notTakeOver();
         }
         RouteJudgeVerdict verdict = verdictOpt.get();
-        // 「达阈值」要求判定可用（无 error）且置信度达标；越界由下的候选命中判定兜住
-        boolean reachedThreshold = StringUtils.isBlank(verdict.error()) && verdict.confidence() != null
-            && verdict.confidence() >= cfg.getConfidenceThreshold();
-        boolean routedToExpert = reachedThreshold && route.candidateByKey.containsKey(verdict.choice());
-        boolean declinedRouting = reachedThreshold
+        // 第一段：分桶基础阈值（判定可用且 top1 达标）；越界由下方的候选命中判定兜住
+        boolean reachedThreshold = StringUtils.isBlank(verdict.error())
+            && topProbability(verdict) >= route.judgeThreshold;
+        // 第二段：margin 二次过滤（仅在基础阈值达标后判定，避免把「未达阈值」误记为 margin 拒绝）
+        boolean marginOk = !reachedThreshold || marginSatisfied(verdict, cfg);
+        boolean adopted = reachedThreshold && marginOk;
+        if (reachedThreshold && !marginOk && StringUtils.isBlank(route.judgeError)) {
+            // 仅在无其它更具体的原因（如 choice 越界）时记 margin 拒绝，避免覆盖
+            route.judgeError = ERROR_MARGIN_REJECTED;
+        }
+        boolean routedToExpert = adopted && route.candidateByKey.containsKey(verdict.choice());
+        boolean declinedRouting = adopted
             && (CHOICE_SELF.equals(verdict.choice()) || CHOICE_OTHER.equals(verdict.choice()));
         route.decisionSource = routedToExpert || declinedRouting ? SOURCE_JUDGE : SOURCE_FALLBACK;
         return routedToExpert
             ? new JudgeGateOutcome(true, verdict.choice())
             : JudgeGateOutcome.notTakeOver();
+    }
+
+    /**
+     * 按候选数取分桶基础阈值（docs/22 §3.1 A）：≤5 用小规模档、6~10 用中规模档、&gt;10 用大规模档。
+     *
+     * @param cfg            结构化决策配置
+     * @param candidateCount 本轮候选数
+     * @return 基础阈值
+     */
+    private static double baseThreshold(AiJevConfigBo cfg, int candidateCount) {
+        if (candidateCount <= BUCKET_SMALL_MAX) {
+            return cfg.getConfidenceThreshold();
+        }
+        return candidateCount <= BUCKET_MEDIUM_MAX
+            ? cfg.getConfidenceThresholdMedium()
+            : cfg.getConfidenceThresholdLarge();
+    }
+
+    /**
+     * 取最大概率（{@code top1}）。概率分布缺失时返回 0（等价未达阈值）。
+     *
+     * @param verdict 判定结果
+     * @return top1
+     */
+    private static double topProbability(RouteJudgeVerdict verdict) {
+        Map<String, Double> probabilities = verdict.probabilities();
+        if (probabilities == null || probabilities.isEmpty()) {
+            return 0D;
+        }
+        double top = 0D;
+        for (Double value : probabilities.values()) {
+            if (value != null && Double.isFinite(value) && value > top) {
+                top = value;
+            }
+        }
+        return top;
+    }
+
+    /**
+     * margin 二次过滤：{@code top1 / top2 ≥ marginRatio}。
+     *
+     * <p>概率键可能缺失部分选项（宽松口径，缺省视为 0），故「不足两个有效概率」时无第二名可比，
+     * 视为不触发 margin（放行）。{@code marginRatio} 取 1.0 等价不启用（比值恒 ≥1）。</p>
+     *
+     * @param verdict 判定结果
+     * @param cfg     结构化决策配置（取 margin 比值）
+     * @return 通过返回 true
+     */
+    private static boolean marginSatisfied(RouteJudgeVerdict verdict, AiJevConfigBo cfg) {
+        Map<String, Double> probabilities = verdict.probabilities();
+        if (probabilities == null || probabilities.size() < 2) {
+            return true;
+        }
+        double top1 = 0D;
+        double top2 = 0D;
+        for (Double value : probabilities.values()) {
+            if (value == null || !Double.isFinite(value)) {
+                continue;
+            }
+            if (value > top1) {
+                top2 = top1;
+                top1 = value;
+            } else if (value > top2) {
+                top2 = value;
+            }
+        }
+        return top2 <= 0D || top1 / top2 >= cfg.getMarginRatio();
     }
 
     /**
@@ -337,7 +548,8 @@ public class RouteJudgeService {
     private void applyGateVerdict(AiRouteContext route, Optional<RouteJudgeVerdict> verdictOpt,
                                   List<AiExpertCandidate> candidates, AiJevConfigBo cfg) {
         route.judgeMode = MODE_CODE_GATE;
-        route.judgeThreshold = cfg.getConfidenceThreshold();
+        // 记录本轮实际使用的**分桶基础阈值**（随候选数变化，不是配置里的单一值），供审计与调参
+        route.judgeThreshold = baseThreshold(cfg, candidates.size());
         recordVerdict(route, verdictOpt, candidates, cfg);
     }
 

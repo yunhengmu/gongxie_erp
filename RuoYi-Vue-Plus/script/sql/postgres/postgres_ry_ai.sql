@@ -20,9 +20,9 @@
 --   4. 依赖：先执行 postgres_ry_vue.sql（sys_menu 等底座表）与 postgres_ry_job.sql（sj_job）。
 --   5. 菜单 ID 段与 postgres_ry_vue.sql / postgres_ry_workflow.sql 不冲突；菜单仅对超级管理员
 --      自动可见，普通角色需在「系统管理 → 角色管理」中勾选后再可见。
---   6. 模型种子（ai_model_config）预置两个示例模型（阿里云百炼，OpenAI 兼容协议），
+--   6. 模型种子（ai_model_config）预置三个示例模型（阿里云百炼，OpenAI 兼容协议），
 --      **api_key 一律留空**，部署后请在「模型配置」换成本人的密钥，或另行新建模型；
---      内置智能体种子的 model_id 已指向其中的对话模型（deepseek-v4-pro-0813），开箱即用。
+--      内置智能体种子的 model_id 已指向其中的对话模型（deepseek-v4.1-flash），开箱即用。
 --   7. 表结构、约束、索引与列注释均以运行库为准（本脚本据此重新生成）；设计说明见
 --      docs/13-BizBuddy数据库设计.md。
 --
@@ -731,13 +731,13 @@ comment on column ai_route_run.status is '编排状态：running / success / deg
 comment on column ai_route_run.degrade_reason is '降级或中止原因';
 comment on column ai_route_run.duration_ms is '编排总耗时（毫秒）';
 comment on column ai_route_run.warning_text is '编排告警汇总（只告警不阻断）：L3 脱敏命中项（按类型计数）+ 事实篡改抽查不一致项（专家关键数字未在最终回答中出现）；无告警时为空';
-comment on column ai_route_run.decision_source is '结构化决策判定来源：L 工具决策 / J 决策模型 / F 回落（工具决策兜底）';
+comment on column ai_route_run.decision_source is '结构化决策判定来源：L 工具决策 / J 决策模型 / K 粘性复用上轮专家（跳过判定）/ F 回落（工具决策兜底）';
 comment on column ai_route_run.judge_choice is '结构化决策：决策模型选择的选项（agent_code / self / other）';
 comment on column ai_route_run.judge_confidence is '结构化决策：判定置信度';
 comment on column ai_route_run.judge_probabilities is '结构化决策：概率分布（JSON 文本，影子校准用）';
 comment on column ai_route_run.judge_latency_ms is '结构化决策：判定耗时（毫秒）';
 comment on column ai_route_run.judge_tokens is '结构化决策：判定输入 Token（费用口径）';
-comment on column ai_route_run.judge_error is '结构化决策：判定不可用原因（超时 / 报错 / 越界）';
+comment on column ai_route_run.judge_error is '结构化决策：判定不可用原因（超时 / 报错 / 越界 / margin_rejected 边际不足 / circuit_breaker_open 熔断中）';
 comment on column ai_route_run.judge_mode is '结构化决策：本轮执行模式 S 影子 / G 闸门';
 create index if not exists idx_ai_route_run_message on ai_route_run (message_id);
 create index if not exists idx_ai_route_run_session on ai_route_run (session_id, id);
@@ -1398,7 +1398,7 @@ create index if not exists idx_ai_safety_event_scene on ai_safety_event (scene);
 -- 三、内置模型配置种子（ai_model_config）
 -- ============================================================
 --   预置三个**示例模型**（提供商：阿里云百炼 / DashScope）：
---     ① deepseek-v4-pro-0813     对话模型（model_type=chat）
+--     ① deepseek-v4.1-flash     对话模型（model_type=chat）
 --     ② qwen3.7-text-embedding-flash  向量模型（model_type=embedding，维度 1024）
 --     ③ decision-model-preview  决策模型（model_type=decision，供「安全合规配置 → 结构化决策路由」引用）
 --   注意：
@@ -1415,7 +1415,7 @@ create index if not exists idx_ai_safety_event_scene on ai_safety_event (scene);
 insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
                              base_url, api_key,
                              dimension, status, remark, create_dept, create_by, create_time, del_flag)
-values (1761400000000020400, 'deepseek-v4-pro-0813', 'dashscope', 'chat', 'deepseek-v4-pro-0813', '1',
+values (1761400000000020400, 'deepseek-v4.1-flash', 'dashscope', 'chat', 'deepseek-v4.1-flash', '1',
         'https://dashscope.aliyuncs.com/compatible-mode/v1', null,
         null, '0',
         '预置示例（对话模型，阿里云百炼）：部署后请把 API 密钥换成本人的，或另行新建模型',
@@ -1757,7 +1757,7 @@ on conflict (id) do nothing;
 --   另附一套**演示数据**（本节末尾）：「BizBuddy介绍演示库」知识库 + 文档「BizBuddy简介.txt」
 --   + 专家「BizBuddy项目介绍专家」（绑定该知识库与知识库检索工具），初始化后即可在页面看到演示数据。
 --   下表中的 model_id 统一指向本节预置的对话模型（ai_model_config 中 provider=dashscope 的
---   deepseek-v4-pro-0813）；如需更换，可在「小Z 配置」「专家配置」页调整。
+--   deepseek-v4.1-flash）；如需更换，可在「小Z 配置」「专家配置」页调整。
 -- ============================================================
 
 -- 入口智能体「小Z」（不绑业务工具 / 知识库 / 技能；路由决策由内置工具 route_decision 承担）
@@ -1785,7 +1785,7 @@ values (1761400000000020302, '小Z（入口智能体）', 'entry_agent',
 
 【风格】简体中文，先给结论再给依据，避免冗长复述。',
         1761400000000020400, 1761000000000000103, '0', 10, '0',
-        '平台预置入口智能体：不绑业务工具、知识库与技能；路由决策由内置工具 route_decision 承担，专家直答。模型指向预置对话模型 deepseek-v4-pro-0813',
+        '平台预置入口智能体：不绑业务工具、知识库与技能；路由决策由内置工具 route_decision 承担，专家直答。模型指向预置对话模型 deepseek-v4.1-flash',
         '1', 1761000000000000103, 1761100000000000001, now(), null, now(), '0')
 on conflict (id) do nothing;
 
@@ -1828,8 +1828,8 @@ values (1761400000000020304, '机构管理专家', 'org_admin_expert',
 【输出风格】
 - 用简体中文，先给结论，再给依据（关键字段以列表呈现），避免冗长复述工具原文。',
         1761400000000020400, 1761000000000000103, '0', 10, '0',
-        '平台预置专家：绑定部门、用户、角色与权限共 15 个工具（只读放行、写入需确认）；模型指向预置对话模型 deepseek-v4-pro-0813',
-        '管理组织架构与人员：部门与用户的新增、修改、删除，以及部门、用户、角色与权限的查询', '1', '1',
+        '平台预置专家：绑定部门、用户、角色与权限共 15 个工具（只读放行、写入需确认）；模型指向预置对话模型 deepseek-v4.1-flash',
+        '用户问「公司有几个部门」「部门列表」「某部门有哪些人」「加个部门」「禁用账号」「有哪些角色」；负责部门与用户增删改、部门/用户/角色/权限查询。不受理公告类（归公告管理专家）', '1', '1',
         1761000000000000103, 1761100000000000001, now(), null, now(), '0')
 on conflict (id) do nothing;
 
@@ -1890,8 +1890,8 @@ values (1761400000000020303, '公告管理专家', 'notice_admin_expert',
 【输出风格】
 - 用简体中文，先给结论，再给依据（关键字段以列表呈现），避免冗长复述工具原文。',
         1761400000000020400, 1761000000000000103, '0', 10, '0',
-        '平台预置专家：绑定公告共 5 个工具（只读放行、写入需确认）；模型指向预置对话模型 deepseek-v4-pro-0813',
-        '管理通知公告：查询、发布、修改、删除', '1', '1',
+        '平台预置专家：绑定公告共 5 个工具（只读放行、写入需确认）；模型指向预置对话模型 deepseek-v4.1-flash',
+        '用户问「有哪些公告」「发个放假通知」「改一下那条公告」「删掉某条公告」；负责公告与通知的查询、发布、修改、删除。不受理部门/人员/角色类（归机构管理专家）', '1', '1',
         1761000000000000103, 1761100000000000001, now(), null, now(), '0')
 on conflict (id) do nothing;
 
@@ -1980,7 +1980,7 @@ values (1761400000000020305, 'BizBuddy项目介绍专家', 'bizbuddy_intro_exper
 【输出风格】
 - 用简体中文，先给结论，再给依据（引用相关资料），避免冗长复述检索原文。',
         1761400000000020400, 1761000000000000103, '0', 10, '0',
-        '平台预置专家：绑定演示知识库「BizBuddy介绍演示库」与知识库检索工具（只读，不允许写入）；模型指向预置对话模型 deepseek-v4-pro-0813',
+        '平台预置专家：绑定演示知识库「BizBuddy介绍演示库」与知识库检索工具（只读，不允许写入）；模型指向预置对话模型 deepseek-v4.1-flash',
         '基于绑定的知识库检索回答 BizBuddy 平台的定位、核心能力、集成方式与部署形态等信息', '0', '1',
         1761000000000000103, 1761100000000000001, now(), null, now(), '0')
 on conflict (id) do nothing;

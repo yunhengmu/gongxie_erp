@@ -368,12 +368,15 @@ const evaluateDisabled = (observed) => {
 const jevPayload = (spec, modelConfigId) => ({
   enabled: spec.enabled,
   modelConfigId,
-  timeoutSeconds: 5,
+  timeoutSeconds: 1,
   mode: spec.mode,
   confidenceThreshold: spec.threshold,
   failOpen: true,
   stateMaxChars: 4000,
-  persistProbabilities: true
+  persistProbabilities: true,
+  circuitBreakerEnabled: false,
+  circuitBreakerThreshold: 3,
+  circuitBreakerPauseSeconds: 300
 });
 
 /**
@@ -389,12 +392,15 @@ const restoreJev = (http, snapshot) => {
   const body = { enabled: false };
   if (snapshot) {
     body.modelConfigId = snapshot.modelConfigId ?? null;
-    body.timeoutSeconds = snapshot.timeoutSeconds ?? 5;
+    body.timeoutSeconds = snapshot.timeoutSeconds ?? 1;
     body.mode = snapshot.mode ?? 'shadow';
     body.confidenceThreshold = snapshot.confidenceThreshold ?? 0.75;
     body.failOpen = snapshot.failOpen ?? true;
     body.stateMaxChars = snapshot.stateMaxChars ?? 4000;
     body.persistProbabilities = snapshot.persistProbabilities ?? true;
+    body.circuitBreakerEnabled = snapshot.circuitBreakerEnabled ?? true;
+    body.circuitBreakerThreshold = snapshot.circuitBreakerThreshold ?? 3;
+    body.circuitBreakerPauseSeconds = snapshot.circuitBreakerPauseSeconds ?? 300;
   }
   return http.request('PUT', '/ai/runtime/jev', { body });
 };

@@ -293,6 +293,24 @@ public class AgentRegistry {
      * @return HarnessAgent 实例
      */
     public HarnessAgent get(AiAgent definition, AiSessionResourceSet resources) {
+        return getInternal(definition, resources, false).agent();
+    }
+
+    /**
+     * 取用（必要时装配）「智能体 × 会话资源集」实例**并同时返回其执行期快照**。
+     *
+     * <p>供入口轮使用：链路追踪需要快照挂父链路、本轮执行需要实例，原先二者各走一遍完整装配
+     * （`snapshotOf` + `get`），此处合并为**一次装配**，省掉一轮重复的绑定 / 工具 / 知识库 / 技能 /
+     * 子智能体 / 运行期策略 / MCP 解析查询（口径见 docs/22 §3.1 C「前提修正」）。</p>
+     *
+     * <p>快照与实例取自**同一次装配结果**，因此「链路里记录的上下文清单」与「实际执行用的实例」
+     * 天然同源——这正是原先 `snapshotOf` 统一走 `get` 所要保证的语义。</p>
+     *
+     * @param definition 智能体定义
+     * @param resources  会话级资源集（可空：表示空集）
+     * @return 装配结果（实例 + 指纹 + 执行期快照）
+     */
+    public AgentHolder holder(AiAgent definition, AiSessionResourceSet resources) {
         return getInternal(definition, resources, false);
     }
 
@@ -324,7 +342,7 @@ public class AgentRegistry {
      * @return HarnessAgent 实例
      */
     public HarnessAgent getExpert(AiAgent definition, AiSessionResourceSet resources) {
-        return getInternal(definition, resources, true);
+        return getInternal(definition, resources, true).agent();
     }
 
     /**
@@ -333,9 +351,9 @@ public class AgentRegistry {
      * @param definition 智能体定义
      * @param resources  会话级资源集（可空：表示空集）
      * @param expertMode 是否专家执行装配（只读强制 + 协议工具，子智能体关闭）
-     * @return HarnessAgent 实例
+     * @return 装配结果（实例 + 指纹 + 执行期快照）
      */
-    private HarnessAgent getInternal(AiAgent definition, AiSessionResourceSet resources, boolean expertMode) {
+    private AgentHolder getInternal(AiAgent definition, AiSessionResourceSet resources, boolean expertMode) {
         if (definition == null || definition.getId() == null) {
             throw new ServiceException("智能体定义不存在");
         }
@@ -426,7 +444,7 @@ public class AgentRegistry {
                 workspacePolicy, mcpAssembly, expertMode, workspaceCode);
             return new AgentHolder(definition.getId(), assembled.agent(), fingerprint, assembled.snapshot());
         });
-        return holder.agent();
+        return holder;
     }
 
     /**
@@ -708,7 +726,7 @@ public class AgentRegistry {
      * @param fingerprint 定义指纹（含场景包签名）
      * @param snapshot    该次装配的执行期快照
      */
-    private record AgentHolder(Long agentId, HarnessAgent agent, String fingerprint, AgentSnapshot snapshot) {
+    record AgentHolder(Long agentId, HarnessAgent agent, String fingerprint, AgentSnapshot snapshot) {
     }
 
 }

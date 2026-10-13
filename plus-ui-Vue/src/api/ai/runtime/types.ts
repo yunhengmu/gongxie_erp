@@ -86,12 +86,30 @@ export interface JevConfig {
   timeoutSeconds: number;
   /** 执行模式：shadow 影子 / gate 闸门 / preselect 候选预筛 */
   mode: string;
-  /** 闸门模式的置信度阈值（0~1） */
+  /** 闸门模式的**基础**置信度阈值（0~1）：候选数 ≤5 档 */
   confidenceThreshold: number;
+  /** 闸门模式的基础置信度阈值：候选数 6~10 档 */
+  confidenceThresholdMedium: number;
+  /** 闸门模式的基础置信度阈值：候选数 >10 档 */
+  confidenceThresholdLarge: number;
+  /** margin 二次过滤比值 r（top1 / top2；1.0 等价不启用） */
+  marginRatio: number;
   /** 决策不可用时是否回落工具决策 */
   failOpen: boolean;
   /** 外呼 state 的字符上限（前置保护） */
   stateMaxChars: number;
   /** 是否落库概率分布 */
   persistProbabilities: boolean;
+  /** 是否启用熔断（连续失败达阈值后暂停判定，避免提供方宕机期间每轮都付超时） */
+  circuitBreakerEnabled: boolean;
+  /** 熔断触发阈值：连续失败次数 */
+  circuitBreakerThreshold: number;
+  /** 熔断暂停时长（秒） */
+  circuitBreakerPauseSeconds: number;
+  /** 粘性路由开关：追问场景跳过判定、直接复用上轮专家（docs/22 §3.3 F） */
+  stickyRoutingEnabled: boolean;
+  /** 粘性路由触发的上轮最低置信度 */
+  stickyMinConfidence: number;
+  /** 粘性路由触发的本轮最大字数 */
+  stickyMaxQueryLength: number;
 }

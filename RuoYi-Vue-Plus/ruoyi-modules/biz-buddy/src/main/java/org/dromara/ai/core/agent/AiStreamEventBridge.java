@@ -199,7 +199,13 @@ public class AiStreamEventBridge {
         if (state.safetyPending.length() <= holdBack) {
             return;
         }
-        int cut = state.safetyPending.length() - holdBack;
+        // 切点对齐安全边界：避免在 PII 模式（手机号 / 邮箱等连续串）内部切开，否则半截串匹配不到正则、
+        // 未脱敏的 head 会被原样下发（实测 2026-10-13：手机号被切成 158/88888/888 三片即明文流出）
+        int cut = alignCutToSafeBoundary(state.safetyPending, state.safetyPending.length() - holdBack);
+        if (cut <= 0) {
+            // 整段都落在可能构成 PII 的连续串内：本次不下发，留待下次一并检测
+            return;
+        }
         String head = state.safetyPending.substring(0, cut);
         state.safetyPending.delete(0, cut);
         SafetyDecision decision = safetyGuard.guard(head, SafetyScene.OUTPUT);
@@ -209,6 +215,54 @@ public class AiStreamEventBridge {
         }
         state.answer.append(decision.text());
         emitTextDelta(emitter, state, textDelta, decision.text());
+    }
+
+    /**
+     * head 切点向左回退的最大字符数。
+     *
+     * <p>PII 模式中最长的是银行卡（16~19 位），64 已远超其长度；超过该上限的连续串（如 base64）
+     * 不做回退，避免流式正文长时间不下发（这类超长连续串本身也不会被任何 PII 正则匹配）。</p>
+     */
+    private static final int MAX_CUT_BACKOFF = 64;
+
+    /**
+     * 把 head 切点对齐到安全边界，避免在 PII 模式内部切断。
+     *
+     * <p>脱敏是**逐片**执行的，而 PII 正则（手机号 / 身份证 / 银行卡 / 邮箱 / IP）都要求目标串**连续**：
+     * 一旦切点落在串内部，head 只剩半截 → 正则匹配不到 → 未脱敏的 head 会被原样下发给用户
+     * （而落库走整段脱敏，故表现为「实时明文、历史掩码」）。</p>
+     *
+     * <p>做法：若切点两侧都是「可能构成 PII 的字符」，则向左回退到该连续串的起点，让整串留在
+     * {@code pending} 里待下次一并检测。</p>
+     *
+     * @param pending 待扫描缓冲
+     * @param cut     原始切点
+     * @return 对齐后的切点；为 0 表示本次不下发
+     */
+    private static int alignCutToSafeBoundary(CharSequence pending, int cut) {
+        if (cut <= 0 || cut >= pending.length()) {
+            return cut;
+        }
+        if (!isPiiChar(pending.charAt(cut - 1)) || !isPiiChar(pending.charAt(cut))) {
+            // 切点本就在安全边界（如空格 / 中文标点 / 换行）上
+            return cut;
+        }
+        int start = cut;
+        while (start > 0 && cut - start < MAX_CUT_BACKOFF && isPiiChar(pending.charAt(start - 1))) {
+            start--;
+        }
+        return start;
+    }
+
+    /**
+     * 是否「可能构成 PII」的字符：数字 / 字母，以及邮箱与域名中常见的符号。
+     *
+     * @param c 字符
+     * @return 是则返回 true
+     */
+    private static boolean isPiiChar(char c) {
+        return Character.isLetterOrDigit(c) || c == '@' || c == '.' || c == '_' || c == '%'
+            || c == '+' || c == '-';
     }
 
     /**

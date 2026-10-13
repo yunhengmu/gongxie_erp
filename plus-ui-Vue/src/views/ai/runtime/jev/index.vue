@@ -77,7 +77,8 @@
           <el-input-number v-model="config.timeoutSeconds" :min="1" :max="120" controls-position="right" style="width: 220px" />
           <span class="form-tip">判定在路由关键路径上，需短于「模型配置」的通用超时</span>
         </el-form-item>
-        <el-form-item label="置信度阈值">
+        <el-form-item label="基础置信度阈值">
+          <span class="form-tip" style="margin: 0 8px 0 0">候选 ≤5</span>
           <el-input-number
             v-model="config.confidenceThreshold"
             :min="0"
@@ -85,9 +86,71 @@
             :step="0.05"
             :precision="2"
             controls-position="right"
+            style="width: 120px"
+          />
+          <span class="form-tip" style="margin: 0 8px">6~10</span>
+          <el-input-number
+            v-model="config.confidenceThresholdMedium"
+            :min="0"
+            :max="1"
+            :step="0.05"
+            :precision="2"
+            controls-position="right"
+            style="width: 120px"
+          />
+          <span class="form-tip" style="margin: 0 8px">&gt;10</span>
+          <el-input-number
+            v-model="config.confidenceThresholdLarge"
+            :min="0"
+            :max="1"
+            :step="0.05"
+            :precision="2"
+            controls-position="right"
+            style="width: 120px"
+          />
+          <div class="form-tip-block">
+            仅「接管」档使用。闭集概率在 N 个选项上归一化，候选越多单选概率天然越低，故按候选数分档取值
+            （建议用影子期数据校准），达标后再叠加 margin 二次过滤。
+          </div>
+        </el-form-item>
+        <el-form-item label="margin 二次过滤">
+          <el-input-number
+            v-model="config.marginRatio"
+            :min="1"
+            :max="20"
+            :step="0.1"
+            :precision="1"
+            controls-position="right"
             style="width: 220px"
           />
-          <span class="form-tip">0~1，仅「接管」档使用，建议用影子期数据校准</span>
+          <span class="form-tip">
+            要求 top1 / top2 ≥ 该比值，1.0 等价不启用；用于压掉「勉强第一」型误接管（如 0.76/0.70）
+          </span>
+        </el-form-item>
+        <el-form-item label="粘性路由">
+          <el-switch v-model="config.stickyRoutingEnabled" />
+          <span class="form-tip">追问场景跳过判定、直接复用上轮专家（本档不外呼，故不涉 PII 出境）</span>
+        </el-form-item>
+        <el-form-item v-if="config.stickyRoutingEnabled" label="粘性触发条件">
+          <span class="form-tip" style="margin: 0 8px 0 0">上轮置信度 ≥</span>
+          <el-input-number
+            v-model="config.stickyMinConfidence"
+            :min="0"
+            :max="1"
+            :step="0.05"
+            :precision="2"
+            controls-position="right"
+            style="width: 130px"
+          />
+          <span class="form-tip" style="margin: 0 8px">且本轮字数 ≤</span>
+          <el-input-number
+            v-model="config.stickyMaxQueryLength"
+            :min="1"
+            :max="200"
+            controls-position="right"
+            style="width: 120px"
+          />
+          <span class="form-tip">字，且本轮未点名专家、上轮来源为「决策模型」、上轮专家仍在本轮候选内</span>
         </el-form-item>
         <el-form-item label="状态持久化">
           <el-switch v-model="config.persistProbabilities" />
@@ -100,6 +163,29 @@
         <el-form-item label="state 字符上限">
           <el-input-number v-model="config.stateMaxChars" :min="100" :max="65536" :step="100" controls-position="right" style="width: 220px" />
           <span class="form-tip">外呼文本前置保护，防止超长被拒</span>
+        </el-form-item>
+        <el-form-item label="失败熔断">
+          <el-switch v-model="config.circuitBreakerEnabled" />
+          <span class="form-tip">连续失败达阈值后暂停判定，提供方宕机期间不再每轮付超时</span>
+        </el-form-item>
+        <el-form-item v-if="config.circuitBreakerEnabled" label="熔断阈值 / 暂停">
+          <el-input-number
+            v-model="config.circuitBreakerThreshold"
+            :min="1"
+            :max="100"
+            controls-position="right"
+            style="width: 130px"
+          />
+          <span class="form-tip" style="margin: 0 8px">次失败后，暂停</span>
+          <el-input-number
+            v-model="config.circuitBreakerPauseSeconds"
+            :min="1"
+            :max="86400"
+            :step="30"
+            controls-position="right"
+            style="width: 150px"
+          />
+          <span class="form-tip">秒（暂停期满后每 30 秒只放一个探测请求）</span>
         </el-form-item>
 
         <el-form-item label="PII 脱敏（强制）">
@@ -142,12 +228,21 @@ const probeResult = ref<HealthCheckItem | null>(null);
 const config = ref<JevConfig>({
   enabled: false,
   modelConfigId: null,
-  timeoutSeconds: 5,
+  timeoutSeconds: 1,
   mode: 'shadow',
   confidenceThreshold: 0.75,
+  confidenceThresholdMedium: 0.65,
+  confidenceThresholdLarge: 0.55,
+  marginRatio: 2.0,
   failOpen: true,
   stateMaxChars: 4000,
-  persistProbabilities: true
+  persistProbabilities: true,
+  circuitBreakerEnabled: true,
+  circuitBreakerThreshold: 3,
+  circuitBreakerPauseSeconds: 300,
+  stickyRoutingEnabled: false,
+  stickyMinConfidence: 0.9,
+  stickyMaxQueryLength: 12
 });
 
 /** 可选的决策模型（「模型配置」中类型为 decision 且启用中的记录） */
