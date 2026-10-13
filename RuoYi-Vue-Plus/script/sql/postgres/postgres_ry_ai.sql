@@ -731,13 +731,13 @@ comment on column ai_route_run.status is '编排状态：running / success / deg
 comment on column ai_route_run.degrade_reason is '降级或中止原因';
 comment on column ai_route_run.duration_ms is '编排总耗时（毫秒）';
 comment on column ai_route_run.warning_text is '编排告警汇总（只告警不阻断）：L3 脱敏命中项（按类型计数）+ 事实篡改抽查不一致项（专家关键数字未在最终回答中出现）；无告警时为空';
-comment on column ai_route_run.decision_source is '结构化决策判定来源：L 工具决策 / J 决策模型 / F 回落（工具决策兜底）';
+comment on column ai_route_run.decision_source is '结构化决策判定来源：L 工具决策 / J 决策模型 / K 粘性复用上轮专家（跳过判定）/ F 回落（工具决策兜底）';
 comment on column ai_route_run.judge_choice is '结构化决策：决策模型选择的选项（agent_code / self / other）';
 comment on column ai_route_run.judge_confidence is '结构化决策：判定置信度';
 comment on column ai_route_run.judge_probabilities is '结构化决策：概率分布（JSON 文本，影子校准用）';
 comment on column ai_route_run.judge_latency_ms is '结构化决策：判定耗时（毫秒）';
 comment on column ai_route_run.judge_tokens is '结构化决策：判定输入 Token（费用口径）';
-comment on column ai_route_run.judge_error is '结构化决策：判定不可用原因（超时 / 报错 / 越界）';
+comment on column ai_route_run.judge_error is '结构化决策：判定不可用原因（超时 / 报错 / 越界 / margin_rejected 边际不足 / circuit_breaker_open 熔断中）';
 comment on column ai_route_run.judge_mode is '结构化决策：本轮执行模式 S 影子 / G 闸门';
 create index if not exists idx_ai_route_run_message on ai_route_run (message_id);
 create index if not exists idx_ai_route_run_session on ai_route_run (session_id, id);

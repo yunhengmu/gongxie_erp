@@ -42,9 +42,24 @@ public class AiJevConfigVo implements Serializable {
     private String mode;
 
     /**
-     * 闸门模式的置信度阈值（0~1）
+     * 闸门模式的**基础**置信度阈值（0~1）：候选数 ≤5 档
      */
     private double confidenceThreshold;
+
+    /**
+     * 闸门模式的基础置信度阈值：候选数 6~10 档
+     */
+    private double confidenceThresholdMedium;
+
+    /**
+     * 闸门模式的基础置信度阈值：候选数 &gt;10 档
+     */
+    private double confidenceThresholdLarge;
+
+    /**
+     * margin 二次过滤比值 r（top1 / top2；1.0 等价不启用）
+     */
+    private double marginRatio;
 
     /**
      * 决策不可用时是否回落工具决策
@@ -75,5 +90,20 @@ public class AiJevConfigVo implements Serializable {
      * 熔断暂停时长（秒）
      */
     private int circuitBreakerPauseSeconds;
+
+    /**
+     * 粘性路由开关（docs/22 §3.3 F）
+     */
+    private boolean stickyRoutingEnabled;
+
+    /**
+     * 粘性路由触发的上轮最低置信度
+     */
+    private double stickyMinConfidence;
+
+    /**
+     * 粘性路由触发的本轮最大字数
+     */
+    private int stickyMaxQueryLength;
 
 }

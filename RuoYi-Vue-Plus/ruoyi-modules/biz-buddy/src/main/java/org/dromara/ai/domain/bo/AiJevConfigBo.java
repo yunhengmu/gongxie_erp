@@ -55,11 +55,39 @@ public class AiJevConfigBo implements Serializable {
     private String mode = "shadow";
 
     /**
-     * 闸门模式的置信度阈值（0~1）
+     * 闸门模式的**基础**置信度阈值（0~1）：**候选数 ≤5** 时使用（docs/22 §3.1 A）。
+     *
+     * <p>闭集打分器的概率在 N 个选项上归一化，候选越多单选置信度天然越低，一把尺子必然失真；
+     * 故按候选数分档——6~10 用 {@link #confidenceThresholdMedium}、&gt;10 用
+     * {@link #confidenceThresholdLarge}。判定顺序固定为「分桶基础阈值 → margin 二次过滤」。</p>
      */
     @DecimalMin(value = "0.0", message = "置信度阈值不能小于 0")
     @DecimalMax(value = "1.0", message = "置信度阈值不能大于 1")
     private double confidenceThreshold = 0.75;
+
+    /**
+     * 闸门模式的基础置信度阈值：候选数 6~10 档（0~1）
+     */
+    @DecimalMin(value = "0.0", message = "置信度阈值不能小于 0")
+    @DecimalMax(value = "1.0", message = "置信度阈值不能大于 1")
+    private double confidenceThresholdMedium = 0.65;
+
+    /**
+     * 闸门模式的基础置信度阈值：候选数 &gt;10 档（0~1）
+     */
+    @DecimalMin(value = "0.0", message = "置信度阈值不能小于 0")
+    @DecimalMax(value = "1.0", message = "置信度阈值不能大于 1")
+    private double confidenceThresholdLarge = 0.55;
+
+    /**
+     * margin 二次过滤比值 r：基础阈值达标后，还要求 {@code top1 / top2 ≥ r}（docs/22 §3.1 A）。
+     *
+     * <p>裸 confidence 分不清「0.76/0.15」与「0.76/0.70」——后者是「勉强第一」型误接管，也是
+     * 降级（时延黑洞）的主要来源；margin 的价值主要在压掉这一类。取 1.0 等价不启用（top1/top2 恒 ≥1）。</p>
+     */
+    @DecimalMin(value = "1.0", message = "margin 比值不能小于 1")
+    @DecimalMax(value = "20.0", message = "margin 比值过大")
+    private double marginRatio = 2.0;
 
     /**
      * 决策不可用时是否回落工具决策
@@ -96,5 +124,28 @@ public class AiJevConfigBo implements Serializable {
     @Min(value = 1, message = "熔断暂停至少 1 秒")
     @Max(value = 86400, message = "熔断暂停过大")
     private int circuitBreakerPauseSeconds = 300;
+
+    /**
+     * 粘性路由开关（docs/22 §3.3 F）：追问场景**跳过判定**、直接复用上轮专家。
+     *
+     * <p>默认关闭（影子期先观察）。命中条件：本轮原话 ≤ {@link #stickyMaxQueryLength} 字，
+     * 且上轮 {@code decision_source='J'} 且上轮判定置信度 ≥ {@link #stickyMinConfidence}，
+     * 且上轮专家仍在**本轮候选**内（候选有效性校验）。命中不留判定、不外呼，来源记 {@code K}。</p>
+     */
+    private boolean stickyRoutingEnabled = false;
+
+    /**
+     * 粘性路由触发的上轮最低置信度（0~1）
+     */
+    @DecimalMin(value = "0.0", message = "粘性触发置信度不能小于 0")
+    @DecimalMax(value = "1.0", message = "粘性触发置信度不能大于 1")
+    private double stickyMinConfidence = 0.9;
+
+    /**
+     * 粘性路由触发的本轮最大字数（超出即走正常判定）
+     */
+    @Min(value = 1, message = "粘性触发字数至少 1")
+    @Max(value = 200, message = "粘性触发字数过大")
+    private int stickyMaxQueryLength = 12;
 
 }

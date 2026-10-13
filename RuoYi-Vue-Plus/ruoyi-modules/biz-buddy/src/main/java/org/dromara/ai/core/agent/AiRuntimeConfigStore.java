@@ -334,12 +334,18 @@ public class AiRuntimeConfigStore {
         bo.setTimeoutSeconds(jev.getTimeoutSeconds());
         bo.setMode(jev.getMode());
         bo.setConfidenceThreshold(jev.getConfidenceThreshold());
+        bo.setConfidenceThresholdMedium(jev.getConfidenceThresholdMedium());
+        bo.setConfidenceThresholdLarge(jev.getConfidenceThresholdLarge());
+        bo.setMarginRatio(jev.getMarginRatio());
         bo.setFailOpen(jev.isFailOpen());
         bo.setStateMaxChars(jev.getStateMaxChars());
         bo.setPersistProbabilities(jev.isPersistProbabilities());
         bo.setCircuitBreakerEnabled(jev.isCircuitBreakerEnabled());
         bo.setCircuitBreakerThreshold(jev.getCircuitBreakerThreshold());
         bo.setCircuitBreakerPauseSeconds(jev.getCircuitBreakerPauseSeconds());
+        bo.setStickyRoutingEnabled(jev.isStickyRoutingEnabled());
+        bo.setStickyMinConfidence(jev.getStickyMinConfidence());
+        bo.setStickyMaxQueryLength(jev.getStickyMaxQueryLength());
         return bo;
     }
 

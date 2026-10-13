@@ -653,9 +653,24 @@ public class AiProperties {
         private String mode = "shadow";
 
         /**
-         * 闸门模式的置信度阈值（0~1；官方示例值 0.75，需按自有样本校准）
+         * 闸门模式的**基础**置信度阈值（0~1）：候选数 ≤5 档（docs/22 §3.1 A；需按自有样本校准）
          */
         private double confidenceThreshold = 0.75;
+
+        /**
+         * 闸门模式的基础置信度阈值：候选数 6~10 档
+         */
+        private double confidenceThresholdMedium = 0.65;
+
+        /**
+         * 闸门模式的基础置信度阈值：候选数 &gt;10 档
+         */
+        private double confidenceThresholdLarge = 0.55;
+
+        /**
+         * margin 二次过滤比值 r：基础阈值达标后还要求 {@code top1 / top2 ≥ r}（1.0 等价不启用）
+         */
+        private double marginRatio = 2.0;
 
         /**
          * 决策不可用时是否回落工具决策（恒定回落，不新增失败面）
@@ -686,6 +701,21 @@ public class AiProperties {
          * 熔断暂停时长（秒）
          */
         private int circuitBreakerPauseSeconds = 300;
+
+        /**
+         * 粘性路由开关（docs/22 §3.3 F）
+         */
+        private boolean stickyRoutingEnabled = false;
+
+        /**
+         * 粘性路由触发的上轮最低置信度
+         */
+        private double stickyMinConfidence = 0.9;
+
+        /**
+         * 粘性路由触发的本轮最大字数
+         */
+        private int stickyMaxQueryLength = 12;
     }
 
 }

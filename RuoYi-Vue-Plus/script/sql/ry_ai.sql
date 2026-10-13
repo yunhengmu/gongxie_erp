@@ -628,13 +628,13 @@ create table if not exists ai_route_run (
     update_time       datetime,
     del_flag          char(1)       default '0',
     warning_text      varchar(1000) comment '编排告警汇总（只告警不阻断）：L3 脱敏命中项（按类型计数）+ 事实篡改抽查不一致项（专家关键数字未在最终回答中出现）；无告警时为空',
-    decision_source   char(1) comment '结构化决策判定来源：L 工具决策 / J 决策模型 / F 回落（工具决策兜底）',
+    decision_source   char(1) comment '结构化决策判定来源：L 工具决策 / J 决策模型 / K 粘性复用上轮专家（跳过判定）/ F 回落（工具决策兜底）',
     judge_choice      varchar(64) comment '结构化决策：决策模型选择的选项（agent_code / self / other）',
     judge_confidence  decimal(5,4) comment '结构化决策：判定置信度',
     judge_probabilities text comment '结构化决策：概率分布（JSON 文本，影子校准用）',
     judge_latency_ms  int comment '结构化决策：判定耗时（毫秒）',
     judge_tokens      int comment '结构化决策：判定输入 Token（费用口径）',
-    judge_error       varchar(500) comment '结构化决策：判定不可用原因（超时 / 报错 / 越界）',
+    judge_error       varchar(500) comment '结构化决策：判定不可用原因（超时 / 报错 / 越界 / margin_rejected 边际不足 / circuit_breaker_open 熔断中）',
     judge_mode        char(1) comment '结构化决策：本轮执行模式 S 影子 / G 闸门',
     constraint pk_ai_route_run primary key (id),
     key idx_ai_route_run_message (message_id),
@@ -650,7 +650,7 @@ create procedure add_ai_route_run_judge_columns()
 begin
     if not exists (select 1 from information_schema.columns
                    where table_schema = database() and table_name = 'ai_route_run' and column_name = 'decision_source') then
-        alter table ai_route_run add column decision_source char(1) comment '结构化决策判定来源：L 工具决策 / J 决策模型 / F 回落（工具决策兜底）';
+        alter table ai_route_run add column decision_source char(1) comment '结构化决策判定来源：L 工具决策 / J 决策模型 / K 粘性复用上轮专家（跳过判定）/ F 回落（工具决策兜底）';
     end if;
     if not exists (select 1 from information_schema.columns
                    where table_schema = database() and table_name = 'ai_route_run' and column_name = 'judge_choice') then
@@ -674,7 +674,7 @@ begin
     end if;
     if not exists (select 1 from information_schema.columns
                    where table_schema = database() and table_name = 'ai_route_run' and column_name = 'judge_error') then
-        alter table ai_route_run add column judge_error varchar(500) comment '结构化决策：判定不可用原因（超时 / 报错 / 越界）';
+        alter table ai_route_run add column judge_error varchar(500) comment '结构化决策：判定不可用原因（超时 / 报错 / 越界 / margin_rejected 边际不足 / circuit_breaker_open 熔断中）';
     end if;
     if not exists (select 1 from information_schema.columns
                    where table_schema = database() and table_name = 'ai_route_run' and column_name = 'judge_mode') then

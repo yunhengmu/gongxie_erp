@@ -282,7 +282,7 @@
               <el-descriptions-item label="判定耗时">{{ formatDuration(detail.record.judgeLatencyMs) }}</el-descriptions-item>
               <el-descriptions-item label="判定 Token">{{ formatNumber(detail.record.judgeTokens) }}</el-descriptions-item>
               <el-descriptions-item v-if="detail.record.judgeError" label="判定异常" :span="3">
-                <span class="detail-error">{{ detail.record.judgeError }}</span>
+                <span class="detail-error">{{ judgeErrorLabel(detail.record.judgeError) }}</span>
               </el-descriptions-item>
             </el-descriptions>
             <div v-else class="context-block">
@@ -430,12 +430,21 @@ const judgeModeLabel = (mode?: string | null): string => {
 /** 结构化决策：判定模式标签配色（闸门为接管档，用 warning 区分影子） */
 const judgeModeTagType = (mode?: string | null): 'info' | 'warning' => (mode === 'G' ? 'warning' : 'info');
 
-/** 结构化决策：本轮判定来源（L 工具决策 / J 决策模型 / F 回落兜底） */
+/** 结构化决策：本轮判定来源（L 工具决策 / J 决策模型 / K 粘性复用上轮 / F 回落兜底） */
 const decisionSourceLabel = (source?: string | null): string => {
   if (source === 'L') return '工具决策（L）';
   if (source === 'J') return '决策模型（J）';
+  if (source === 'K') return '粘性复用上轮（K）';
   if (source === 'F') return '回落工具决策（F）';
   return source ? String(source) : '-';
+};
+
+/** 结构化决策：判定异常（把内部错误码翻成可读文案，未知码原样透出） */
+const judgeErrorLabel = (error?: string | null): string => {
+  if (!error) return '-';
+  if (error === 'margin_rejected') return '边际不足（top1 未显著高于 top2），回落工具决策';
+  if (error === 'circuit_breaker_open') return '熔断中（提供方连续失败，暂停判定）';
+  return error;
 };
 
 /** 结构化决策：判定选项（self / other 为不路由，其余为专家编码） */
@@ -463,7 +472,7 @@ const judgeTooltip = (row: RouteRunVO): string => {
     parts.push(`Token：${formatNumber(row.judgeTokens)}`);
   }
   if (row.judgeError) {
-    parts.push(`异常：${row.judgeError}`);
+    parts.push(`异常：${judgeErrorLabel(row.judgeError)}`);
   }
   return parts.join('　');
 };
