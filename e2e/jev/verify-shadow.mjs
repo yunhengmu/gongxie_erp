@@ -101,12 +101,15 @@ const resolveDecisionModel = async (http, explicitId) => {
 const jevPayload = (modelConfigId, enabled, mode = 'shadow', threshold = 0.75) => ({
   enabled,
   modelConfigId,
-  timeoutSeconds: 5,
+  timeoutSeconds: 1,
   mode,
   confidenceThreshold: threshold,
   failOpen: true,
   stateMaxChars: 4000,
-  persistProbabilities: true
+  persistProbabilities: true,
+  circuitBreakerEnabled: true,
+  circuitBreakerThreshold: 3,
+  circuitBreakerPauseSeconds: 300
 });
 
 /**

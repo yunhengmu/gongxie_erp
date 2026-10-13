@@ -101,6 +101,29 @@
           <el-input-number v-model="config.stateMaxChars" :min="100" :max="65536" :step="100" controls-position="right" style="width: 220px" />
           <span class="form-tip">外呼文本前置保护，防止超长被拒</span>
         </el-form-item>
+        <el-form-item label="失败熔断">
+          <el-switch v-model="config.circuitBreakerEnabled" />
+          <span class="form-tip">连续失败达阈值后暂停判定，提供方宕机期间不再每轮付超时</span>
+        </el-form-item>
+        <el-form-item v-if="config.circuitBreakerEnabled" label="熔断阈值 / 暂停">
+          <el-input-number
+            v-model="config.circuitBreakerThreshold"
+            :min="1"
+            :max="100"
+            controls-position="right"
+            style="width: 130px"
+          />
+          <span class="form-tip" style="margin: 0 8px">次失败后，暂停</span>
+          <el-input-number
+            v-model="config.circuitBreakerPauseSeconds"
+            :min="1"
+            :max="86400"
+            :step="30"
+            controls-position="right"
+            style="width: 150px"
+          />
+          <span class="form-tip">秒（暂停期满后每 30 秒只放一个探测请求）</span>
+        </el-form-item>
 
         <el-form-item label="PII 脱敏（强制）">
           <span class="form-tip">
@@ -142,12 +165,15 @@ const probeResult = ref<HealthCheckItem | null>(null);
 const config = ref<JevConfig>({
   enabled: false,
   modelConfigId: null,
-  timeoutSeconds: 5,
+  timeoutSeconds: 1,
   mode: 'shadow',
   confidenceThreshold: 0.75,
   failOpen: true,
   stateMaxChars: 4000,
-  persistProbabilities: true
+  persistProbabilities: true,
+  circuitBreakerEnabled: true,
+  circuitBreakerThreshold: 3,
+  circuitBreakerPauseSeconds: 300
 });
 
 /** 可选的决策模型（「模型配置」中类型为 decision 且启用中的记录） */

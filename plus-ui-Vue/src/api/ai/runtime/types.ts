@@ -94,4 +94,10 @@ export interface JevConfig {
   stateMaxChars: number;
   /** 是否落库概率分布 */
   persistProbabilities: boolean;
+  /** 是否启用熔断（连续失败达阈值后暂停判定，避免提供方宕机期间每轮都付超时） */
+  circuitBreakerEnabled: boolean;
+  /** 熔断触发阈值：连续失败次数 */
+  circuitBreakerThreshold: number;
+  /** 熔断暂停时长（秒） */
+  circuitBreakerPauseSeconds: number;
 }
