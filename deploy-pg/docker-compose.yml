@@ -20,7 +20,7 @@
 #        pnpm install && pnpm build:prod
 #
 #   3) 启动（本目录）：
-#        cd deploy
+#        cd deploy-pg
 #        docker compose up -d --build
 #
 #   4) 访问：

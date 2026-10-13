@@ -4,12 +4,12 @@
 # 组件：MySQL 8.0 + Redis + Milvus（standalone：etcd / minio / milvus）
 #       + ruoyi-admin（后端） + ruoyi-snailjob-server（调度服务端） + nginx（前端 + 反向代理）
 #
-# 与 `deploy/`（PostgreSQL 版）的关系：
+# 与 `deploy-pg/`（PostgreSQL 版）的关系：
 #   两者是**并列的两套编排**，技术栈不同（数据库 + JDBC 驱动 + 技能仓库实现），
 #   其余组件一致。项目已同时支持 PostgreSQL 与 MySQL 8.0——技能仓库按数据源类型自动装配
 #   （见 AgentScopeConfig#aiSkillRepository），无需改代码。
 #
-# 与 `deploy/` 刻意区分的三点（两套编排可**同时运行、互不干扰**）：
+# 与 `deploy-pg/` 刻意区分的三点（两套编排可**同时运行、互不干扰**）：
 #   ① compose 项目名 = bizbuddy-mysql（容器名、网络、数据卷均以此为前缀）；
 #   ② 对外端口整体错开（见 .env.example）；
 #   ③ 建库脚本换成 MySQL 方言的 script/sql/*.sql。

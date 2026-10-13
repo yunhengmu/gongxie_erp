@@ -2,13 +2,13 @@
 
 用 Docker Compose 拉起 BizBuddy 全栈：**MySQL 8.0 + Redis + Milvus standalone（etcd / minio / milvus）+ 后端 + 调度服务端 + Nginx（前端）**。
 
-> 与 [`deploy/`](../deploy)（PostgreSQL 版）是**并列的两套编排**，技术栈差异只在数据库（及随之为其准备的 JDBC 驱动 / 技能仓库实现），其余组件一致。
+> 与 [`deploy-pg/`](../deploy-pg)（PostgreSQL 版）是**并列的两套编排**，技术栈差异只在数据库（及随之为其准备的 JDBC 驱动 / 技能仓库实现），其余组件一致。
 > 本项目已同时支持 PostgreSQL 与 MySQL 8.0：**技能仓库按数据源类型自动装配**（`AgentScopeConfig#aiSkillRepository`，PostgreSQL 版 `PostgresSkillRepository` / MySQL 版 `MysqlSkillRepository`），无需改代码。
 > 两套编排刻意在**项目名、容器名、对外端口**上区分，因此可以**同时运行、互不干扰**（便于对照验证）。
 
 ## 1. 与 PostgreSQL 版的三点差异
 
-| 项 | `deploy/`（PG） | `deploy-mysql/`（MySQL） |
+| 项 | `deploy-pg/`（PG） | `deploy-mysql/`（MySQL） |
 |---|---|---|
 | 数据库镜像 | `postgres:14` | `mysql:8.0` |
 | 建库脚本 | `script/sql/postgres/*.sql` | `script/sql/*.sql`（MySQL 方言，含 `ry_ai.sql`） |
@@ -163,6 +163,6 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 
 ## 9. 相关文档
 
-- 部署总览（PostgreSQL 版，含更多背景说明）：[../deploy/README.md](../deploy/README.md)
+- 部署总览（PostgreSQL 版，含更多背景说明）：[../deploy-pg/README.md](../deploy-pg/README.md)
 - 后端配置项：[../RuoYi-Vue-Plus/docs/configuration.md](../RuoYi-Vue-Plus/docs/configuration.md)
 - 架构与二次开发：[../RuoYi-Vue-Plus/docs/README.md](../RuoYi-Vue-Plus/docs/README.md)

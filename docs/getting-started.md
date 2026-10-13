@@ -39,7 +39,7 @@ ry_ai.sql         # AI 平台表（ai_* 表结构 + 种子数据）
 > 顺序要求：`*_ry_ai.sql` **依赖** `*_ry_job.sql` —— 它末尾要向 `sj_job` 登记「定时 Agent 任务派发」。若先执行 AI 脚本会报 `relation "sj_job" does not exist`（PostgreSQL）/ `Table 'sj_job' doesn't exist`（MySQL）。
 
 > **脚本是「当前状态基线」，只在空库执行**：面向全新数据库一次性建好全部对象（按对象组织，不含历史增量段），重复执行幂等。已运行的存量库若结构落后，需按对应版本的变更说明手工补 DDL（例如新增列）。
-> Oracle / SQLServer 方言的历史脚本仍保留在仓库中，但**不维护**。两套编排见 [`../deploy/`](../deploy)（PostgreSQL 版）与 [`../deploy-mysql/`](../deploy-mysql)（MySQL 8.0 版），可按需二选一或同时运行（端口已错开）。
+> Oracle / SQLServer 方言的历史脚本仍保留在仓库中，但**不维护**。两套编排见 [`../deploy-pg/`](../deploy-pg)（PostgreSQL 版）与 [`../deploy-mysql/`](../deploy-mysql)（MySQL 8.0 版），可按需二选一或同时运行（端口已错开）。
 > 数据库差异只影响两处，均已在代码内按数据源自动处理，无需改配置：① JDBC 驱动（`postgresql` / `mysql-connector-j` 均在位）；② 技能持久化仓库（`PostgresSkillRepository` / `MysqlSkillRepository`，见 `AgentScopeConfig#aiSkillRepository`）。
 
 ## 3. 启动后端

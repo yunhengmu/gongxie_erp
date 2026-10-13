@@ -7,7 +7,7 @@
 
 | | PostgreSQL 栈 | MySQL 8.0 栈 |
 |---|---|---|
-| 目录 | [`deploy/`](../deploy) | [`deploy-mysql/`](../deploy-mysql) |
+| 目录 | [`deploy-pg/`](../deploy-pg) | [`deploy-mysql/`](../deploy-mysql) |
 | Compose 项目名 | `bizbuddy` | `bizbuddy-mysql` |
 | 前端 / 后端 / 调度控制台 | `80` / `8080` / `8800` | `81` / `8081` / `8801` |
 | 数据库 / Redis / Milvus | `5432` / `6379` / `19530` | `3306` / `6380` / `19531` |
@@ -15,7 +15,7 @@
 
 `up` 起来的是：数据库 + Redis + Milvus（standalone，含 etcd / minio）+ 后端 `ruoyi-admin` + 调度服务端 `snailjob-server` + Nginx（托管前端 `dist`）+ 平台 MinIO（一次性 `minio-init` 建桶并上传演示文档）。
 
-> 下文命令除注明外，均在**仓库根目录（`biz-buddy/`）**执行；`cd deploy` 之类表示进入该子目录。
+> 下文命令除注明外，均在**仓库根目录（`biz-buddy/`）**执行；`cd deploy-pg` 之类表示进入该子目录。
 
 ## 1. 前置：先在宿主机构建三个产物
 
@@ -34,13 +34,13 @@ cd ../plus-ui-Vue
 pnpm install && pnpm build:prod
 ```
 
-> 只调中间件时可跳过构建，例如只要一个 PostgreSQL：`cd deploy && docker compose up -d postgres`。
+> 只调中间件时可跳过构建，例如只要一个 PostgreSQL：`cd deploy-pg && docker compose up -d postgres`。
 > **前端产物 `dist/` 不入库**（见 `plus-ui-Vue/.gitignore`）：改了 `plus-ui-Vue/src` 下任何源码（含页面 / 文案）都必须重新 `pnpm build:prod`，否则 Nginx 托管的仍是旧包。
 
 ## 2. 启动 PostgreSQL 栈
 
 ```bash
-cd deploy
+cd deploy-pg
 cp .env.example .env          # 可选：不复制则用文件内默认值（端口、口令等，见 .env.example）
 docker compose up -d --build
 ```
@@ -112,4 +112,4 @@ node e2e/run.mjs --base-url http://localhost:8081  # MySQL 栈
 ```
 
 > 上述命令需在**仓库根目录**执行；脚本说明与前置条件见 [../e2e/](../e2e)（唯一机密 `BIZBUDDY_LLM_API_KEY` 见 `e2e/.env.example`）。
-> 部署排障：PostgreSQL 栈见 [`deploy/README.md`](../deploy/README.md)，MySQL 栈见 [`deploy-mysql/README.md`](../deploy-mysql/README.md)（含 OSS 对外地址、MySQL 认证插件、端口改动等已知坑）。
+> 部署排障：PostgreSQL 栈见 [`deploy-pg/README.md`](../deploy-pg/README.md)，MySQL 栈见 [`deploy-mysql/README.md`](../deploy-mysql/README.md)（含 OSS 对外地址、MySQL 认证插件、端口改动等已知坑）。

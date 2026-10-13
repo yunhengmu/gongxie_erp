@@ -7,7 +7,7 @@
 | `RuoYi-Vue-Plus/ruoyi-admin/src/main/resources/application.yml` | 通用配置 + **AI 平台配置 `bizbuddy.ai.*`** + 安全排除路径 |
 | `.../application-dev.yml` | 开发环境：数据源、Redis、SnailJob 客户端、SQL 日志 |
 | `.../application-prod.yml` | 生产环境：同上（日志更安静、连接池更大） |
-| `.env`（可选，见 `deploy/.env.example`） | 容器化部署的端口与口令变量 |
+| `.env`（可选，见 `deploy-pg/.env.example`） | 容器化部署的端口与口令变量 |
 
 环境由 Maven profile 决定（`pom.xml` 的 `<profiles>`，默认 `dev`）：
 
@@ -177,11 +177,11 @@
 | 7 | `snail-job.token` | `SNAILJOB_TOKEN` | 接入令牌默认随源码公开；须与 `sj_group_config` 表一致 |
 | 8 | 数据库表 `sys_oss_config.domain_url` | —（数据库配置） | 必须是**浏览器可达**地址；容器部署默认给 `localhost`，从其它机器 / 公网访问需改成实际域名或 IP（各栈端口见部署文档） |
 
-> 环境变量名与部署侧的登记见 `deploy/.env.example` / `deploy-mysql/.env.example` 的「生产部署密钥」段。
+> 环境变量名与部署侧的登记见 `deploy-pg/.env.example` / `deploy-mysql/.env.example` 的「生产部署密钥」段。
 
 ## 5. 相关文档
 
 - [architecture.md](architecture.md) —— 这些配置在链路里作用于哪一环
 - [development.md](development.md) —— 新增业务工具
-- [../deploy/README.md](../deploy/README.md) / [../deploy-mysql/README.md](../deploy-mysql/README.md) —— 容器化部署、变量覆盖与已知坑（含 OSS 地址与「文档需先解析再向量化」）
+- [../deploy-pg/README.md](../deploy-pg/README.md) / [../deploy-mysql/README.md](../deploy-mysql/README.md) —— 容器化部署、变量覆盖与已知坑（含 OSS 地址与「文档需先解析再向量化」）
 - [../e2e/](../e2e) —— 端到端脚本：改完配置后在真实栈上验证（L1~L11 + RAG 检索质量评测 `e2e/eval/`）

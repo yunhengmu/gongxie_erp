@@ -28,7 +28,7 @@ pnpm install && pnpm build:prod
 ## 2. 启动
 
 ```bash
-cd deploy
+cd deploy-pg
 cp .env.example .env        # 可选：不复制则用文件内默认值
 docker compose up -d --build
 ```
@@ -128,10 +128,10 @@ docker logs bizbuddy-postgres 2>&1 | grep -E 'docker-entrypoint-initdb.d|ERROR'
 现象：上传文档失败，后端日志 `S3StorageException: Unable to execute HTTP request: Connection refused: /127.0.0.1:9000`。
 原因：**平台文件存储（OSS）的坐标不在 yaml 里，而在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。容器里 `127.0.0.1` 是容器自身，自然连不上。
 处置：本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9000/9001；注意与 Milvus 自用的 `milvus-minio` 是两套，互不共用）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`；对应 `sys_oss_config.access_policy=0`，且**框架不会自动建桶**）。文件访问由后端**读取时现算预签名 URL**（有效期 `oss.presign-expire-seconds`，默认 120s）。建桶复用 `minio` 镜像**自带的 `mc`**——`minio/mc` 独立镜像在部分镜像源上拉不到（403）。
-另外 `deploy/sql/50-oss-endpoint.sql` 会在首次建库时把 `sys_oss_config` 的端点改成 `minio:9000`；**已初始化过的数据卷不会重跑**，需手动补一次：
+另外 `deploy-pg/sql/50-oss-endpoint.sql` 会在首次建库时把 `sys_oss_config` 的端点改成 `minio:9000`；**已初始化过的数据卷不会重跑**，需手动补一次：
 
 ```bash
-docker exec -i bizbuddy-postgres psql -U postgres -d biz_buddy < deploy/sql/50-oss-endpoint.sql
+docker exec -i bizbuddy-postgres psql -U postgres -d biz_buddy < deploy-pg/sql/50-oss-endpoint.sql
 docker compose restart ruoyi-admin      # 让 OSS 配置重新加载
 ```
 
