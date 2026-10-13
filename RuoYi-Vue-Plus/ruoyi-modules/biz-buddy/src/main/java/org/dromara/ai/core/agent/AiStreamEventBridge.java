@@ -209,6 +209,7 @@ public class AiStreamEventBridge {
         String head = state.safetyPending.substring(0, cut);
         state.safetyPending.delete(0, cut);
         SafetyDecision decision = safetyGuard.guard(head, SafetyScene.OUTPUT);
+        recordOutputHit(state, decision);
         if (decision.blocked()) {
             blockAnswer(emitter, state);
             return;
@@ -266,6 +267,30 @@ public class AiStreamEventBridge {
     }
 
     /**
+     * 流式输出命中即留痕（每轮首次命中记一条）。
+     *
+     * <p>此前 `OUTPUT` 的留痕只在收尾整段过审时补记，而流式层脱敏后**收尾已是掩码文本**、
+     * 通常不再命中，于是「实时下发过 PII」在审计里看不出来。此处改为命中当场记一条，
+     * 使 {@code ai_safety_event} 能如实反映流式阶段出现过什么。</p>
+     *
+     * <p>片段取**脱敏后**文本，不把明文 PII 再写进审计库（命中类型由 {@code hits} 体现）；
+     * 阻断时决策文本为 null，以统一拒答文案占位。</p>
+     *
+     * @param state    流式累积状态
+     * @param decision 本次守卫决策
+     */
+    private void recordOutputHit(AiStreamState state, SafetyDecision decision) {
+        if (!decision.hit() || state.outputSafetyRecorded) {
+            return;
+        }
+        state.outputSafetyRecorded = true;
+        String snippet = decision.text() == null ? AiSafetyGuard.REFUSAL_TEXT : decision.text();
+        safetyEventService.record(SafetyScene.OUTPUT, decision, safetyGuard.engineName(),
+            state.sessionId, null, state.agentId, state.userId,
+            AiSseSupport.abbreviate(snippet, aiProperties.getChat().getToolOutputPreviewChars()));
+    }
+
+    /**
      * 下发正文增量事件。
      *
      * @param emitter   SSE 发射器
@@ -314,6 +339,7 @@ public class AiStreamEventBridge {
         String tail = state.safetyPending.toString();
         state.safetyPending.setLength(0);
         SafetyDecision decision = safetyGuard.guard(tail, SafetyScene.OUTPUT);
+        recordOutputHit(state, decision);
         if (decision.blocked()) {
             // 与 onTextDelta 同源：清屏 + 下发拒答文案，随后以拒答文案落库
             blockAnswer(emitter, state);

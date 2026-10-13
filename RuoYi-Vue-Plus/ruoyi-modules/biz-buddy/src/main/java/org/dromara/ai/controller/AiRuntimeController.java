@@ -203,7 +203,6 @@ public class AiRuntimeController extends BaseController {
         vo.setConfidenceThresholdMedium(bo.getConfidenceThresholdMedium());
         vo.setConfidenceThresholdLarge(bo.getConfidenceThresholdLarge());
         vo.setMarginRatio(bo.getMarginRatio());
-        vo.setFailOpen(bo.isFailOpen());
         vo.setStateMaxChars(bo.getStateMaxChars());
         vo.setPersistProbabilities(bo.isPersistProbabilities());
         vo.setCircuitBreakerEnabled(bo.isCircuitBreakerEnabled());

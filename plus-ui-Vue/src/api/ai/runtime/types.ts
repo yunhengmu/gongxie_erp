@@ -94,8 +94,6 @@ export interface JevConfig {
   confidenceThresholdLarge: number;
   /** margin 二次过滤比值 r（top1 / top2；1.0 等价不启用） */
   marginRatio: number;
-  /** 决策不可用时是否回落工具决策 */
-  failOpen: boolean;
   /** 外呼 state 的字符上限（前置保护） */
   stateMaxChars: number;
   /** 是否落库概率分布 */

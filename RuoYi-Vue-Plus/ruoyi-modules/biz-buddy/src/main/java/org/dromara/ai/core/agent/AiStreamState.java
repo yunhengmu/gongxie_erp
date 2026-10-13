@@ -37,6 +37,12 @@ final class AiStreamState {
      */
     volatile boolean safetyBlocked;
 
+    /**
+     * 本轮**流式输出**是否已留痕（{@code OUTPUT} 场景命中即记一条）：
+     * 逐片扫描会反复命中，故每轮只记首次，避免把 {@code ai_safety_event} 刷成流水。
+     */
+    volatile boolean outputSafetyRecorded;
+
     /** 工具调用累积（toolCallId → 累积项） */
     final Map<String, AiToolCallAcc> tools = new ConcurrentHashMap<>();
 

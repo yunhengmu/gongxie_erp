@@ -104,7 +104,6 @@ const jevPayload = (modelConfigId, enabled, mode = 'shadow', threshold = 0.75) =
   timeoutSeconds: 1,
   mode,
   confidenceThreshold: threshold,
-  failOpen: true,
   stateMaxChars: 4000,
   persistProbabilities: true,
   circuitBreakerEnabled: true,

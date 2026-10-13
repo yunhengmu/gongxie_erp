@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * {@link JevSystemOneSupport}。</p>
  *
  * <p><b>不可用即「无判定」</b>：未启用 / 未选模型 / 模型不存在 / 已停用 / 非 decision 类型 / 地址或标识为空 /
- * 密钥为空 → 返回 {@link Optional#empty()}（不抛异常，等价「无判定」，沿用 {@code failOpen} 语义，
+ * 密钥为空 → 返回 {@link Optional#empty()}（不抛异常，等价「无判定」，由调用方恒定回落工具决策，
  * 不新增失败面）；仅在首次出现时打一条可读 WARN，避免每轮刷屏。</p>
  *
  * <p><b>异常归一化</b>：超时 / 网络错误 / 非 2xx / 解析失败一律返回带 {@code error} 的结果，绝不向上抛异常。</p>

@@ -90,11 +90,6 @@ public class AiJevConfigBo implements Serializable {
     private double marginRatio = 2.0;
 
     /**
-     * 决策不可用时是否回落工具决策
-     */
-    private boolean failOpen = true;
-
-    /**
      * 外呼 {@code state} 的字符上限（前置保护）
      */
     @Min(value = 100, message = "state 上限过小")

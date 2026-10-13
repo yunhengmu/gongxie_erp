@@ -15,6 +15,7 @@ import io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig;
 import io.agentscope.harness.agent.tools.ToolsConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentTool;
 import org.dromara.ai.domain.AiModelConfig;
@@ -96,6 +97,12 @@ public class AgentAssembler {
 
     private final AiWriteDedupStore writeDedupStore;
 
+    /**
+     * 安全守卫：给业务工具包一层「结果脱敏」，使喂给模型的结果不含 PII/命中词
+     * （见 {@link ToolResultGuardTool}；此前只脱敏了落库与前端两份副本）
+     */
+    private final AiSafetyGuard safetyGuard;
+
     private final IAiMcpClientService mcpClientService;
 
     private final AgentSkillRepository aiSkillRepository;
@@ -121,6 +128,7 @@ public class AgentAssembler {
      * @param stateStore         AgentScope 状态存储
      * @param toolFactory        业务工具工厂（implName → AgentTool）
      * @param writeDedupStore    专家写工具短期去重
+     * @param safetyGuard        安全守卫（工具结果喂模型前脱敏）
      * @param mcpClientService   外部 MCP 连接（REQ-AI-16）
      * @param aiSkillRepository  技能仓库（本项目数据库，平台唯一技能来源）
      * @param permissionModeStore 全局权限模式
@@ -134,6 +142,7 @@ public class AgentAssembler {
                           @Qualifier("aiAgentStateStore") AgentStateStore stateStore,
                           AiToolFactory toolFactory,
                           AiWriteDedupStore writeDedupStore,
+                          AiSafetyGuard safetyGuard,
                           IAiMcpClientService mcpClientService,
                           AgentSkillRepository aiSkillRepository,
                           AiPermissionModeStore permissionModeStore,
@@ -146,6 +155,7 @@ public class AgentAssembler {
         this.stateStore = stateStore;
         this.toolFactory = toolFactory;
         this.writeDedupStore = writeDedupStore;
+        this.safetyGuard = safetyGuard;
         this.mcpClientService = mcpClientService;
         this.aiSkillRepository = aiSkillRepository;
         this.permissionModeStore = permissionModeStore;
@@ -517,12 +527,15 @@ public class AgentAssembler {
         List<String> registered = new ArrayList<>();
         for (AiTool definition : enabledTools) {
             toolFactory.create(definition, kbIds).ifPresent(tool -> {
-                // 专家链路的写工具包一层「同专家会话短期去重」（REQ-AI-30 安全护栏）：
+                // 安全合规：结果先过守卫（喂给模型的那一份也脱敏，见 ToolResultGuardTool）
+                AgentTool effective = new ToolResultGuardTool(tool, safetyGuard);
+                // 专家链路的写工具再包一层「同专家会话短期去重」（REQ-AI-30 安全护栏）：
                 // 契约校验不合格重试、或 HITL 恢复段续跑时，模型若重复调用同一写工具
                 // （同 sessionId + 同工具名 + 同入参），不会产生重复副作用（如重复发布公告）。
                 // 入口 / 普通智能体为长期会话，不包装（避免误伤「同一会话再执行一次同样操作」）
-                AgentTool effective = dedupWrites && !tool.isReadOnly()
-                    ? new DedupWriteTool(tool, writeDedupStore) : tool;
+                if (dedupWrites && !tool.isReadOnly()) {
+                    effective = new DedupWriteTool(effective, writeDedupStore);
+                }
                 toolkit.registerAgentTool(effective);
                 registered.add(definition.getToolCode());
             });

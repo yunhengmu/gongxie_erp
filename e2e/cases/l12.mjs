@@ -19,7 +19,7 @@
  * <p>前置不满足（桩不可达 / 运行期配置接口不可读 / 平台无对话密钥）→ {@code SKIP}，不判 {@code FAIL}。
  * <b>收尾无条件恢复</b>：开始前先 {@code GET /ai/runtime/jev} <b>快照原配置</b>，{@code finally} 里把
  * {@code modelConfigId} 与策略字段（{@code timeoutSeconds} / {@code mode} / {@code confidenceThreshold} /
- * {@code failOpen} / {@code stateMaxChars} / {@code persistProbabilities}）连同 {@code enabled=false}
+ * {@code stateMaxChars} / {@code persistProbabilities}）连同 {@code enabled=false}
  * 一起 PUT 回去，并<b>删除临时决策模型</b>。会话登记到 {@code registry.sessions} 以便统一清理。</p>
  *
  * <p><b>密钥处置</b>：本层不再写任何真实密钥——临时模型自带一把不被校验的占位密钥，收尾随模型一并删除，
@@ -371,7 +371,6 @@ const jevPayload = (spec, modelConfigId) => ({
   timeoutSeconds: 1,
   mode: spec.mode,
   confidenceThreshold: spec.threshold,
-  failOpen: true,
   stateMaxChars: 4000,
   persistProbabilities: true,
   circuitBreakerEnabled: false,
@@ -395,7 +394,6 @@ const restoreJev = (http, snapshot) => {
     body.timeoutSeconds = snapshot.timeoutSeconds ?? 1;
     body.mode = snapshot.mode ?? 'shadow';
     body.confidenceThreshold = snapshot.confidenceThreshold ?? 0.75;
-    body.failOpen = snapshot.failOpen ?? true;
     body.stateMaxChars = snapshot.stateMaxChars ?? 4000;
     body.persistProbabilities = snapshot.persistProbabilities ?? true;
     body.circuitBreakerEnabled = snapshot.circuitBreakerEnabled ?? true;
