@@ -673,11 +673,6 @@ public class AiProperties {
         private double marginRatio = 2.0;
 
         /**
-         * 决策不可用时是否回落工具决策（恒定回落，不新增失败面）
-         */
-        private boolean failOpen = true;
-
-        /**
          * 外呼 {@code state} 的字符上限（前置保护，远低于协议 65536 token 上限）
          */
         private int stateMaxChars = 4000;

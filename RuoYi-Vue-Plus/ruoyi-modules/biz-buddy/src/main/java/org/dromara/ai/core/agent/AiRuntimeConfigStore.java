@@ -337,7 +337,6 @@ public class AiRuntimeConfigStore {
         bo.setConfidenceThresholdMedium(jev.getConfidenceThresholdMedium());
         bo.setConfidenceThresholdLarge(jev.getConfidenceThresholdLarge());
         bo.setMarginRatio(jev.getMarginRatio());
-        bo.setFailOpen(jev.isFailOpen());
         bo.setStateMaxChars(jev.getStateMaxChars());
         bo.setPersistProbabilities(jev.isPersistProbabilities());
         bo.setCircuitBreakerEnabled(jev.isCircuitBreakerEnabled());

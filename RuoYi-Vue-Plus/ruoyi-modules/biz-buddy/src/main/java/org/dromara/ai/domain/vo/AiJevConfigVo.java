@@ -62,11 +62,6 @@ public class AiJevConfigVo implements Serializable {
     private double marginRatio;
 
     /**
-     * 决策不可用时是否回落工具决策
-     */
-    private boolean failOpen;
-
-    /**
      * 外呼 {@code state} 的字符上限（前置保护）
      */
     private int stateMaxChars;

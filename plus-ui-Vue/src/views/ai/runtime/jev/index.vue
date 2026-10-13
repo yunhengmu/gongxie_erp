@@ -156,10 +156,6 @@
           <el-switch v-model="config.persistProbabilities" />
           <span class="form-tip">落库概率分布（影子期校准用），接管稳定后可关闭以省存储</span>
         </el-form-item>
-        <el-form-item label="容错回落">
-          <el-switch v-model="config.failOpen" />
-          <span class="form-tip">判定不可用时回落工具决策（恒定回落，不新增失败面）</span>
-        </el-form-item>
         <el-form-item label="state 字符上限">
           <el-input-number v-model="config.stateMaxChars" :min="100" :max="65536" :step="100" controls-position="right" style="width: 220px" />
           <span class="form-tip">外呼文本前置保护，防止超长被拒</span>
@@ -234,7 +230,6 @@ const config = ref<JevConfig>({
   confidenceThresholdMedium: 0.65,
   confidenceThresholdLarge: 0.55,
   marginRatio: 2.0,
-  failOpen: true,
   stateMaxChars: 4000,
   persistProbabilities: true,
   circuitBreakerEnabled: true,
