@@ -13,11 +13,13 @@ import io.agentscope.core.model.ChatUsage;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiRetrievalSourceRegistry;
 import org.dromara.ai.core.safety.AiSafetyGuard;
+import org.dromara.ai.core.safety.SafetyAction;
 import org.dromara.ai.core.safety.SafetyDecision;
 import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiTraceService;
 import org.dromara.ai.test.AiTestSupport;
+import org.dromara.ai.util.AiPiiMasker;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,9 +30,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -71,6 +75,36 @@ class AiStreamEventBridgeTest {
         AiStreamState state = new AiStreamState();
         state.traceId = traceId;
         return state;
+    }
+
+    @Test
+    @DisplayName("正文跨片切断手机号 / 邮箱时仍被脱敏（切点对齐安全边界）")
+    void shouldMaskPiiSplitAcrossDeltas() {
+        // 复刻实测分片：手机号被切成「158 / 88888 / 888」、邮箱被切成「m / ybizb / uddy@163 / .com」
+        when(safetyGuard.anyActive()).thenReturn(true);
+        when(safetyGuard.holdBackChars()).thenReturn(32);
+        // 让守卫真正做 PII 脱敏（等价生产实现里 PII 那一段）
+        when(safetyGuard.guard(any(), any())).thenAnswer(invocation -> {
+            String text = invocation.getArgument(0);
+            AiPiiMasker.Outcome outcome = AiPiiMasker.mask(text);
+            return outcome.count() > 0
+                ? new SafetyDecision(SafetyAction.MASK, outcome.text(), true, outcome.types())
+                : SafetyDecision.pass(text);
+        });
+
+        AiStreamState state = state(100L);
+        for (String piece : List.of("- 手机号码：158", "88888", "888\n- 邮箱：m", "ybizb",
+            "uddy@163", ".com\n")) {
+            bridge.handle(emitter, state, new TextBlockDeltaEvent("reply-1", "block-1", piece));
+        }
+        bridge.flushSafety(emitter, state);
+
+        // state.answer 即「已下发内容」的累积（onTextDelta 对同一字符串既 append 又 emit）
+        String shown = state.answer.toString();
+        assertFalse(shown.contains("15888888888"), "手机号不得以明文下发：" + shown);
+        assertFalse(shown.contains("mybizbuddy@163.com"), "邮箱不得以明文下发：" + shown);
+        assertTrue(shown.contains("158****8888"), "手机号应已掩码：" + shown);
+        assertTrue(shown.contains("m***@163.com"), "邮箱应已掩码：" + shown);
     }
 
     @Test
