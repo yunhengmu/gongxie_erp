@@ -19,7 +19,7 @@ cd RuoYi-Vue-Plus
 ./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
 
 # 前端静态资源（plus-ui-Vue/dist，由 Nginx 直接托管）
-cd ../plus-ui-Vue
+cd ../../plus-ui-Vue
 pnpm install && pnpm build:prod
 ```
 
@@ -28,7 +28,7 @@ pnpm install && pnpm build:prod
 ## 2. 启动
 
 ```bash
-cd deploy-pg
+cd deploy/deploy-pg
 cp .env.example .env        # 可选：不复制则用文件内默认值
 docker compose up -d --build
 ```
@@ -79,7 +79,7 @@ docker compose up -d --build
 | 后端 Redis | Redisson 已连接 `redis:6379` |
 | 建库结果 | 97 张表（`ai_*` **39** / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 / `test_*` 3 / `gen_*` 2）；`admin` 等初始账号在位；`sys_menu` BizBuddy 段 123 行（6 分组 / 30 功能页 / 86 按钮）；`ai_tool` 26、入口小Z 1、专家 **3**（机构管理 / 公告管理 / 演示「BizBuddy项目介绍专家」）、`ai_model_config` 2（`api_key` 留空）；演示种子一套（知识库 `bizbuddy_demo_kb` + 文档 `BizBuddy简介.txt` + `sys_oss` 行）；`sj_job` 已有派发任务 |
 
-> **可一键自检**：仓库自带端到端测试脚本 [`../e2e/`](../e2e)——对**已运行**的栈发真实 HTTP 断言，覆盖 **L1~L11**：「模型连通 → 专家提示词生成 → 知识库解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议与客户端」；另含 RAG 检索质量评测（`e2e/eval/`）。用法：
+> **可一键自检**：仓库自带端到端测试脚本 [`../../e2e/`](../../e2e)——对**已运行**的栈发真实 HTTP 断言，覆盖 **L1~L11**：「模型连通 → 专家提示词生成 → 知识库解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议与客户端」；另含 RAG 检索质量评测（`e2e/eval/`）。用法：
 
 ```bash
 cd biz-buddy
@@ -88,7 +88,7 @@ node e2e/run.mjs --only L1,L3 --verbose # 指定层级
 node e2e/run.mjs --allow-writes         # L5 走「接受」路径（会真建公告，收尾自动清理）
 ```
 
-> 密钥放 `e2e/.env.local`（模板见 `e2e/.env.example`，已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、不触发模型调用。退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败（栈不可达、登录失败、种子缺失）/ `3` 参数错误。详见 [docs/14 §85](../docs/14-BizBuddy未覆盖项与已知限制.md#s85) 与 [docs/17 §85](../docs/17-BizBuddy实施过程与验证记录.md#s85)。
+> 密钥放 `e2e/.env.local`（模板见 `e2e/.env.example`，已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、不触发模型调用。退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败（栈不可达、登录失败、种子缺失）/ `3` 参数错误。详见 [docs/14 §85](../../docs/14-BizBuddy未覆盖项与已知限制.md#s85) 与 [docs/17 §85](../../docs/17-BizBuddy实施过程与验证记录.md#s85)。
 
 ## 5. 已知坑（都踩过，按此排查）
 
@@ -128,10 +128,10 @@ docker logs bizbuddy-postgres 2>&1 | grep -E 'docker-entrypoint-initdb.d|ERROR'
 现象：上传文档失败，后端日志 `S3StorageException: Unable to execute HTTP request: Connection refused: /127.0.0.1:9000`。
 原因：**平台文件存储（OSS）的坐标不在 yaml 里，而在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。容器里 `127.0.0.1` 是容器自身，自然连不上。
 处置：本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9000/9001；注意与 Milvus 自用的 `milvus-minio` 是两套，互不共用）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`；对应 `sys_oss_config.access_policy=0`，且**框架不会自动建桶**）。文件访问由后端**读取时现算预签名 URL**（有效期 `oss.presign-expire-seconds`，默认 120s）。建桶复用 `minio` 镜像**自带的 `mc`**——`minio/mc` 独立镜像在部分镜像源上拉不到（403）。
-另外 `deploy-pg/sql/50-oss-endpoint.sql` 会在首次建库时把 `sys_oss_config` 的端点改成 `minio:9000`；**已初始化过的数据卷不会重跑**，需手动补一次：
+另外 `deploy/deploy-pg/sql/50-oss-endpoint.sql` 会在首次建库时把 `sys_oss_config` 的端点改成 `minio:9000`；**已初始化过的数据卷不会重跑**，需手动补一次：
 
 ```bash
-docker exec -i bizbuddy-postgres psql -U postgres -d biz_buddy < deploy-pg/sql/50-oss-endpoint.sql
+docker exec -i bizbuddy-postgres psql -U postgres -d biz_buddy < deploy/deploy-pg/sql/50-oss-endpoint.sql
 docker compose restart ruoyi-admin      # 让 OSS 配置重新加载
 ```
 
@@ -179,5 +179,5 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 
 ## 8. 相关文档
 
-- 后端配置项：[../docs/configuration.md](../docs/configuration.md)
-- 架构与二次开发：[../docs/README.md](../docs/README.md)
+- 后端配置项：[../../docs/configuration.md](../../docs/configuration.md)
+- 架构与二次开发：[../../docs/README.md](../../docs/README.md)

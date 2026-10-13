@@ -30,7 +30,7 @@ cd RuoYi-Vue-Plus
 ./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
 
 # 前端静态资源（plus-ui-Vue/dist，由 Nginx 直接托管）
-cd ../plus-ui-Vue
+cd ../../plus-ui-Vue
 pnpm install && pnpm build:prod
 ```
 
@@ -39,7 +39,7 @@ pnpm install && pnpm build:prod
 ## 3. 启动
 
 ```bash
-cd deploy-mysql
+cd deploy/deploy-mysql
 cp .env.example .env        # 可选：不复制则用文件内默认值
 docker compose up -d --build
 ```
@@ -120,10 +120,10 @@ docker logs bizbuddy-mysql 2>&1 | grep -iE 'docker-entrypoint|ERROR'
 原因：Spring 松散绑定下 `SNAILJOB_HOST` 落到 **`snail-job.host`（客户端自己的 IP）**。本目录已改用 `SNAILJOB_SERVER_HOST`。
 
 **⑥ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
-原因：**平台文件存储（OSS）坐标存在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9002/9003）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`）。`deploy-mysql/sql/50-oss-endpoint.sql` 会在首次建库时把端点改成 `minio:9000`、`domain_url` 写成宿主机可达地址、`access_policy` 置 `0`（私有，文件访问走后端下发的预签名 URL）；**已初始化过的数据卷不会重跑**，需手动补一次：
+原因：**平台文件存储（OSS）坐标存在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9002/9003）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`）。`deploy/deploy-mysql/sql/50-oss-endpoint.sql` 会在首次建库时把端点改成 `minio:9000`、`domain_url` 写成宿主机可达地址、`access_policy` 置 `0`（私有，文件访问走后端下发的预签名 URL）；**已初始化过的数据卷不会重跑**，需手动补一次：
 
 ```bash
-docker exec -i bizbuddy-mysql mysql -uroot -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < deploy-mysql/sql/50-oss-endpoint.sql
+docker exec -i bizbuddy-mysql mysql -uroot -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < deploy/deploy-mysql/sql/50-oss-endpoint.sql
 docker compose restart ruoyi-admin      # 让 OSS 配置重新加载
 ```
 
@@ -164,5 +164,5 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 ## 9. 相关文档
 
 - 部署总览（PostgreSQL 版，含更多背景说明）：[../deploy-pg/README.md](../deploy-pg/README.md)
-- 后端配置项：[../RuoYi-Vue-Plus/docs/configuration.md](../RuoYi-Vue-Plus/docs/configuration.md)
-- 架构与二次开发：[../RuoYi-Vue-Plus/docs/README.md](../RuoYi-Vue-Plus/docs/README.md)
+- 后端配置项：[../../RuoYi-Vue-Plus/docs/configuration.md](../../RuoYi-Vue-Plus/docs/configuration.md)
+- 架构与二次开发：[../../RuoYi-Vue-Plus/docs/README.md](../../RuoYi-Vue-Plus/docs/README.md)
