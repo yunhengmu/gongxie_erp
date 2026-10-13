@@ -14,6 +14,7 @@ import org.dromara.ai.domain.vo.AiModelConfigVo;
 import org.dromara.ai.service.IAiModelConfigService;
 import org.dromara.ai.test.AiTestSupport;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -28,10 +29,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -62,7 +67,12 @@ class JevRouteJudgeTest {
      */
     private final IAiModelConfigService modelConfigService = mock(IAiModelConfigService.class);
 
-    private final JevRouteJudge judge = new JevRouteJudge(runtimeConfigStore, modelConfigService);
+    /**
+     * 熔断器（默认放行；按需在用例里改为拒绝，验证「熔断期间不判定、不外呼」）
+     */
+    private final JevCircuitBreaker circuitBreaker = mock(JevCircuitBreaker.class);
+
+    private final JevRouteJudge judge = new JevRouteJudge(runtimeConfigStore, modelConfigService, circuitBreaker);
 
     /**
      * 决策模型基址（不在终点判定，故拼装为 {@code .../v1/systemone}）
@@ -72,6 +82,14 @@ class JevRouteJudgeTest {
     @BeforeAll
     static void beforeAll() {
         AiTestSupport.initialize();
+    }
+
+    /**
+     * 默认放行外呼：熔断器拒绝是独立分支，避免它影响既有的「连接信息 / 报文解析」类用例。
+     */
+    @BeforeEach
+    void allowByDefault() {
+        when(circuitBreaker.allow(any(), any())).thenReturn(true);
     }
 
     /**
@@ -374,6 +392,86 @@ class JevRouteJudgeTest {
         cfg.setEnabled(true);
         cfg.setModelConfigId(modelConfigId);
         return cfg;
+    }
+
+    @Test
+    @DisplayName("判定实例：熔断中 → 留痕 circuit_breaker_open 且零外呼")
+    void shouldSkipWhenCircuitOpen() {
+        when(runtimeConfigStore.jev()).thenReturn(enabledWith(9L));
+        when(modelConfigService.queryById(9L)).thenReturn(decisionModel("0", AiModelConfig.TYPE_DECISION));
+        when(modelConfigService.decryptApiKey(9L)).thenReturn("sk-decision");
+        when(circuitBreaker.allow(any(), any())).thenReturn(false);
+        try (MockedStatic<HttpRequest> http = mockStatic(HttpRequest.class)) {
+            Optional<RouteJudgeVerdict> verdict = judge.judge(request());
+
+            assertTrue(verdict.isPresent());
+            assertEquals("circuit_breaker_open", verdict.get().error());
+            assertNull(verdict.get().choice());
+            // 熔断期间不外呼、也不计失败（避免无人值守时反复刷新计数）
+            http.verify(() -> HttpRequest.post(anyString()), never());
+            verify(circuitBreaker, never()).recordFailure(any(), any());
+        }
+    }
+
+    @Test
+    @DisplayName("判定实例：gate 档外呼失败只尝试一次（不重试）")
+    void shouldNotRetryInGateMode() {
+        AiJevConfigBo cfg = enabledWith(9L);
+        cfg.setMode("gate");
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        when(modelConfigService.queryById(9L)).thenReturn(decisionModel("0", AiModelConfig.TYPE_DECISION));
+        when(modelConfigService.decryptApiKey(9L)).thenReturn("sk-decision");
+        try (MockedStatic<HttpRequest> http = mockStatic(HttpRequest.class)) {
+            stubHttp(http, 500, "{\"error\":{\"message\":\"boom\"}}");
+
+            Optional<RouteJudgeVerdict> verdict = judge.judge(request());
+
+            assertTrue(verdict.isPresent());
+            assertNotNull(verdict.get().error());
+            // gate 档在用户请求线程上同步阻塞，重试会叠加首字延迟 → 单次快失败
+            http.verify(() -> HttpRequest.post(anyString()), times(1));
+            verify(circuitBreaker).recordFailure(9L, cfg);
+        }
+    }
+
+    @Test
+    @DisplayName("判定实例：shadow 档外呼失败重试一次（旁路执行，重试无感）")
+    void shouldRetryInShadowMode() {
+        AiJevConfigBo cfg = enabledWith(9L);
+        cfg.setMode("shadow");
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        when(modelConfigService.queryById(9L)).thenReturn(decisionModel("0", AiModelConfig.TYPE_DECISION));
+        when(modelConfigService.decryptApiKey(9L)).thenReturn("sk-decision");
+        try (MockedStatic<HttpRequest> http = mockStatic(HttpRequest.class)) {
+            stubHttp(http, 500, "{\"error\":{\"message\":\"boom\"}}");
+
+            Optional<RouteJudgeVerdict> verdict = judge.judge(request());
+
+            assertTrue(verdict.isPresent());
+            assertNotNull(verdict.get().error());
+            http.verify(() -> HttpRequest.post(anyString()), times(2));
+            verify(circuitBreaker).recordFailure(9L, cfg);
+        }
+    }
+
+    @Test
+    @DisplayName("判定实例：外呼成功即复位熔断计数")
+    void shouldResetBreakerOnSuccess() {
+        AiJevConfigBo cfg = enabledWith(9L);
+        when(runtimeConfigStore.jev()).thenReturn(cfg);
+        when(modelConfigService.queryById(9L)).thenReturn(decisionModel("0", AiModelConfig.TYPE_DECISION));
+        when(modelConfigService.decryptApiKey(9L)).thenReturn("sk-decision");
+        try (MockedStatic<HttpRequest> http = mockStatic(HttpRequest.class)) {
+            stubHttp(http, 200, """
+                {"answers":{"expert":{"type":"choice","choice":"expert_a","confidence":0.9,
+                "probabilities":{"self":0.1,"expert_a":0.8,"other":0.1}}},
+                "usage":{"input_tokens":30}}""");
+
+            judge.judge(request());
+
+            verify(circuitBreaker).recordSuccess(9L, cfg);
+            verify(circuitBreaker, never()).recordFailure(any(), any());
+        }
     }
 
     /**

@@ -203,6 +203,9 @@ public class AiRuntimeController extends BaseController {
         vo.setFailOpen(bo.isFailOpen());
         vo.setStateMaxChars(bo.getStateMaxChars());
         vo.setPersistProbabilities(bo.isPersistProbabilities());
+        vo.setCircuitBreakerEnabled(bo.isCircuitBreakerEnabled());
+        vo.setCircuitBreakerThreshold(bo.getCircuitBreakerThreshold());
+        vo.setCircuitBreakerPauseSeconds(bo.getCircuitBreakerPauseSeconds());
         return vo;
     }
 

@@ -337,6 +337,9 @@ public class AiRuntimeConfigStore {
         bo.setFailOpen(jev.isFailOpen());
         bo.setStateMaxChars(jev.getStateMaxChars());
         bo.setPersistProbabilities(jev.isPersistProbabilities());
+        bo.setCircuitBreakerEnabled(jev.isCircuitBreakerEnabled());
+        bo.setCircuitBreakerThreshold(jev.getCircuitBreakerThreshold());
+        bo.setCircuitBreakerPauseSeconds(jev.getCircuitBreakerPauseSeconds());
         return bo;
     }
 

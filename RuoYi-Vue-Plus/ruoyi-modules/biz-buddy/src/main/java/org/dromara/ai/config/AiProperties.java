@@ -640,9 +640,12 @@ public class AiProperties {
         private Long modelConfigId;
 
         /**
-         * 判定超时（秒；与「模型配置」的通用超时无关——判定在路由关键路径上，需要更短的超时）
+         * 判定超时（秒；与「模型配置」的通用超时无关——判定在路由关键路径上，需要更短的超时）。
+         *
+         * <p>默认 1 秒：健康调用实测中位 ≈200ms，1 秒已很宽裕；而故障时单轮代价由此前的
+         * 「5s 超时 + 300ms 退避 + 二次尝试」压到约 1s（口径见 docs/22 §3.1 B）。</p>
          */
-        private int timeoutSeconds = 5;
+        private int timeoutSeconds = 1;
 
         /**
          * 执行模式：shadow 影子（只留痕不接管）/ gate 闸门（高置信接管）/ preselect 候选预筛（可选）
@@ -668,6 +671,21 @@ public class AiProperties {
          * 是否落库概率分布（影子期开启供校准；闸门稳定后可关以省存储）
          */
         private boolean persistProbabilities = true;
+
+        /**
+         * 是否启用熔断（docs/22 §3.1 B）：连续失败达阈值后暂停判定
+         */
+        private boolean circuitBreakerEnabled = true;
+
+        /**
+         * 熔断触发阈值：连续失败次数
+         */
+        private int circuitBreakerThreshold = 3;
+
+        /**
+         * 熔断暂停时长（秒）
+         */
+        private int circuitBreakerPauseSeconds = 300;
     }
 
 }

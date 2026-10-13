@@ -59,9 +59,16 @@ public class JevRouteJudge implements RouteJudge {
      */
     private static final AtomicBoolean MODEL_UNAVAILABLE_WARNED = new AtomicBoolean(false);
 
+    /**
+     * 熔断期间未判定的留痕口径（写入 {@code ai_route_run.judge_error}，见 docs/22 §5.1）
+     */
+    private static final String ERROR_CIRCUIT_OPEN = "circuit_breaker_open";
+
     private final AiRuntimeConfigStore runtimeConfigStore;
 
     private final IAiModelConfigService modelConfigService;
+
+    private final JevCircuitBreaker circuitBreaker;
 
     @Override
     public Optional<RouteJudgeVerdict> judge(RouteJudgeRequest request) {
@@ -75,6 +82,12 @@ public class JevRouteJudge implements RouteJudge {
             // 未启用 / 无可用决策模型：不判定、不外呼（零成本），由工具决策照旧决定路由
             return Optional.empty();
         }
+        // 熔断中（或半开且非本次探测）：不判定、不外呼，等价「无判定」并留痕原因
+        // （口径见 docs/22 §3.1 B：提供方宕机期间判定环节的额外耗时归零）
+        if (!circuitBreaker.allow(cfg.getModelConfigId(), cfg)) {
+            return Optional.of(new RouteJudgeVerdict(null, null, null, elapsedMs(startNanos), 0L,
+                ERROR_CIRCUIT_OPEN));
+        }
         Map<String, Object> criteria = JevSystemOneSupport.buildCriteria(request.candidates());
 
         String requestJson;
@@ -87,9 +100,12 @@ public class JevRouteJudge implements RouteJudge {
         HttpAttempt attempt = invokeWithRetry(JevSystemOneSupport.endpoint(model.baseUrl()), model, cfg, requestJson);
         long latencyMs = elapsedMs(startNanos);
         if (!attempt.ok()) {
+            // 记失败：连续失败到阈值即熔断（只统计外呼连通性失败；2xx 但报文不可解析不算提供方故障）
+            circuitBreaker.recordFailure(cfg.getModelConfigId(), cfg);
             log.warn("结构化决策外呼失败（按不可用处理，不影响编排）：{}", attempt.error());
             return Optional.of(new RouteJudgeVerdict(null, null, null, latencyMs, 0L, attempt.error()));
         }
+        circuitBreaker.recordSuccess(cfg.getModelConfigId(), cfg);
         try {
             return Optional.of(JevSystemOneSupport.parseLeniently(attempt.body(), criteria.keySet(), latencyMs));
         } catch (Exception e) {
@@ -156,15 +172,23 @@ public class JevRouteJudge implements RouteJudge {
     /**
      * 外呼一次并做「失败重试一次」：非 2xx 或传输异常时等待 {@link #RETRY_BACKOFF_MS} 毫秒后重试一次。
      *
+     * <p><b>gate 档不重试</b>：闸门判定在用户请求线程上同步阻塞（{@code start} 事件已下发、正文未开始），
+     * 重试会直接叠加到首字延迟上，故 gate 档单次快失败即回落工具决策。
+     * <b>shadow 档保留重试</b>：它在入口轮收尾的旁路执行（{@code done} 已下发），重试不影响用户可见耗时。</p>
+     *
      * @param url         已拼装的服务地址
      * @param model       决策模型连接信息（取 apiKey）
-     * @param cfg         判定策略（取超时）
+     * @param cfg         判定策略（取超时与执行模式）
      * @param requestJson 请求体 JSON
      * @return 最后一次尝试的结果
      */
     private HttpAttempt invokeWithRetry(String url, DecisionModel model, AiJevConfigBo cfg, String requestJson) {
         HttpAttempt attempt = invokeOnce(url, model, cfg, requestJson);
         if (attempt.ok()) {
+            return attempt;
+        }
+        if (RouteJudgeMode.parse(cfg.getMode()) == RouteJudgeMode.GATE) {
+            log.warn("结构化决策首次调用失败（gate 档不重试，直接回落工具决策）：{}", attempt.error());
             return attempt;
         }
         log.warn("结构化决策首次调用失败，将重试一次：{}", attempt.error());

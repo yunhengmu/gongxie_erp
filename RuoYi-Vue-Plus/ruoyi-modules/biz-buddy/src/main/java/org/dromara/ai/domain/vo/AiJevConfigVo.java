@@ -61,4 +61,19 @@ public class AiJevConfigVo implements Serializable {
      */
     private boolean persistProbabilities;
 
+    /**
+     * 是否启用熔断（docs/22 §3.1 B）
+     */
+    private boolean circuitBreakerEnabled;
+
+    /**
+     * 熔断触发阈值：连续失败次数
+     */
+    private int circuitBreakerThreshold;
+
+    /**
+     * 熔断暂停时长（秒）
+     */
+    private int circuitBreakerPauseSeconds;
+
 }

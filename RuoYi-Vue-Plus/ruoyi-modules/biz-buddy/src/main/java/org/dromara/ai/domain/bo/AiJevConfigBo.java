@@ -46,7 +46,7 @@ public class AiJevConfigBo implements Serializable {
      */
     @Min(value = 1, message = "判定超时至少 1 秒")
     @Max(value = 120, message = "判定超时过大")
-    private int timeoutSeconds = 5;
+    private int timeoutSeconds = 1;
 
     /**
      * 执行模式：shadow 影子（只留痕不接管）/ gate 闸门（高置信接管）/ preselect 候选预筛（可选）
@@ -77,5 +77,24 @@ public class AiJevConfigBo implements Serializable {
      * 是否落库概率分布
      */
     private boolean persistProbabilities = true;
+
+    /**
+     * 是否启用熔断（docs/22 §3.1 B）：连续失败达阈值后暂停判定，避免提供方宕机期间每轮都付超时
+     */
+    private boolean circuitBreakerEnabled = true;
+
+    /**
+     * 熔断触发阈值：连续失败次数达到该值即熔断
+     */
+    @Min(value = 1, message = "熔断阈值至少 1 次")
+    @Max(value = 100, message = "熔断阈值过大")
+    private int circuitBreakerThreshold = 3;
+
+    /**
+     * 熔断暂停时长（秒）：暂停期内一律不判定、不外呼
+     */
+    @Min(value = 1, message = "熔断暂停至少 1 秒")
+    @Max(value = 86400, message = "熔断暂停过大")
+    private int circuitBreakerPauseSeconds = 300;
 
 }

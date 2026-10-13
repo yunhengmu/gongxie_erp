@@ -310,9 +310,13 @@ public class AiChatFacade {
         }
         // 过审后的用户内容（MASK 时为掩码文本）才是下发给模型与专家的口径
         String userContent = inputGuard.text();
+        // 装配一次同时取「实例 + 执行期快照」：快照供链路追踪挂父链路，实例供本轮执行。
+        // 原先 snapshotOf 与下方的 get 各走一遍完整装配（各含绑定 / 工具 / 知识库 / 技能 / 子智能体 /
+        // 运行期策略 / MCP 解析等查询），合并后每轮省掉一遍（口径见 docs/22 §3.1 C「前提修正」）
+        AgentRegistry.AgentHolder holder = agentRegistry.holder(definition, resources);
         // 链路追踪（REQ-AI-28）先建：编排运行状态需要它以建立「父链路 → 专家子链路」的关系
         Long traceId = traceService.start(sessionId, definition.getId(), userId, AiTrace.SOURCE_CHAT,
-            agentRegistry.snapshotOf(definition, resources));
+            holder.snapshot());
         // 编排分支（REQ-AI-30）：入口智能体（{@code ai_entry_agent}）的一轮对话即一次编排运行。
         // 候选清单在此**现算**（提问用户可见 ∩ 启用 ∩ 自动路由），故新增/停用专家无需重启或重新装配。
         // 用三目一次性赋值：变量需「有效 final」才能被下方的订阅回调捕获。
@@ -344,7 +348,7 @@ public class AiChatFacade {
                 route.taskContext = AiRouteSupport.taskContext(userContent, slots, userId, deptId);
             }
         }
-        HarnessAgent agent = agentRegistry.get(definition, resources);
+        HarnessAgent agent = holder.agent();
         RuntimeContext.Builder contextBuilder = RuntimeContext.builder()
             .userId(String.valueOf(userId))
             .sessionId(String.valueOf(sessionId))
