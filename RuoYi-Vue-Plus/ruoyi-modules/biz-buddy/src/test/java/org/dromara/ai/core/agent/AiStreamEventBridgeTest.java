@@ -15,6 +15,7 @@ import org.dromara.ai.core.AiRetrievalSourceRegistry;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.core.safety.SafetyAction;
 import org.dromara.ai.core.safety.SafetyDecision;
+import org.dromara.ai.core.safety.SafetyScene;
 import org.dromara.ai.domain.vo.AiSourceVo;
 import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiTraceService;
@@ -105,6 +106,33 @@ class AiStreamEventBridgeTest {
         assertFalse(shown.contains("mybizbuddy@163.com"), "邮箱不得以明文下发：" + shown);
         assertTrue(shown.contains("158****8888"), "手机号应已掩码：" + shown);
         assertTrue(shown.contains("m***@163.com"), "邮箱应已掩码：" + shown);
+    }
+
+    @Test
+    @DisplayName("流式正文命中 PII 时当场留痕，且每轮只记一条")
+    void shouldRecordOutputHitOncePerRound() {
+        when(safetyGuard.anyActive()).thenReturn(true);
+        when(safetyGuard.holdBackChars()).thenReturn(32);
+        when(safetyGuard.guard(any(), any())).thenAnswer(invocation -> {
+            String text = invocation.getArgument(0);
+            AiPiiMasker.Outcome outcome = AiPiiMasker.mask(text);
+            return outcome.count() > 0
+                ? new SafetyDecision(SafetyAction.MASK, outcome.text(), true, outcome.types())
+                : SafetyDecision.pass(text);
+        });
+
+        AiStreamState state = state(100L);
+        state.sessionId = 1L;
+        state.userId = 2L;
+        for (String piece : List.of("- 手机号码：158", "88888", "888\n- 邮箱：m", "ybizb",
+            "uddy@163", ".com\n")) {
+            bridge.handle(emitter, state, new TextBlockDeltaEvent("reply-1", "block-1", piece));
+        }
+        bridge.flushSafety(emitter, state);
+
+        // 多个分片先后命中，但只应留痕一条（否则审计会被逐片刷屏）
+        verify(safetyEventService, times(1)).record(eq(SafetyScene.OUTPUT), any(SafetyDecision.class),
+            any(), eq(1L), any(), any(), eq(2L), any());
     }
 
     @Test

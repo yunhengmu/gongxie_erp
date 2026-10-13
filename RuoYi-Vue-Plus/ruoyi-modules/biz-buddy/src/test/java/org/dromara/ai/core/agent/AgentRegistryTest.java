@@ -9,6 +9,7 @@ import io.agentscope.harness.agent.HarnessAgent;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.agent.tools.GetCurrentTimeTool;
 import org.dromara.ai.core.agent.tools.GetCurrentUserTool;
+import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentTool;
 import org.dromara.ai.domain.AiEntryAgent;
@@ -98,6 +99,8 @@ class AgentRegistryTest {
     @Mock
     private AiWriteDedupStore writeDedupStore;
     @Mock
+    private AiSafetyGuard safetyGuard;
+    @Mock
     private AiPermissionModeStore permissionModeStore;
     @Mock
     private AiRuntimeConfigStore runtimeConfigStore;
@@ -134,7 +137,7 @@ class AgentRegistryTest {
      */
     private AgentAssembler assembler() {
         return new AgentAssembler(modelFactory, aiProperties, runtimeConfigStore, stateStore, toolFactory, writeDedupStore,
-            mcpClientService, aiSkillRepository, permissionModeStore, snapshotFactory, subagentAssembler,
+            safetyGuard, mcpClientService, aiSkillRepository, permissionModeStore, snapshotFactory, subagentAssembler,
             routeOrchestrator);
     }
 
