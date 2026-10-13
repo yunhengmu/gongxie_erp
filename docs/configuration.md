@@ -7,7 +7,7 @@
 | `RuoYi-Vue-Plus/ruoyi-admin/src/main/resources/application.yml` | 通用配置 + **AI 平台配置 `bizbuddy.ai.*`** + 安全排除路径 |
 | `.../application-dev.yml` | 开发环境：数据源、Redis、SnailJob 客户端、SQL 日志 |
 | `.../application-prod.yml` | 生产环境：同上（日志更安静、连接池更大） |
-| `.env`（可选，见 `deploy/.env.example`） | 容器化部署的端口与口令变量 |
+| `.env`（可选，见 `deploy/deploy-pg/.env.example`） | 容器化部署的端口与口令变量 |
 
 环境由 Maven profile 决定（`pom.xml` 的 `<profiles>`，默认 `dev`）：
 
@@ -159,7 +159,7 @@
 | `application-dev.yml` | `spring.datasource.dynamic.datasource.master.*` | 主数据源连接（dynamic-datasource）：PostgreSQL 14 或 MySQL 8.0，仅 JDBC URL 不同（驱动由 Hikari 按 URL 自动匹配，不在配置中声明） |
 | `application-dev.yml` | `spring.data.redis.*` / `redisson.*` | Redis 连接与 Redisson 连接池；dev 配置**要求必须设置 Redis 密码** |
 | `application-dev.yml` | `snail-job.*` | 调度客户端：`enabled`、`group`、`token`、`namespace`、服务端地址 |
-| 数据库表 `sys_oss_config`（**不在 yaml**） | `endpoint` / `domain_url` / `access_policy` | 平台文件存储（OSS）坐标：`endpoint` 供**服务端读写**（容器部署写 `minio:9000`，容器网络内可达），`domain_url` 供**前端展示**（返回给浏览器的 URL，必须**浏览器可达**——PG 栈 `http://localhost:9000`、MySQL 8.0 栈 `http://localhost:9002`），`access_policy` 容器部署为 **`0`（私有桶）**。私有桶下文件访问统一由后端**读取时现算预签名 URL**（对外按 `domain_url`、服务端按 `endpoint` 签名），故 `domain_url` 配错会导致前端预览 / 下载失败。容器部署由 `deploy*/sql/50-oss-endpoint.sql` 在首次建库时写入，**存量数据卷不会重跑**，需按部署文档手工补一次 |
+| 数据库表 `sys_oss_config`（**不在 yaml**） | `endpoint` / `domain_url` / `access_policy` | 平台文件存储（OSS）坐标：`endpoint` 供**服务端读写**（容器部署写 `minio:9000`，容器网络内可达），`domain_url` 供**前端展示**（返回给浏览器的 URL，必须**浏览器可达**——PG 栈 `http://localhost:9000`、MySQL 8.0 栈 `http://localhost:9002`），`access_policy` 容器部署为 **`0`（私有桶）**。私有桶下文件访问统一由后端**读取时现算预签名 URL**（对外按 `domain_url`、服务端按 `endpoint` 签名），故 `domain_url` 配错会导致前端预览 / 下载失败。容器部署由 `deploy/deploy-*/sql/50-oss-endpoint.sql` 在首次建库时写入，**存量数据卷不会重跑**，需按部署文档手工补一次 |
 | `application.yml` | `oss.presign-expire-seconds` | 私有桶预签名 URL 有效期（秒），默认 `120`；过短会导致预览 / 下载中途失效，过长则弱化私有桶的访问控制（改后需重启 `ruoyi-admin`） |
 
 ## 4. 生产环境必改清单
@@ -177,11 +177,11 @@
 | 7 | `snail-job.token` | `SNAILJOB_TOKEN` | 接入令牌默认随源码公开；须与 `sj_group_config` 表一致 |
 | 8 | 数据库表 `sys_oss_config.domain_url` | —（数据库配置） | 必须是**浏览器可达**地址；容器部署默认给 `localhost`，从其它机器 / 公网访问需改成实际域名或 IP（各栈端口见部署文档） |
 
-> 环境变量名与部署侧的登记见 `deploy/.env.example` / `deploy-mysql/.env.example` 的「生产部署密钥」段。
+> 环境变量名与部署侧的登记见 `deploy/deploy-pg/.env.example` / `deploy/deploy-mysql/.env.example` 的「生产部署密钥」段。
 
 ## 5. 相关文档
 
 - [architecture.md](architecture.md) —— 这些配置在链路里作用于哪一环
 - [development.md](development.md) —— 新增业务工具
-- [../deploy/README.md](../deploy/README.md) / [../deploy-mysql/README.md](../deploy-mysql/README.md) —— 容器化部署、变量覆盖与已知坑（含 OSS 地址与「文档需先解析再向量化」）
+- [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md) / [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md) —— 容器化部署、变量覆盖与已知坑（含 OSS 地址与「文档需先解析再向量化」）
 - [../e2e/](../e2e) —— 端到端脚本：改完配置后在真实栈上验证（L1~L11 + RAG 检索质量评测 `e2e/eval/`）

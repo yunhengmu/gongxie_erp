@@ -1912,7 +1912,7 @@ on conflict (agent_id, tool_code) do nothing;
 --   向量化状态取 STATUS_VECTOR_PENDING='0'；正文直接写入 content（预览可看，解析另有 OSS 源文件）；
 --   同时预置一行 sys_oss（key=demo/bizbuddy_intro.txt）
 --   并把这行文档的 oss_id 指向它，使「重新解析」能按对象键读取——对象由部署编排的 minio-init 在
---   初始化时用 mc cp 写入 MinIO（见 deploy*/docker-compose.yml，种子文件 docs/BizBuddy简介.txt）；
+--   初始化时用 mc cp 写入 MinIO（见 deploy/deploy-*/docker-compose.yml，种子文件 docs/BizBuddy简介.txt）；
 --   专家的知识库检索工具（search_knowledge_base）不在 AgentRegistry.BUILTIN_READONLY_TOOL_CODES 之列
 --   （需按提问用户过滤生效范围），故须经 ai_agent_tool 显式绑定。
 insert into ai_knowledge_base (id, kb_name, kb_code, description, embedding_model_id, collection_name,

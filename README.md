@@ -37,8 +37,8 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 | [`plus-ui-Vue/`](plus-ui-Vue) | **前端工程**：Vue 3 + TypeScript + Element Plus + Vite，包管理 pnpm |
 | [`docs/`](docs/README.md) | **开发者文档**：一键运行（Docker Compose）与快速开始（源码手工跑）、运行时架构、二次开发（新增业务工具）、配置项参考 |
 | [`RuoYi-Vue-Plus/docs/`](RuoYi-Vue-Plus/docs) | 平台功能说明（含 9 张运行界面截图） |
-| [`deploy/`](deploy) | **PostgreSQL 全栈容器编排**：PG 14 + Redis + Milvus + 后端 + 调度 + Nginx（`docker compose up -d --build` 即「有表有数据可登录」） |
-| [`deploy-mysql/`](deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
+| [`deploy/deploy-pg/`](deploy/deploy-pg) | **PostgreSQL 全栈容器编排**：PG 14 + Redis + Milvus + 后端 + 调度 + Nginx（`docker compose up -d --build` 即「有表有数据可登录」） |
+| [`deploy/deploy-mysql/`](deploy/deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
 | [`e2e/`](e2e) | **端到端测试脚本**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP 断言，见下文「测试与覆盖率」 |
 
 ## 功能说明
@@ -201,7 +201,7 @@ RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器�
 | L11 | MCP 客户端：连通探测 + 自演示连接登记 |
 
 ```bash
-# 需要栈已在运行（deploy/ 或 deploy-mysql/ 任一）
+# 需要栈已在运行（deploy/deploy-pg/ 或 deploy/deploy-mysql/ 任一）
 node e2e/run.mjs                          # 全量；未配置密钥的层自动 SKIP
 node e2e/run.mjs --only L1,L3 --verbose    # 指定层级
 node e2e/run.mjs --allow-writes            # L5 走「接受」路径（会真建公告，收尾自动清理）
