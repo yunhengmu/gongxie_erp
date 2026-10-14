@@ -3,6 +3,7 @@ package org.dromara.ai.core.safety;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.domain.AiSensitiveWord;
+import org.dromara.ai.domain.bo.AiSecurityConfigBo;
 import org.dromara.ai.service.IAiSensitiveWordService;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Component;
@@ -45,7 +46,7 @@ public class LocalKeywordSafetyEngine implements IAiContentSafetyEngine {
     }
 
     @Override
-    public ContentSafetyResult check(String text, SafetyScene scene) {
+    public ContentSafetyResult check(String text, SafetyScene scene, AiSecurityConfigBo config) {
         if (StringUtils.isBlank(text)) {
             return ContentSafetyResult.miss();
         }

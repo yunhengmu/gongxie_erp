@@ -265,9 +265,11 @@ public class AiRuntimeConfigStore {
      */
     public void updateSecurity(AiSecurityConfigBo bo) {
         RedisUtils.setCacheObject(SECURITY_KEY, JsonUtils.toJsonString(bo));
-        log.info("安全合规配置已更新：enabled={}, engine={}, action={}, input/output/channelOut={}/{}/{}, maskPii={}, holdBack={}",
+        log.info("安全合规配置已更新：enabled={}, engine={}, action={}, input/output/channelOut={}/{}/{}, "
+                + "maskPii={}, holdBack={}, externalProvider={}",
             bo.isEnabled(), bo.getEngine(), bo.getAction(), bo.isInputCheck(), bo.isOutputCheck(),
-            bo.isChannelOutCheck(), bo.isMaskPii(), bo.getHoldBackChars());
+            bo.isChannelOutCheck(), bo.isMaskPii(), bo.getHoldBackChars(),
+            StringUtils.isBlank(bo.getProviderEndpoint()) ? "未配置（降级本地词库）" : "已配置");
     }
 
     /**

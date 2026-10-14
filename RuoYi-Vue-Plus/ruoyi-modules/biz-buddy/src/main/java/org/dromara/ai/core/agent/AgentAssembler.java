@@ -15,6 +15,7 @@ import io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig;
 import io.agentscope.harness.agent.tools.ToolsConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.mcp.GuardingMcpClientWrapper;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentTool;
@@ -99,7 +100,8 @@ public class AgentAssembler {
 
     /**
      * 安全守卫：给业务工具包一层「结果脱敏」，使喂给模型的结果不含 PII/命中词
-     * （见 {@link ToolResultGuardTool}；此前只脱敏了落库与前端两份副本）
+     * （见 {@link ToolResultGuardTool}）；外部 MCP 工具拿不到工具包装点，改在客户端层拦截
+     * （见 {@link GuardingMcpClientWrapper}）。此前只脱敏了落库与前端两份副本。
      */
     private final AiSafetyGuard safetyGuard;
 
@@ -491,12 +493,15 @@ public class AgentAssembler {
         }
         List<String> registered = new ArrayList<>(clients.size());
         for (Map.Entry<String, McpClientWrapper> entry : clients.entrySet()) {
+            // 安全合规：MCP 回参先过守卫（喂给模型的那一份也脱敏）——MCP 工具由框架直接构造并注册，
+            // 平台拿不到工具包装点，故在客户端层拦截（见 GuardingMcpClientWrapper）
+            McpClientWrapper guarded = new GuardingMcpClientWrapper(entry.getValue(), safetyGuard);
             try {
                 // block 与框架一致：装配必须同步完成，否则工具箱里还没有工具就开始构建 Agent
-                toolkit.registerMcpClient(entry.getValue()).block(MCP_REGISTER_TIMEOUT);
+                toolkit.registerMcpClient(guarded).block(MCP_REGISTER_TIMEOUT);
                 registered.add(entry.getKey());
             } catch (Exception e) {
-                closeQuietly(entry.getValue());
+                closeQuietly(guarded);
                 log.warn("外部 MCP 工具接入失败，该 Server 本轮不接入：agent={}, server={}, 原因={}",
                     definition.getAgentCode(), entry.getKey(), e.getMessage());
             }

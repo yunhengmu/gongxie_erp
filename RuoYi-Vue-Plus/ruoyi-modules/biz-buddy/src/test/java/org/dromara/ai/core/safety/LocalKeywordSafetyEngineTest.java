@@ -35,7 +35,7 @@ class LocalKeywordSafetyEngineTest {
     void shouldHitLiteralWord() {
         when(wordService.enabledWords()).thenReturn(List.of(word("违规词", "0", "违禁")));
 
-        ContentSafetyResult result = engine.check("这里包含违规词内容", SafetyScene.INPUT);
+        ContentSafetyResult result = engine.check("这里包含违规词内容", SafetyScene.INPUT, null);
 
         assertTrue(result.hit());
         assertTrue(result.hits().contains("违规词"));
@@ -47,8 +47,8 @@ class LocalKeywordSafetyEngineTest {
     void shouldHitRegexWord() {
         when(wordService.enabledWords()).thenReturn(List.of(word("\\d{6,}", "1", "数字刷屏")));
 
-        assertTrue(engine.check("编号 123456789", SafetyScene.OUTPUT).hit());
-        assertFalse(engine.check("没有长数字", SafetyScene.OUTPUT).hit());
+        assertTrue(engine.check("编号 123456789", SafetyScene.OUTPUT, null).hit());
+        assertFalse(engine.check("没有长数字", SafetyScene.OUTPUT, null).hit());
     }
 
     @Test
@@ -56,8 +56,8 @@ class LocalKeywordSafetyEngineTest {
     void shouldMissWhenAbsent() {
         when(wordService.enabledWords()).thenReturn(List.of(word("违规词", "0", null)));
 
-        assertFalse(engine.check("正常内容", SafetyScene.INPUT).hit());
-        assertFalse(engine.check(null, SafetyScene.INPUT).hit());
+        assertFalse(engine.check("正常内容", SafetyScene.INPUT, null).hit());
+        assertFalse(engine.check(null, SafetyScene.INPUT, null).hit());
     }
 
     @Test
@@ -65,7 +65,7 @@ class LocalKeywordSafetyEngineTest {
     void shouldSkipInvalidRegex() {
         when(wordService.enabledWords()).thenReturn(List.of(word("[unclosed", "1", null), word("违规词", "0", null)));
 
-        assertTrue(engine.check("包含违规词的句子", SafetyScene.INPUT).hit());
+        assertTrue(engine.check("包含违规词的句子", SafetyScene.INPUT, null).hit());
     }
 
 }

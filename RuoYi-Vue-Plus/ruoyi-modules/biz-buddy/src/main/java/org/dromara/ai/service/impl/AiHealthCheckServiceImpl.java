@@ -471,25 +471,28 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
     }
 
     /**
-     * 内容安全引擎（外部引擎尚未接入，配了会降级）。
+     * 内容安全引擎（本地词库 / 外部 API；外部引擎缺地址或密钥时降级为本地词库）。
      */
     private AiHealthCheckVo checkSafetyEngine() {
         String key = "safety.engine";
         String name = "内容安全引擎";
         AiSecurityConfigBo security = runtimeConfigStore.security();
         String pii = security.isMaskPii() ? "开启" : "关闭";
-        if ("external".equalsIgnoreCase(security.getEngine())) {
-            return warn(key, name, CATEGORY_RUNTIME,
-                "审核引擎配置为 external，但外部内容安全引擎尚未接入，实际降级为本地词库（PII 脱敏：" + pii + "）",
-                "改回 local 使用本地词库，或接入外部引擎后再切回");
-        }
         if (!security.isEnabled()) {
             return warn(key, name, CATEGORY_RUNTIME,
                 "内容审核未启用（PII 脱敏：" + pii + "，两者独立开关）",
                 "按需到「安全合规配置」开启；开启后默认只留痕（action=log）");
         }
+        boolean external = "external".equalsIgnoreCase(security.getEngine());
+        if (external && (StringUtils.isBlank(security.getProviderEndpoint())
+            || StringUtils.isBlank(security.getProviderApiKey()))) {
+            return warn(key, name, CATEGORY_RUNTIME,
+                "审核引擎配置为 external，但接口地址 / 密钥不全，实际降级为本地词库（PII 脱敏：" + pii + "）",
+                "到「安全合规配置」补全外部引擎的接口地址与密钥，或改回 local 使用本地词库");
+        }
         return pass(key, name, CATEGORY_RUNTIME,
-            "内容审核已启用（引擎 local，处置动作 " + security.getAction() + "，PII 脱敏：" + pii + "）");
+            "内容审核已启用（引擎 " + (external ? "external" : "local")
+                + "，处置动作 " + security.getAction() + "，PII 脱敏：" + pii + "）");
     }
 
     /**
