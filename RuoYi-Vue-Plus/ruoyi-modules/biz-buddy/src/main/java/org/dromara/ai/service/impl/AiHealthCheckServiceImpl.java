@@ -493,27 +493,62 @@ public class AiHealthCheckServiceImpl implements IAiHealthCheckService {
     }
 
     /**
-     * 检索重排（开启但缺密钥会静默降级为原序）。
+     * 检索重排（按**知识库级配置**判定：启用重排的库是否都绑定了可用的重排模型）。
+     *
+     * <p>口径（2026-10-14 调整）：重排模型登记在「模型配置」（{@code model_type=rerank}），
+     * 「是否启用 + 用哪个模型」由知识库配置（{@code ai_knowledge_base.rerank_enabled / rerank_model_id}）。
+     * 若某启用重排的知识库未绑模型 / 模型不存在 / 类型不符 / 已停用 / 缺密钥，检索只会**静默降级为原序**，
+     * 故这里逐一给出 warn；全部可用才 pass。</p>
      */
     private AiHealthCheckVo checkRerank() {
         String key = "rag.rerank";
         String name = "检索重排（Rerank）";
-        AiProperties.Rag rag = aiProperties.getRag();
-        if (!rag.isRerankEnabled()) {
+        List<AiKnowledgeBaseVo> rerankKbs = knowledgeBaseService.queryOptions().stream()
+            .filter(kb -> "1".equals(StringUtils.trim(kb.getRerankEnabled())))
+            .toList();
+        if (rerankKbs.isEmpty()) {
             return pass(key, name, CATEGORY_RUNTIME, "检索重排未启用（保持向量原序）");
         }
-        if (StringUtils.isBlank(rag.getRerankEndpoint())) {
-            return warn(key, name, CATEGORY_RUNTIME, "已启用重排但未配置服务端点，检索将静默降级为原序",
-                "配置 bizbuddy.ai.rag.rerank-endpoint，或关闭 bizbuddy.ai.rag.rerank-enabled");
+        StringBuilder problems = new StringBuilder();
+        for (AiKnowledgeBaseVo kb : rerankKbs) {
+            String reason = rerankModelProblem(kb.getRerankModelId());
+            if (reason != null) {
+                problems.append(kb.getKbName()).append("：").append(reason).append("；");
+            }
         }
-        boolean anyKey = modelConfigService.queryOptions("embedding").stream()
-            .anyMatch(model -> StringUtils.isNotBlank(model.getApiKeyMask()));
-        if (!anyKey) {
-            return warn(key, name, CATEGORY_RUNTIME, "已启用重排但没有任何可用的向量模型密钥，检索将静默降级为原序",
-                "到「模型配置」补全向量模型密钥，或关闭重排");
+        if (problems.length() > 0) {
+            return warn(key, name, CATEGORY_RUNTIME,
+                "有启用重排的知识库其重排模型不可用，检索将静默降级为原序：" + problems,
+                "到「模型配置」新增并启用 rerank 模型、补全密钥，或到「知识库管理」关闭该库的重排");
         }
         return pass(key, name, CATEGORY_RUNTIME,
-            "重排已启用（模型 " + rag.getRerankModel() + "，融合模式 " + rag.getRerankMode() + "）");
+            "检索重排已启用（" + rerankKbs.size() + " 个知识库，融合模式 " + aiProperties.getRag().getRerankMode() + "）");
+    }
+
+    /**
+     * 校验某重排模型是否可用。
+     *
+     * @param modelId 模型主键（可为空）
+     * @return 不可用原因；可用时返回 {@code null}
+     */
+    private String rerankModelProblem(Long modelId) {
+        if (modelId == null) {
+            return "未绑定重排模型";
+        }
+        AiModelConfigVo model = modelConfigService.queryById(modelId);
+        if (model == null) {
+            return "绑定的重排模型不存在";
+        }
+        if (!AiModelConfig.TYPE_RERANK.equalsIgnoreCase(StringUtils.trim(model.getModelType()))) {
+            return "绑定的模型不是重排类型（" + model.getConfigName() + "）";
+        }
+        if (!"0".equals(StringUtils.trim(model.getStatus()))) {
+            return "绑定的重排模型已停用（" + model.getConfigName() + "）";
+        }
+        if (StringUtils.isBlank(model.getApiKeyMask())) {
+            return "绑定的重排模型未配置密钥（" + model.getConfigName() + "）";
+        }
+        return null;
     }
 
     /**

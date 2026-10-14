@@ -34,6 +34,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("文本重排客户端")
 class AiRerankClientTest {
 
+    /**
+     * 重排端点与模型由调用方（知识库所绑的重排模型配置）给出，此处给非空值避免降级。
+     */
+    private static final String ENDPOINT =
+        "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank";
+
+    private static final String MODEL = "gte-rerank-v2";
+
     private AiRerankClient client;
 
     @BeforeAll
@@ -70,7 +78,8 @@ class AiRerankClientTest {
             + "{\"index\":0,\"relevance_score\":0.18}]},\"usage\":{\"total_tokens\":10}}";
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(200, body));
-            AiRerankClient.RerankOutcome outcome = client.rerank("key", "q", List.of("a", "b", "c"), 3);
+            AiRerankClient.RerankOutcome outcome =
+                client.rerank("key", ENDPOINT, MODEL, "q", List.of("a", "b", "c"), 3);
             assertFalse(outcome.degraded());
             assertEquals(2, outcome.docs().size());
             assertEquals(2, outcome.docs().get(0).index());
@@ -82,7 +91,7 @@ class AiRerankClientTest {
     @Test
     @DisplayName("未配密钥：降级为原顺序，不发请求")
     void shouldDegradeWhenNoKey() {
-        AiRerankClient.RerankOutcome outcome = client.rerank(null, "q", List.of("a", "b"), 2);
+        AiRerankClient.RerankOutcome outcome = client.rerank(null, ENDPOINT, MODEL, "q", List.of("a", "b"), 2);
         assertTrue(outcome.degraded());
         assertEquals(List.of(0, 1), outcome.docs().stream().map(AiRerankClient.RankedDoc::index).toList());
     }
@@ -90,8 +99,8 @@ class AiRerankClientTest {
     @Test
     @DisplayName("查询为空或候选为空：降级为原顺序")
     void shouldDegradeWhenInputBlank() {
-        assertTrue(client.rerank("key", "  ", List.of("a"), 1).degraded());
-        assertTrue(client.rerank("key", "q", List.of(), 1).degraded());
+        assertTrue(client.rerank("key", ENDPOINT, MODEL, "  ", List.of("a"), 1).degraded());
+        assertTrue(client.rerank("key", ENDPOINT, MODEL, "q", List.of(), 1).degraded());
     }
 
     @Test
@@ -99,7 +108,7 @@ class AiRerankClientTest {
     void shouldDegradeOnNon2xx() {
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(500, "{\"message\":\"boom\"}"));
-            AiRerankClient.RerankOutcome outcome = client.rerank("key", "q", List.of("a", "b"), 2);
+            AiRerankClient.RerankOutcome outcome = client.rerank("key", ENDPOINT, MODEL, "q", List.of("a", "b"), 2);
             assertTrue(outcome.degraded());
             assertEquals(2, outcome.docs().size());
             assertEquals(0, outcome.docs().get(0).index());
@@ -117,7 +126,7 @@ class AiRerankClientTest {
             when(request.body(anyString())).thenReturn(request);
             when(request.execute()).thenThrow(new RuntimeException("timeout"));
             httpUtil.when(() -> HttpUtil.createPost(anyString())).thenReturn(request);
-            AiRerankClient.RerankOutcome outcome = client.rerank("key", "q", List.of("a"), 1);
+            AiRerankClient.RerankOutcome outcome = client.rerank("key", ENDPOINT, MODEL, "q", List.of("a"), 1);
             assertTrue(outcome.degraded());
         }
     }
@@ -127,7 +136,7 @@ class AiRerankClientTest {
     void shouldDegradeOnMalformedBody() {
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(200, "{\"output\":{\"results\":\"oops\"}}"));
-            AiRerankClient.RerankOutcome outcome = client.rerank("key", "q", List.of("a", "b"), 2);
+            AiRerankClient.RerankOutcome outcome = client.rerank("key", ENDPOINT, MODEL, "q", List.of("a", "b"), 2);
             assertTrue(outcome.degraded());
             assertEquals(List.of(0, 1), outcome.docs().stream().map(AiRerankClient.RankedDoc::index).toList());
         }
@@ -140,7 +149,7 @@ class AiRerankClientTest {
             + "{\"index\":0,\"relevance_score\":0.5}]}}";
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(200, body));
-            AiRerankClient.RerankOutcome outcome = client.rerank("key", "q", List.of("a", "b"), 2);
+            AiRerankClient.RerankOutcome outcome = client.rerank("key", ENDPOINT, MODEL, "q", List.of("a", "b"), 2);
             assertFalse(outcome.degraded());
             assertEquals(1, outcome.docs().size());
             assertEquals(0, outcome.docs().get(0).index());

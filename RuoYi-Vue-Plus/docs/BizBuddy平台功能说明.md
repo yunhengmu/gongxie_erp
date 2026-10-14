@@ -335,7 +335,7 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 
 检索链路内置**检索增强**，测试接口可按需透传参数做 A/B：
 
-- **Rerank 重排**（默认开启）：稠密召回 `max(topK, rerank-top-n)` → 重排 → 融合 → 截断 `topK`；融合模式可选 `replace` / `rank_rrf` / `score_fusion`（默认分数归一化加权）；
+- **Rerank 重排**（**按每个知识库的「检索重排」开关决定**，未启用则保持向量原序）：重排模型在「模型配置」登记为 `rerank` 类型（`baseUrl` 填**完整重排端点**、`apiKey` 为该模型**自带**）；稠密召回 `max(topK, rerank-top-n)` → 重排 → 融合 → 截断 `topK`；融合模式可选 `replace` / `rank_rrf` / `score_fusion`（默认分数归一化加权）；
 - **上下文装配**（默认开启）：对返回集做确定性去重与相邻切片合并，并受字符 / Token 上限约束，**不改排序**。
 
 量化口径见仓库自带的 `e2e/eval/eval-rag.mjs`（hit@1 / hit@3 / hit@5 / MRR 分类汇总）。
@@ -473,6 +473,6 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 | `chat.workspace-enabled` | true | 工作区上下文注入开关（与记忆解耦） |
 | `chat.mcp-server-auth-enabled` / `mcp-server-token` | true / 空 | MCP 出口口令校验与口令 |
 | `chat.current-time-enabled` / `current-time-zone` | true / `Asia/Shanghai` | 每轮注入当前时间及其时区 |
-| `rag.rerank-enabled` / `rerank-mode` / `rerank-top-n` | true / `score_fusion` / 30 | 检索重排开关、融合模式与候选数 |
+| `rag.rerank-mode` / `rag.rerank-top-n` | `score_fusion` / 30 | 重排融合模式与候选数（**与模型无关的算法参数**；重排的模型与开关已迁至「模型配置」`model_type=rerank` + 「知识库」，`rag.rerank-enabled` / `rerank-model` / `rerank-endpoint` **已删除**） |
 | `rag.assemble-*` | 见配置参考 | 上下文装配：去重 / 相邻合并 / 字符与 Token 上限 |
 | `security.enabled` / `action` / `mask-pii` / `prompt-hardening` | false / `log` / true / true | 安全审核总开关、处置动作、PII 脱敏与提示词注入防护 |

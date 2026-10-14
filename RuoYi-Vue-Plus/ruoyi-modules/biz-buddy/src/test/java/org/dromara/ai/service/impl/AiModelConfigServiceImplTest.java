@@ -434,6 +434,20 @@ class AiModelConfigServiceImplTest {
         assertThrows(ServiceException.class, () -> service.insertByBo(bo));
     }
 
+    @Test
+    @DisplayName("保存时允许 rerank（重排）类型")
+    void shouldAllowRerankModelTypeOnSave() {
+        AiModelConfigBo bo = new AiModelConfigBo();
+        bo.setConfigName("重排模型");
+        bo.setModelType(AiModelConfig.TYPE_RERANK);
+        bo.setApiKey("sk-1");
+        when(secretManager.encrypt("sk-1")).thenReturn("cipher");
+        when(baseMapper.selectCount(any())).thenReturn(0L);
+        when(baseMapper.insert(any(AiModelConfig.class))).thenReturn(1);
+
+        assertTrue(service.insertByBo(bo));
+    }
+
     private static void stubHttp(MockedStatic<HttpUtil> http, int status, String body) {
         HttpRequest request = mock(HttpRequest.class);
         HttpResponse response = mock(HttpResponse.class);

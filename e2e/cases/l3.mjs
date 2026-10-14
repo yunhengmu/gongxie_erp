@@ -60,9 +60,23 @@ export const run = async (ctx) => {
     return { status: 'FAIL', detail: '检索无命中（返回空数组）——请确认文档已向量化且相似度阈值合适', evidence };
   }
 
+  // 知识库级重排字段的接线校验（含存量库迁移）：新建列须能经 DB → VO → 接口透出，
+  // 否则「知识库页配重排」整条链路是断的（真实重排行为由单测与手工接口验证覆盖，需外部重排密钥）
+  const kbList = await http.request('GET', '/ai/kb/list', { query: { pageNum: 1, pageSize: 50 } });
+  const demoKb = (kbList?.rows ?? []).find((row) => String(row.id) === String(resolved.demoKbId));
+  evidence.rerankEnabled = demoKb?.rerankEnabled;
+  if (!demoKb || demoKb.rerankEnabled === undefined) {
+    return {
+      status: 'FAIL',
+      detail: '知识库接口未透出 rerankEnabled 字段——请确认两方言建表已加列、且存量库已执行 ALTER',
+      evidence
+    };
+  }
+
   return {
     status: 'PASS',
-    detail: `解析出 ${evidence.chunkCount} 切片 → 向量化完成 → 检索命中 ${evidence.hitCount} 条（最高分 ${evidence.topHit?.score ?? '-'}）`,
+    detail: `解析出 ${evidence.chunkCount} 切片 → 向量化完成 → 检索命中 ${evidence.hitCount} 条（最高分 ${evidence.topHit?.score ?? '-'}）`
+      + `；知识库重排配置字段已透出（rerankEnabled=${evidence.rerankEnabled}）`,
     evidence
   };
 };

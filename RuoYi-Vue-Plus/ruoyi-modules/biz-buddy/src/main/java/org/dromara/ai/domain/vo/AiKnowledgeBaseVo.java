@@ -52,6 +52,21 @@ public class AiKnowledgeBaseVo implements Serializable {
     private String embeddingModelName;
 
     /**
+     * 是否启用检索重排（0否 1是）
+     */
+    private String rerankEnabled;
+
+    /**
+     * 重排模型主键（为空表示不重排）
+     */
+    private Long rerankModelId;
+
+    /**
+     * 重排模型名称（联表补充，便于列表展示）
+     */
+    private String rerankModelName;
+
+    /**
      * 向量集合名称
      */
     private String collectionName;

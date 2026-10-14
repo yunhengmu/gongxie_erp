@@ -27,6 +27,12 @@ export interface KnowledgeBaseVO {
   retrievalTopK?: number;
   /** 默认相似度阈值 */
   similarityThreshold?: number;
+  /** 是否启用检索重排（0否 1是） */
+  rerankEnabled?: string;
+  /** 重排模型主键（为空表示不重排） */
+  rerankModelId?: string | number;
+  /** 重排模型名称 */
+  rerankModelName?: string;
   /** 状态（0正常 1停用） */
   status: string;
   /** 归属部门（visibleScope=1 本部门时生效） */
@@ -62,6 +68,10 @@ export interface KnowledgeBaseForm extends BaseEntity {
   retrievalTopK?: number;
   /** 默认相似度阈值 */
   similarityThreshold?: number;
+  /** 是否启用检索重排（0否 1是） */
+  rerankEnabled?: string;
+  /** 重排模型主键（启用重排时必填） */
+  rerankModelId?: string | number;
   /** 状态（0正常 1停用） */
   status?: string;
   /** 归属部门（visibleScope=1 本部门时生效） */

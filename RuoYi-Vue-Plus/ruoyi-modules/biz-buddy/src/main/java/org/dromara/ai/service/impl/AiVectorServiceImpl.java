@@ -164,16 +164,29 @@ public class AiVectorServiceImpl implements IAiVectorService {
 
     @Override
     public List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold) {
-        return retrieve(kbId, query, topK, threshold, false);
+        // 默认检索：是否重排**按知识库配置**（不在调用方写死）
+        return retrieve(kbId, query, topK, threshold, null, null);
     }
 
     @Override
     public List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, boolean rerank) {
-        return retrieve(kbId, query, topK, threshold, rerank, null);
+        return retrieve(kbId, query, topK, threshold, Boolean.valueOf(rerank), null);
     }
 
+    /**
+     * 检索（含可选重排）。
+     *
+     * @param kbId       知识库主键
+     * @param query      查询文本
+     * @param topK       返回条数（为空取知识库配置）
+     * @param threshold  相似度阈值（为空取知识库配置）
+     * @param rerank     重排开关**覆盖**：{@code null}＝按知识库配置（{@code rerank_enabled}）；
+     *                   {@code true}/{@code false}＝显式要求/拒绝本次重排（供「检索测试」做 A/B）
+     * @param rerankMode 融合模式显式覆盖（为空取平台配置）
+     * @return 命中列表
+     */
     @Override
-    public List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, boolean rerank,
+    public List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, Boolean rerank,
                                            String rerankMode) {
         if (StringUtils.isBlank(query)) {
             throw new ServiceException("请输入查询内容");
@@ -189,8 +202,13 @@ public class AiVectorServiceImpl implements IAiVectorService {
                 ? knowledgeBase.getSimilarityThreshold().doubleValue()
                 : aiProperties.getRetrievalScoreThreshold());
 
+        // 本次是否重排：请求级参数可覆盖，否则按知识库配置；且必须该知识库的重排模型可用
+        boolean wantRerank = rerank != null
+            ? rerank : "1".equals(StringUtils.trim(knowledgeBase.getRerankEnabled()));
+        AiModelConfig rerankModel = wantRerank ? resolveRerankModel(knowledgeBase) : null;
+
         // 开启重排时先多召回（max(topK, rerankTopN)），给重排模型更大的候选池
-        int recallLimit = rerank ? Math.max(limit, aiProperties.getRag().getRerankTopN()) : limit;
+        int recallLimit = rerankModel != null ? Math.max(limit, aiProperties.getRag().getRerankTopN()) : limit;
 
         double[] queryVector = embeddingClient.embedOne(model, apiKey, query);
         List<AiVectorStore.VectorHit> hits = vectorStore.search(
@@ -199,10 +217,10 @@ public class AiVectorServiceImpl implements IAiVectorService {
             return List.of();
         }
         List<AiRetrievalHitVo> result = buildHits(hits);
-        if (!rerank) {
+        if (rerankModel == null) {
             return result;
         }
-        return applyRerank(apiKey, query, result, limit, resolveRerankMode(rerankMode));
+        return applyRerank(rerankModel, query, result, limit, resolveRerankMode(rerankMode));
     }
 
     /**
@@ -227,20 +245,22 @@ public class AiVectorServiceImpl implements IAiVectorService {
      * <p><b>条件触发</b>：当 {@code rerankTriggerMargin > 0} 且「首条与次条向量分差 ≥ margin」时，
      * 认为向量头部已足够确信，<b>跳过重排调用</b>直接返回原序 topK，节省一次模型调用。</p>
      *
-     * @param apiKey 明文密钥（复用知识库向量模型）
+     * @param rerankModel 该知识库绑定的重排模型（连接信息取自模型配置）
      * @param query  查询文本
      * @param hits   稠密召回结果（已按相似度降序）
      * @param topK   最终返回条数
      * @param mode   融合模式
      * @return 重排融合后（或降级原序）截取 topK 的结果
      */
-    private List<AiRetrievalHitVo> applyRerank(String apiKey, String query, List<AiRetrievalHitVo> hits,
+    private List<AiRetrievalHitVo> applyRerank(AiModelConfig rerankModel, String query, List<AiRetrievalHitVo> hits,
                                                int topK, AiRankFusion.Mode mode) {
         if (shouldSkipRerank(hits)) {
             return truncate(hits, topK);
         }
         List<String> documents = hits.stream().map(AiRetrievalHitVo::getContent).toList();
-        AiRerankClient.RerankOutcome outcome = rerankClient.rerank(apiKey, query, documents, documents.size());
+        AiRerankClient.RerankOutcome outcome = rerankClient.rerank(
+            modelConfigService.decryptApiKey(rerankModel.getId()), rerankModel.getBaseUrl(),
+            rerankModel.getModelCode(), query, documents, documents.size());
         if (outcome.degraded() || outcome.docs().isEmpty()) {
             // 降级：保持原余弦分与原顺序，仅按 topK 截断
             log.warn("检索重排降级为原顺序（kb 检索不受影响），候选数={}", hits.size());
@@ -460,6 +480,32 @@ public class AiVectorServiceImpl implements IAiVectorService {
             }
         }
         return ids;
+    }
+
+    /**
+     * 解析该知识库绑定的重排模型（连接信息取自「模型配置」，{@code model_type=rerank}）。
+     *
+     * <p><b>不抛异常</b>：重排是增强通道——未绑定 / 不存在 / 类型不符 / 已停用都只表示「本次不重排」，
+     * 绝不阻断检索（与 {@code docs/22} 对「决策模型是增强通道」的口径一致）。</p>
+     *
+     * @param knowledgeBase 知识库实体
+     * @return 可用的重排模型；不可用时返回 {@code null}
+     */
+    private AiModelConfig resolveRerankModel(AiKnowledgeBase knowledgeBase) {
+        Long modelId = knowledgeBase.getRerankModelId();
+        if (modelId == null) {
+            log.debug("知识库 {} 启用了重排但未绑定重排模型，本次不重排", knowledgeBase.getId());
+            return null;
+        }
+        AiModelConfig model = modelConfigMapper.selectById(modelId);
+        if (model == null
+            || !AiModelConfig.TYPE_RERANK.equalsIgnoreCase(StringUtils.trim(model.getModelType()))
+            || !"0".equals(StringUtils.trim(model.getStatus()))) {
+            log.warn("知识库 {} 的重排模型不可用（不存在 / 非 rerank 类型 / 已停用），本次不重排",
+                knowledgeBase.getId());
+            return null;
+        }
+        return model;
     }
 
     /**

@@ -44,23 +44,28 @@ public class AiRerankClient {
     /**
      * 文本重排。
      *
+     * <p><b>端点与模型由调用方给出</b>（2026-10-14 调整）：连接信息来自该知识库所选的重排模型配置
+     * （{@code ai_model_config}，{@code model_type=rerank}，见 {@code AiKnowledgeBase#rerankModelId}）；
+     * 本类不再从全局 {@link AiProperties.Rag} 取端点/模型，只保留与模型无关的超时。</p>
+     *
      * @param apiKey    明文密钥（为空直接降级）
+     * @param endpoint  完整重排端点（DashScope 文本重排接口）
+     * @param model     重排模型标识（如 {@code gte-rerank-v2}）
      * @param query     查询文本
      * @param documents 候选文本列表（顺序即原始召回顺序）
      * @param topN      期望返回条数（超出候选数时取候选数）
      * @return 重排结果；任何异常均降级为「degraded=true + 原始顺序」
      */
-    public RerankOutcome rerank(String apiKey, String query, List<String> documents, int topN) {
+    public RerankOutcome rerank(String apiKey, String endpoint, String model, String query,
+                               List<String> documents, int topN) {
         int size = documents == null ? 0 : documents.size();
         if (StringUtils.isBlank(apiKey) || StringUtils.isBlank(query) || size == 0) {
             return RerankOutcome.degradedOrder(size);
         }
-
-        AiProperties.Rag rag = aiProperties.getRag();
-        String endpoint = StringUtils.trim(rag.getRerankEndpoint());
-        String model = StringUtils.trim(rag.getRerankModel());
-        if (StringUtils.isBlank(endpoint) || StringUtils.isBlank(model)) {
-            log.warn("重排已启用但端点或模型未配置，降级为原顺序");
+        String url = StringUtils.trim(endpoint);
+        String code = StringUtils.trim(model);
+        if (StringUtils.isBlank(url) || StringUtils.isBlank(code)) {
+            log.warn("重排模型未配置端点或模型标识，降级为原顺序");
             return RerankOutcome.degradedOrder(size);
         }
 
@@ -72,14 +77,15 @@ public class AiRerankClient {
         parameters.put("top_n", effectiveTopN);
         parameters.put("return_documents", false);
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", model);
+        body.put("model", code);
         body.put("input", input);
         body.put("parameters", parameters);
 
-        int timeout = rag.getRerankTimeoutMs() > 0 ? rag.getRerankTimeoutMs() : 12000;
+        int timeout = aiProperties.getRag().getRerankTimeoutMs() > 0
+            ? aiProperties.getRag().getRerankTimeoutMs() : 12000;
         int status;
         String responseBody;
-        try (HttpResponse response = HttpUtil.createPost(endpoint)
+        try (HttpResponse response = HttpUtil.createPost(url)
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer " + apiKey)
             .timeout(timeout)

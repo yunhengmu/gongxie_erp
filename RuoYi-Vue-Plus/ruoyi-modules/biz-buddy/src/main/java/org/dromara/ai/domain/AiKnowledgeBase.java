@@ -1,5 +1,7 @@
 package org.dromara.ai.domain;
 
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -78,6 +80,18 @@ public class AiKnowledgeBase extends BaseEntity {
      * 默认相似度阈值
      */
     private BigDecimal similarityThreshold;
+
+    /**
+     * 是否启用检索重排（0否 1是，非空默认 0）：开启后检索走「稠密召回 → 重排 → 融合 → 截断 topK」
+     */
+    private String rerankEnabled;
+
+    /**
+     * 重排模型（ai_model_config.id，model_type=rerank）：为空表示不重排
+     * <p>关闭重排时需把本列清空，故用 ALWAYS——否则 updateById 会跳过 null 字段，库里仍留着旧模型 id。</p>
+     */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private Long rerankModelId;
 
     /**
      * 状态（0正常 1停用）

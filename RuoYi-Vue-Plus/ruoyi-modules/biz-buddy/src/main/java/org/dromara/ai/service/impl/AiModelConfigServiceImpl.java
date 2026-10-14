@@ -243,6 +243,11 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
                 if (knowledgeBaseMapper.selectCount(ref) > 0) {
                     throw new ServiceException("该模型已被知识库引用为向量模型，请先调整知识库配置后再删除");
                 }
+                LambdaQueryWrapper<AiKnowledgeBase> rerankRef = Wrappers.lambdaQuery();
+                rerankRef.eq(AiKnowledgeBase::getRerankModelId, id);
+                if (knowledgeBaseMapper.selectCount(rerankRef) > 0) {
+                    throw new ServiceException("该模型已被知识库引用为重排模型，请先调整知识库配置后再删除");
+                }
             }
         }
         return baseMapper.deleteByIds(ids) > 0;
@@ -257,11 +262,17 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
             if (StringUtils.isBlank(apiKey) && bo.getId() != null) {
                 apiKey = decryptApiKey(bo.getId());
             }
-            validateEndpoint(bo.getBaseUrl());
             int timeout = bo.getTimeoutSeconds() != null ? bo.getTimeoutSeconds() : aiProperties.getTestTimeoutSeconds();
-            if (isDecision(bo.getModelType())) {
+            if (isRerank(bo.getModelType())) {
+                // 重排类型：baseUrl 即**完整重排端点**（DashScope 原生接口，路径含 /api/v1），
+                // 故不走 OpenAI 兼容地址校验，也不拼 /chat/completions 之类的后缀
+                validateRerankEndpoint(bo.getBaseUrl());
+                fillRerankResult(result, bo, apiKey, timeout);
+            } else if (isDecision(bo.getModelType())) {
+                validateEndpoint(bo.getBaseUrl());
                 fillDecisionResult(result, bo, apiKey, timeout);
             } else {
+                validateEndpoint(bo.getBaseUrl());
                 boolean embedding = isEmbedding(bo.getModelType());
                 String url = resolveEndpoint(bo.getBaseUrl(), embedding);
                 String body = buildTestBody(bo.getModelCode(), embedding, bo.getDimension(),
@@ -556,8 +567,10 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
         String modelType = StringUtils.trim(entity.getModelType());
         if (!AiModelConfig.TYPE_CHAT.equalsIgnoreCase(modelType)
             && !AiModelConfig.TYPE_EMBEDDING.equalsIgnoreCase(modelType)
-            && !AiModelConfig.TYPE_DECISION.equalsIgnoreCase(modelType)) {
-            throw new ServiceException("模型类型只能是 chat（对话）/ embedding（向量）/ decision（决策）");
+            && !AiModelConfig.TYPE_DECISION.equalsIgnoreCase(modelType)
+            && !AiModelConfig.TYPE_RERANK.equalsIgnoreCase(modelType)) {
+            throw new ServiceException(
+                "模型类型只能是 chat（对话）/ embedding（向量）/ decision（决策）/ rerank（重排）");
         }
         if (isEmbedding(entity.getModelType()) && entity.getDimension() == null) {
             throw new ServiceException("向量模型必须填写向量维度");
@@ -588,6 +601,75 @@ public class AiModelConfigServiceImpl implements IAiModelConfigService {
      */
     private boolean isDecision(String modelType) {
         return AiModelConfig.TYPE_DECISION.equalsIgnoreCase(StringUtils.trim(modelType));
+    }
+
+    /**
+     * 是否重排模型（检索结果重排序，DashScope 文本重排协议）。
+     *
+     * @param modelType 模型类型
+     * @return 是否重排模型
+     */
+    private boolean isRerank(String modelType) {
+        return AiModelConfig.TYPE_RERANK.equalsIgnoreCase(StringUtils.trim(modelType));
+    }
+
+    /**
+     * 重排端点的轻校验：只查空值与协议头。
+     *
+     * <p>不复用 {@link #validateEndpoint}——它会拦掉「DashScope 原生接口（含 {@code /api/v1}）」，
+     * 而重排端点（{@code .../api/v1/services/rerank/text-rerank/text-rerank}）本身就是原生接口，
+     * 平台并无 OpenAI 兼容版重排路径。</p>
+     *
+     * @param baseUrl 重排端点（完整 URL）
+     */
+    private void validateRerankEndpoint(String baseUrl) {
+        String base = StringUtils.trim(baseUrl);
+        if (StringUtils.isBlank(base)) {
+            throw new ServiceException("重排模型的服务地址不能为空（请填完整重排端点）");
+        }
+        if (base.contains("{") || base.contains("}")) {
+            throw new ServiceException("服务地址仍包含占位符（如 {WorkspaceId}），请替换为真实业务空间 ID 后再测试");
+        }
+        if (!base.startsWith("http://") && !base.startsWith("https://")) {
+            throw new ServiceException("服务地址需以 http:// 或 https:// 开头");
+        }
+    }
+
+    /**
+     * 重排模型连通性：按 DashScope 文本重排协议外呼一次（1 条 query + 2 条示例文档），
+     * 能从 {@code output.results} 解析出非空结果数组即视为可用。
+     *
+     * @param result  测试结果（就地写入）
+     * @param bo      表单数据（取 baseUrl / modelCode）
+     * @param apiKey  密钥（为空则不带鉴权头）
+     * @param timeout 超时（秒）
+     * @throws Exception 传输层异常（超时 / 连接失败等）
+     */
+    private void fillRerankResult(AiModelTestVo result, AiModelConfigBo bo, String apiKey, int timeout)
+        throws Exception {
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("query", "连通性测试");
+        input.put("documents", List.of("连通性测试文档一", "无关文档二"));
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", bo.getModelCode());
+        body.put("input", input);
+        body.put("parameters", Map.of("top_n", 2));
+        HttpCall call = post(StringUtils.trim(bo.getBaseUrl()), JsonUtils.toJsonString(body), apiKey, timeout);
+        if (call.status() < 200 || call.status() >= 300) {
+            result.setSuccess(false);
+            result.setMessage(buildHttpErrorMessage(call.status(), call.body()));
+            return;
+        }
+        boolean parsed;
+        try {
+            JsonNode results = JsonUtils.getJsonMapper().readTree(call.body()).path("output").path("results");
+            parsed = results.isArray() && !results.isEmpty();
+        } catch (Exception e) {
+            parsed = false;
+        }
+        result.setSuccess(parsed);
+        result.setMessage(parsed ? "重排模型连通性正常：" + bo.getModelCode()
+            : "响应中未找到重排结果（output.results）：" + abbreviate(call.body()));
     }
 
     /**

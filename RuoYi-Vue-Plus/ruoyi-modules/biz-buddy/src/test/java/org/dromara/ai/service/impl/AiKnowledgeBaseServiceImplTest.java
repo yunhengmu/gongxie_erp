@@ -598,6 +598,54 @@ class AiKnowledgeBaseServiceImplTest {
         assertSame(entity, knowledgeBaseService.queryEntity(1L));
     }
 
+    /**
+     * 验证启用重排但未选重排模型时拒绝保存。
+     */
+    @Test
+    @DisplayName("启用重排未选模型抛异常")
+    void shouldRejectRerankWithoutModel() {
+        AiKnowledgeBase add = new AiKnowledgeBase();
+        add.setKbCode("kb_1");
+        add.setEmbeddingModelId(5L);
+        add.setRerankEnabled("1");
+        when(modelConfigMapper.selectById(5L)).thenReturn(embeddingModel(5L, 1024));
+
+        try (MockedStatic<MapstructUtils> ms = mockStatic(MapstructUtils.class)) {
+            ms.when(() -> MapstructUtils.convert(any(AiKnowledgeBaseBo.class), eq(AiKnowledgeBase.class))).thenReturn(add);
+            ServiceException ex = assertThrows(ServiceException.class,
+                () -> knowledgeBaseService.insertByBo(new AiKnowledgeBaseBo()));
+            assertTrue(ex.getMessage().contains("必须选择重排模型"));
+        }
+    }
+
+    /**
+     * 验证未启用重排时把重排开关归零并清空模型绑定。
+     */
+    @Test
+    @DisplayName("未启用重排时清空重排模型绑定")
+    void shouldClearRerankWhenDisabled() {
+        AiKnowledgeBaseBo bo = new AiKnowledgeBaseBo();
+        AiKnowledgeBase add = new AiKnowledgeBase();
+        add.setKbCode(" Kb_1 ");
+        add.setEmbeddingModelId(5L);
+        add.setRerankEnabled("0");
+        add.setRerankModelId(9L);
+        when(modelConfigMapper.selectById(5L)).thenReturn(embeddingModel(5L, 1024));
+        when(baseMapper.selectCount(any())).thenReturn(0L);
+        when(baseMapper.insert(any(AiKnowledgeBase.class))).thenAnswer(inv -> {
+            ((AiKnowledgeBase) inv.getArgument(0)).setId(100L);
+            return 1;
+        });
+
+        try (MockedStatic<MapstructUtils> ms = mockStatic(MapstructUtils.class)) {
+            ms.when(() -> MapstructUtils.convert(bo, AiKnowledgeBase.class)).thenReturn(add);
+            assertTrue(knowledgeBaseService.insertByBo(bo));
+        }
+
+        assertEquals("0", add.getRerankEnabled());
+        assertNull(add.getRerankModelId());
+    }
+
     private AiModelConfig embeddingModel(Long id, Integer dimension) {
         AiModelConfig model = new AiModelConfig();
         model.setId(id);

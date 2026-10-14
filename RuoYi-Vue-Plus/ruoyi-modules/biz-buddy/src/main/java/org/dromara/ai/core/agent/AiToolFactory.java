@@ -269,9 +269,9 @@ public class AiToolFactory {
     public Optional<AgentTool> create(AiTool definition, List<Long> kbIds, boolean platformScope) {
         String implName = definition.getImplName();
         if (IMPL_KNOWLEDGE_SEARCH.equals(implName)) {
+            // 是否重排由**知识库配置**决定（不再按平台开关写死），故此处不再传重排开关
             return Optional.of(new KnowledgeSearchTool(vectorService, kbIds, null, knowledgeBaseService, platformScope,
-                aiProperties.getRag().isRerankEnabled(), AiRetrievalContextAssembler.Options.from(aiProperties.getRag()),
-                retrievalSourceRegistry));
+                AiRetrievalContextAssembler.Options.from(aiProperties.getRag()), retrievalSourceRegistry));
         }
         if (IMPL_CREATE_NOTICE.equals(implName)) {
             return Optional.of(new CreateNoticeTool(noticeService, permissionService));

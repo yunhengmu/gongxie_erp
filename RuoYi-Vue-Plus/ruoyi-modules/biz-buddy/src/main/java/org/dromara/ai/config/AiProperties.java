@@ -504,34 +504,16 @@ public class AiProperties {
     }
 
     /**
-     * RAG 检索增强配置（当前仅「检索重排 Rerank」）。
+     * RAG 检索增强配置（检索重排 Rerank 的**算法参数** + 上下文装配）。
      *
-     * <p>口径：<b>默认关闭</b>（{@code rerankEnabled=false}），开启后检索走「稠密召回 → 文本重排 → 截断 topK」，
-     * 可经「检索测试」接口的 {@code rerank} 参数或本开关按需对 A/B。</p>
+     * <p><b>模型与开关已不在本段</b>（2026-10-14 调整）：重排模型登记在「模型配置」（{@code model_type=rerank}）,
+     * 「是否启用重排 + 用哪个模型」由**知识库**配置（{@code ai_knowledge_base.rerank_enabled / rerank_model_id}）；
+     * 本段只保留与模型无关的算法参数（候选数 / 融合模式 / 权重 / 条件触发 / 超时）。</p>
      *
-     * <p>降级：未配密钥 / HTTP 非 2xx / 超时 / 响应结构不符时，<b>一律保持原顺序</b>，绝不阻断检索。</p>
+     * <p>降级：模型未配置 / 密钥缺失 / HTTP 非 2xx / 超时 / 响应结构不符时，<b>一律保持原顺序</b>，绝不阻断检索。</p>
      */
     @Data
     public static class Rag {
-
-        /**
-         * 是否启用检索重排（**默认开启**）。
-         *
-         * <p>实测依据（56 用例评测集，见 docs/17 §89）：开启后 hit@1 67.9%→75.0%、MRR 0.772→0.829、
-         * hit@5 89.3%→98.2%、recall@5 96.4%→98.2%（延迟约 +170ms，`rerankMode=score_fusion`）。
-         * 依赖 DashScope 文本重排端点与知识库向量模型密钥；任一不可用时**自动降级为原顺序**，不影响检索可用性。</p>
-         */
-        private boolean rerankEnabled = true;
-
-        /**
-         * 重排模型标识（DashScope 文本重排）
-         */
-        private String rerankModel = "gte-rerank-v2";
-
-        /**
-         * 重排服务端点（DashScope 原生文本重排接口，完整 URL）
-         */
-        private String rerankEndpoint = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank";
 
         /**
          * 重排前的稠密召回条数（先按 max(topK, rerankTopN) 召回再重排）。

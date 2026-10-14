@@ -256,7 +256,7 @@ create table if not exists ai_model_config (
 comment on table ai_model_config is 'AI 模型配置表';
 comment on column ai_model_config.config_name is '配置名称';
 comment on column ai_model_config.provider is '提供商（openai/dashscope/deepseek/glm/ollama/custom）';
-comment on column ai_model_config.model_type is '模型类型（chat 对话 / embedding 向量 / decision 决策）';
+comment on column ai_model_config.model_type is '模型类型（chat 对话 / embedding 向量 / decision 决策 / rerank 重排）';
 comment on column ai_model_config.model_code is '模型标识（如 qwen-plus、text-embedding-v3）';
 comment on column ai_model_config.supports_vision is '是否支持视觉（图片输入；仅对话模型有意义）：1是 0否';
 comment on column ai_model_config.base_url is '服务地址（OpenAI 兼容根地址）';
@@ -280,6 +280,8 @@ create table if not exists ai_knowledge_base (
     chunk_size           integer       default 500,
     chunk_overlap        integer       default 50,
     retrieval_top_k      integer       default 5,
+    rerank_enabled       varchar(1)    not null default '0',
+    rerank_model_id      bigint,
     similarity_threshold numeric(4, 3) default 0.500,
     status               char(1)       default '0',
     remark               varchar(500),
@@ -301,6 +303,8 @@ comment on column ai_knowledge_base.dimension is '向量维度（与向量模型
 comment on column ai_knowledge_base.chunk_size is '切片长度（字符）';
 comment on column ai_knowledge_base.chunk_overlap is '切片重叠长度（字符）';
 comment on column ai_knowledge_base.retrieval_top_k is '默认召回条数';
+comment on column ai_knowledge_base.rerank_enabled is '是否启用检索重排（0否 1是）';
+comment on column ai_knowledge_base.rerank_model_id is '重排模型（ai_model_config.id，model_type=rerank）';
 comment on column ai_knowledge_base.similarity_threshold is '默认相似度阈值';
 comment on column ai_knowledge_base.status is '状态（0正常 1停用）';
 comment on column ai_knowledge_base.owner_dept_id is '归属部门（visible_scope=1 时生效）';

@@ -53,7 +53,8 @@ public class AiRetrievalController extends BaseController {
      * @param query     查询文本
      * @param topK      召回条数，为空取知识库配置
      * @param threshold 相似度阈值，为空取知识库配置
-     * @param rerank    是否开启重排，为空时跟随平台配置（{@code bizbuddy.ai.rag.rerank-enabled}）
+     * @param rerank    是否开启重排：为空时**按知识库配置**（{@code rerank_enabled + rerank_model_id}）；
+     *                  传 true/false 可显式覆盖（仅供检索测试做 A/B）
      * @param assemble  是否对命中应用上下文装配（P0-③ 去重 + 相邻合并 + 字符上限）；为空 / false 时保持原始命中
      * @param rerankMode 重排融合模式（{@code replace} / {@code rank_rrf} / {@code score_fusion}），
      *                   为空时跟随平台配置（{@code bizbuddy.ai.rag.rerank-mode}）；仅 {@code rerank=true} 时生效
@@ -73,8 +74,8 @@ public class AiRetrievalController extends BaseController {
                                           @RequestParam(required = false) Boolean assemble,
                                           @RequestParam(required = false) String rerankMode) {
         aiKnowledgeBaseService.validateVisible(kbId, LoginHelper.getUserId(), "检索");
-        boolean useRerank = rerank != null ? rerank : aiProperties.getRag().isRerankEnabled();
-        List<AiRetrievalHitVo> hits = aiVectorService.retrieve(kbId, query, topK, threshold, useRerank, rerankMode);
+        // 是否重排：传参显式覆盖；未传时按知识库配置（rerank_enabled + 绑定的重排模型）
+        List<AiRetrievalHitVo> hits = aiVectorService.retrieve(kbId, query, topK, threshold, rerank, rerankMode);
         if (Boolean.TRUE.equals(assemble)) {
             return R.ok(AiRetrievalContextAssembler.assemble(hits,
                 AiRetrievalContextAssembler.Options.from(aiProperties.getRag())));

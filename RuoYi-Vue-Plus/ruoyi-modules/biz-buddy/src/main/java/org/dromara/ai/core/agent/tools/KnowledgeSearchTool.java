@@ -68,11 +68,6 @@ public class KnowledgeSearchTool extends ToolBase {
     private final boolean platformScope;
 
     /**
-     * 是否开启检索重排（Rerank），来自平台配置
-     */
-    private final boolean rerank;
-
-    /**
      * 上下文装配参数（P0-③ 去重 + 相邻合并 + 字符上限），来自平台配置；为 null 时取默认值
      */
     private final AiRetrievalContextAssembler.Options assembleOptions;
@@ -92,7 +87,7 @@ public class KnowledgeSearchTool extends ToolBase {
      */
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
                                IAiKnowledgeBaseService knowledgeBaseService) {
-        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, false, false, null, null);
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, false, null, null);
     }
 
     /**
@@ -110,22 +105,7 @@ public class KnowledgeSearchTool extends ToolBase {
      */
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
                                IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope) {
-        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, false, null, null);
-    }
-
-    /**
-     * 完整构造。
-     *
-     * @param vectorService        向量检索服务
-     * @param kbIds                知识库主键集合
-     * @param defaultTopK          默认召回条数，留空取 5
-     * @param knowledgeBaseService 知识库服务
-     * @param platformScope        是否平台出口模式
-     * @param rerank               是否开启检索重排
-     */
-    public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
-                               IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope, boolean rerank) {
-        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, rerank, null, null);
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, null, null);
     }
 
     /**
@@ -136,29 +116,30 @@ public class KnowledgeSearchTool extends ToolBase {
      * @param defaultTopK          默认召回条数，留空取 5
      * @param knowledgeBaseService 知识库服务
      * @param platformScope        是否平台出口模式
-     * @param rerank               是否开启检索重排
      * @param assembleOptions      上下文装配参数；为 null 取默认值
      */
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
-                               IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope, boolean rerank,
+                               IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope,
                                AiRetrievalContextAssembler.Options assembleOptions) {
-        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, rerank, assembleOptions, null);
+        this(vectorService, kbIds, defaultTopK, knowledgeBaseService, platformScope, assembleOptions, null);
     }
 
     /**
      * 完整构造（含上下文装配参数与来源注册表）。
+     *
+     * <p><b>是否重排由知识库配置决定</b>（{@code ai_knowledge_base.rerank_enabled / rerank_model_id}，
+     * 2026-10-14 起不再由本工具按平台开关写死）。</p>
      *
      * @param vectorService        向量检索服务
      * @param kbIds                知识库主键集合
      * @param defaultTopK          默认召回条数，留空取 5
      * @param knowledgeBaseService 知识库服务
      * @param platformScope        是否平台出口模式
-     * @param rerank               是否开启检索重排
      * @param assembleOptions      上下文装配参数；为 null 取默认值
      * @param sourceRegistry       检索来源注册表；为 null 时不暂存来源
      */
     public KnowledgeSearchTool(IAiVectorService vectorService, List<Long> kbIds, Integer defaultTopK,
-                               IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope, boolean rerank,
+                               IAiKnowledgeBaseService knowledgeBaseService, boolean platformScope,
                                AiRetrievalContextAssembler.Options assembleOptions,
                                AiRetrievalSourceRegistry sourceRegistry) {
         super(ToolBase.builder()
@@ -172,7 +153,6 @@ public class KnowledgeSearchTool extends ToolBase {
         this.defaultTopK = defaultTopK;
         this.knowledgeBaseService = knowledgeBaseService;
         this.platformScope = platformScope;
-        this.rerank = rerank;
         this.assembleOptions = assembleOptions;
         this.sourceRegistry = sourceRegistry;
     }
@@ -222,7 +202,8 @@ public class KnowledgeSearchTool extends ToolBase {
         try {
             List<AiRetrievalHitVo> hits = new ArrayList<>();
             for (Long kbId : accessible) {
-                List<AiRetrievalHitVo> part = vectorService.retrieve(kbId, query, topK, null, rerank);
+                // 传三个 null＝(阈值默认, 重排按知识库配置, 融合模式默认)
+                List<AiRetrievalHitVo> part = vectorService.retrieve(kbId, query, topK, null, null, null);
                 if (part != null) {
                     hits.addAll(part);
                 }

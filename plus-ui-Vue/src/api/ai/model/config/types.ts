@@ -9,7 +9,7 @@ export interface ModelConfigVO {
   configName: string;
   /** 提供商 */
   provider: string;
-  /** 模型类型（chat 对话 / embedding 向量 / decision 决策） */
+  /** 模型类型（chat 对话 / embedding 向量 / decision 决策 / rerank 重排） */
   modelType: string;
   /** 模型标识 */
   modelCode: string;
@@ -46,7 +46,7 @@ export interface ModelConfigForm extends BaseEntity {
   configName?: string;
   /** 提供商 */
   provider?: string;
-  /** 模型类型（chat 对话 / embedding 向量 / decision 决策） */
+  /** 模型类型（chat 对话 / embedding 向量 / decision 决策 / rerank 重排） */
   modelType?: string;
   /** 模型标识 */
   modelCode?: string;
