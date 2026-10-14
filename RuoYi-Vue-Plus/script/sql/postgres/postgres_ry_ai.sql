@@ -1404,10 +1404,11 @@ create index if not exists idx_ai_safety_event_scene on ai_safety_event (scene);
 -- ============================================================
 -- 三、内置模型配置种子（ai_model_config）
 -- ============================================================
---   预置三个**示例模型**（提供商：阿里云百炼 / DashScope）：
+--   预置四个**示例模型**（提供商：阿里云百炼 / DashScope）：
 --     ① deepseek-v4.1-flash     对话模型（model_type=chat）
 --     ② qwen3.7-text-embedding-flash  向量模型（model_type=embedding，维度 1024）
 --     ③ decision-model-preview  决策模型（model_type=decision，供「安全合规配置 → 结构化决策路由」引用）
+--     ④ gte-rerank-v2           重排模型（model_type=rerank，供「知识库管理」的检索重排引用）
 --   注意：
 --   a. **api_key 一律留空** —— 部署后请到「模型配置」换成本人的阿里云百炼密钥；
 --      若要使用其它模型，也可在该页另行新建，再把「小Z 配置」「专家配置」的模型槽位指向它。
@@ -1418,6 +1419,9 @@ create index if not exists idx_ai_safety_event_scene on ai_safety_event (scene);
 --      （如 https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode，运行时自动拼 /v1/systemone）；
 --      通用的 https://dashscope.aliyuncs.com/compatible-mode 上**没有该接口**（实测返回 404），
 --      故此处按占位符预置，部署后须替换为真实业务空间 ID 并补齐密钥。
+--   e. 重排模型走 DashScope **文本重排原生接口**，base_url 须填**完整端点**
+--      （https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank，不拼 /chat/completions），
+--      model_code 即重排模型名（此处 gte-rerank-v2）；知识库要在「知识库管理」开重排开关并选中它。
 -- ============================================================
 insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
                              base_url, api_key,
@@ -1446,6 +1450,16 @@ values (1761400000000020402, 'decision-model-preview', 'dashscope', 'decision', 
         'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode', null,
         null, '0',
         '预置示例（决策模型，阿里云百炼 TypeSafe System One）：base_url 必须替换为业务空间专属域名（通用 dashscope 域名无 /v1/systemone，实测 404）；同时补齐 API 密钥',
+        1761000000000000103, 1761100000000000001, now(), '0')
+on conflict (id) do nothing;
+
+insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
+                             base_url, api_key,
+                             dimension, status, remark, create_dept, create_by, create_time, del_flag)
+values (1761400000000020403, 'gte-rerank-v2', 'dashscope', 'rerank', 'gte-rerank-v2', '1',
+        'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank', null,
+        null, '0',
+        '预置示例（重排模型，阿里云百炼文本重排原生接口）：base_url 须填完整重排端点；部署后请换密钥或另行新建模型',
         1761000000000000103, 1761100000000000001, now(), '0')
 on conflict (id) do nothing;
 
