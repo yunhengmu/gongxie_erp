@@ -328,8 +328,16 @@ public class AiRouteOrchestrator {
             route.expertPromptTokens.addAndGet(usage.promptTokens());
             route.expertCompletionTokens.addAndGet(usage.completionTokens());
         }
-        // 预算走运行期配置（Redis 覆盖优先，缺省回落 AiProperties.Chat），保存后下一次编排即生效
-        AiRouteBudgetConfigBo budget = runtimeConfigStore.routeBudget();
+        // 预算走运行期配置（Redis 覆盖优先，缺省回落 AiProperties.Chat），保存后下一次编排即生效。
+        // **记账是尽力而为**：Redis 读失败（含线程遗留中断态导致的 RedisException）只告警、不外抛——
+        // 否则会连累其后的取消收尾，把「已取消」审计明细一并丢掉（实测约半数 L13 失败）。
+        AiRouteBudgetConfigBo budget;
+        try {
+            budget = runtimeConfigStore.routeBudget();
+        } catch (Exception e) {
+            log.warn("编排预算读取失败，本轮跳过预算判定（不影响审计）：sessionId={}", route.sessionId, e);
+            return;
+        }
         long tokens = route.expertPromptTokens.get() + route.expertCompletionTokens.get();
         if (budget.getExpertTokens() > 0 && tokens >= budget.getExpertTokens()) {
             route.budgetExceeded = true;
@@ -641,11 +649,22 @@ public class AiRouteOrchestrator {
         // 用户停止（「停止生成」/ SSE 断连）：不判契约、不置降级、不发 route_fallback，
         // 调用明细记「已取消」、子链路记「已中止」；置 route.cancelled 后交调用方按「已中止」收尾
         if (cancelled) {
+            // **取消收尾的硬约束：审计明细不可被跳过**。外层 dispose 对 boundedElastic 工作线程的中断是
+            // **异步送达**的——可能落在取消判定之后、甚至落在随后的 Redis / DB 收尾调用上（点清一次收不
+            // 干净，实测仍约半数失败）。故：① 清中断态收窄窗口；② 把 recordCall 提到一切 Redis 记账与
+            // 其他收尾之前，只依赖内存态；③ 子链路记账包 try/catch，失败只告警不外抛。
+            // 取消信号已由 externalCancel / interrupted 承载，清中断态不影响归因。
+            Thread.interrupted();
             ChatTokenUsage cancelledUsage = state.toTokenUsage();
             recordCall(route, candidate, expertSessionId, attempt, kind, null, false, CANCELLED_TEXT,
                 false, true, cancelledUsage, durationMs);
-            accumulateTrace(state, childTraceId, false, CANCELLED_TEXT, false, cancelledUsage, durationMs);
             route.cancelled = true;
+            try {
+                accumulateTrace(state, childTraceId, false, CANCELLED_TEXT, false, cancelledUsage, durationMs);
+            } catch (Exception e) {
+                log.warn("取消收尾的子链路记账失败（不影响专家调用明细）：expert={}, attempt={}",
+                    candidate.agentKey(), attempt, e);
+            }
             return ExpertAttempt.stopped();
         }
 

@@ -129,7 +129,8 @@
 | 配置项 | 默认 | 说明 |
 |---|---|---|
 | `enabled` | `false` | 内容审核总开关（默认关以免误杀；开启后按 `action` 处置） |
-| `engine` | `local` | 审核引擎：`local`（本地词库）/ `external`（外部 API，预留） |
+| `engine` | `local` | 审核引擎：`local`（本地词库）/ `external`（外部内容安全 API；缺端点或密钥自动降级本地词库，调用失败按未命中放行） |
+| `external.endpoint` / `external.api-key` / `external.timeout-ms` | 空 / 空 / `3000` | 外部引擎服务地址、密钥与单次超时（`engine=external` 时使用；默认值，页面上写入运行期配置覆盖） |
 | `action` | `log` | 命中处置：`log`（只留痕）/ `mask`（脱敏放行）/ `block`（阻断） |
 | `input-check` | `true` | 审核用户输入 |
 | `output-check` | `true` | 审核模型输出 |

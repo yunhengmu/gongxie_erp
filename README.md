@@ -48,8 +48,8 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 - **功能地图与权限模型**——6 个分组、33 个功能页与权限标识约定、工具三档授权；
 - **智能体与对话**——任务工作台、入口智能体「小Z」配置、专家配置（含提示词 **AI 辅助生成 / 模板套用 / 克隆专家 / 保存前体检**）、任务管理、定时任务、计划模式、技能仓库、长期记忆、工作区文件、子智能体、场景包；
 - **模型与推理 / 知识库与检索**——模型配置与连通性测试、用量与配额、上下文压缩策略、编排预算（运行期可调）；知识库、文档与切片、检索测试；**RAG 检索增强**（Rerank 重排默认开启 + 结果去重 / 相邻合并的上下文装配 + Token 预算）；
-- **工具与集成**——业务工具注册、MCP 服务端（对外出口）与客户端（接入外部）、飞书 / 企业微信 / 钉钉 / GitHub 渠道接入；**MCP 自演示**（系统信息工具 `get_system_info` + 启动时登记一条指向自身 `/mcp` 的客户端连接）；
-- **安全合规**——敏感词库、安全事件留痕、安全合规配置（输入 / 输出 / 渠道出站 / 工具结果 / 知识库入库 / MCP 出口全链路过审 + PII 脱敏 + 提示词注入防护）；
+- **工具与集成**——业务工具注册、MCP 服务端（对外出口）与客户端（接入外部）、飞书 / 企业微信 / 钉钉 / GitHub 渠道接入；**MCP 自演示**（系统信息工具 `get_system_info` + 启动时登记一条指向自身 `/mcp` 的客户端连接）；业务工具与**外部 MCP 回参**一律过脱敏；
+- **安全合规**——敏感词库、安全事件留痕、安全合规配置（输入 / 输出 / 渠道出站 / 工具结果 / 知识库入库 / MCP 出口全链路过审 + PII 脱敏 + 提示词注入防护）；审核引擎可选**本地词库 / 外部内容安全 API**（缺端点或密钥自动降级本地词库）；
 - **审计与观测**——会话与消息、工具调用、权限决策、链路追踪、编排运行五类留痕；
 - **配置项与运行依赖**——`bizbuddy.ai` 配置清单与依赖组件。
 
@@ -181,6 +181,22 @@ JaCoCo 覆盖率报告（构建后生成）：
 RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/index.html   # HTML 报告
 RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器可读
 ```
+
+### 集成测试（真库 schema 与框架装配）
+
+单测全 Mockito、不起 Spring 容器，e2e 只看接口行为，「框架 × 配置」类缺陷两边都抓不到。另有 4 个集成测试类，**默认全部跳过**（设 `BIZBUDDY_IT=true` 才执行），需两栈（PG `5432` / MySQL `3306`）已运行（**任一栈连上即跑该栈**）：
+
+- `AiDbDialectIntegrationTest`（`biz-buddy`）——裸 JDBC 拉取 PostgreSQL / MySQL 两栈的**真实 schema** 逐项对比：AI 表 / 列 / `idx_ai_` 索引 / `sys_menu` 的 `ai:` 权限，并显式断言 6 个 `create_time` 索引两方言都在；
+- `AiEntitySchemaIntegrationTest`（`biz-buddy`）——以**实体元数据**为准反查真库：`org.dromara.ai.domain` 下带 `@TableName` 的实体按 MyBatis-Plus 映射规则算出期望列，缺表 / 缺列即失败（补「两方言**同时**漏改」这一方言对比抓不到的盲区）；
+- `AiSkillRepositoryIntegrationTest`（`biz-buddy`）——直接调生产装配 `AgentScopeConfig#aiSkillRepository` 建出**方言专属**技能仓库（PG / MySQL 两分支），用临时技能走「裸 JDBC 写 → 框架仓库读」，验证 `ai_skill` / `ai_skill_resource` 列结构兼容与只读契约，收尾删除；
+- `AiContextIntegrationTest`（`ruoyi-admin`）——`@SpringBootTest`（随机端口、`snail-job.enabled=false`）验证整套 Bean 能否装配、运行期配置走真 Redis（覆盖优先）、审计超期统计走真库。
+
+```bash
+# 在 RuoYi-Vue-Plus 目录下；先设 BIZBUDDY_IT=true（PowerShell：$env:BIZBUDDY_IT='true'）
+./mvnw.cmd -o -pl ruoyi-admin -am test
+```
+
+坐标可用 `BIZBUDDY_IT_PG_URL` / `BIZBUDDY_IT_MYSQL_URL` 覆盖；不引 Testcontainers，默认 `mvn test` 行为不变。
 
 ### 端到端测试（e2e）
 

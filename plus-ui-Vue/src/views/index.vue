@@ -7,7 +7,7 @@
         <p>
           BizBuddy 以 AgentScope 2.0 为内核：入口智能体「小Z」统一接待，能准确回答的直接回答，需要领域能力的按专家清单路由；
           专家智能体带着只读工具、知识库与技能作业，把自己的判断直接回给提问人。写操作一律先经人工确认，
-          每一轮编排、每次工具调用与每一次权限决策都留痕。
+          对话内容过安全审核，每一轮编排、每次工具调用与每一次权限决策都留痕。
         </p>
         <div class="hero-actions">
           <el-button v-if="chatVisible" type="primary" @click="goPage('/bizbuddy/agent/chat')">开始对话</el-button>
@@ -195,8 +195,15 @@ const capabilities = [
     icon: 'tool',
     status: '已落地',
     title: '工具与 MCP 双向接入',
-    desc: '业务工具按「允许 / 需确认 / 禁止」三档授权注册；MCP 客户端接入外部系统，MCP 服务端把只读工具对外提供给第三方 AI。',
+    desc: '业务工具按「允许 / 需确认 / 禁止」三档授权注册；MCP 客户端接入外部系统、服务端把只读工具对外提供，第三方 MCP 回参同样过脱敏。',
     tags: ['MCP', '三档授权']
+  },
+  {
+    icon: 'shield',
+    status: '可选开启',
+    title: '安全合规',
+    desc: '输入 / 输出 / 渠道出站 / 工具结果 / 知识库入库 / MCP 出口逐段过审，含 PII 脱敏与提示词注入防护；审核引擎可选本地词库或外部内容安全 API，内容审核默认关闭可灰度开启。',
+    tags: ['内容审核', 'PII 脱敏']
   },
   {
     icon: 'lock',

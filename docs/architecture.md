@@ -98,6 +98,7 @@ flowchart LR
 
 - 出口：自建 `/mcp`，把标记为「对外暴露」的**只读**工具提供给外部调用方，带访问口令校验；
 - 接入：作为 MCP 客户端连接外部 Server。远端工具名可能不满足 LLM 的 function name 规范（如 `weather.search_local`），装配期会做**工具名归一化**，否则严格模型会整轮 400。
+- 回参守卫：外部 MCP 工具的回参在客户端层逐块脱敏（`GuardingMcpClientWrapper` 包在装配期最外层），第三方返回里的 PII 不直进模型。
 
 ## 6. 状态、记忆与审计
 
