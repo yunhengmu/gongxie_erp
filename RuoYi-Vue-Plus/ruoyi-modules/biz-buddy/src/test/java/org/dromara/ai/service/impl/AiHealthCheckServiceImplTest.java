@@ -202,7 +202,7 @@ class AiHealthCheckServiceImplTest {
     }
 
     @Test
-    @DisplayName("审核引擎配置为 external 时告警（当前会降级为本地词库）")
+    @DisplayName("审核引擎配置为 external 但地址/密钥不全时告警（实际降级为本地词库）")
     void shouldWarnWhenSafetyEngineExternal() {
         AiSecurityConfigBo security = new AiSecurityConfigBo();
         security.setEnabled(true);
@@ -211,6 +211,20 @@ class AiHealthCheckServiceImplTest {
         AiHealthCheckVo item = itemOf(service.check(), "safety.engine");
         assertEquals(AiHealthCheckVo.STATUS_WARN, item.getStatus());
         assertTrue(item.getDetail().contains("降级"));
+    }
+
+    @Test
+    @DisplayName("审核引擎配置为 external 且地址/密钥齐备时判通过")
+    void shouldPassWhenSafetyEngineExternalConfigured() {
+        AiSecurityConfigBo security = new AiSecurityConfigBo();
+        security.setEnabled(true);
+        security.setEngine("external");
+        security.setProviderEndpoint("https://ext.example.com/moderate");
+        security.setProviderApiKey("secret");
+        when(runtimeConfigStore.security()).thenReturn(security);
+        AiHealthCheckVo item = itemOf(service.check(), "safety.engine");
+        assertEquals(AiHealthCheckVo.STATUS_PASS, item.getStatus());
+        assertTrue(item.getDetail().contains("external"));
     }
 
     @Test

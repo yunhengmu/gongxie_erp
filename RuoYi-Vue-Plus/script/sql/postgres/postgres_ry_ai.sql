@@ -81,7 +81,7 @@
 -- 一、菜单与按钮权限（sys_menu）
 -- ============================================================
 --   一级菜单「BizBuddy」+ 6 个二级分组（智能体 / 模型与推理 / 知识库 / 工具与集成 /
---   审计与观测 / 安全合规）+ 功能页与按钮权限，共 132 行（6 分组 / 33 功能页 / 92 按钮）；权限标识统一为 ai:{模块}:{动作}。
+--   审计与观测 / 安全合规）+ 功能页与按钮权限，共 134 行（6 分组 / 33 功能页 / 94 按钮）；权限标识统一为 ai:{模块}:{动作}。
 -- ============================================================
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020000, 'BizBuddy', 0, 2, 'bizbuddy', null, '', 'N', 'Y', 'M', '0', '0', '', 'skill', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.116279', null, null, 'BizBuddy 智能业务平台') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020010, '智能体', 1761400000000020000, 1, 'agent', '', '', 'N', 'Y', 'M', '0', '0', '', 'model', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.119194', null, null, '智能体定义、会话与对话工作台') on conflict (menu_id) do nothing;
@@ -203,6 +203,8 @@ insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component,
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020247, '场景包修改', 1761400000000020244, 3, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:pack:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-09-30 22:04:38.239179', null, null, '') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020248, '场景包删除', 1761400000000020244, 4, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:pack:remove', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-09-30 22:04:38.242062', null, null, '') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020250, '编排运行详情', 1761400000000020249, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:audit:route:query', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-01 15:38:14.050332', null, null, '') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020278, '审计保留修改', 1761400000000020249, 2, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:audit:retention:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-14 14:00:00', null, null, '设置审计/运行明细的保留天数（0＝不清理）') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020279, '审计数据清理', 1761400000000020249, 3, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:audit:retention:cleanup', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-14 14:00:00', null, null, '按保留天数物理删除审计/运行明细（不含会话正文）') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020252, '小Z配置修改', 1761400000000020251, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:agent:entry:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-03 06:34:12.337031', null, null, '') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020259, '敏感词库', 1761400000000020060, 1, 'safetyWord', 'ai/safety/word/index', '', 'N', 'Y', 'C', '0', '0', 'ai:safety:word:list', 'lock', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '敏感词库：普通词与正则的维护、分类与启停，供输入 / 输出 / 渠道出站安全校验') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020260, '安全事件', 1761400000000020060, 2, 'safetyEvent', 'ai/safety/event/index', '', 'N', 'Y', 'C', '0', '0', 'ai:safety:event:list', 'monitor', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '安全事件留痕：敏感词 / PII 命中与处置明细，可按场景、动作、用户与时间范围检索') on conflict (menu_id) do nothing;
@@ -625,6 +627,7 @@ comment on column ai_message.total_tokens is '总 Token 数';
 comment on column ai_message.duration_ms is '本轮耗时（毫秒）';
 comment on column ai_message.sources is '回答参考来源（JSON 字符串，知识库命中；可空）';
 create index if not exists idx_ai_message_session on ai_message (session_id, id);
+create index if not exists idx_ai_message_create_time on ai_message (create_time);
 
 -- 存量库增量（幂等）：为已存在的 ai_message 补充「回答参考来源」列
 alter table ai_message add column if not exists sources text;
@@ -694,6 +697,7 @@ comment on column ai_tool_call_log.duration_ms is '工具执行耗时（毫秒�
 comment on column ai_tool_call_log.agent_id is '发起该工具调用的智能体主键（入口轮＝会话智能体，专家调用＝专家，无人值守＝对应智能体；历史行为空）';
 create index if not exists idx_ai_tool_call_agent on ai_tool_call_log (message_id, agent_id);
 create index if not exists idx_ai_tool_call_log_session on ai_tool_call_log (session_id, id);
+create index if not exists idx_ai_tool_call_log_create_time on ai_tool_call_log (create_time);
 
 create table if not exists ai_route_run (
     id                bigint        not null,
@@ -748,6 +752,7 @@ comment on column ai_route_run.judge_error is '结构化决策：判定不可用
 comment on column ai_route_run.judge_mode is '结构化决策：本轮执行模式 S 影子 / G 闸门';
 create index if not exists idx_ai_route_run_message on ai_route_run (message_id);
 create index if not exists idx_ai_route_run_session on ai_route_run (session_id, id);
+create index if not exists idx_ai_route_run_create_time on ai_route_run (create_time);
 
 -- 存量库增量（幂等）：为已存在的 ai_route_run 补充「结构化决策」审计列；全新库由上方建表语句已含这些列。
 alter table ai_route_run add column if not exists decision_source char(1);
@@ -795,6 +800,7 @@ comment on column ai_route_expert_call.completion_tokens is '该次调用的输�
 comment on column ai_route_expert_call.duration_ms is '该次调用耗时（毫秒）';
 create index if not exists idx_ai_route_call_expert on ai_route_expert_call (expert_agent_id, create_time DESC);
 create index if not exists idx_ai_route_call_run on ai_route_expert_call (route_run_id, attempt_no);
+create index if not exists idx_ai_route_expert_call_create_time on ai_route_expert_call (create_time);
 
 -- ============================================================
 -- 工具与集成
@@ -1157,6 +1163,7 @@ comment on column ai_agent_task_run.tool_call_count is '工具调用次数';
 comment on column ai_agent_task_run.error_msg is '失败原因';
 create index if not exists idx_ai_agent_task_run_session on ai_agent_task_run (session_id);
 create index if not exists idx_ai_agent_task_run_task on ai_agent_task_run (task_id, id DESC);
+create index if not exists idx_ai_agent_task_run_create_time on ai_agent_task_run (create_time);
 
 -- ============================================================
 -- 治理与观测
@@ -1213,6 +1220,7 @@ comment on column ai_permission_decision_log.confirm_source is '确认作用范�
 create index if not exists idx_ai_perm_log_session on ai_permission_decision_log (session_id, message_id);
 create index if not exists idx_ai_perm_log_tool on ai_permission_decision_log (tool_code, decision);
 create index if not exists idx_ai_perm_log_user on ai_permission_decision_log (user_id, create_time DESC);
+create index if not exists idx_ai_perm_log_create_time on ai_permission_decision_log (create_time);
 
 create table if not exists ai_trace (
     id                  bigint        not null,
@@ -1263,6 +1271,7 @@ create index if not exists idx_ai_trace_agent on ai_trace (agent_id, create_time
 create index if not exists idx_ai_trace_message on ai_trace (message_id);
 create index if not exists idx_ai_trace_parent on ai_trace (parent_trace_id);
 create index if not exists idx_ai_trace_session on ai_trace (session_id);
+create index if not exists idx_ai_trace_create_time on ai_trace (create_time);
 
 -- ============================================================
 -- 场景包

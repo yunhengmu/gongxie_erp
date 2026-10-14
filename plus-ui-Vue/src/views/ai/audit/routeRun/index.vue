@@ -1,5 +1,29 @@
 <template>
   <div class="p-2 app-container">
+    <!-- 审计数据保留：保留天数（0＝不清理）+ 清理过期数据（物理删除，不含会话正文） -->
+    <el-card shadow="hover" class="retention-panel" style="margin-bottom: 12px">
+      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
+        <strong>审计数据保留</strong>
+        <span class="text-muted" style="font-size: 12px">{{ retentionTip }}</span>
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 8px">
+          <span class="text-muted" style="font-size: 12px">保留天数</span>
+          <el-input-number v-model="retentionDays" :min="0" :max="3650" size="small" controls-position="right" style="width: 120px" />
+          <el-button v-hasPermi="['ai:audit:retention:edit']" size="small" :loading="retentionSaving" @click="saveRetention">
+            保存
+          </el-button>
+          <el-button
+            v-hasPermi="['ai:audit:retention:cleanup']"
+            size="small"
+            type="danger"
+            plain
+            :loading="purging"
+            @click="purgeRetention"
+          >
+            清理过期数据
+          </el-button>
+        </div>
+      </div>
+    </el-card>
     <div class="search-wrap">
       <el-card shadow="hover" class="search-panel" :class="{ 'is-collapsed': !showSearch }">
         <template #header>
@@ -342,9 +366,11 @@
 
 <script setup name="AiAuditRouteRun" lang="ts">
 import type { AgentVO } from '@/api/ai/agent/types';
-import { optionAuditAgents } from '@/api/ai/audit';
+import { getAuditRetention, optionAuditAgents, purgeAuditRetention, saveAuditRetention } from '@/api/ai/audit';
+import type { AuditRetentionVO } from '@/api/ai/audit';
 import { getRouteRun, listRouteRuns, routeRunStats } from '@/api/ai/route';
 import type { RouteExpertCallVO, RouteRunQuery, RouteRunStatsVO, RouteRunVO } from '@/api/ai/route/types';
+import modal from '@/plugins/modal';
 
 const { proxy } = getCurrentInstance() as any;
 
@@ -356,6 +382,76 @@ const statLoading = ref(true);
 const showSearch = ref(true);
 const total = ref(0);
 const dateRange = ref<string[]>([]);
+
+/** 审计数据保留：保留天数（0＝不清理）与各表超期行数 */
+const retention = ref<AuditRetentionVO>({});
+const retentionDays = ref<number>(0);
+const retentionSaving = ref(false);
+const purging = ref(false);
+
+/** 表名 → 中文名（与后端清理清单一一对应） */
+const RETENTION_TABLES: Record<string, string> = {
+  ai_trace: '链路追踪',
+  ai_tool_call_log: '工具调用',
+  ai_permission_decision_log: '权限决策',
+  ai_agent_task_run: '定时任务',
+  ai_route_run: '编排运行',
+  ai_route_expert_call: '专家调用'
+};
+
+/** 保留策略提示：0 天＝不清理；否则列出各表超期行数与截止时间 */
+const retentionTip = computed<string>(() => {
+  if (!retentionDays.value) {
+    return '保留 0 天＝不清理（审计明细将持续累积）';
+  }
+  const pending = retention.value.pending || {};
+  const parts = Object.entries(RETENTION_TABLES).map(([key, label]) => `${label} ${pending[key] ?? 0}`);
+  return `超期行数（截止 ${retention.value.cutoff || '-'}）：${parts.join(' / ')}`;
+});
+
+/** 加载当前保留策略与超期行数 */
+const getRetention = async () => {
+  const res = await getAuditRetention();
+  retention.value = res.data || {};
+  retentionDays.value = res.data?.retentionDays ?? 0;
+};
+
+/** 保存保留天数（运行期生效） */
+const saveRetention = async () => {
+  retentionSaving.value = true;
+  try {
+    await saveAuditRetention(retentionDays.value);
+    modal.msgSuccess('保留天数已保存');
+    await getRetention();
+  } finally {
+    retentionSaving.value = false;
+  }
+};
+
+/** 按当前保留策略清理超期数据（二次确认后物理删除） */
+const purgeRetention = async () => {
+  if (!retentionDays.value) {
+    modal.msgWarning('保留天数为 0（不限），无可清理数据');
+    return;
+  }
+  const pending = retention.value.pending || {};
+  const summary = Object.entries(RETENTION_TABLES).map(([key, label]) => `${label} ${pending[key] ?? 0}`).join(' / ');
+  try {
+    await modal.confirm(`将物理删除超期数据（${summary}），删除后不可恢复，是否继续？`);
+  } catch {
+    return;
+  }
+  purging.value = true;
+  try {
+    const res = await purgeAuditRetention();
+    const purged = res.data?.purged || {};
+    const detail = Object.entries(RETENTION_TABLES).map(([key, label]) => `${label} ${purged[key] ?? 0}`).join(' / ');
+    modal.msgSuccess(`清理完成：${detail}`);
+    await getRetention();
+  } finally {
+    purging.value = false;
+  }
+};
 const queryFormRef = ref<ElFormInstance>();
 
 /**
@@ -670,6 +766,7 @@ onMounted(() => {
   applyRouteQuery();
   getAgentOptions();
   getList();
+  getRetention();
 });
 </script>
 

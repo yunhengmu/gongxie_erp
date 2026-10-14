@@ -87,7 +87,7 @@ SET NAMES utf8mb4;
 -- 一、菜单与按钮权限（sys_menu）
 -- ============================================================
 --   一级菜单「BizBuddy」+ 6 个二级分组（智能体 / 模型与推理 / 知识库 / 工具与集成 /
---   审计与观测 / 安全合规）+ 功能页与按钮权限，共 132 行（6 分组 / 33 功能页 / 92 按钮）；权限标识统一为 ai:{模块}:{动作}。
+--   审计与观测 / 安全合规）+ 功能页与按钮权限，共 134 行（6 分组 / 33 功能页 / 94 按钮）；权限标识统一为 ai:{模块}:{动作}。
 -- ============================================================
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020000, 'BizBuddy', 0, 2, 'bizbuddy', null, '', 'N', 'Y', 'M', '0', '0', '', 'skill', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.116279', null, null, 'BizBuddy 智能业务平台') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020010, '智能体', 1761400000000020000, 1, 'agent', '', '', 'N', 'Y', 'M', '0', '0', '', 'model', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.119194', null, null, '智能体定义、会话与对话工作台') on duplicate key update menu_id = menu_id;
@@ -209,6 +209,8 @@ insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component,
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020247, '场景包修改', 1761400000000020244, 3, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:pack:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-09-30 22:04:38.239179', null, null, '') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020248, '场景包删除', 1761400000000020244, 4, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:pack:remove', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-09-30 22:04:38.242062', null, null, '') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020250, '编排运行详情', 1761400000000020249, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:audit:route:query', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-01 15:38:14.050332', null, null, '') on duplicate key update menu_id = menu_id;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020278, '审计保留修改', 1761400000000020249, 2, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:audit:retention:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-14 14:00:00', null, null, '设置审计/运行明细的保留天数（0＝不清理）') on duplicate key update menu_id = menu_id;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020279, '审计数据清理', 1761400000000020249, 3, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:audit:retention:cleanup', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-14 14:00:00', null, null, '按保留天数物理删除审计/运行明细（不含会话正文）') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020252, '小Z配置修改', 1761400000000020251, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:agent:entry:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-03 06:34:12.337031', null, null, '') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020259, '敏感词库', 1761400000000020060, 1, 'safetyWord', 'ai/safety/word/index', '', 'N', 'Y', 'C', '0', '0', 'ai:safety:word:list', 'lock', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '敏感词库：普通词与正则的维护、分类与启停，供输入 / 输出 / 渠道出站安全校验') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020260, '安全事件', 1761400000000020060, 2, 'safetyEvent', 'ai/safety/event/index', '', 'N', 'Y', 'C', '0', '0', 'ai:safety:event:list', 'monitor', '', '', 1761000000000000103, 1761100000000000001, '2026-10-11 12:00:00', null, null, '安全事件留痕：敏感词 / PII 命中与处置明细，可按场景、动作、用户与时间范围检索') on duplicate key update menu_id = menu_id;
@@ -551,7 +553,8 @@ create table if not exists ai_message (
     update_time       datetime,
     del_flag          char(1)       default '0',
     constraint pk_ai_message primary key (id),
-    key idx_ai_message_session (session_id, id)
+    key idx_ai_message_session (session_id, id),
+    key idx_ai_message_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 会话消息表';
 
 -- 存量库增量（幂等）：为已存在的 ai_message 补充「回答参考来源」列。
@@ -610,7 +613,8 @@ create table if not exists ai_tool_call_log (
     agent_id     bigint(20) comment '发起该工具调用的智能体主键（入口轮＝会话智能体，专家调用＝专家，无人值守＝对应智能体；历史行为空）',
     constraint pk_ai_tool_call_log primary key (id),
     key idx_ai_tool_call_agent (message_id, agent_id),
-    key idx_ai_tool_call_log_session (session_id, id)
+    key idx_ai_tool_call_log_session (session_id, id),
+    key idx_ai_tool_call_log_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 工具调用明细表（物理追加）';
 
 create table if not exists ai_route_run (
@@ -643,7 +647,8 @@ create table if not exists ai_route_run (
     judge_mode        char(1) comment '结构化决策：本轮执行模式 S 影子 / G 闸门',
     constraint pk_ai_route_run primary key (id),
     key idx_ai_route_run_message (message_id),
-    key idx_ai_route_run_session (session_id, id)
+    key idx_ai_route_run_session (session_id, id),
+    key idx_ai_route_run_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 编排运行表（入口智能体的每一轮编排一行；自答时也落一行用于统计路由命中率）';
 
 -- 存量库增量（幂等）：为已存在的 ai_route_run 补充「结构化决策」审计列。
@@ -710,7 +715,8 @@ create table if not exists ai_route_expert_call (
     create_time       datetime,
     constraint pk_ai_route_expert_call primary key (id),
     key idx_ai_route_call_expert (expert_agent_id, create_time DESC),
-    key idx_ai_route_call_run (route_run_id, attempt_no)
+    key idx_ai_route_call_run (route_run_id, attempt_no),
+    key idx_ai_route_expert_call_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 专家调用明细表（一次专家调用一行；追加型，物理删除）';
 
 -- ============================================================
@@ -979,7 +985,8 @@ create table if not exists ai_agent_task_run (
     update_time       datetime,
     constraint pk_ai_agent_task_run primary key (id),
     key idx_ai_agent_task_run_session (session_id),
-    key idx_ai_agent_task_run_task (task_id, id DESC)
+    key idx_ai_agent_task_run_task (task_id, id DESC),
+    key idx_ai_agent_task_run_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 定时任务执行记录表（物理追加）';
 
 -- ============================================================
@@ -1025,7 +1032,8 @@ create table if not exists ai_permission_decision_log (
     constraint pk_ai_permission_decision_log primary key (id),
     key idx_ai_perm_log_session (session_id, message_id),
     key idx_ai_perm_log_tool (tool_code, decision),
-    key idx_ai_perm_log_user (user_id, create_time DESC)
+    key idx_ai_perm_log_user (user_id, create_time DESC),
+    key idx_ai_perm_log_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 工具权限决策日志（ALLOW / ASK / DENY 全量留痕）';
 
 create table if not exists ai_trace (
@@ -1057,7 +1065,8 @@ create table if not exists ai_trace (
     key idx_ai_trace_agent (agent_id, create_time DESC),
     key idx_ai_trace_message (message_id),
     key idx_ai_trace_parent (parent_trace_id),
-    key idx_ai_trace_session (session_id)
+    key idx_ai_trace_session (session_id),
+    key idx_ai_trace_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 链路追踪表（一次任务一条：执行期模型版本 + 上下文清单 + 状态迁移）';
 
 -- ============================================================

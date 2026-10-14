@@ -163,7 +163,9 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 
 > 建库脚本**只在数据卷为空时执行**。改了口令/库名等变量要生效，需 `down -v` 重建。
 
-> 人工排查时用 `docker exec ... mysql` 查中文，请带 `--default-character-set=utf8mb4`：MySQL 官方镜像不带 locale，客户端会退回 latin1，中文会显示成 `?`（**数据本身是正确的 utf8mb4**，用 `hex()` 可验证）。建库脚本各自自带 `SET NAMES utf8mb4`，初始化不受此影响。
+> 人工排查时用 `docker exec ... mysql` 查中文，请带 `--default-character-set=utf8mb4`：MySQL 官方镜像不带 locale，客户端会退回 latin1，中文会显示成 `?`（**读到的乱码不代表库里是乱码**，用 `hex()` 可验证）。建库脚本各自自带 `SET NAMES utf8mb4`，初始化不受此影响。
+>
+> **写入同理**：手工执行增量 SQL（`INSERT` / `UPDATE`，如升级须知里的 ALTER / 补菜单 / 订正数据）**必须先 `SET NAMES utf8mb4`**（或给客户端加 `--default-character-set=utf8mb4`），否则中文会按 latin1 二次编码**真的写坏**（读出为 `å¯¹è¯` 这类乱码，`hex()` 出现 `C3A5…` 之类特征）。排查：`where hex(列名) like '%C3A5%' …`。
 
 ## 8. 变量
 

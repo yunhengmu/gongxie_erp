@@ -28,7 +28,7 @@ public class AiSecurityConfigBo implements Serializable {
     private boolean enabled;
 
     /**
-     * 审核引擎：local（本地词库）/ external（外部内容安全 API，预留）
+     * 审核引擎：local（本地词库）/ external（外部内容安全 API，未配端点或密钥时降级为本地词库）
      */
     @Pattern(regexp = "^(local|external)$", message = "审核引擎只能是 local 或 external")
     private String engine = "local";
@@ -99,12 +99,12 @@ public class AiSecurityConfigBo implements Serializable {
     private int excerptChars = 200;
 
     /**
-     * 外部审核引擎服务地址（engine=external 时使用；本轮仅占位）
+     * 外部审核引擎服务地址（engine=external 时使用；留空即降级为本地词库）
      */
     private String providerEndpoint = "";
 
     /**
-     * 外部审核引擎访问密钥（engine=external 时使用；本轮仅占位）
+     * 外部审核引擎访问密钥（engine=external 时使用；留空即降级为本地词库）
      */
     private String providerApiKey = "";
 

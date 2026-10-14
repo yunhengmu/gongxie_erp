@@ -74,6 +74,25 @@ public class AiProperties {
     private Jev jev = new Jev();
 
     /**
+     * 审计与运行数据保留策略（默认值来源，可被「编排运行」页运行期覆盖，
+     * Redis 键 {@code bizbuddy:ai:runtime:audit-retention}）
+     */
+    private Retention retention = new Retention();
+
+    /**
+     * 审计与运行数据保留策略。
+     */
+    @Data
+    public static class Retention {
+
+        /**
+         * 审计 / 运行明细保留天数（0＝不限，不执行清理）
+         */
+        private int auditDays = 0;
+
+    }
+
+    /**
      * Milvus 连接配置。
      */
     @Data
@@ -147,7 +166,7 @@ public class AiProperties {
         private boolean enabled = false;
 
         /**
-         * 审核引擎：local（本地词库）/ external（外部内容安全 API，预留）
+         * 审核引擎：local（本地词库）/ external（外部内容安全 API）
          */
         private String engine = "local";
 
@@ -213,13 +232,22 @@ public class AiProperties {
         private int excerptChars = 200;
 
         /**
-         * 外部审核引擎配置（engine=external 时使用；本轮仅占位）
+         * 外部审核引擎配置（engine=external 时使用；页面上「接口地址 / 接口密钥」写入运行期配置，
+         * 此处仅为默认值来源）
          */
         private External external = new External();
     }
 
     /**
-     * 外部内容安全引擎配置（预留）。
+     * 外部内容安全引擎配置。
+     *
+     * <p><b>契约</b>：对每段待审文本发起一次 {@code POST <endpoint>}，请求体
+     * {@code {"scene":"<场景编码>","text":"<待审文本>"}}，请求头 {@code Content-Type: application/json}
+     * 与 {@code Authorization: Bearer <apiKey>}；期望响应 {@code {"hit":true/false,"hits":[...],"categories":[...]}}
+     * （字段缺失按未命中处理）。{@code hits} 需为待审文本中的**精确子串**，否则 `mask` 动作无法替换。</p>
+     *
+     * <p><b>降级</b>：未配地址 / 未配密钥 / HTTP 非 2xx / 超时 / 响应结构不符时，一律<b>按未命中放行</b>
+     * （fail-open，仅告警），与本地词库、重排模型的降级口径一致，绝不因审核服务故障阻断对话。</p>
      */
     @Data
     public static class External {
@@ -233,6 +261,11 @@ public class AiProperties {
          * 访问密钥
          */
         private String apiKey = "";
+
+        /**
+         * 单次校验超时（毫秒）：审核在对话主链路上，超时即按未命中放行
+         */
+        private int timeoutMs = 3000;
     }
 
     /**
