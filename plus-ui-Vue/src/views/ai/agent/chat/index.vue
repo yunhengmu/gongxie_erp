@@ -939,9 +939,12 @@ const appendRouteParts = (msg: LocalMessage, run?: AiRouteRunDetailVO) => {
       attemptNo: call.attemptNo,
       callKind: call.callKind,
       // pending_confirm＝专家命中「需确认」工具、暂停等用户处置：仍显示「调用中」，
-      // 处置后由恢复段的 expert_result 回填；映射成 invalid 会误标「结构不合格」
-      expertState: call.status === 'success' ? 'success' : call.status === 'pending_confirm' ? 'running' : 'invalid',
-      expertError: call.status === 'pending_confirm' ? undefined : call.validationError || undefined,
+      // 处置后由恢复段的 expert_result 回填；映射成 invalid 会误标「结构不合格」。
+      // cancelled＝用户「停止生成」中断了这次专家调用：同样不映射成 invalid（不是专家的问题）
+      expertState: call.status === 'success' ? 'success'
+        : call.status === 'pending_confirm' || call.status === 'cancelled' ? 'running' : 'invalid',
+      expertError: call.status === 'pending_confirm' || call.status === 'cancelled'
+        ? undefined : call.validationError || undefined,
       expertConclusion: call.parsedOutput || call.rawOutput || undefined
     });
   });

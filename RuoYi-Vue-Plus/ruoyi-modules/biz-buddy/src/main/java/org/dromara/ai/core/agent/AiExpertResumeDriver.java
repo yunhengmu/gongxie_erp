@@ -24,6 +24,7 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -203,12 +204,18 @@ public class AiExpertResumeDriver {
             return true;
         };
         runRegistry.register(sessionId, cancelable);
+        // 收尾幂等：外层 dispose（doOnCancel）、内层专家被中断（route.cancelled）、异常三者只会生效一个，
+        // 避免「内层取消」与「外层 dispose」同时触发导致重复落库 / 重复 aborted
+        AtomicBoolean settled = new AtomicBoolean(false);
         try {
             Disposable subscription = Mono.fromCallable(
                     () -> routeOrchestrator.resumeExpert(route, resume, AiResumeMessageFactory.build(pending)))
                 .subscribeOn(Schedulers.boundedElastic())
                 .doOnCancel(() -> {
                     // 用户停止 / SSE 断连：本段无 agent 事件回调可依，取消时就地按「已中止」收尾
+                    if (!settled.compareAndSet(false, true)) {
+                        return;
+                    }
                     long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
                     traceService.appendTransition(traceId, "cancelled", "用户停止专家续跑");
                     turnFinisher.finishRoute(route, null, AiRouteRun.STATUS_ABORTED, CANCELLED_TEXT, durationMs);
@@ -216,6 +223,17 @@ public class AiExpertResumeDriver {
                 })
                 .doFinally(signal -> runRegistry.unregister(sessionId, cancelable))
                 .subscribe(outcome -> {
+                    if (!settled.compareAndSet(false, true)) {
+                        return;
+                    }
+                    if (route.cancelled) {
+                        // 用户停止：专家续跑已被中断（编排器置 route.cancelled），按「已中止」收尾（不降级）
+                        long cancelledMs = (System.nanoTime() - startNanos) / 1_000_000;
+                        turnFinisher.finishCancelled(emitter, sessionId, state, cancelledMs, messageId, route);
+                        pendingStore.remove(sessionId, messageId);
+                        pendingStore.release(sessionId, messageId);
+                        return;
+                    }
                     if (outcome.paused()) {
                         // 恢复段内再次命中「需确认」：同一条消息上再出一张卡片（暂存不清）
                         long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
@@ -241,6 +259,9 @@ public class AiExpertResumeDriver {
                     pendingStore.remove(sessionId, messageId);
                     pendingStore.release(sessionId, messageId);
                 }, error -> {
+                    if (!settled.compareAndSet(false, true)) {
+                        return;
+                    }
                     long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
                     String message = AiSseSupport.rootCauseMessage(error);
                     log.error("编排恢复失败，sessionId={}, messageId={}", sessionId, messageId, error);

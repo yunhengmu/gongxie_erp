@@ -782,7 +782,7 @@ comment on column ai_route_expert_call.contract_json is '本次下发的输出�
 comment on column ai_route_expert_call.raw_output is '专家原始输出原文（不改写、不裁剪，供前端来源卡片与事后追溯）';
 comment on column ai_route_expert_call.parsed_output is '通过契约校验后的结构化结果（JSON 文本）';
 comment on column ai_route_expert_call.validation_error is '结构校验失败原因（重试时回传给专家）';
-comment on column ai_route_expert_call.status is '调用状态：success / invalid / failed / timeout';
+comment on column ai_route_expert_call.status is '调用状态：success / invalid / failed / timeout / pending_confirm / cancelled';
 comment on column ai_route_expert_call.prompt_tokens is '该次调用的输入 Token（计入编排总预算）';
 comment on column ai_route_expert_call.completion_tokens is '该次调用的输出 Token';
 comment on column ai_route_expert_call.duration_ms is '该次调用耗时（毫秒）';

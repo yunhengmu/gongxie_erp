@@ -696,7 +696,7 @@ create table if not exists ai_route_expert_call (
     raw_output        longtext comment '专家原始输出原文（不改写、不裁剪，供前端来源卡片与事后追溯）',
     parsed_output     longtext comment '通过契约校验后的结构化结果（JSON 文本）',
     validation_error  varchar(1000) comment '结构校验失败原因（重试时回传给专家）',
-    status            varchar(16) comment '调用状态：success / invalid / failed / timeout',
+    status            varchar(16) comment '调用状态：success / invalid / failed / timeout / pending_confirm / cancelled',
     prompt_tokens     bigint(20) comment '该次调用的输入 Token（计入编排总预算）',
     completion_tokens bigint(20) comment '该次调用的输出 Token',
     duration_ms       bigint(20) comment '该次调用耗时（毫秒）',

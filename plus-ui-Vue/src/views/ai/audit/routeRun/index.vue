@@ -571,7 +571,8 @@ const callStatusLabel = (status?: string) => {
     invalid: '未完成',
     failed: '调用失败',
     timeout: '超时',
-    pending_confirm: '待人工确认'
+    pending_confirm: '待人工确认',
+    cancelled: '已取消'
   };
   return status ? map[status] || status : '-';
 };
@@ -583,7 +584,8 @@ const callStatusTagType = (status?: string): ElTagType => {
     invalid: 'warning',
     failed: 'danger',
     timeout: 'danger',
-    pending_confirm: 'warning'
+    pending_confirm: 'warning',
+    cancelled: 'info'
   };
   return status ? map[status] || 'info' : 'info';
 };

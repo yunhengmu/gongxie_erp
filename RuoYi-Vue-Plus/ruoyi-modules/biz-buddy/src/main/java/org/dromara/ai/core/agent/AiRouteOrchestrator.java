@@ -1,5 +1,6 @@
 package org.dromara.ai.core.agent;
 
+import io.agentscope.core.agent.AgentRun;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.message.ContentBlock;
@@ -24,12 +25,14 @@ import org.dromara.ai.service.IAiTraceService;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
-import reactor.core.publisher.Flux;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 专家编排器（REQ-AI-30）：把入口智能体的决策落成**一次**专家调用，并处置其可用性。
@@ -94,6 +97,11 @@ public class AiRouteOrchestrator {
     static final String PAUSE_VALIDATION_ERROR = "命中「需确认」工具，等待用户人工确认后由恢复段续跑";
 
     /**
+     * 用户主动停止本轮的说明文案（落专家调用明细的 validation_error 与链路追踪；与门面 / 整合轮同口径）
+     */
+    static final String CANCELLED_TEXT = "用户停止生成";
+
+    /**
      * 暂停场景下回给入口智能体的工具结果文本（本轮已暂停，只提示、不再路由）
      */
     static final String PAUSE_TOOL_RESULT =
@@ -125,6 +133,11 @@ public class AiRouteOrchestrator {
     private final IAiAgentService agentService;
 
     /**
+     * 单次执行取消注册表：专家调用经此登记句柄，使「停止生成」/ SSE 断连能中断**正在进行**的专家推理
+     */
+    private final AiRunRegistry runRegistry;
+
+    /**
      * @param agentRegistry    智能体装配注册表（专家走独立装配）
      * @param expertDirectory  专家名录（取专家定义）
      * @param recorder         编排链路落库
@@ -134,6 +147,7 @@ public class AiRouteOrchestrator {
      * @param runtimeConfigStore 运行期配置（编排预算可在运行期覆盖）
      * @param skillService     技能生效范围（专家链路按提问用户过滤可见面）
      * @param agentService     用户级工具信任查询
+     * @param runRegistry      单次执行取消注册表（「停止生成」取消专家的进行中调用）
      */
     public AiRouteOrchestrator(@Lazy AgentRegistry agentRegistry,
                                AiExpertDirectory expertDirectory,
@@ -143,7 +157,8 @@ public class AiRouteOrchestrator {
                                AiProperties aiProperties,
                                AiRuntimeConfigStore runtimeConfigStore,
                                IAiSkillService skillService,
-                               IAiAgentService agentService) {
+                               IAiAgentService agentService,
+                               AiRunRegistry runRegistry) {
         this.agentRegistry = agentRegistry;
         this.expertDirectory = expertDirectory;
         this.recorder = recorder;
@@ -153,6 +168,7 @@ public class AiRouteOrchestrator {
         this.runtimeConfigStore = runtimeConfigStore;
         this.skillService = skillService;
         this.agentService = agentService;
+        this.runRegistry = runRegistry;
     }
 
     /**
@@ -216,6 +232,10 @@ public class AiRouteOrchestrator {
             return degradeReport(route, chosen, null);
         }
         ExpertAttempt result = runOnce(route, chosen, 1, AiRouteExpertCall.KIND_FIRST);
+        if (result.cancelled()) {
+            // 用户停止（「停止生成」/ SSE 断连）：不重试、不降级，由调用方按「已中止」收尾
+            return "";
+        }
         if (route.pendingResume != null) {
             // 专家命中「需确认」：本轮编排暂停（不算失败），用户确认后由恢复段续跑
             //（REQ-AI-30 Phase 2 HITL 贯通）
@@ -257,6 +277,10 @@ public class AiRouteOrchestrator {
         // 用确认结果续跑本次尝试（同一专家会话）；恢复段沿用首段的 attemptNo（审计口径不变）
         ExpertAttempt resumed = runExpert(route, candidate, attempt, AiRouteExpertCall.KIND_RESUME,
             null, confirmMessages);
+        if (resumed.cancelled()) {
+            // 用户停止：不降级，由恢复段按「已中止」收尾
+            return new ResumeOutcome(false, null);
+        }
         if (route.pendingResume != null) {
             return new ResumeOutcome(true, null);
         }
@@ -479,7 +503,12 @@ public class AiRouteOrchestrator {
     }
 
     /**
-     * 专家调用的统一实现：独立会话、强制同步等待、正文直传用户，并把结果落库与下发事件。
+     * 专家调用的统一实现：独立会话、**可取消**的同步等待、正文直传用户，并把结果落库与下发事件。
+     *
+     * <p><b>可取消</b>（docs/00 第 1 项）：执行经 {@code expert.prepareRun(...)} 取得
+     * {@code AgentRun}，把 {@code run::cancel} 登记进 {@link AiRunRegistry}；
+     * 用户「停止生成」或 SSE 断连即中断**正在进行**的模型调用与工具循环，本方法随即将
+     * {@code route.cancelled} 置位并返回「已取消」，由调用方按「已中止」收尾（不降级）。</p>
      *
      * <p>{@code resumeMessages} 非空时表示这是**人工确认后的续跑**（REQ-AI-30 Phase 2 HITL 贯通）：
      * 用 {@code ConfirmResult} 消息驱动**同一个专家会话**继续执行，不再重复下发 {@code expert_start}
@@ -535,20 +564,64 @@ public class AiRouteOrchestrator {
         applyExpertPermission(expert, definition, context, route, expertSessionId);
 
         long startNanos = System.nanoTime();
+        // 可取消的专家执行（AgentScope 2.0.4 AgentRun）：登记句柄后，「停止生成」/ SSE 断连可中断
+        // **正在进行**的模型调用与工具循环（与入口轮同款口径；原先是裸 streamEvents + blockLast，
+        // 同步阻塞且无 Disposable 可登记，导致短路轮 / 指定专家兜底 / 恢复段都停不下来）
+        AgentRun<AgentEvent> run = expert.prepareRun(resume ? resumeMessages : List.of(userMessage), context);
+        AtomicBoolean externalCancel = new AtomicBoolean(false);
+        AiRunRegistry.Cancelable cancelable = () -> {
+            externalCancel.set(true);
+            return run.cancel();
+        };
+        runRegistry.register(route.sessionId, cancelable);
+        CountDownLatch settled = new CountDownLatch(1);
+        AtomicReference<String> failure = new AtomicReference<>();
+        boolean finishedInTime = true;
+        boolean interrupted = false;
+        try {
+            run.stream()
+                // 正文直传用户、工具事件不下发（专家直答）；emitter 为 null（无人值守）时退化为只累积
+                .doOnNext(event -> streamBridge.handle(route.emitter, state, event, false))
+                .doFinally(signal -> runRegistry.unregister(route.sessionId, cancelable))
+                .subscribe(ignored -> {
+                }, e -> {
+                    failure.set(AiSseSupport.rootCauseMessage(e));
+                    settled.countDown();
+                }, settled::countDown);
+            // 同步等待（与原 blockLast 同口径）：等待超时即取消该 run，归因见下方
+            finishedInTime = settled.await(expertTimeoutSeconds(), TimeUnit.SECONDS);
+            if (!finishedInTime) {
+                run.cancel();
+            }
+        } catch (InterruptedException e) {
+            // 等待被中断＝**外部取消**：入口轮被取消时 Reactor 会 dispose 本任务（`RouteDecisionTool` 里
+            // subscribeOn(boundedElastic) 的阻塞专家调用）并中断其等待；而本方法自己的「等超时」走的是
+            // await 返回 false，不会中断。故中断一律按取消归因。
+            // **刻意不重新置中断标志**——池化 worker 上遗留中断态会让同一任务后续的 Redis / DB 调用失败，
+            // 且异常会被上层 onErrorResume 静默吞掉（实测「进了取消分支却一行明细都没落库」）。
+            interrupted = true;
+            run.cancel();
+        } catch (Exception e) {
+            // 订阅异常（例如同一 AgentRun 被重复订阅）：先注销句柄，避免残留
+            runRegistry.unregister(route.sessionId, cancelable);
+            failure.set(AiSseSupport.rootCauseMessage(e));
+        }
+        // 取消归因：① 句柄被外部（停止 / 断连）调用过；② 等待被中断（同上，外部取消的副产物）。
+        // **不看 run.status()**——等待超时同样会把 run 置为 CANCELLED，按状态判定会把「超时」误标成「用户取消」
+        boolean cancelled = externalCancel.get() || interrupted;
         boolean timeout = false;
         String error = null;
-        try {
-            Flux<AgentEvent> stream = (resume
-                ? expert.streamEvents(resumeMessages, context)
-                : expert.streamEvents(userMessage, context))
-                // 正文直传用户、工具事件不下发（专家直答）；emitter 为 null（无人值守）时退化为只累积
-                .doOnNext(event -> streamBridge.handle(route.emitter, state, event, false));
-            stream.blockLast(Duration.ofSeconds(expertTimeoutSeconds()));
-        } catch (Exception e) {
-            error = AiSseSupport.rootCauseMessage(e);
-            timeout = error != null && error.toLowerCase().contains("timeout");
-            error = translatePausedStateError(error);
+        if (cancelled) {
+            log.info("专家调用被用户停止：expert={}, attempt={}", candidate.agentKey(), attempt);
+        } else if (!finishedInTime) {
+            timeout = true;
+            error = translatePausedStateError("专家调用超时（" + expertTimeoutSeconds() + " 秒内未完成）");
             log.warn("专家调用失败：expert={}, attempt={}, 原因={}", candidate.agentKey(), attempt, error);
+        } else {
+            error = translatePausedStateError(failure.get());
+            if (error != null) {
+                log.warn("专家调用失败：expert={}, attempt={}, 原因={}", candidate.agentKey(), attempt, error);
+            }
         }
         // 参考来源（知识库命中）：专家使用**独立的流式状态**，其内部检索命中的来源若只留在该状态会随调用结束丢弃；
         // 此处回填到入口轮状态（气泡下方「参考来源」与落库均读入口状态），失败/超时也回填已命中的部分
@@ -564,6 +637,17 @@ public class AiRouteOrchestrator {
         // 编排预算（Phase 2 第四项）：专家轮 Token 累计 + 触顶判定。
         // 「暂停」的那一次调用同样消耗了模型配额，故在暂停分支之前累计
         accumulateExpertTokens(route, state.toTokenUsage());
+
+        // 用户停止（「停止生成」/ SSE 断连）：不判契约、不置降级、不发 route_fallback，
+        // 调用明细记「已取消」、子链路记「已中止」；置 route.cancelled 后交调用方按「已中止」收尾
+        if (cancelled) {
+            ChatTokenUsage cancelledUsage = state.toTokenUsage();
+            recordCall(route, candidate, expertSessionId, attempt, kind, null, false, CANCELLED_TEXT,
+                false, true, cancelledUsage, durationMs);
+            accumulateTrace(state, childTraceId, false, CANCELLED_TEXT, false, cancelledUsage, durationMs);
+            route.cancelled = true;
+            return ExpertAttempt.stopped();
+        }
 
         // 命中「需确认」工具：框架暂停了专家会话，把暂停上浮为入口轮的待确认
         //（编排链路的 HITL 贯通），本函数返回的结果不会被使用——调用方见 pendingResume 即返回
@@ -592,7 +676,7 @@ public class AiRouteOrchestrator {
         }
         ChatTokenUsage usage = state.toTokenUsage();
         recordCall(route, candidate, expertSessionId, attempt, kind, rawOutput, ok, reason,
-            timeout, usage, durationMs);
+            timeout, false, usage, durationMs);
         accumulateTrace(state, childTraceId, ok, reason, timeout, usage, durationMs);
         emit(route, EVENT_EXPERT_RESULT, Map.of(
             "expertKey", candidate.agentKey(),
@@ -600,7 +684,7 @@ public class AiRouteOrchestrator {
             "expertName", candidate.agentName(),
             "attemptNo", attempt,
             "status", ok ? AiRouteExpertCall.STATUS_SUCCESS : AiRouteExpertCall.STATUS_INVALID));
-        return new ExpertAttempt(ok, !ok, rawOutput, reason);
+        return new ExpertAttempt(ok, !ok, rawOutput, reason, false);
     }
 
     /**
@@ -631,12 +715,13 @@ public class AiRouteOrchestrator {
      * @param ok             是否拿到可用正文
      * @param reason         不可用原因（成功时为空）
      * @param timeout        是否超时
+     * @param cancelled      是否被用户停止（「停止生成」/ SSE 断连）
      * @param usage          Token 用量
      * @param durationMs     耗时
      */
     private void recordCall(AiRouteContext route, AiExpertCandidate candidate, String expertSessionId,
                             int attempt, String kind, String rawOutput, boolean ok, String reason,
-                            boolean timeout, ChatTokenUsage usage, long durationMs) {
+                            boolean timeout, boolean cancelled, ChatTokenUsage usage, long durationMs) {
         AiRouteExpertCall call = new AiRouteExpertCall();
         call.setRouteRunId(route.routeRunId);
         call.setExpertAgentId(candidate.agentId());
@@ -645,7 +730,7 @@ public class AiRouteOrchestrator {
         call.setCallKind(kind);
         call.setRawOutput(rawOutput);
         call.setValidationError(ok ? null : reason);
-        call.setStatus(resolveCallStatus(ok, timeout));
+        call.setStatus(resolveCallStatus(ok, timeout, cancelled));
         if (usage != null) {
             call.setPromptTokens((long) usage.promptTokens());
             call.setCompletionTokens((long) usage.completionTokens());
@@ -658,11 +743,15 @@ public class AiRouteOrchestrator {
     /**
      * 归一出专家调用状态（专家直答修订，2026-10-03）。
      *
-     * @param ok      是否拿到可用正文
-     * @param timeout 是否超时
+     * @param ok        是否拿到可用正文
+     * @param timeout   是否超时
+     * @param cancelled 是否被用户停止（「停止生成」/ SSE 断连）
      * @return 状态取值
      */
-    private String resolveCallStatus(boolean ok, boolean timeout) {
+    private String resolveCallStatus(boolean ok, boolean timeout, boolean cancelled) {
+        if (cancelled) {
+            return AiRouteExpertCall.STATUS_CANCELLED;
+        }
         if (ok) {
             return AiRouteExpertCall.STATUS_SUCCESS;
         }
@@ -852,8 +941,10 @@ public class AiRouteOrchestrator {
      * @param failed    是否失败（失败即降级，由入口智能体兜底自答）
      * @param rawOutput 专家输出正文（原文留证）
      * @param error     不可用原因（成功时为空）
+     * @param cancelled 是否被用户停止（「停止生成」/ SSE 断连）：为真时不降级、不产报告
      */
-    private record ExpertAttempt(boolean ok, boolean failed, String rawOutput, String error) {
+    private record ExpertAttempt(boolean ok, boolean failed, String rawOutput, String error,
+                                 boolean cancelled) {
 
         /**
          * 失败的尝试（专家不存在 / 调用异常 / 无产出）。
@@ -862,7 +953,17 @@ public class AiRouteOrchestrator {
          * @return 尝试结果
          */
         static ExpertAttempt unrepairable(String reason) {
-            return new ExpertAttempt(false, true, null, reason);
+            return new ExpertAttempt(false, true, null, reason, false);
+        }
+
+        /**
+         * 被用户停止的尝试（「停止生成」/ SSE 断连）：既不算成功也不算失败，
+         * 由调用方按「已中止」收尾，**不得**降级为小Z 兜底自答。
+         *
+         * @return 尝试结果
+         */
+        static ExpertAttempt stopped() {
+            return new ExpertAttempt(false, false, null, CANCELLED_TEXT, true);
         }
     }
 }

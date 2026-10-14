@@ -211,16 +211,30 @@ public class AiIntegrationDriver {
             return true;
         };
         runRegistry.register(sessionId, cancelable);
+        // 收尾幂等：外层 dispose（doOnCancel）、内层专家被中断（route.cancelled）、异常三者只会生效一个
+        AtomicBoolean settled = new AtomicBoolean(false);
         Disposable subscription = Mono.fromCallable(() -> routeOrchestrator.executePinned(route))
             .subscribeOn(Schedulers.boundedElastic())
             .doOnCancel(() -> {
                 // 用户停止 / SSE 断连：本段无 agent 事件回调可依，取消时就地按「已中止」收尾
+                if (!settled.compareAndSet(false, true)) {
+                    return;
+                }
                 long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
                 traceService.appendTransition(route.traceId, "cancelled", "用户停止指定专家兜底");
                 turnFinisher.finishRoute(route, null, AiRouteRun.STATUS_ABORTED, CANCELLED_TEXT, durationMs);
             })
             .doFinally(signal -> runRegistry.unregister(sessionId, cancelable))
             .subscribe(report -> {
+                if (!settled.compareAndSet(false, true)) {
+                    return;
+                }
+                if (route.cancelled) {
+                    // 用户停止：专家调用已被中断（编排器置 route.cancelled），按「已中止」收尾（不降级）
+                    long cancelledMs = (System.nanoTime() - startNanos) / 1_000_000;
+                    turnFinisher.finishCancelled(emitter, sessionId, state, cancelledMs, null, route);
+                    return;
+                }
                 if (route.pendingResume != null) {
                     // 指定专家命中「需确认」：与主路径同款暂停并落确认卡片
                     long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
@@ -240,6 +254,9 @@ public class AiIntegrationDriver {
                 turnFinisher.finishRoute(route, assistant == null ? null : assistant.getId(),
                     AiRouteRun.STATUS_SUCCESS, null, durationMs);
             }, error -> {
+                if (!settled.compareAndSet(false, true)) {
+                    return;
+                }
                 long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
                 String message = AiSseSupport.rootCauseMessage(error);
                 log.error("指定专家兜底编排失败，sessionId={}", sessionId, error);

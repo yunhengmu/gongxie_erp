@@ -285,7 +285,7 @@ export interface AiRouteExpertCallVO {
   parsedOutput?: string;
   /** 失败原因（专家直答修订后为「专家不可用原因」） */
   validationError?: string;
-  /** 调用状态（success 已回答 / failed / timeout / pending_confirm；历史数据可能含 invalid / partial） */
+  /** 调用状态（success 已回答 / failed / timeout / pending_confirm / cancelled 已取消；历史数据可能含 invalid / partial） */
   status?: string;
   /** 输入 Token */
   promptTokens?: number;
