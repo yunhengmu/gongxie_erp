@@ -45,6 +45,15 @@ public class AiModelConfig extends BaseEntity {
      */
     public static final String TYPE_DECISION = "decision";
 
+    /**
+     * 模型类型：重排模型（检索结果重排序，DashScope 文本重排协议）
+     *
+     * <p><b>baseUrl 语义与其他类型不同</b>：这里填**完整重排端点**（如
+     * {@code https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank}），
+     * 不拼 {@code /chat/completions} 之类的后缀；{@code modelCode} 为重排模型名（如 {@code gte-rerank-v2}）。</p>
+     */
+    public static final String TYPE_RERANK = "rerank";
+
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -65,7 +74,7 @@ public class AiModelConfig extends BaseEntity {
     private String provider;
 
     /**
-     * 模型类型（chat 对话 / embedding 向量 / decision 决策）
+     * 模型类型（chat 对话 / embedding 向量 / decision 决策 / rerank 重排）
      */
     private String modelType;
 

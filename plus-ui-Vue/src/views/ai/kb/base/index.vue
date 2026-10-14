@@ -69,6 +69,12 @@
         <el-table-column label="向量模型" align="center" :show-overflow-tooltip="true">
           <template #default="scope">{{ scope.row.embeddingModelName || '-' }}</template>
         </el-table-column>
+        <el-table-column label="检索重排" align="center" :show-overflow-tooltip="true">
+          <template #default="scope">
+            <span v-if="scope.row.rerankEnabled === '1'">{{ scope.row.rerankModelName || '已启用（未绑模型）' }}</span>
+            <span v-else>未启用</span>
+          </template>
+        </el-table-column>
         <el-table-column label="维度" align="center" prop="dimension" width="80" />
         <el-table-column label="切片/重叠" align="center" width="120">
           <template #default="scope">{{ scope.row.chunkSize }} / {{ scope.row.chunkOverlap }}</template>
@@ -216,6 +222,42 @@
         <el-form-item label="相似度阈值" prop="similarityThreshold">
           <el-input-number v-model="form.similarityThreshold" :min="0" :max="1" :step="0.05" :precision="3" controls-position="right" />
         </el-form-item>
+        <el-form-item label="检索重排" prop="rerankEnabled">
+          <template #label>
+            <span class="label-tip">
+              检索重排
+              <el-tooltip placement="top">
+                <template #content>
+                  <div class="tip-content">
+                    开启后检索走「稠密召回 → 重排 → 融合 → 截断 TopK」。重排模型需先在「模型与推理 → 模型配置」新增
+                    rerank 类型的模型；重排不可用时会自动降级为向量原序，不影响检索。
+                  </div>
+                </template>
+                <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
+          <el-switch v-model="form.rerankEnabled" active-value="1" inactive-value="0" @change="handleRerankToggle" />
+        </el-form-item>
+        <el-form-item v-if="form.rerankEnabled === '1'" label="重排模型" prop="rerankModelId">
+          <template #label>
+            <span class="label-tip">
+              重排模型
+              <el-tooltip v-if="!rerankModels.length" placement="top">
+                <template #content>
+                  <div class="tip-content">暂无可用重排模型，请先到「模型与推理 → 模型配置」新增 rerank 类型的模型（地址填完整重排端点）。</div>
+                </template>
+                <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
+          <el-select v-model="form.rerankModelId" placeholder="请选择重排模型" style="width: 100%">
+            <el-option v-for="item in rerankModels" :key="item.id" :label="item.configName" :value="item.id">
+              <span>{{ item.configName }}</span>
+              <span class="option-meta">{{ item.modelCode }}</span>
+            </el-option>
+          </el-select>
+        </el-form-item>
         <el-form-item label="生效范围" prop="visibleScope">
           <el-radio-group v-model="form.visibleScope">
             <el-radio value="0">公开</el-radio>
@@ -256,6 +298,9 @@
           </el-descriptions-item>
           <el-descriptions-item label="召回 TopK">{{ detail.record.retrievalTopK ?? '-' }}</el-descriptions-item>
           <el-descriptions-item label="相似度阈值">{{ detail.record.similarityThreshold ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="检索重排">
+            {{ detail.record.rerankEnabled === '1' ? (detail.record.rerankModelName || '已启用（未绑模型）') : '未启用' }}
+          </el-descriptions-item>
           <el-descriptions-item label="生效范围">
             <el-tag :type="scopeTagType(detail.record.visibleScope)" effect="plain" size="small">
               {{ scopeLabel(detail.record.visibleScope) }}
@@ -298,6 +343,9 @@ const router = useRouter();
 
 const kbList = ref<KnowledgeBaseVO[]>([]);
 const embeddingModels = ref<ModelConfigVO[]>([]);
+
+/** 可选重排模型（model_type=rerank） */
+const rerankModels = ref<ModelConfigVO[]>([]);
 const buttonLoading = ref(false);
 const { loading, withLoading } = useLoading(true);
 const { showSearch } = useSearchToggle();
@@ -317,6 +365,8 @@ const initFormData: KnowledgeBaseForm = {
   chunkOverlap: 50,
   retrievalTopK: 5,
   similarityThreshold: 0.5,
+  rerankEnabled: '0',
+  rerankModelId: undefined,
   status: '0',
   visibleScope: '0',
   remark: undefined
@@ -337,7 +387,20 @@ const data = reactive<PageData<KnowledgeBaseForm, KnowledgeBaseQuery>>({
       { required: true, message: '知识库编码不能为空', trigger: 'blur' },
       { pattern: /^[a-z][a-z0-9_]{1,60}$/, message: '只能包含小写字母、数字与下划线，且以字母开头', trigger: 'blur' }
     ],
-    embeddingModelId: [{ required: true, message: '向量模型不能为空', trigger: 'change' }]
+    embeddingModelId: [{ required: true, message: '向量模型不能为空', trigger: 'change' }],
+    rerankModelId: [
+      {
+        // 仅在「启用检索重排」时必填（开关关闭时后端会清空该字段）
+        validator: (_rule: any, value: unknown, callback: (error?: Error) => void) => {
+          if (form.value.rerankEnabled === '1' && !value) {
+            callback(new Error('启用检索重排时必须选择重排模型'));
+            return;
+          }
+          callback();
+        },
+        trigger: 'change'
+      }
+    ]
   }
 });
 
@@ -388,6 +451,21 @@ const handleModelChange = (value: string | number) => {
   if (matched?.dimension) {
     form.value.dimension = matched.dimension;
   }
+};
+
+/** 查询可用重排模型（model_type=rerank） */
+const loadRerankModels = async () => {
+  const res = await optionModelConfig('rerank');
+  rerankModels.value = res.data ?? [];
+};
+
+/** 切换「检索重排」：开启时刷新候选、关闭时清空已选模型（与后端归一化口径一致） */
+const handleRerankToggle = async (value: string | number | boolean) => {
+  if (String(value) !== '1') {
+    form.value.rerankModelId = undefined;
+    return;
+  }
+  await loadRerankModels();
 };
 
 /** 查询知识库列表 */
@@ -483,6 +561,7 @@ const handleDelete = async (row?: Partial<KnowledgeBaseVO>) => {
 };
 
 loadEmbeddingModels();
+loadRerankModels();
 getList();
 </script>
 

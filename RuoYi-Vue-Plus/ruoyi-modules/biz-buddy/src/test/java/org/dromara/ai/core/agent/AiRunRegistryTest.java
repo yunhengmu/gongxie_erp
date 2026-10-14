@@ -59,4 +59,46 @@ class AiRunRegistryTest {
 
         assertTrue(registry.cancel(2L));
     }
+
+    @Test
+    @DisplayName("同一会话多段并存：取消时全部取消（嵌套场景）")
+    void shouldCancelAllHandles() {
+        AtomicBoolean outer = new AtomicBoolean(false);
+        AtomicBoolean inner = new AtomicBoolean(false);
+        registry.register(3L, () -> {
+            outer.set(true);
+            return true;
+        });
+        registry.register(3L, () -> {
+            inner.set(true);
+            return true;
+        });
+
+        assertTrue(registry.cancel(3L));
+        assertTrue(outer.get());
+        assertTrue(inner.get());
+    }
+
+    @Test
+    @DisplayName("先完成的一段注销后，仍在跑的那段仍可取消")
+    void shouldKeepRemainingHandleAfterUnregister() {
+        AtomicBoolean outer = new AtomicBoolean(false);
+        AtomicBoolean inner = new AtomicBoolean(false);
+        AiRunRegistry.Cancelable outerHandle = () -> {
+            outer.set(true);
+            return true;
+        };
+        AiRunRegistry.Cancelable innerHandle = () -> {
+            inner.set(true);
+            return true;
+        };
+        registry.register(4L, outerHandle);
+        registry.register(4L, innerHandle);
+        // 外层先结束并注销（不得连带删掉仍在跑的内层句柄）
+        registry.unregister(4L, outerHandle);
+
+        assertTrue(registry.cancel(4L));
+        assertFalse(outer.get());
+        assertTrue(inner.get());
+    }
 }

@@ -100,7 +100,7 @@ export interface RouteExpertCallVO {
   parsedOutput?: string;
   /** 失败原因（专家直答修订后为「专家不可用原因」；历史数据为结构校验失败原因） */
   validationError?: string;
-  /** 调用状态（success 已回答 / failed 调用失败 / timeout 超时 / pending_confirm 待确认；历史数据可能含 invalid / partial） */
+  /** 调用状态（success 已回答 / failed 调用失败 / timeout 超时 / pending_confirm 待确认 / cancelled 已取消；历史数据可能含 invalid / partial） */
   status?: string;
   /** 输入 Token */
   promptTokens?: number | null;

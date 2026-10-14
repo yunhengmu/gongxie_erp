@@ -1,6 +1,7 @@
 package org.dromara.ai.core.agent;
 
 import io.agentscope.core.ReActAgent;
+import io.agentscope.core.agent.AgentRun;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.RequireUserConfirmEvent;
@@ -30,11 +31,15 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -86,6 +91,9 @@ class AiRouteOrchestratorTest {
 
     private final SseEmitter emitter = mock(SseEmitter.class);
 
+    /** 真实的取消注册表：取消类用例直接从测试线程调 {@code cancel(sessionId)} 模拟「停止生成」 */
+    private final AiRunRegistry runRegistry = new AiRunRegistry();
+
     @BeforeAll
     static void init() {
         AiTestSupport.initialize();
@@ -99,7 +107,18 @@ class AiRouteOrchestratorTest {
 
     private AiRouteOrchestrator newOrchestrator() {
         return new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder, streamBridge,
-            traceService, aiProperties, runtimeConfigStore, skillService, agentService);
+            traceService, aiProperties, runtimeConfigStore, skillService, agentService, runRegistry);
+    }
+
+    /**
+     * 把「事件流」包成可取消的 {@code AgentRun}（与 {@code HarnessAgent#prepareRun} 同构）：
+     * 生产代码改用 {@code prepareRun} 后，桩点即由此提供流。
+     *
+     * @param events 专家事件流
+     * @return 可取消的执行句柄
+     */
+    private static AgentRun<AgentEvent> runOf(Flux<AgentEvent> events) {
+        return AgentRun.create("test-expert", () -> events);
     }
 
     private AiRouteContext newRoute() {
@@ -194,7 +213,7 @@ class AiRouteOrchestratorTest {
     private AiRouteOrchestrator newOrchestratorWithRealBridge(AiRetrievalSourceRegistry registry) {
         return new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
             new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService, registry),
-            traceService, aiProperties, runtimeConfigStore, skillService, agentService);
+            traceService, aiProperties, runtimeConfigStore, skillService, agentService, runRegistry);
     }
 
     /** 专家定义（主键 10，与 {@link #candidate()} 对齐）。 */
@@ -246,8 +265,8 @@ class AiRouteOrchestratorTest {
         AiExpertAgent definition = expertDefinition();
         HarnessAgent expert = stubExpertRun(definition);
         when(expertDirectory.definition(10L)).thenReturn(definition);
-        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class)))
-            .thenReturn(Flux.<AgentEvent>just(new TextBlockDeltaEvent("reply-1", "block-1", "专家回答")));
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(runOf(Flux.<AgentEvent>just(new TextBlockDeltaEvent("reply-1", "block-1", "专家回答"))));
         AiRouteContext route = newRoute();
 
         String report = newOrchestratorWithRealBridge().execute(route, candidate());
@@ -276,10 +295,10 @@ class AiRouteOrchestratorTest {
         source.setDocName("员工手册");
         source.setScore(0.9);
         registry.put("c1", List.of(source));
-        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>just(
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class))).thenReturn(runOf(Flux.<AgentEvent>just(
             new ToolCallStartEvent("reply-1", "c1", "search_knowledge_base"),
             new ToolResultEndEvent("reply-1", "c1", "search_knowledge_base", ToolResultState.SUCCESS),
-            new TextBlockDeltaEvent("reply-1", "block-1", "专家回答")));
+            new TextBlockDeltaEvent("reply-1", "block-1", "专家回答"))));
         AiRouteContext route = newRoute();
         route.entryState = new AiStreamState();
 
@@ -296,7 +315,8 @@ class AiRouteOrchestratorTest {
         AiExpertAgent definition = expertDefinition();
         HarnessAgent expert = stubExpertRun(definition);
         when(expertDirectory.definition(10L)).thenReturn(definition);
-        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class))).thenReturn(Flux.<AgentEvent>empty());
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(runOf(Flux.<AgentEvent>empty()));
         AiRouteContext route = newRoute();
         route.pinnedExpertId = 10L;
 
@@ -317,8 +337,8 @@ class AiRouteOrchestratorTest {
         AiExpertAgent definition = expertDefinition();
         HarnessAgent expert = stubExpertRun(definition);
         when(expertDirectory.definition(10L)).thenReturn(definition);
-        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class)))
-            .thenReturn(Flux.<AgentEvent>just(new RequireUserConfirmEvent("reply-1", null)));
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(runOf(Flux.<AgentEvent>just(new RequireUserConfirmEvent("reply-1", null))));
         AiRouteContext route = newRoute();
 
         String report = newOrchestratorWithRealBridge().execute(route, candidate());
@@ -338,8 +358,8 @@ class AiRouteOrchestratorTest {
         AiExpertAgent definition = expertDefinition();
         HarnessAgent expert = stubExpertRun(definition);
         when(expertDirectory.definition(10L)).thenReturn(definition);
-        when(expert.streamEvents(anyList(), any(RuntimeContext.class)))
-            .thenReturn(Flux.<AgentEvent>just(new TextBlockDeltaEvent("reply-2", "block-2", "续跑回答")));
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(runOf(Flux.<AgentEvent>just(new TextBlockDeltaEvent("reply-2", "block-2", "续跑回答"))));
         AiRouteContext route = newRoute();
         AiConfirmPendingStore.ExpertResume resume =
             new AiConfirmPendingStore.ExpertResume(1L, 10L, "1#10", "task", 2, "resume");
@@ -363,8 +383,8 @@ class AiRouteOrchestratorTest {
         AiExpertAgent definition = expertDefinition();
         HarnessAgent expert = stubExpertRun(definition);
         when(expertDirectory.definition(10L)).thenReturn(definition);
-        when(expert.streamEvents(anyList(), any(RuntimeContext.class)))
-            .thenReturn(Flux.<AgentEvent>just(new RequireUserConfirmEvent("reply-2", null)));
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class)))
+            .thenReturn(runOf(Flux.<AgentEvent>just(new RequireUserConfirmEvent("reply-2", null))));
         AiRouteContext route = newRoute();
         AiConfirmPendingStore.ExpertResume resume =
             new AiConfirmPendingStore.ExpertResume(1L, 10L, "1#10", "task", 1, "first");
@@ -378,5 +398,72 @@ class AiRouteOrchestratorTest {
         verify(recorder).recordExpertCall(any(AiRouteExpertCall.class));
         // 仅 answer_reset（暂停刻意不下发 expert_result）
         verify(emitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    // ==================== 第 3 圈：可取消（「停止生成」中断专家调用） ====================
+
+    @Test
+    @DisplayName("专家调用被「停止生成」中断：立即返回、不降级、明细记 cancelled")
+    void shouldCancelExpertCallWithoutDegrade() throws Exception {
+        AiExpertAgent definition = expertDefinition();
+        HarnessAgent expert = stubExpertRun(definition);
+        when(expertDirectory.definition(10L)).thenReturn(definition);
+        // 永不结束的流：模拟长回答，供测试线程在中途取消
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class))).thenReturn(runOf(Flux.never()));
+        AiRouteContext route = newRoute();
+
+        AtomicReference<String> report = new AtomicReference<>();
+        CountDownLatch returned = new CountDownLatch(1);
+        Thread worker = new Thread(() -> {
+            try {
+                report.set(newOrchestratorWithRealBridge().execute(route, candidate()));
+            } finally {
+                returned.countDown();
+            }
+        });
+        worker.start();
+
+        // 轮询至句柄登记完成（cancel 返回 true 即说明句柄已登记并被取消）
+        boolean cancelled = false;
+        for (int i = 0; i < 100 && !cancelled; i++) {
+            cancelled = runRegistry.cancel(route.sessionId);
+            if (!cancelled) {
+                Thread.sleep(20);
+            }
+        }
+        assertTrue(cancelled, "应在专家执行期间登记可取消句柄");
+        assertTrue(returned.await(5, TimeUnit.SECONDS), "取消后 runExpert 应立即返回（不再等满超时）");
+
+        // 用户停止≠失败：不产降级报告、不置降级，调用方拿到空报告自行按「已中止」收尾
+        assertEquals("", report.get());
+        assertTrue(route.cancelled);
+        assertFalse(route.degraded);
+        assertNull(route.degradeReason);
+        ArgumentCaptor<AiRouteExpertCall> captor = ArgumentCaptor.forClass(AiRouteExpertCall.class);
+        verify(recorder).recordExpertCall(captor.capture());
+        assertEquals(AiRouteExpertCall.STATUS_CANCELLED, captor.getValue().getStatus());
+        // route_decision + expert_start + answer_reset（取消刻意不下发 expert_result / route_fallback）
+        verify(emitter, times(3)).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
+    @DisplayName("等待超时按「超时」归因：不会被误标为用户取消")
+    void shouldTreatWaitTimeoutAsTimeout() throws Exception {
+        AiExpertAgent definition = expertDefinition();
+        HarnessAgent expert = stubExpertRun(definition);
+        when(expertDirectory.definition(10L)).thenReturn(definition);
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class))).thenReturn(runOf(Flux.never()));
+        aiProperties.getChat().setExpertTimeoutSeconds(1);
+        AiRouteContext route = newRoute();
+
+        String report = newOrchestratorWithRealBridge().execute(route, candidate());
+
+        assertTrue(route.degraded, "超时应降级为小Z 兜底自答");
+        assertFalse(route.cancelled, "超时不得被归因为用户取消");
+        assertTrue(route.degradeReason.contains("超时"));
+        assertTrue(report.contains("【专家结论不可用】"));
+        ArgumentCaptor<AiRouteExpertCall> captor = ArgumentCaptor.forClass(AiRouteExpertCall.class);
+        verify(recorder).recordExpertCall(captor.capture());
+        assertEquals(AiRouteExpertCall.STATUS_TIMEOUT, captor.getValue().getStatus());
     }
 }

@@ -8,6 +8,8 @@ import io.agentscope.core.tool.ToolCallParam;
 import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.json.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -35,6 +37,8 @@ import java.util.Map;
  * @author BizBuddy
  */
 class RouteDecisionTool extends ToolBase {
+
+    private static final Logger log = LoggerFactory.getLogger(RouteDecisionTool.class);
 
     /**
      * 工具名（编排协议内部工具，不在 ai_tool 业务工具注册表中登记）
@@ -141,6 +145,9 @@ class RouteDecisionTool extends ToolBase {
             .map(report -> ToolResultBlock.text(report).withIdAndName(id, name))
             .onErrorResume(error -> {
                 String message = AiSseSupport.rootCauseMessage(error);
+                // 编排异常一律降级，但必须留日志：否则「明细没落库 / 编排被打断」这类问题会被静默吞掉
+                log.error("专家编排执行失败（按降级处理）：sessionId={}, routeRunId={}, 原因={}",
+                    route.sessionId, route.routeRunId, message, error);
                 route.degraded = true;
                 route.degradeReason = "编排异常：" + message;
                 return Mono.just(ToolResultBlock
@@ -173,6 +180,9 @@ class RouteDecisionTool extends ToolBase {
             .map(report -> ToolResultBlock.text(report).withIdAndName(id, name))
             .onErrorResume(error -> {
                 String message = AiSseSupport.rootCauseMessage(error);
+                // 同上：降级必须留日志，避免异常被静默吞掉
+                log.error("指定专家编排执行失败（按降级处理）：sessionId={}, routeRunId={}, 原因={}",
+                    route.sessionId, route.routeRunId, message, error);
                 route.degraded = true;
                 route.degradeReason = "编排异常：" + message;
                 return Mono.just(ToolResultBlock

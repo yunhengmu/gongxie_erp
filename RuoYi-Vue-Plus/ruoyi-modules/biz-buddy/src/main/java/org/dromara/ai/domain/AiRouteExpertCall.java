@@ -68,6 +68,11 @@ public class AiRouteExpertCall implements Serializable {
      */
     public static final String STATUS_PENDING_CONFIRM = "pending_confirm";
 
+    /**
+     * 调用状态：已取消（用户「停止生成」/ SSE 断连中断了本次专家调用）
+     */
+    public static final String STATUS_CANCELLED = "cancelled";
+
     @Serial
     private static final long serialVersionUID = 1L;
 
@@ -123,7 +128,7 @@ public class AiRouteExpertCall implements Serializable {
     private String validationError;
 
     /**
-     * 调用状态（success / invalid / failed / timeout）
+     * 调用状态（success / invalid / failed / timeout / pending_confirm / cancelled）
      */
     private String status;
 

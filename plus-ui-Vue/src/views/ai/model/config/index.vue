@@ -223,6 +223,10 @@
                       <code>https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode</code>）；
                       通用的 <code>dashscope.aliyuncs.com/compatible-mode</code> 上<b>没有该接口</b>（实测返回 404）。
                     </template>
+                    <template v-else-if="isRerankForm">
+                      重排模型填 <b>完整重排端点</b>（DashScope 文本重排原生接口），平台<b>不拼后缀</b>：<br />
+                      <code>{{ RERANK_ENDPOINT }}</code>；模型标识填重排模型名（如 <code>gte-rerank-v2</code>）。
+                    </template>
                     <template v-else>
                       统一填 <b>OpenAI 兼容根地址</b>，不用自己拼 /embeddings 或 /chat/completions。
                     </template>
@@ -385,7 +389,8 @@ const PROVIDER_OPTIONS = [
 const MODEL_TYPE_OPTIONS = [
   { label: '对话模型', value: 'chat' },
   { label: '向量模型', value: 'embedding' },
-  { label: '决策模型', value: 'decision' }
+  { label: '决策模型', value: 'decision' },
+  { label: '重排模型', value: 'rerank' }
 ];
 
 const providerOptions = PROVIDER_OPTIONS;
@@ -443,6 +448,12 @@ const isChatForm = computed(() => form.value.modelType === 'chat');
 /** 决策模型：走 TypeSafe System One 协议，服务地址由后端自动拼 /v1/systemone */
 const isDecisionForm = computed(() => form.value.modelType === 'decision');
 
+/**
+ * 重排模型：服务地址要填**完整重排端点**（DashScope 文本重排原生接口），
+ * 后端不拼 `/chat/completions` 之类的后缀，故这里给专门的提示与占位符
+ */
+const isRerankForm = computed(() => form.value.modelType === 'rerank');
+
 /** 表单校验规则：向量维度按类型动态必填 */
 const rules = computed<ElFormRules>(() => ({
   configName: [{ required: true, message: '配置名称不能为空', trigger: 'blur' }],
@@ -465,10 +476,13 @@ const rules = computed<ElFormRules>(() => ({
   dimension: isEmbeddingForm.value ? [{ required: true, message: '向量模型必须填写向量维度', trigger: 'blur' }] : []
 }));
 
-/** 当前提供商推荐的兼容地址（决策模型不推荐：业务空间专属域名无法预知，通用域名又不可用） */
+/** 当前提供商推荐的兼容地址（决策 / 重排模型不推荐通用地址：一个要业务空间专属域名，一个要重排端点） */
 const recommendedBaseUrl = computed(() => {
   if (isDecisionForm.value) {
     return '';
+  }
+  if (isRerankForm.value) {
+    return RERANK_ENDPOINT;
   }
   return providerOptions.find((item) => item.value === form.value.provider)?.baseUrl ?? '';
 });
@@ -481,6 +495,10 @@ const baseUrlWarning = computed(() => {
   }
   if (/[{}]/.test(value)) {
     return '⚠ 地址中仍有占位符（如 {WorkspaceId}），请替换为真实业务空间 ID';
+  }
+  // 重排模型**就是** DashScope 原生接口（完整端点），故不套用「请改用 compatible-mode」的通用告警
+  if (isRerankForm.value) {
+    return '';
   }
   if (value.includes('aliyuncs.com') && value.includes('/api/v1') && !value.includes('/compatible-mode')) {
     return '⚠ 这是 DashScope 原生接口地址，请改用 .../compatible-mode/v1';
@@ -520,16 +538,33 @@ const providerLabel = (value?: string) => providerOptions.find((item) => item.va
 /** 模型类型名称 */
 const modelTypeLabel = (value?: string) => modelTypeOptions.find((item) => item.value === value)?.label ?? value ?? '-';
 
-/** 模型类型标签配色：对话 / 向量 / 决策 三色区分 */
-const modelTypeTag = (value?: string): 'primary' | 'warning' | 'success' => {
+/** 模型类型标签配色：对话 / 向量 / 决策 / 重排 四色区分 */
+const modelTypeTag = (value?: string): 'primary' | 'warning' | 'success' | 'info' => {
   if (value === 'embedding') {
     return 'warning';
   }
-  return value === 'decision' ? 'success' : 'primary';
+  if (value === 'decision') {
+    return 'success';
+  }
+  return value === 'rerank' ? 'info' : 'primary';
 };
 
-/** 切换模型类型：切到决策模型时清掉「提供商默认回填」的通用地址（通用域名上没有 System One 接口） */
+/** 重排模型推荐（也是唯一支持的）端点：DashScope 文本重排原生接口 */
+const RERANK_ENDPOINT = 'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank';
+
+/**
+ * 切换模型类型：
+ * ① 切到决策模型时清掉「提供商默认回填」的通用地址（通用域名上没有 System One 接口）；
+ * ② 切到重排模型时把地址预填为 DashScope 重排端点（平台只支持该重排协议，避免填错）
+ */
 const handleModelTypeChange = (value: string) => {
+  if (value === 'rerank') {
+    const providerDefault = providerOptions.find((item) => item.value === form.value.provider)?.baseUrl;
+    if (!form.value.baseUrl || form.value.baseUrl === providerDefault) {
+      form.value.baseUrl = RERANK_ENDPOINT;
+    }
+    return;
+  }
   if (value !== 'decision') {
     return;
   }

@@ -1,6 +1,7 @@
 package org.dromara.ai.core.agent;
 
 import io.agentscope.core.ReActAgent;
+import io.agentscope.core.agent.AgentRun;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.ConfirmResult;
 import io.agentscope.core.event.RequireUserConfirmEvent;
@@ -127,7 +128,7 @@ class AiWriteChainTest {
         AiRouteOrchestrator orchestrator = new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
             new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService,
                 new org.dromara.ai.core.AiRetrievalSourceRegistry()), traceService,
-            aiProperties, runtimeConfigStore, skillService, agentService);
+            aiProperties, runtimeConfigStore, skillService, agentService, new AiRunRegistry());
         RouteDecisionTool routeTool = new RouteDecisionTool(orchestrator);
 
         AiExpertAgent definition = expertDefinition();
@@ -140,9 +141,9 @@ class AiWriteChainTest {
         // ① 提问 → ② 路由：入口智能体（小Z）调用 route_decision，选中「公告管理专家」
         // ③ 专家发起写工具 create_notice，框架按「需确认」档暂停并上抛确认事件
         ToolUseBlock pendingWriteCall = new ToolUseBlock(TOOL_CALL_ID, "create_notice", noticeInput());
-        when(expert.streamEvents(any(Msg.class), any(RuntimeContext.class))).thenReturn(Flux.just(
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class))).thenReturn(runOf(Flux.just(
             new ToolCallStartEvent(FIRST_REPLY_ID, TOOL_CALL_ID, "create_notice"),
-            new RequireUserConfirmEvent(FIRST_REPLY_ID, List.of(pendingWriteCall))));
+            new RequireUserConfirmEvent(FIRST_REPLY_ID, List.of(pendingWriteCall)))));
 
         ToolResultBlock result =
             routeTool.callAsync(param(RouteDecisionTool.TOOL_NAME, routeInput(), routeContext(firstRoute))).block();
@@ -172,10 +173,10 @@ class AiWriteChainTest {
 
         // ④ 确认 → ⑤ 续跑：用 ConfirmResult 驱动**同一专家会话**续跑，写工具此时才真正执行
         // 恢复段与门面一致：重建编排上下文（复用同一次编排主键），候选清单按提问用户现算
-        when(expert.streamEvents(anyList(), any(RuntimeContext.class))).thenReturn(Flux.just(
+        when(expert.prepareRun(anyList(), any(RuntimeContext.class))).thenReturn(runOf(Flux.just(
             new ToolCallStartEvent(RESUME_REPLY_ID, TOOL_CALL_ID, "create_notice"),
             new ToolResultEndEvent(RESUME_REPLY_ID, TOOL_CALL_ID, "create_notice", ToolResultState.SUCCESS),
-            new TextBlockDeltaEvent(RESUME_REPLY_ID, "block-2", "公告已发布（通知 ID：1234），标题：关于10月8日放假的通知")));
+            new TextBlockDeltaEvent(RESUME_REPLY_ID, "block-2", "公告已发布（通知 ID：1234），标题：关于10月8日放假的通知"))));
 
         AiConfirmPendingStore.ExpertResume resume = firstRoute.pendingResume;
         AiStreamState resumeEntryState = new AiStreamState();
@@ -284,10 +285,21 @@ class AiWriteChainTest {
     }
 
     /**
+     * 把「事件流」包成可取消的 {@code AgentRun}（与 {@code HarnessAgent#prepareRun} 同构）。
+     *
+     * @param events 专家事件流
+     * @return 可取消的执行句柄
+     */
+    private static AgentRun<io.agentscope.core.event.AgentEvent> runOf(
+        Flux<io.agentscope.core.event.AgentEvent> events) {
+        return AgentRun.create("test-expert", () -> events);
+    }
+
+    /**
      * 打桩专家调用的装配期前置依赖（专家实例 / 权限基线 / 会话槽位 / 技能过滤 / 信任 / 子链路）。
      *
      * @param definition 专家定义（须与候选主键一致）
-     * @return 专家实例（供用例配置 {@code streamEvents} 的事件流）
+     * @return 专家实例（供用例配置 {@code prepareRun} 的事件流）
      */
     private HarnessAgent stubExpertRun(AiExpertAgent definition) {
         HarnessAgent expert = mock(HarnessAgent.class);

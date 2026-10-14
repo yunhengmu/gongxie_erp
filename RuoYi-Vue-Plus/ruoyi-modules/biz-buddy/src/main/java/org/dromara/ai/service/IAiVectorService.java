@@ -51,19 +51,22 @@ public interface IAiVectorService {
     /**
      * 检索测试：按查询文本召回切片，可选开启重排（Rerank）并指定**融合模式**。
      *
-     * <p>{@code rerank=true} 时先按 {@code max(topK, rerankTopN)} 稠密召回，再调重排模型，
-     * 并按 {@code rerankMode}（{@code replace} / {@code rank_rrf} / {@code score_fusion}）融合后截取 topK；
-     * 重排失败（未配密钥 / 非 2xx / 超时 / 结构异常）时保持原顺序与原文分数，不阻断检索。</p>
+     * <p>重排的**模型与开关来自知识库配置**（{@code ai_knowledge_base.rerank_enabled / rerank_model_id}，
+     * 模型连接信息取自「模型配置」{@code model_type=rerank}）；{@code rerank} 参数用于显式覆盖该开关
+     * （{@code null}＝按知识库配置），供「检索测试」做 A/B。开启时先按 {@code max(topK, rerankTopN)}
+     * 稠密召回，再调重排模型，并按 {@code rerankMode}（{@code replace} / {@code rank_rrf} /
+     * {@code score_fusion}）融合后截取 topK；重排失败（模型不可用 / 未配密钥 / 非 2xx / 超时 / 结构异常）
+     * 时保持原顺序与原文分数，不阻断检索。</p>
      *
      * @param kbId       知识库主键
      * @param query      查询文本
      * @param topK       召回条数，为空取知识库配置
      * @param threshold  相似度阈值，为空取知识库配置
-     * @param rerank     是否开启重排
+     * @param rerank     重排开关覆盖：{@code null}＝按知识库配置；{@code true}/{@code false}＝显式要求/拒绝
      * @param rerankMode 融合模式，为空时取平台配置（{@code bizbuddy.ai.rag.rerank-mode}）
      * @return 命中切片
      */
-    List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, boolean rerank,
+    List<AiRetrievalHitVo> retrieve(Long kbId, String query, Integer topK, BigDecimal threshold, Boolean rerank,
                                     String rerankMode);
 
     /**

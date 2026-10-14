@@ -33,8 +33,9 @@ import * as l9 from './cases/l9.mjs';
 import * as l10 from './cases/l10.mjs';
 import * as l11 from './cases/l11.mjs';
 import * as l12 from './cases/l12.mjs';
+import * as l13 from './cases/l13.mjs';
 
-const CASES = [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12];
+const CASES = [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13];
 const EXIT = { OK: 0, FAIL: 1, PREFLIGHT: 2, USAGE: 3 };
 
 /** 参数错误 */

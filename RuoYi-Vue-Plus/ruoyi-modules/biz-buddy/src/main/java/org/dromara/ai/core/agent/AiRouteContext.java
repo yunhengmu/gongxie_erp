@@ -247,6 +247,15 @@ import java.util.concurrent.atomic.AtomicLong;
     volatile boolean routeDone;
 
     /**
+     * 本轮编排是否被用户停止（「停止生成」/ SSE 断连）而中止。
+     *
+     * <p>由 {@link AiRouteOrchestrator} 在专家调用被取消时置位。与 {@code degraded} 刻意区分：
+     * 用户主动停止**不是**专家失败，不得降级为小Z 兜底自答，收尾一律走「已中止」口径。
+     * 调用方（门面短路轮 / 指定专家兜底 / 恢复段）据此提前返回，不再产出降级报告。</p>
+     */
+    volatile boolean cancelled;
+
+    /**
      * 构造一次编排运行状态。
      *
      * @param routeRunId     编排主键

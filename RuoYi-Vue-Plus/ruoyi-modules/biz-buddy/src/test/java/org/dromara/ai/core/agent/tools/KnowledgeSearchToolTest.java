@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -79,7 +78,7 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any()))
             .thenReturn(List.of(hitWithTrace(11L, "员工手册", 2, 0.9, "考勤正文。", "第2章 > 2.3 考勤", 12)));
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "考勤"), "100")).block();
@@ -94,7 +93,7 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any()))
             .thenReturn(List.of(hit(11L, "员工手册", 0, 0.5, "正文。")));
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
@@ -112,7 +111,7 @@ class KnowledgeSearchToolTest {
         ToolResultBlock result = tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of(), "100")).block();
         assertFalse(isError(result));
         assertTrue(text(result).contains("未绑定知识库"));
-        verify(vectorService, never()).retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean());
+        verify(vectorService, never()).retrieve(anyLong(), anyString(), anyInt(), any(), any(), any());
     }
 
     @Test
@@ -143,9 +142,9 @@ class KnowledgeSearchToolTest {
     void shouldRegisterSourcesOnHit() {
         AiRetrievalSourceRegistry registry = new AiRetrievalSourceRegistry();
         KnowledgeSearchTool tool = new KnowledgeSearchTool(vectorService, List.of(1L), null,
-            knowledgeBaseService, false, false, null, registry);
+                knowledgeBaseService, false, null, registry);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any()))
             .thenReturn(List.of(hitWithTrace(11L, "员工手册", 2, 0.9, "考勤正文。", "第2章", 12)));
 
         tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "考勤"), "100")).block();
@@ -164,9 +163,9 @@ class KnowledgeSearchToolTest {
     void shouldNotRegisterSourcesWhenNoHit() {
         AiRetrievalSourceRegistry registry = new AiRetrievalSourceRegistry();
         KnowledgeSearchTool tool = new KnowledgeSearchTool(vectorService, List.of(1L), null,
-            knowledgeBaseService, false, false, null, registry);
+                knowledgeBaseService, false, null, registry);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean())).thenReturn(List.of());
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any())).thenReturn(List.of());
 
         tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
 
@@ -179,7 +178,7 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any()))
             .thenReturn(List.of(
                 hit(11L, "员工手册", 0, 0.5, "员工考勤与请假管理规定正文。"),
                 hit(12L, "报销制度", 0, 0.9, "差旅报销标准与审批流程正文。")));
@@ -197,7 +196,7 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any()))
             .thenReturn(List.of(
                 hit(11L, "员工手册", 2, 0.9, "第一段关于考勤的规定。"),
                 hit(11L, "员工手册", 3, 0.8, "第二段关于请假的规定。")));
@@ -216,7 +215,7 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean())).thenReturn(null);
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any())).thenReturn(null);
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
         assertFalse(isError(result));
@@ -228,7 +227,7 @@ class KnowledgeSearchToolTest {
     void shouldSkipFilterInPlatformScope() {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), 3, knowledgeBaseService, true);
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any()))
             .thenReturn(List.of(hit(11L, "公开资料", 0.8)));
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "公开"), "100")).block();
@@ -243,7 +242,7 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any()))
             .thenThrow(new ServiceException("向量库不可用"));
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();
@@ -257,7 +256,7 @@ class KnowledgeSearchToolTest {
         KnowledgeSearchTool tool =
             new KnowledgeSearchTool(vectorService, List.of(1L), null, knowledgeBaseService);
         when(knowledgeBaseService.filterRetrievableKbIds(any(), any())).thenReturn(List.of(1L));
-        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), anyBoolean()))
+        when(vectorService.retrieve(anyLong(), anyString(), anyInt(), any(), any(), any()))
             .thenThrow(new IllegalStateException("boom"));
         ToolResultBlock result =
             tool.callAsync(param(KnowledgeSearchTool.TOOL_NAME, Map.of("query", "制度"), "100")).block();

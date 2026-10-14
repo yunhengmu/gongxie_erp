@@ -394,14 +394,14 @@ bizbuddy:
       username: ${MILVUS_USERNAME:root}
       password: ${MILVUS_PASSWORD:Milvus}
       connect-timeout-ms: 10000
-    # RAG 检索重排（Rerank）：**默认开启**（实测 hit@1 67.9→75.0%、MRR 0.772→0.829、hit@5 89.3→98.2%，见 docs/17 §89）；
-    # 开启后检索走「稠密召回(max(topK,rerankTopN)) → 重排 → 融合 → 截断 topK」。
-    # 密钥复用知识库向量模型（dashscope）的 api_key；未配密钥/非 2xx/超时/结构异常一律降级为原顺序。
+    # RAG 检索重排（Rerank）：**模型与开关已迁出本段**——重排模型登记在「模型配置」（model_type=rerank），
+    # 「是否启用重排 + 用哪个模型」由知识库配置（ai_knowledge_base.rerank_enabled / rerank_model_id）；
+    # 本段只保留与模型无关的算法参数，启用重排的知识库检索走「稠密召回(max(topK,rerank-top-n)) → 重排 → 融合 → 截断 topK」。
+    # 密钥取该知识库所选重排模型配置的 api_key；未配模型/非 2xx/超时/结构异常一律降级为原顺序。
     rag:
-      rerank-enabled: true
-      rerank-model: gte-rerank-v2
-      rerank-endpoint: https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank
+      # 重排前的稠密召回条数（候选池）
       rerank-top-n: 30
+      # 重排调用超时（毫秒），超时即降级为原顺序
       rerank-timeout-ms: 12000
       # 重排融合模式：replace（纯替换）/ rank_rrf（排名 RRF 融合）/ score_fusion（分数归一化加权，默认）
       rerank-mode: score_fusion

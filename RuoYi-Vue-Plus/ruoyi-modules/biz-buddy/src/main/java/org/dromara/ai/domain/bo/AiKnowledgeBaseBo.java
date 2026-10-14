@@ -59,6 +59,16 @@ public class AiKnowledgeBaseBo implements Serializable {
     private Long embeddingModelId;
 
     /**
+     * 是否启用检索重排（0否 1是）
+     */
+    private String rerankEnabled;
+
+    /**
+     * 重排模型（ai_model_config.id，model_type=rerank）：启用重排时必填
+     */
+    private Long rerankModelId;
+
+    /**
      * 向量维度：留空时取向量模型配置的维度
      */
     private Integer dimension;

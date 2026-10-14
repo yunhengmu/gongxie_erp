@@ -257,6 +257,7 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
     public Boolean insertByBo(AiKnowledgeBaseBo bo) {
         AiKnowledgeBase add = MapstructUtils.convert(bo, AiKnowledgeBase.class);
         AiModelConfig model = resolveEmbeddingModel(add.getEmbeddingModelId());
+        resolveRerank(add);
         add.setKbCode(normalizeCode(add.getKbCode()));
         add.setCollectionName(buildCollectionName(add.getKbCode()));
         add.setDimension(resolveDimension(add.getDimension(), model));
@@ -277,6 +278,7 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
         }
         AiKnowledgeBase update = MapstructUtils.convert(bo, AiKnowledgeBase.class);
         AiModelConfig model = resolveEmbeddingModel(update.getEmbeddingModelId());
+        resolveRerank(update);
         update.setKbCode(normalizeCode(update.getKbCode()));
         update.setCollectionName(buildCollectionName(update.getKbCode()));
         update.setDimension(resolveDimension(update.getDimension(), model));
@@ -328,7 +330,7 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
     }
 
     /**
-     * 补充向量模型名称。
+     * 补充向量模型 / 重排模型名称。
      *
      * @param list 知识库列表
      */
@@ -341,6 +343,9 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
             if (vo.getEmbeddingModelId() != null) {
                 modelIds.add(vo.getEmbeddingModelId());
             }
+            if (vo.getRerankModelId() != null) {
+                modelIds.add(vo.getRerankModelId());
+            }
         }
         if (modelIds.isEmpty()) {
             return;
@@ -349,7 +354,10 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
         for (AiModelConfig model : modelConfigMapper.selectByIds(modelIds)) {
             nameMap.put(model.getId(), model.getConfigName());
         }
-        list.forEach(vo -> vo.setEmbeddingModelName(nameMap.get(vo.getEmbeddingModelId())));
+        list.forEach(vo -> {
+            vo.setEmbeddingModelName(nameMap.get(vo.getEmbeddingModelId()));
+            vo.setRerankModelName(nameMap.get(vo.getRerankModelId()));
+        });
     }
 
     /**
@@ -417,6 +425,34 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
             throw new ServiceException("所选向量模型已停用：" + model.getConfigName());
         }
         return model;
+    }
+
+    /**
+     * 校验并归一化重排配置：仅当「启用重排」时才要求并校验重排模型（存在 / 类型 rerank / 未停用）；
+     * 未启用则一律清空模型绑定，避免留下「开关关了却还挂着模型」的脏数据。
+     *
+     * @param entity 知识库实体（就地改写）
+     */
+    private void resolveRerank(AiKnowledgeBase entity) {
+        if (!"1".equals(StringUtils.trim(entity.getRerankEnabled()))) {
+            entity.setRerankEnabled("0");
+            entity.setRerankModelId(null);
+            return;
+        }
+        Long modelId = entity.getRerankModelId();
+        if (modelId == null) {
+            throw new ServiceException("启用检索重排时必须选择重排模型");
+        }
+        AiModelConfig model = modelConfigMapper.selectById(modelId);
+        if (model == null) {
+            throw new ServiceException("重排模型不存在或已被删除");
+        }
+        if (!AiModelConfig.TYPE_RERANK.equalsIgnoreCase(StringUtils.trim(model.getModelType()))) {
+            throw new ServiceException("所选模型不是重排模型：" + model.getConfigName());
+        }
+        if (!STATUS_NORMAL.equals(model.getStatus())) {
+            throw new ServiceException("所选重排模型已停用：" + model.getConfigName());
+        }
     }
 
     /**

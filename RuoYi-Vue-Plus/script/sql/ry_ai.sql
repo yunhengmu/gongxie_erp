@@ -87,7 +87,7 @@ SET NAMES utf8mb4;
 -- 一、菜单与按钮权限（sys_menu）
 -- ============================================================
 --   一级菜单「BizBuddy」+ 6 个二级分组（智能体 / 模型与推理 / 知识库 / 工具与集成 /
---   审计与观测 / 安全合规）+ 功能页与按钮权限，共 123 行（6 分组 / 30 功能页 / 86 按钮）；权限标识统一为 ai:{模块}:{动作}。
+--   审计与观测 / 安全合规）+ 功能页与按钮权限，共 132 行（6 分组 / 33 功能页 / 92 按钮）；权限标识统一为 ai:{模块}:{动作}。
 -- ============================================================
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020000, 'BizBuddy', 0, 2, 'bizbuddy', null, '', 'N', 'Y', 'M', '0', '0', '', 'skill', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.116279', null, null, 'BizBuddy 智能业务平台') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020010, '智能体', 1761400000000020000, 1, 'agent', '', '', 'N', 'Y', 'M', '0', '0', '', 'model', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.119194', null, null, '智能体定义、会话与对话工作台') on duplicate key update menu_id = menu_id;
@@ -103,6 +103,9 @@ insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component,
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020273, '结构化决策查询', 1761400000000020272, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:runtime:jev:query', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-12 22:00:00', null, null, '') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020274, '结构化决策修改', 1761400000000020272, 2, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:runtime:jev:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-12 22:00:00', null, null, '') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020275, '结构化决策探测', 1761400000000020272, 3, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:health:probe', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-12 22:00:00', null, null, '连通性探测复用健康自检的探测接口（ai:health:probe）') on duplicate key update menu_id = menu_id;
+-- 「对话偏好」独立页（用户级设置，覆盖平台默认）：挂「智能体」分组，紧随「小Z配置 / 结构化决策路由」
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020276, '对话偏好', 1761400000000020010, 13, 'pref', 'ai/chat/pref/index', '', 'N', 'Y', 'C', '0', '0', 'ai:chat:pref:query', 'international', '', '', 1761000000000000103, 1761100000000000001, '2026-10-14 12:00:00', null, null, '对话偏好：时区 / 语言两项用户级设置，覆盖平台默认（REQ-AI-31）') on duplicate key update menu_id = menu_id;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020277, '对话偏好修改', 1761400000000020276, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:chat:pref:edit', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-14 12:00:00', null, null, '') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020101, '专家配置', 1761400000000020010, 4, 'expert', 'ai/agent/expert/index', '', 'N', 'Y', 'C', '0', '0', 'ai:agent:list', 'model', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.132477', null, null, '专家智能体：模型、系统提示词、工具 / 知识库 / 技能绑定、默认输出契约与自动路由开关') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020102, '任务管理', 1761400000000020010, 5, 'session', 'ai/agent/session/index', '', 'N', 'Y', 'C', '0', '0', 'ai:session:list', 'list', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.135441', null, null, '会话检索、原始日志与终止') on duplicate key update menu_id = menu_id;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020179, '计划模式与任务清单', 1761400000000020010, 6, 'plan', 'ai/runtime/plan/index', '', 'N', 'Y', 'C', '0', '0', 'ai:runtime:plan', 'guide', '', '', 1761000000000000103, 1761100000000000001, '2026-09-26 13:08:12.413124', null, null, '计划模式（只读设计阶段）与任务清单开关') on duplicate key update menu_id = menu_id;
@@ -239,7 +242,7 @@ create table if not exists ai_model_config (
     id              bigint(20)         not null,
     config_name     varchar(100)   not null comment '配置名称',
     provider        varchar(50)    not null comment '提供商（openai/dashscope/deepseek/glm/ollama/custom）',
-    model_type      varchar(20)    not null comment '模型类型（chat 对话 / embedding 向量 / decision 决策）',
+    model_type      varchar(20)    not null comment '模型类型（chat 对话 / embedding 向量 / decision 决策 / rerank 重排）',
     model_code      varchar(100)   not null comment '模型标识（如 qwen-plus、text-embedding-v3）',
     supports_vision char(1)        default '1' comment '是否支持视觉（图片输入；仅对话模型有意义）：1是 0否',
     base_url        varchar(255)   not null comment '服务地址（OpenAI 兼容根地址）',
@@ -272,6 +275,8 @@ create table if not exists ai_knowledge_base (
     chunk_size           int       default 500 comment '切片长度（字符）',
     chunk_overlap        int       default 50 comment '切片重叠长度（字符）',
     retrieval_top_k      int       default 5 comment '默认召回条数',
+    rerank_enabled       char(1)   not null default '0' comment '是否启用检索重排（0否 1是）',
+    rerank_model_id      bigint(20) comment '重排模型（ai_model_config.id，model_type=rerank）',
     similarity_threshold decimal(4, 3) default 0.500 comment '默认相似度阈值',
     status               char(1)       default '0' comment '状态（0正常 1停用）',
     remark               varchar(500),
@@ -696,7 +701,7 @@ create table if not exists ai_route_expert_call (
     raw_output        longtext comment '专家原始输出原文（不改写、不裁剪，供前端来源卡片与事后追溯）',
     parsed_output     longtext comment '通过契约校验后的结构化结果（JSON 文本）',
     validation_error  varchar(1000) comment '结构校验失败原因（重试时回传给专家）',
-    status            varchar(16) comment '调用状态：success / invalid / failed / timeout',
+    status            varchar(16) comment '调用状态：success / invalid / failed / timeout / pending_confirm / cancelled',
     prompt_tokens     bigint(20) comment '该次调用的输入 Token（计入编排总预算）',
     completion_tokens bigint(20) comment '该次调用的输出 Token',
     duration_ms       bigint(20) comment '该次调用耗时（毫秒）',
@@ -1167,10 +1172,11 @@ create table if not exists ai_safety_event (
 -- ============================================================
 -- 三、内置模型配置种子（ai_model_config）
 -- ============================================================
---   预置三个**示例模型**（提供商：阿里云百炼 / DashScope）：
+--   预置四个**示例模型**（提供商：阿里云百炼 / DashScope）：
 --     ① deepseek-v4.1-flash     对话模型（model_type=chat）
 --     ② qwen3.7-text-embedding-flash  向量模型（model_type=embedding，维度 1024）
 --     ③ decision-model-preview  决策模型（model_type=decision，供「安全合规配置 → 结构化决策路由」引用）
+--     ④ gte-rerank-v2           重排模型（model_type=rerank，供「知识库管理」的检索重排引用）
 --   注意：
 --   a. **api_key 一律留空** —— 部署后请到「模型配置」换成本人的阿里云百炼密钥；
 --      若要使用其它模型，也可在该页另行新建，再把「小Z 配置」「专家配置」的模型槽位指向它。
@@ -1181,6 +1187,9 @@ create table if not exists ai_safety_event (
 --      （如 https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode，运行时自动拼 /v1/systemone）；
 --      通用的 https://dashscope.aliyuncs.com/compatible-mode 上**没有该接口**（实测返回 404），
 --      故此处按占位符预置，部署后须替换为真实业务空间 ID 并补齐密钥。
+--   e. 重排模型走 DashScope **文本重排原生接口**，base_url 须填**完整端点**
+--      （https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank，不拼 /chat/completions），
+--      model_code 即重排模型名（此处 gte-rerank-v2）；知识库要在「知识库管理」开重排开关并选中它。
 -- ============================================================
 insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
                              base_url, api_key,
@@ -1209,6 +1218,16 @@ values (1761400000000020402, 'decision-model-preview', 'dashscope', 'decision', 
         'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode', null,
         null, '0',
         '预置示例（决策模型，阿里云百炼 TypeSafe System One）：base_url 必须替换为业务空间专属域名（通用 dashscope 域名无 /v1/systemone，实测 404）；同时补齐 API 密钥',
+        1761000000000000103, 1761100000000000001, now(), '0')
+on duplicate key update id = id;
+
+insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
+                             base_url, api_key,
+                             dimension, status, remark, create_dept, create_by, create_time, del_flag)
+values (1761400000000020403, 'gte-rerank-v2', 'dashscope', 'rerank', 'gte-rerank-v2', '1',
+        'https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank', null,
+        null, '0',
+        '预置示例（重排模型，阿里云百炼文本重排原生接口）：base_url 须填完整重排端点；部署后请换密钥或另行新建模型',
         1761000000000000103, 1761100000000000001, now(), '0')
 on duplicate key update id = id;
 

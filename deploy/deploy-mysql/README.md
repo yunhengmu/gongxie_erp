@@ -91,6 +91,15 @@ docker compose up -d --build
 
 > 智能体只绑定了模型，未绑知识库 / 技能；若要换用其它厂商或模型，在「模型配置」页新建即可（提供商选对应项，`base_url` 填其 OpenAI 兼容根地址）。
 
+### 升级须知（2026-10-14 重排改造）
+
+本次改造删除了全局 `bizbuddy.ai.rag.rerank-enabled` / `rerank-model` / `rerank-endpoint` 三项；重排模型改在「模型配置」登记为 `rerank` 类型，由「知识库」开启「检索重排」并选择模型（`ai_knowledge_base` 新增两列，列内联 comment 已在建表脚本里）。建表脚本已加这两列，但**建库脚本只挂进 `docker-entrypoint-initdb.d`、仅在数据卷为空（首次初始化）时执行，不会重跑**——**存量库必须手工迁移**：
+
+```sql
+alter table ai_knowledge_base add column rerank_enabled char(1) not null default '0';
+alter table ai_knowledge_base add column rerank_model_id bigint(20);
+```
+
 ## 6. 已知坑（与 PostgreSQL 版相同，附 MySQL 增量项）
 
 **① 用 Docker Hub 拉 `bellsoft/liberica-openjdk-rocky` 反复失败**

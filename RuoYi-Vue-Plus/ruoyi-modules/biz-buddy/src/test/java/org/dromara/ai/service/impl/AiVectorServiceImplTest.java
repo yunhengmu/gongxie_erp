@@ -76,6 +76,16 @@ class AiVectorServiceImplTest {
 
     private final AiProperties aiProperties = new AiProperties();
 
+    /**
+     * 重排模型自身的密钥 / 端点 / 模型标识（本次改造后重排不再复用向量模型密钥）。
+     */
+    private static final String RERANK_KEY = "rerank-key";
+
+    private static final String RERANK_BASE =
+        "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank";
+
+    private static final String RERANK_CODE = "gte-rerank-v2";
+
     private AiVectorServiceImpl service;
 
     @BeforeEach
@@ -106,6 +116,29 @@ class AiVectorServiceImplTest {
         AiModelConfig model = new AiModelConfig();
         model.setId(id);
         model.setModelCode("embed");
+        return model;
+    }
+
+    /**
+     * 知识库桩：启用重排并绑定指定重排模型。
+     */
+    private AiKnowledgeBase kbWithRerank(Long id, Integer dimension, Long embeddingModelId, Long rerankModelId) {
+        AiKnowledgeBase kb = kb(id, dimension, embeddingModelId);
+        kb.setRerankEnabled("1");
+        kb.setRerankModelId(rerankModelId);
+        return kb;
+    }
+
+    /**
+     * 重排模型桩：类型 rerank、状态正常，带端点与模型标识。
+     */
+    private AiModelConfig rerankModel(Long id) {
+        AiModelConfig model = new AiModelConfig();
+        model.setId(id);
+        model.setModelType(AiModelConfig.TYPE_RERANK);
+        model.setStatus("0");
+        model.setModelCode(RERANK_CODE);
+        model.setBaseUrl(RERANK_BASE);
         return model;
     }
 
@@ -272,11 +305,13 @@ class AiVectorServiceImplTest {
     @Test
     @DisplayName("检索：开启重排时多召回、按重排分重排并截取 topK")
     void shouldRerankRetrieval() {
-        AiKnowledgeBase kb = kb(2L, 3, 7L);
+        AiKnowledgeBase kb = kbWithRerank(2L, 3, 7L, 8L);
         AiModelConfig model = model(7L);
         when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb);
         when(modelConfigMapper.selectById(7L)).thenReturn(model);
+        when(modelConfigMapper.selectById(8L)).thenReturn(rerankModel(8L));
         when(modelConfigService.decryptApiKey(7L)).thenReturn("key");
+        when(modelConfigService.decryptApiKey(8L)).thenReturn(RERANK_KEY);
         when(embeddingClient.embedOne(model, "key", "q")).thenReturn(new double[]{1, 2, 3});
         // topK=2、rerankTopN=20 → 召回上限取 20
         when(vectorStore.search(eq("col"), eq(3), any(double[].class), eq(20), eq(0.3)))
@@ -289,7 +324,7 @@ class AiVectorServiceImplTest {
         doc.setDocName("来源文档");
         when(documentMapper.selectByIds(any())).thenReturn(List.of(doc));
         // 重排把下标 1（B）提到首位，分 0.95；下标 0（A）次之，分 0.3
-        when(rerankClient.rerank(eq("key"), eq("q"), any(), eq(2)))
+        when(rerankClient.rerank(eq(RERANK_KEY), eq(RERANK_BASE), eq(RERANK_CODE), eq("q"), any(), eq(2)))
             .thenReturn(new AiRerankClient.RerankOutcome(false, List.of(
                 new AiRerankClient.RankedDoc(1, 0.95),
                 new AiRerankClient.RankedDoc(0, 0.3))));
@@ -306,11 +341,13 @@ class AiVectorServiceImplTest {
     @Test
     @DisplayName("检索：重排降级时保持原顺序与原余弦分并截取 topK")
     void shouldKeepOriginalOrderWhenRerankDegraded() {
-        AiKnowledgeBase kb = kb(2L, 3, 7L);
+        AiKnowledgeBase kb = kbWithRerank(2L, 3, 7L, 8L);
         AiModelConfig model = model(7L);
         when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb);
         when(modelConfigMapper.selectById(7L)).thenReturn(model);
+        when(modelConfigMapper.selectById(8L)).thenReturn(rerankModel(8L));
         when(modelConfigService.decryptApiKey(7L)).thenReturn("key");
+        when(modelConfigService.decryptApiKey(8L)).thenReturn(RERANK_KEY);
         when(embeddingClient.embedOne(model, "key", "q")).thenReturn(new double[]{1, 2, 3});
         when(vectorStore.search(eq("col"), eq(3), any(double[].class), eq(20), eq(0.3)))
             .thenReturn(List.of(
@@ -321,7 +358,7 @@ class AiVectorServiceImplTest {
         doc.setId(10L);
         doc.setDocName("来源文档");
         when(documentMapper.selectByIds(any())).thenReturn(List.of(doc));
-        when(rerankClient.rerank(any(), any(), any(), anyInt()))
+        when(rerankClient.rerank(any(), any(), any(), any(), any(), anyInt()))
             .thenReturn(AiRerankClient.RerankOutcome.degradedOrder(2));
 
         List<AiRetrievalHitVo> result = service.retrieve(2L, "q", 1, null, true);
@@ -335,11 +372,13 @@ class AiVectorServiceImplTest {
      * 检索公共桩：知识库/模型/密钥/查询向量 + 三命中召回。
      */
     private void stubRetrieveCommon(List<AiVectorStore.VectorHit> vectorHits) {
-        AiKnowledgeBase kb = kb(2L, 3, 7L);
+        AiKnowledgeBase kb = kbWithRerank(2L, 3, 7L, 8L);
         AiModelConfig model = model(7L);
         when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb);
         when(modelConfigMapper.selectById(7L)).thenReturn(model);
+        when(modelConfigMapper.selectById(8L)).thenReturn(rerankModel(8L));
         when(modelConfigService.decryptApiKey(7L)).thenReturn("key");
+        when(modelConfigService.decryptApiKey(8L)).thenReturn(RERANK_KEY);
         when(embeddingClient.embedOne(model, "key", "q")).thenReturn(new double[]{1, 2, 3});
         when(vectorStore.search(eq("col"), eq(3), any(double[].class), eq(20), eq(0.3))).thenReturn(vectorHits);
         when(chunkMapper.selectByIds(any())).thenReturn(List.of(chunk(1L, "C1"), chunk(2L, "C2"), chunk(3L, "C3")));
@@ -356,7 +395,7 @@ class AiVectorServiceImplTest {
             new AiVectorStore.VectorHit("1", "10", 0, 0.95),
             new AiVectorStore.VectorHit("2", "10", 1, 0.7),
             new AiVectorStore.VectorHit("3", "10", 2, 0.5)));
-        when(rerankClient.rerank(eq("key"), eq("q"), any(), eq(3)))
+        when(rerankClient.rerank(eq(RERANK_KEY), eq(RERANK_BASE), eq(RERANK_CODE), eq("q"), any(), eq(3)))
             .thenReturn(new AiRerankClient.RerankOutcome(false, List.of(
                 new AiRerankClient.RankedDoc(1, 0.95),
                 new AiRerankClient.RankedDoc(0, 0.9),
@@ -378,7 +417,7 @@ class AiVectorServiceImplTest {
             new AiVectorStore.VectorHit("1", "10", 0, 0.95),
             new AiVectorStore.VectorHit("2", "10", 1, 0.7),
             new AiVectorStore.VectorHit("3", "10", 2, 0.5)));
-        when(rerankClient.rerank(eq("key"), eq("q"), any(), eq(3)))
+        when(rerankClient.rerank(eq(RERANK_KEY), eq(RERANK_BASE), eq(RERANK_CODE), eq("q"), any(), eq(3)))
             .thenReturn(new AiRerankClient.RerankOutcome(false, List.of(
                 new AiRerankClient.RankedDoc(1, 0.9),
                 new AiRerankClient.RankedDoc(2, 0.6),
@@ -401,7 +440,7 @@ class AiVectorServiceImplTest {
 
         List<AiRetrievalHitVo> result = service.retrieve(2L, "q", 1, null, true);
 
-        verify(rerankClient, never()).rerank(any(), any(), any(), anyInt());
+        verify(rerankClient, never()).rerank(any(), any(), any(), any(), any(), anyInt());
         assertEquals(1, result.size());
         assertEquals("C1", result.get(0).getContent());
         assertEquals(0.9, result.get(0).getScore().doubleValue());

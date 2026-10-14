@@ -214,12 +214,22 @@ class AiHealthCheckServiceImplTest {
     }
 
     @Test
-    @DisplayName("重排开启但向量模型无密钥时告警（会静默降级）")
+    @DisplayName("启用重排的知识库所绑重排模型无密钥时告警（会静默降级）")
     void shouldWarnWhenRerankEnabledWithoutKey() {
-        when(modelConfigService.queryOptions("embedding"))
-            .thenReturn(List.of(embeddingModel(10L, "", 1024)));
+        AiKnowledgeBaseVo kb = kb(1L, "演示库", 10L, 1024);
+        kb.setRerankEnabled("1");
+        kb.setRerankModelId(20L);
+        when(knowledgeBaseService.queryOptions()).thenReturn(List.of(kb));
+        AiModelConfigVo rerank = new AiModelConfigVo();
+        rerank.setId(20L);
+        rerank.setConfigName("重排-20");
+        rerank.setModelType(AiModelConfig.TYPE_RERANK);
+        rerank.setStatus("0");
+        rerank.setApiKeyMask("");
+        when(modelConfigService.queryById(20L)).thenReturn(rerank);
         AiHealthCheckVo item = itemOf(service.check(), "rag.rerank");
         assertEquals(AiHealthCheckVo.STATUS_WARN, item.getStatus());
+        assertTrue(item.getDetail().contains("未配置密钥"));
     }
 
     @Test

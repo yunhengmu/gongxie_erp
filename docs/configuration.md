@@ -109,9 +109,6 @@
 
 | 配置项 | 默认 | 说明 |
 |---|---|---|
-| `rerank-enabled` | `true` | 检索重排总开关；开启后检索走「稠密召回 `max(topK, rerank-top-n)` → 重排 → 融合 → 截断 `topK`」 |
-| `rerank-model` | `gte-rerank-v2` | 重排模型 |
-| `rerank-endpoint` | 百炼 text-rerank | 重排服务地址 |
 | `rerank-top-n` | `30` | 送入重排的候选数上限 |
 | `rerank-timeout-ms` | `12000` | 重排调用超时 |
 | `rerank-mode` | `score_fusion` | 融合模式：`replace`（纯替换）/ `rank_rrf`（排名 RRF）/ `score_fusion`（分数归一化加权） |
@@ -125,7 +122,7 @@
 | `assemble-max-chars` | `6000` | 装配后正文的绝对字符上限 |
 | `assemble-max-tokens` | `6000` | 装配后正文的 Token 预算（与字符上限取小，`CJK≈1 token/字符`） |
 
-> 重排密钥复用知识库**向量模型**（`dashscope`）的 `api_key`；未配密钥 / 非 2xx / 超时 / 结构异常一律**降级为原顺序**。上下文装配（`assemble-*`）只作用于返回集后处理，**不改排序**。改动后可用 `e2e/eval/eval-rag.mjs` 做 A/B。
+> **2026-10-14**：`rerank-enabled` / `rerank-model` / `rerank-endpoint` 已删除——重排的**模型与开关**已迁至「模型配置」（`model_type=rerank`，`baseUrl` 填完整重排端点、密钥为该模型自带）+「知识库」配置（`rerank_enabled` / `rerank_model_id`）；本节只保留**与模型无关的算法参数**。启用且绑定可用重排模型才重排，否则保持向量原序；未配密钥 / 非 2xx / 超时 / 结构异常一律**降级为原顺序**。上下文装配（`assemble-*`）只作用于返回集后处理，**不改排序**。改动后可用 `e2e/eval/eval-rag.mjs` 做 A/B。
 
 ### 2.8 安全合规（`bizbuddy.ai.security.*`）
 

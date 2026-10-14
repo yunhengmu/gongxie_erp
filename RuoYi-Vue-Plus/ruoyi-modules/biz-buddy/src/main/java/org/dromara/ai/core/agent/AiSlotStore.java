@@ -83,11 +83,21 @@ public class AiSlotStore {
     }
 
     /**
+     * 读取人级槽位原值（供页面回显；未设置或读取出错时为 {@code null}）。
+     *
+     * @param userId 用户主键（可空）
+     * @return 人级槽位；未设置时为 {@code null}
+     */
+    public AiSlotSet getUserSlot(Long userId) {
+        return userId == null ? null : read(USER_PREFIX + userId);
+    }
+
+    /**
      * 平台默认槽位（时区与语言由平台给定，时间窗 / 任务线默认未设置）。
      *
      * @return 平台默认槽位
      */
-    private AiSlotSet platformDefault() {
+    public AiSlotSet platformDefault() {
         return new AiSlotSet(aiProperties.getChat().getCurrentTimeZone(), null, DEFAULT_LOCALE, null);
     }
 

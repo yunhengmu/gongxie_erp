@@ -389,6 +389,12 @@ public class AiChatFacade {
         AtomicBoolean finished = new AtomicBoolean(false);
         try {
             AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
+            // SSE 断连 / 超时：取消该会话**当前全部**后端执行（与对话页「停止」同一路径）。
+            // 统一在此登记一次——SseEmitter 的回调是单槽覆盖，分支内再注册会顶掉这里；
+            // 故入口轮、短路轮、指定专家兜底、整合轮与恢复段共用这一套（原先只有入口轮分支注册过）
+            emitter.onCompletion(() -> runRegistry.cancel(sessionId));
+            emitter.onTimeout(() -> runRegistry.cancel(sessionId));
+            emitter.onError(ignored -> runRegistry.cancel(sessionId));
             // 结构化决策闸门前置判定（docs/21 §5.4 / §5.7，T9）：在入口轮 ReAct **之前**判定，高置信且
             // 选项合法即采信并**短路到专家直答**（不再跑入口轮）。pinned 已指定专家，按口径跳过判定；
             // 关闭 / 非 gate 档 / 未采信时 takeOver=false，照常跑入口轮，行为与现状逐项等价。
@@ -467,10 +473,6 @@ public class AiChatFacade {
                         null, durationMs);
                 }
             );
-            // SSE 断连 / 超时：取消后端执行（与对话页「停止」同一路径）
-            emitter.onCompletion(run::cancel);
-            emitter.onTimeout(run::cancel);
-            emitter.onError(ignored -> run.cancel());
         } catch (Exception e) {
             throw e instanceof ServiceException serviceException
                 ? serviceException : new ServiceException("对话启动失败：" + e.getMessage());
@@ -544,6 +546,12 @@ public class AiChatFacade {
         log.info("闸门采信短路：sessionId={}, expert={}, report={}", sessionId, expertCode,
             AiSseSupport.abbreviate(report, 200));
         long durationMs = (System.nanoTime() - startNanos) / 1_000_000;
+        if (route.cancelled) {
+            // 用户停止（「停止生成」/ SSE 断连）：专家调用已被中断（编排器置 route.cancelled），
+            // 按「已中止」收尾；**不**补跑降级整合轮——用户已经不想看了，再跑一整轮只会继续产生副作用
+            turnFinisher.finishCancelled(emitter, sessionId, state, durationMs, null, route);
+            return;
+        }
         if (state.pendingConfirm) {
             // 专家命中「需确认」：暂停并落确认卡片，用户确认后由恢复段续跑（与入口轮同款）
             Long pausedMessageId = turnFinisher.finishPending(emitter, sessionId, state, durationMs, route);
@@ -869,6 +877,11 @@ public class AiChatFacade {
         AtomicBoolean finished = new AtomicBoolean(false);
         try {
             AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
+            // SSE 断连 / 超时：取消该会话**当前全部**后端执行（与对话页「停止」同一路径）。
+            // 恢复段是**另一条 SSE 请求**，故此处同样要登记（与 streamChat 同款；SseEmitter 回调单槽覆盖）
+            emitter.onCompletion(() -> runRegistry.cancel(sessionId));
+            emitter.onTimeout(() -> runRegistry.cancel(sessionId));
+            emitter.onError(ignored -> runRegistry.cancel(sessionId));
             AgentRun<AgentEvent> run = agent.prepareRun(AiResumeMessageFactory.build(pending), ctx);
             AiRunRegistry.Cancelable cancelable = run::cancel;
             runRegistry.register(sessionId, cancelable);
@@ -918,10 +931,6 @@ public class AiChatFacade {
                     pendingStore.remove(sessionId, messageId);
                 }
             );
-            // SSE 断连 / 超时：取消后端执行（与对话页「停止」同一路径）
-            emitter.onCompletion(run::cancel);
-            emitter.onTimeout(run::cancel);
-            emitter.onError(ignored -> run.cancel());
         } catch (Exception e) {
             throw e instanceof ServiceException serviceException
                 ? serviceException : new ServiceException("恢复执行失败：" + e.getMessage());
