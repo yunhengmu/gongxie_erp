@@ -551,7 +551,8 @@ create table if not exists ai_message (
     update_time       datetime,
     del_flag          char(1)       default '0',
     constraint pk_ai_message primary key (id),
-    key idx_ai_message_session (session_id, id)
+    key idx_ai_message_session (session_id, id),
+    key idx_ai_message_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 会话消息表';
 
 -- 存量库增量（幂等）：为已存在的 ai_message 补充「回答参考来源」列。
@@ -610,7 +611,8 @@ create table if not exists ai_tool_call_log (
     agent_id     bigint(20) comment '发起该工具调用的智能体主键（入口轮＝会话智能体，专家调用＝专家，无人值守＝对应智能体；历史行为空）',
     constraint pk_ai_tool_call_log primary key (id),
     key idx_ai_tool_call_agent (message_id, agent_id),
-    key idx_ai_tool_call_log_session (session_id, id)
+    key idx_ai_tool_call_log_session (session_id, id),
+    key idx_ai_tool_call_log_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 工具调用明细表（物理追加）';
 
 create table if not exists ai_route_run (
@@ -643,7 +645,8 @@ create table if not exists ai_route_run (
     judge_mode        char(1) comment '结构化决策：本轮执行模式 S 影子 / G 闸门',
     constraint pk_ai_route_run primary key (id),
     key idx_ai_route_run_message (message_id),
-    key idx_ai_route_run_session (session_id, id)
+    key idx_ai_route_run_session (session_id, id),
+    key idx_ai_route_run_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 编排运行表（入口智能体的每一轮编排一行；自答时也落一行用于统计路由命中率）';
 
 -- 存量库增量（幂等）：为已存在的 ai_route_run 补充「结构化决策」审计列。
@@ -979,7 +982,8 @@ create table if not exists ai_agent_task_run (
     update_time       datetime,
     constraint pk_ai_agent_task_run primary key (id),
     key idx_ai_agent_task_run_session (session_id),
-    key idx_ai_agent_task_run_task (task_id, id DESC)
+    key idx_ai_agent_task_run_task (task_id, id DESC),
+    key idx_ai_agent_task_run_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 定时任务执行记录表（物理追加）';
 
 -- ============================================================
@@ -1025,7 +1029,8 @@ create table if not exists ai_permission_decision_log (
     constraint pk_ai_permission_decision_log primary key (id),
     key idx_ai_perm_log_session (session_id, message_id),
     key idx_ai_perm_log_tool (tool_code, decision),
-    key idx_ai_perm_log_user (user_id, create_time DESC)
+    key idx_ai_perm_log_user (user_id, create_time DESC),
+    key idx_ai_perm_log_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 工具权限决策日志（ALLOW / ASK / DENY 全量留痕）';
 
 create table if not exists ai_trace (
@@ -1057,7 +1062,8 @@ create table if not exists ai_trace (
     key idx_ai_trace_agent (agent_id, create_time DESC),
     key idx_ai_trace_message (message_id),
     key idx_ai_trace_parent (parent_trace_id),
-    key idx_ai_trace_session (session_id)
+    key idx_ai_trace_session (session_id),
+    key idx_ai_trace_create_time (create_time)
 ) engine=innodb default charset=utf8mb4 comment='AI 链路追踪表（一次任务一条：执行期模型版本 + 上下文清单 + 状态迁移）';
 
 -- ============================================================

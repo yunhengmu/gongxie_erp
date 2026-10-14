@@ -625,6 +625,7 @@ comment on column ai_message.total_tokens is '总 Token 数';
 comment on column ai_message.duration_ms is '本轮耗时（毫秒）';
 comment on column ai_message.sources is '回答参考来源（JSON 字符串，知识库命中；可空）';
 create index if not exists idx_ai_message_session on ai_message (session_id, id);
+create index if not exists idx_ai_message_create_time on ai_message (create_time);
 
 -- 存量库增量（幂等）：为已存在的 ai_message 补充「回答参考来源」列
 alter table ai_message add column if not exists sources text;
@@ -694,6 +695,7 @@ comment on column ai_tool_call_log.duration_ms is '工具执行耗时（毫秒�
 comment on column ai_tool_call_log.agent_id is '发起该工具调用的智能体主键（入口轮＝会话智能体，专家调用＝专家，无人值守＝对应智能体；历史行为空）';
 create index if not exists idx_ai_tool_call_agent on ai_tool_call_log (message_id, agent_id);
 create index if not exists idx_ai_tool_call_log_session on ai_tool_call_log (session_id, id);
+create index if not exists idx_ai_tool_call_log_create_time on ai_tool_call_log (create_time);
 
 create table if not exists ai_route_run (
     id                bigint        not null,
@@ -748,6 +750,7 @@ comment on column ai_route_run.judge_error is '结构化决策：判定不可用
 comment on column ai_route_run.judge_mode is '结构化决策：本轮执行模式 S 影子 / G 闸门';
 create index if not exists idx_ai_route_run_message on ai_route_run (message_id);
 create index if not exists idx_ai_route_run_session on ai_route_run (session_id, id);
+create index if not exists idx_ai_route_run_create_time on ai_route_run (create_time);
 
 -- 存量库增量（幂等）：为已存在的 ai_route_run 补充「结构化决策」审计列；全新库由上方建表语句已含这些列。
 alter table ai_route_run add column if not exists decision_source char(1);
@@ -1157,6 +1160,7 @@ comment on column ai_agent_task_run.tool_call_count is '工具调用次数';
 comment on column ai_agent_task_run.error_msg is '失败原因';
 create index if not exists idx_ai_agent_task_run_session on ai_agent_task_run (session_id);
 create index if not exists idx_ai_agent_task_run_task on ai_agent_task_run (task_id, id DESC);
+create index if not exists idx_ai_agent_task_run_create_time on ai_agent_task_run (create_time);
 
 -- ============================================================
 -- 治理与观测
@@ -1213,6 +1217,7 @@ comment on column ai_permission_decision_log.confirm_source is '确认作用范�
 create index if not exists idx_ai_perm_log_session on ai_permission_decision_log (session_id, message_id);
 create index if not exists idx_ai_perm_log_tool on ai_permission_decision_log (tool_code, decision);
 create index if not exists idx_ai_perm_log_user on ai_permission_decision_log (user_id, create_time DESC);
+create index if not exists idx_ai_perm_log_create_time on ai_permission_decision_log (create_time);
 
 create table if not exists ai_trace (
     id                  bigint        not null,
@@ -1263,6 +1268,7 @@ create index if not exists idx_ai_trace_agent on ai_trace (agent_id, create_time
 create index if not exists idx_ai_trace_message on ai_trace (message_id);
 create index if not exists idx_ai_trace_parent on ai_trace (parent_trace_id);
 create index if not exists idx_ai_trace_session on ai_trace (session_id);
+create index if not exists idx_ai_trace_create_time on ai_trace (create_time);
 
 -- ============================================================
 -- 场景包
