@@ -74,6 +74,25 @@ public class AiProperties {
     private Jev jev = new Jev();
 
     /**
+     * 审计与运行数据保留策略（默认值来源，可被「编排运行」页运行期覆盖，
+     * Redis 键 {@code bizbuddy:ai:runtime:audit-retention}）
+     */
+    private Retention retention = new Retention();
+
+    /**
+     * 审计与运行数据保留策略。
+     */
+    @Data
+    public static class Retention {
+
+        /**
+         * 审计 / 运行明细保留天数（0＝不限，不执行清理）
+         */
+        private int auditDays = 0;
+
+    }
+
+    /**
      * Milvus 连接配置。
      */
     @Data

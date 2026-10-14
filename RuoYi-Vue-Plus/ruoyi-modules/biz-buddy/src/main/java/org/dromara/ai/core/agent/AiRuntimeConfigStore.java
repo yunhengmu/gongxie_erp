@@ -3,6 +3,7 @@ package org.dromara.ai.core.agent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.domain.bo.AiAuditRetentionBo;
 import org.dromara.ai.domain.bo.AiCompactionConfigBo;
 import org.dromara.ai.domain.bo.AiJevConfigBo;
 import org.dromara.ai.domain.bo.AiMcpServerConfigBo;
@@ -71,6 +72,11 @@ public class AiRuntimeConfigStore {
      * 结构化决策（专家路由判断）配置的 Redis 键（docs/21 §7）
      */
     private static final String JEV_KEY = "bizbuddy:ai:runtime:jev";
+
+    /**
+     * 审计与运行数据保留策略的 Redis 键
+     */
+    private static final String AUDIT_RETENTION_KEY = "bizbuddy:ai:runtime:audit-retention";
 
     private final AiProperties aiProperties;
 
@@ -345,6 +351,38 @@ public class AiRuntimeConfigStore {
         bo.setStickyRoutingEnabled(jev.isStickyRoutingEnabled());
         bo.setStickyMinConfidence(jev.getStickyMinConfidence());
         bo.setStickyMaxQueryLength(jev.getStickyMaxQueryLength());
+        return bo;
+    }
+
+    /**
+     * 解析当前生效的审计保留策略：Redis 覆盖值优先，其次配置默认值。
+     *
+     * @return 审计保留策略
+     */
+    public AiAuditRetentionBo auditRetention() {
+        String cached = RedisUtils.getCacheObject(AUDIT_RETENTION_KEY);
+        AiAuditRetentionBo stored = JsonUtils.parseObject(cached, AiAuditRetentionBo.class);
+        return stored == null ? defaultAuditRetention() : stored;
+    }
+
+    /**
+     * 保存审计保留策略（写入 Redis 覆盖值，下一次「清理过期数据」即按新天数执行）。
+     *
+     * @param bo 审计保留策略
+     */
+    public void updateAuditRetention(AiAuditRetentionBo bo) {
+        RedisUtils.setCacheObject(AUDIT_RETENTION_KEY, JsonUtils.toJsonString(bo));
+        log.info("审计保留策略已更新：retentionDays={}", bo.getRetentionDays());
+    }
+
+    /**
+     * 由配置默认值构造审计保留策略。
+     *
+     * @return 默认审计保留策略
+     */
+    private AiAuditRetentionBo defaultAuditRetention() {
+        AiAuditRetentionBo bo = new AiAuditRetentionBo();
+        bo.setRetentionDays(aiProperties.getRetention().getAuditDays());
         return bo;
     }
 

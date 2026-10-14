@@ -60,3 +60,49 @@ export const optionAuditAgents = (): AxiosPromise<AgentVO[]> => {
     method: 'get'
   });
 };
+
+/**
+ * 审计保留策略视图：保留天数 + 各表超期行数（清理后另带逐表删除行数）
+ */
+export interface AuditRetentionVO {
+  /** 保留天数（0＝不限，不清理） */
+  retentionDays?: number;
+  /** 保留截止时间（早于该时间的行会被清理；不限时为空） */
+  cutoff?: string | null;
+  /** 各表当前超期行数：键＝表名 */
+  pending?: Record<string, number>;
+  /** 本次清理各表实际删除行数（未执行清理时为空） */
+  purged?: Record<string, number> | null;
+}
+
+/**
+ * 查询当前审计保留策略与各表超期行数
+ */
+export const getAuditRetention = (): AxiosPromise<AuditRetentionVO> => {
+  return request({
+    url: '/ai/audit/retention',
+    method: 'get'
+  });
+};
+
+/**
+ * 保存审计保留策略（运行期生效，下一次清理即按新天数执行）
+ * @param retentionDays 保留天数（0＝不限，不清理）
+ */
+export const saveAuditRetention = (retentionDays: number): AxiosPromise<void> => {
+  return request({
+    url: '/ai/audit/retention',
+    method: 'put',
+    data: { retentionDays }
+  });
+};
+
+/**
+ * 按当前保留策略清理超期数据（物理删除，返回逐表删除行数）
+ */
+export const purgeAuditRetention = (): AxiosPromise<AuditRetentionVO> => {
+  return request({
+    url: '/ai/audit/retention/purge',
+    method: 'post'
+  });
+};
