@@ -28,6 +28,8 @@
 cd RuoYi-Vue-Plus
 ./mvnw -o -pl ruoyi-modules/biz-buddy test
 # 覆盖率报告：ruoyi-modules/biz-buddy/target/site/jacoco/index.html
+# 集成测试（真库方言一致性 + 上下文装配；需两栈已运行，设 BIZBUDDY_IT=true 才跑）
+BIZBUDDY_IT=true ./mvnw -o -pl ruoyi-admin -am test
 
 # 后端
 ./mvnw -pl ruoyi-admin spring-boot:run

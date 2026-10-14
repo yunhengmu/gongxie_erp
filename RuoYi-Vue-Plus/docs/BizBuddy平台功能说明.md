@@ -438,9 +438,9 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 
 - **敏感词库**：普通词与正则的维护、分类与启停，供输入 / 输出 / 渠道出站等场景校验；
 - **安全事件**：敏感词 / PII 命中与处置明细（可按场景、动作、用户与时间范围检索）；
-- **安全合规配置**：总开关与各场景处置策略（只记录 / 脱敏放行 / 阻断）。
+- **安全合规配置**：总开关、各场景处置策略（只记录 / 脱敏放行 / 阻断）与检测引擎（本地词库 / 外部 API，含外部引擎接口地址与密钥）。
 
-覆盖 **输入 / 输出 / 渠道出站 / 工具结果 / 知识库入库 / MCP 出口** 全链路过审，外加 **PII 脱敏**（手机号 / 身份证 / 邮箱 / 银行卡 / IP，独立开关）与**提示词注入防护**（system prompt 加固 + 外部内容边界标记）。总开关**默认关闭**（避免误杀，可先只留痕灰度），各场景开关与处置策略可在页面运行期覆盖。
+覆盖 **输入 / 输出 / 渠道出站 / 工具结果 / 知识库入库 / MCP 出口** 全链路过审（业务工具与**外部 MCP 回参**同样逐块脱敏），外加 **PII 脱敏**（手机号 / 身份证 / 邮箱 / 银行卡 / IP，独立开关）与**提示词注入防护**（system prompt 加固 + 外部内容边界标记）。审核引擎可选**本地词库 / 外部内容安全 API**（外部缺端点或密钥自动降级本地词库、调用失败按未命中放行）。总开关**默认关闭**（避免误杀，可先只留痕灰度），各场景开关与处置策略可在页面运行期覆盖。
 
 ## 9. 配置项与运行依赖
 
@@ -482,4 +482,5 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 | `chat.current-time-enabled` / `current-time-zone` | true / `Asia/Shanghai` | 每轮注入当前时间及其时区 |
 | `rag.rerank-mode` / `rag.rerank-top-n` | `score_fusion` / 30 | 重排融合模式与候选数（**与模型无关的算法参数**；重排的模型与开关已迁至「模型配置」`model_type=rerank` + 「知识库」，`rag.rerank-enabled` / `rerank-model` / `rerank-endpoint` **已删除**） |
 | `rag.assemble-*` | 见配置参考 | 上下文装配：去重 / 相邻合并 / 字符与 Token 上限 |
-| `security.enabled` / `action` / `mask-pii` / `prompt-hardening` | false / `log` / true / true | 安全审核总开关、处置动作、PII 脱敏与提示词注入防护 |
+| `security.enabled` / `engine` / `action` | false / `local` / `log` | 安全审核总开关、检测引擎（`local` / `external`）、处置动作 |
+| `security.mask-pii` / `prompt-hardening` / `external.endpoint` / `external.api-key` | true / true / 空 / 空 | PII 脱敏、提示词注入防护；外部审核引擎接口地址与密钥（`engine=external` 时使用，页面可覆盖，缺端点或密钥自动降级本地词库） |
