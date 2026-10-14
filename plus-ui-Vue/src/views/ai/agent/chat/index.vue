@@ -101,7 +101,7 @@
 
           <div v-else-if="msg.role === 'assistant'" class="msg-row msg-row--assistant">
             <div class="avatar">
-              <el-icon><MagicStick /></el-icon>
+              <img class="avatar__logo" :src="logo" alt="小Z" />
             </div>
             <div class="bubble bubble--assistant">
               <template v-for="(part, index) in msg.parts" :key="index">
@@ -427,6 +427,7 @@ import type { SkillOptionVO } from '@/api/ai/skill/types';
 import type { ToolCallLogVO } from '@/api/ai/session/types';
 import { uploadOss } from '@/api/system/oss';
 import modal from '@/plugins/modal';
+import logo from '@/assets/logo/logo.png';
 import AiMarkdown from '@/views/ai/components/AiMarkdown.vue';
 
 /** 消息片段：文本片段、工具调用卡片、人工确认卡片、编排提示与专家卡片交错排列 */
@@ -2174,9 +2175,15 @@ onMounted(() => {
   flex: 0 0 32px;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  background: var(--app-accent-soft);
-  color: var(--app-accent-strong);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.avatar__logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .bubble {
