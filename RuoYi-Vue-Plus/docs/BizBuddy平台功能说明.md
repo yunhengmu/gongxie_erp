@@ -71,12 +71,13 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 
 ### 2.1 菜单结构
 
-一级菜单「BizBuddy」下设 **6 个分组**、**30 个功能页**（另有 86 个按钮权限）：
+一级菜单「BizBuddy」下设 **6 个分组**、**33 个功能页**（另有 92 个按钮权限）：
 
 | 分组 | 功能页（路由） | 页面权限 |
 |---|---|---|
 | **智能体** | 任务工作台（`agent/chat`） | `ai:chat:send` |
 | | 小Z配置（`agent/entry`） | `ai:agent:entry:query` |
+| | 结构化决策路由（`agent/jev`） | `ai:runtime:jev` |
 | | 专家配置（`agent/expert`） | `ai:agent:list` |
 | | 任务管理（`agent/session`） | `ai:session:list` |
 | | 定时任务（`agent/task`） | `ai:task:list` |
@@ -86,6 +87,7 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 | | 工作区文件（`agent/workspace`） | `ai:workspace:list` |
 | | 子智能体（`agent/subagent`） | `ai:subagent:list` |
 | | 场景包（`agent/pack`） | `ai:pack:list` |
+| | 对话偏好（`agent/pref`） | `ai:chat:pref:query` |
 | **模型与推理** | 模型配置（`model/config`） | `ai:model:list` |
 | | 用量与配额（`model/usage`） | `ai:usage:list` |
 | | 上下文与压缩策略（`model/compaction`） | `ai:runtime:compaction` |
@@ -102,6 +104,7 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 | | 权限决策日志（`audit/permission`） | `ai:perm:list` |
 | | 链路追踪（`audit/trace`） | `ai:audit:trace` |
 | | 编排运行（`audit/routeRun`） | `ai:audit:route` |
+| | 健康自检（`audit/health`） | `ai:health` |
 | **安全合规** | 敏感词库（`safety/safetyWord`） | `ai:safety:word:list` |
 | | 安全事件（`safety/safetyEvent`） | `ai:safety:event:list` |
 | | 安全合规配置（`safety/security`） | `ai:runtime:security` |
@@ -178,6 +181,10 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 | 最大迭代次数 / 状态 / 备注 | 单轮最大迭代、启停与备注 |
 
 > 小Z 的可用工具、知识库、技能与 MCP **不在此处绑定**，而是来自**会话级资源集**（在任务工作台选择）；其唯一内置协议工具是 `route_decision`。
+
+#### 对话偏好（用户级时区 / 语言）
+
+「对话偏好」（`agent/pref`）只维护**时区 / 语言**两项**用户级**设置：作用于该用户与小Z 的所有对话及专家任务，**优先于平台默认**，留空表示该项不设置；页面下方只读展示「平台默认 / 我已设置 / 实际生效」三段值。清空我的设置即两项均回落平台默认。保存读 `GET /ai/chat/pref`、写 `PUT /ai/chat/pref`、清空 `DELETE /ai/chat/pref`（权限 `ai:chat:pref:query` / `ai:chat:pref:edit`）。
 
 ### 3.3 专家配置
 

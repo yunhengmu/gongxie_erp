@@ -45,7 +45,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 
 平台完整功能说明见 **[RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md)**，按真实菜单与代码梳理，涵盖：
 
-- **功能地图与权限模型**——6 个分组、30 个功能页与权限标识约定、工具三档授权；
+- **功能地图与权限模型**——6 个分组、33 个功能页与权限标识约定、工具三档授权；
 - **智能体与对话**——任务工作台、入口智能体「小Z」配置、专家配置（含提示词 **AI 辅助生成 / 模板套用 / 克隆专家 / 保存前体检**）、任务管理、定时任务、计划模式、技能仓库、长期记忆、工作区文件、子智能体、场景包；
 - **模型与推理 / 知识库与检索**——模型配置与连通性测试、用量与配额、上下文压缩策略、编排预算（运行期可调）；知识库、文档与切片、检索测试；**RAG 检索增强**（Rerank 重排默认开启 + 结果去重 / 相邻合并的上下文装配 + Token 预算）；
 - **工具与集成**——业务工具注册、MCP 服务端（对外出口）与客户端（接入外部）、飞书 / 企业微信 / 钉钉 / GitHub 渠道接入；**MCP 自演示**（系统信息工具 `get_system_info` + 启动时登记一条指向自身 `/mcp` 的客户端连接）；
@@ -199,6 +199,8 @@ RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器�
 | L9 | 鉴权与参数校验边界：未登录 / 伪造 token、缺参 / 空消息 / 不存在会话 |
 | L10 | MCP 出口：协议 `initialize` / `tools/list` / `tools/call` + 错误口令被拒 |
 | L11 | MCP 客户端：连通探测 + 自演示连接登记 |
+| L12 | 结构化决策闸门（桩服务四分支）：真实外呼决策模型，需先启动 JEV 桩否则 SKIP |
+| L13 | 停止生成（中断专家编排）：SSE 中途取消 → 后端中止专家调用并收尾为「已中止」 |
 
 ```bash
 # 需要栈已在运行（deploy/deploy-pg/ 或 deploy/deploy-mysql/ 任一）
@@ -208,7 +210,7 @@ node e2e/run.mjs --allow-writes            # L5 走「接受」路径（会真�
 node e2e/run.mjs --base-url http://localhost:8081   # 指向 MySQL 栈（PG 栈为 8080）
 ```
 
-- 配置：复制 [`e2e/.env.example`](e2e/.env.example) 为 `e2e/.env.local`（已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走平台「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**。
+- 配置：复制 [`e2e/.env.example`](e2e/.env.example) 为 `e2e/.env.local`（已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走平台「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**；L12 需 JEV 桩已启动（否则 SKIP），L13 走平台密钥（真跑模型）。
 - 退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败 / `3` 参数错误。
 - **L5 默认走「拒绝」路径、不产生任何业务数据**；`--allow-writes` 才真写，并在收尾按标题清理公告与会话。
 - 它**不进 `mvn test`**、不引 Testcontainers，与上面的单测**互不影响**；两个数据库栈均已实跑通过（PostgreSQL `8080` / MySQL `8081`）。
