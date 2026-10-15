@@ -356,7 +356,7 @@
 
     <!-- 渠道表单 -->
     <el-dialog v-model="dialog.visible" :title="dialog.title" width="720px" append-to-body>
-      <el-form ref="channelFormRef" :model="form" :rules="rules" label-width="130px">
+      <el-form ref="channelFormRef" :model="form" :rules="rules" label-width="180px">
         <el-form-item label="渠道名称" prop="channelName">
           <el-input v-model="form.channelName" placeholder="如：飞书知识问答机器人" />
         </el-form-item>

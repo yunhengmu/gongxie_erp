@@ -147,7 +147,7 @@
     </el-card>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" width="860px" append-to-body>
-      <el-form ref="subagentFormRef" :model="form" :rules="rules" label-width="110px">
+      <el-form ref="subagentFormRef" :model="form" :rules="rules" label-width="130px">
         <el-form-item label="子智能体标识" prop="name">
           <template #label>
             <span class="label-tip">

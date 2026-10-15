@@ -143,7 +143,7 @@
     </el-card>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" width="900px" append-to-body>
-      <el-form ref="packFormRef" :model="form" :rules="rules" label-width="110px">
+      <el-form ref="packFormRef" :model="form" :rules="rules" label-width="130px">
         <el-form-item label="场景包编码" prop="packCode">
           <template #label>
             <span class="label-tip">
