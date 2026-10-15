@@ -26,7 +26,7 @@ SET NAMES utf8mb4;
 --   4. 依赖：先执行 ry_vue.sql（sys_menu 等底座表）与 ry_job.sql（sj_job）。
 --   5. 菜单 ID 段与 ry_vue.sql / ry_workflow.sql 不冲突；菜单仅对超级管理员
 --      自动可见，普通角色需在「系统管理 → 角色管理」中勾选后再可见。
---   6. 模型种子（ai_model_config）预置三个示例模型（阿里云百炼，OpenAI 兼容协议），
+--   6. 模型种子（ai_model_config）预置四个示例模型（阿里云百炼 / DashScope；协议各异，详见第三节），
 --      **api_key 一律留空**，部署后请在「模型配置」换成本人的密钥，或另行新建模型；
 --      内置智能体种子的 model_id 已指向其中的对话模型（deepseek-v4.1-flash），开箱即用。
 --   7. 表结构、约束、索引与列注释均以运行库为准（本脚本据此重新生成）；设计说明见
