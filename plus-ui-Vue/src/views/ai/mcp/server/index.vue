@@ -128,6 +128,66 @@
       </el-table>
       <el-empty v-if="!toolsLoading && !toolList.length" description="暂无启用中的只读工具，请先到「业务工具注册」新增" />
     </el-card>
+
+    <el-card shadow="hover" class="table-panel example-panel">
+      <template #header>
+        <div class="toolbar-shell">
+          <div class="table-heading">
+            <h3>调用示例</h3>
+            <p>
+              出口是「无状态 HTTP + JSON-RPC 2.0」：调用方 POST 到出口端点即可，三步之间无需保持会话。
+              下面的地址与口令取自本页当前配置，可直接复制交付给外部调用方。
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <el-descriptions :column="1" border class="server-desc">
+        <el-descriptions-item label="出口完整地址">
+          <span class="mono">{{ mcpUrl }}</span>
+          <el-button link type="primary" icon="CopyDocument" class="copy-btn" @click="handleCopy(mcpUrl)">复制</el-button>
+          <div class="form-tip">
+            也可直连后端：<span class="mono">http://&lt;后端主机&gt;:8080{{ status.endpoint || '/mcp' }}</span>（容器内为 ruoyi-admin:8080）
+          </div>
+        </el-descriptions-item>
+        <el-descriptions-item label="请求头">
+          必带 <span class="mono">Content-Type: application/json</span> 与
+          <span class="mono">Accept: application/json, text/event-stream</span>（无状态传输，响应可能以 SSE 帧回包）
+        </el-descriptions-item>
+        <el-descriptions-item label="认证">
+          <span class="mono">Authorization: Bearer &lt;访问口令&gt;</span> 或
+          <span class="mono">X-MCP-Token: &lt;访问口令&gt;</span>
+          <div class="form-tip">
+            {{
+              status.authEnabled
+                ? '当前已开启口令校验：缺失或错误将返回 HTTP 401 + JSON-RPC error.code=-32001'
+                : '当前未开启口令校验：认证头可省略（仅建议内网调试时）'
+            }}
+          </div>
+        </el-descriptions-item>
+      </el-descriptions>
+
+      <div class="example-block">
+        <div class="example-title">
+          <span>curl 三步调用</span>
+          <el-button link type="primary" icon="CopyDocument" @click="handleCopy(curlExample)">复制</el-button>
+        </div>
+        <pre class="code-block">{{ curlExample }}</pre>
+      </div>
+
+      <div class="example-block">
+        <div class="example-title">
+          <span>MCP 客户端（Streamable HTTP）配置片段</span>
+          <el-button link type="primary" icon="CopyDocument" @click="handleCopy(clientExample)">复制</el-button>
+        </div>
+        <pre class="code-block">{{ clientExample }}</pre>
+        <div class="form-tip">
+          填在支持 Streamable HTTP 的 MCP 客户端配置里（<span class="mono">type</span> 字段名因客户端而异，可能是
+          <span class="mono">"http"</span> 或 <span class="mono">"streamable-http"</span>）；未开启口令校验时删掉
+          <span class="mono">headers</span>。
+        </div>
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -158,6 +218,58 @@ const configForm = ref<McpServerConfigForm>({
 });
 
 const toolList = ref<McpServerTool[]>([]);
+
+/** 出口完整地址：站点源 + 前端 API 前缀 + 出口路径（供外部调用方直接复制） */
+const mcpUrl = computed(() => {
+  const base = String(import.meta.env.VITE_APP_BASE_API || '').replace(/\/$/, '');
+  return `${window.location.origin}${base}${status.value.endpoint || '/mcp'}`;
+});
+
+/** 拼一条 curl：按当前是否开启口令校验决定是否带认证头 */
+const curlOf = (id: number, method: string, params: string) => {
+  const lines = [
+    `curl -s -X POST "${mcpUrl.value}" \\`,
+    '  -H "Content-Type: application/json" \\',
+    '  -H "Accept: application/json, text/event-stream" \\'
+  ];
+  if (status.value.authEnabled) {
+    lines.push(`  -H "Authorization: Bearer ${status.value.token || '<访问口令>'}" \\`);
+  }
+  lines.push(`  -d '{"jsonrpc":"2.0","id":${id},"method":"${method}","params":${params}}'`);
+  return lines.join('\n');
+};
+
+/** curl 三步调用示例（内插当前地址与口令） */
+const curlExample = computed(() =>
+  [
+    '# ① 握手：确认地址与口令可用，返回 serverInfo',
+    curlOf(1, 'initialize', '{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"my-client","version":"1.0.0"}}'),
+    '',
+    '# ② 列出当前挂载的工具（清单来自「对外暴露清单」）',
+    curlOf(2, 'tools/list', '{}'),
+    '',
+    '# ③ 调用工具：系统信息（平台内置只读工具；若已在暴露清单里撤销，请换成清单内的其它工具）',
+    curlOf(3, 'tools/call', '{"name":"get_system_info","arguments":{}}')
+  ].join('\n')
+);
+
+/** MCP 客户端配置片段（Streamable HTTP） */
+const clientExample = computed(() => {
+  const headers = status.value.authEnabled
+    ? `,\n      "headers": { "Authorization": "Bearer ${status.value.token || '<访问口令>'}" }`
+    : '';
+  return `{\n  "mcpServers": {\n    "bizbuddy": {\n      "type": "http",\n      "url": "${mcpUrl.value}"${headers}\n    }\n  }\n}`;
+});
+
+/** 复制到剪贴板（浏览器未放行时提示手动复制） */
+const handleCopy = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    modal.msgSuccess('已复制');
+  } catch {
+    modal.msgWarning('浏览器未放行剪贴板，请手动选择复制');
+  }
+};
 
 /** 加载出口状态与访问配置 */
 const loadServer = async () => {
@@ -277,5 +389,39 @@ onMounted(loadAll);
 
 .mono {
   font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+}
+
+.copy-btn {
+  margin-left: 8px;
+}
+
+.example-panel {
+  margin-top: 12px;
+}
+
+.example-block + .example-block {
+  margin-top: 12px;
+}
+
+.example-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+
+.code-block {
+  margin: 0;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-primary);
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
 }
 </style>

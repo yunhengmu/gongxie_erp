@@ -27,8 +27,11 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -37,6 +40,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -99,6 +103,16 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
 
     private final RedissonClient redissonClient;
 
+    /**
+     * 项目数据源：仅用于探测数据库产品名，以选择用量 upsert 的方言实现
+     */
+    private final DataSource dataSource;
+
+    /**
+     * 数据源是否为 MySQL（延迟探测并缓存；探测失败按 PostgreSQL 处理）
+     */
+    private volatile Boolean mysqlDialect;
+
     @Override
     public void accumulate(Long userId, Long agentId, Long modelId, ChatTokenUsage tokens, int toolCallCount,
                            int requestCount) {
@@ -123,13 +137,45 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
         stat.setToolCallCount(toolCallCount);
         stat.setCost(cost);
         try {
-            usageStatMapper.upsert(stat);
+            // 两方言的累加 upsert 语法不同（PostgreSQL on conflict / MySQL on duplicate key），按数据源选择
+            if (isMysqlDialect()) {
+                usageStatMapper.upsertMysql(stat);
+            } else {
+                usageStatMapper.upsert(stat);
+            }
         } catch (Exception e) {
             // 统计失败不影响对话主流程
             log.error("用量统计写入失败：userId={}, agentId={}, modelId={}", userId, agentId, modelId, e);
             return;
         }
         incrementCounters(userId, total, requestCount);
+    }
+
+    /**
+     * 探测数据源是否为 MySQL（延迟一次、结果缓存）。
+     *
+     * <p>用量统计的累加 upsert 是**双方言**实现：PostgreSQL 用 {@code on conflict … excluded.}，
+     * MySQL 8.0 用 {@code on duplicate key update … values(…)}。判定方式与技能仓库装配
+     * （{@code AgentScopeConfig#aiSkillRepository}）一致：读数据源的数据库产品名。
+     * 探测失败时按 PostgreSQL 处理——写入异常仍由 {@link #accumulate} 吞掉，不影响对话主流程。</p>
+     *
+     * @return 数据源为 MySQL 时返回 true
+     */
+    private boolean isMysqlDialect() {
+        Boolean cached = mysqlDialect;
+        if (cached != null) {
+            return cached;
+        }
+        boolean resolved = false;
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseMetaData metaData = connection == null ? null : connection.getMetaData();
+            String product = metaData == null ? null : metaData.getDatabaseProductName();
+            resolved = product != null && product.toLowerCase(Locale.ROOT).contains("mysql");
+        } catch (Exception e) {
+            log.warn("探测数据库产品名失败，用量统计按 PostgreSQL 方言处理：{}", e.getMessage());
+        }
+        mysqlDialect = resolved;
+        return resolved;
     }
 
     @Override

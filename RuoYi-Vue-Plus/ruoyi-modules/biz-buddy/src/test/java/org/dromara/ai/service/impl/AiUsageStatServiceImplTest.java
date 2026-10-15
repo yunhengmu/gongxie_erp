@@ -35,7 +35,10 @@ import org.redisson.api.RedissonClient;
 import org.springframework.context.support.StaticApplicationContext;
 import tools.jackson.databind.json.JsonMapper;
 
+import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +69,9 @@ class AiUsageStatServiceImplTest {
 
     @Mock
     private RedissonClient redissonClient;
+
+    @Mock
+    private DataSource dataSource;
 
     @InjectMocks
     private AiUsageStatServiceImpl usageStatService;
@@ -119,6 +125,34 @@ class AiUsageStatServiceImplTest {
             // 当日 + 当月 Token 各累加 300；当日请求累加 1
             verify(atomicLong, times(2)).addAndGet(300L);
             verify(atomicLong).addAndGet(1L);
+        }
+    }
+
+    /**
+     * 验证 MySQL 数据源改用 {@code on duplicate key update} 版 upsert。
+     *
+     * <p>PostgreSQL 版 SQL 含 {@code on conflict … excluded.}，在 MySQL 8.0 上是**语法错误**，
+     * 曾导致 MySQL 栈用量一直不落库。</p>
+     */
+    @Test
+    @DisplayName("MySQL 数据源走 MySQL 版 upsert")
+    void shouldUseMysqlUpsertOnMysqlDataSource() throws Exception {
+        Connection connection = mock(Connection.class);
+        DatabaseMetaData metaData = mock(DatabaseMetaData.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.getMetaData()).thenReturn(metaData);
+        when(metaData.getDatabaseProductName()).thenReturn("MySQL");
+        when(usageStatMapper.upsertMysql(any(AiUsageStat.class))).thenReturn(1);
+        when(redissonClient.getAtomicLong(anyString())).thenReturn(mock(RAtomicLong.class));
+
+        try (MockedStatic<IdGeneratorUtil> id = mockStatic(IdGeneratorUtil.class);
+             MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
+            id.when(IdGeneratorUtil::nextLongId).thenReturn(9L);
+
+            usageStatService.accumulate(1L, 2L, 3L, new ChatTokenUsage(10, 20, null), 0, 1);
+
+            verify(usageStatMapper).upsertMysql(any(AiUsageStat.class));
+            verify(usageStatMapper, never()).upsert(any(AiUsageStat.class));
         }
     }
 

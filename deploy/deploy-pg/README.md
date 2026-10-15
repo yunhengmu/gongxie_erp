@@ -42,14 +42,16 @@ docker compose up -d --build
 
 ## 3. 首次启动后必做：配置模型密钥
 
-建库脚本已预置两个**示例模型**（提供商：阿里云百炼 / DashScope，走 OpenAI 兼容协议），但 **`api_key` 一律留空**，需自行补齐：
+建库脚本已预置**四个示例模型**（提供商：阿里云百炼 / DashScope；**协议各异**——对话 / 向量走 OpenAI 兼容，决策走 TypeSafe System One，重排走 DashScope 文本重排端点），但 **`api_key` 一律留空**，需自行补齐：
 
 | 配置名称 | 类型 | 说明 |
 |---|---|---|
 | `deepseek-v4.1-flash` | 对话 | 大语言模型 |
 | `qwen3.7-text-embedding-flash` | 向量 | 维度按 `1024` 预置，须与模型实际输出一致 |
+| `decision-model-preview` | 决策 | 供「安全合规配置 → 结构化决策路由」引用 |
+| `gte-rerank-v2` | 重排 | 供「知识库管理」的检索重排引用 |
 
-1. 登录 →「模型配置」把这两个模型（或你另行新建的模型）的 **API Key** 换成自己的阿里云百炼密钥 —— 换完即可用，无需其它配置；
+1. 登录 →「模型配置」把这四个模型（或你另行新建的模型）的 **API Key** 换成自己的阿里云百炼密钥 —— 换完即可用，无需其它配置；
 2. 内置智能体（小Z 与两个专家）的模型槽位**已指向** `deepseek-v4.1-flash`；若要换模型，到「小Z 配置」「专家配置」改指即可；
 3. 要用知识库检索，向量模型须选上表中的 embedding 模型（维度与知识库一致）。
 
@@ -88,9 +90,9 @@ comment on column ai_knowledge_base.rerank_model_id is '检索重排模型（ai_
 | `GET http://localhost:8800/snail-job/`（调度控制台） | 200 |
 | 后端数据源 | HikariPool 初始化成功 |
 | 后端 Redis | Redisson 已连接 `redis:6379` |
-| 建库结果 | 97 张表（`ai_*` **39** / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 / `test_*` 3 / `gen_*` 2）；`admin` 等初始账号在位；`sys_menu` BizBuddy 段 123 行（6 分组 / 30 功能页 / 86 按钮）；`ai_tool` 26、入口小Z 1、专家 **3**（机构管理 / 公告管理 / 演示「BizBuddy项目介绍专家」）、`ai_model_config` 2（`api_key` 留空）；演示种子一套（知识库 `bizbuddy_demo_kb` + 文档 `BizBuddy简介.txt` + `sys_oss` 行）；`sj_job` 已有派发任务 |
+| 建库结果 | 97 张表（`ai_*` **39** / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 / `test_*` 3 / `gen_*` 2）；`admin` 等初始账号在位；`sys_menu` BizBuddy 段 123 行（6 分组 / 30 功能页 / 86 按钮）；`ai_tool` 26、入口小Z 1、专家 **3**（机构管理 / 公告管理 / 演示「BizBuddy项目介绍专家」）、`ai_model_config` **4**（`api_key` 留空）；演示种子一套（知识库 `bizbuddy_demo_kb` + 文档 `BizBuddy简介.txt` + `sys_oss` 行）；`sj_job` 已有派发任务 |
 
-> **可一键自检**：仓库自带端到端测试脚本 [`../../e2e/`](../../e2e)——对**已运行**的栈发真实 HTTP 断言，覆盖 **L1~L11**：「模型连通 → 专家提示词生成 → 知识库解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议与客户端」；另含 RAG 检索质量评测（`e2e/eval/`）。用法：
+> **可一键自检**：仓库自带端到端测试脚本 [`../../e2e/`](../../e2e)——对**已运行**的栈发真实 HTTP 断言，覆盖 **L1~L13**：「模型连通 → 专家提示词生成 → 知识库解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（JEV 桩）→ 停止生成（中断专家编排）」；另含 RAG 检索质量评测（`e2e/eval/`）。用法：
 
 ```bash
 cd biz-buddy
@@ -99,7 +101,7 @@ node e2e/run.mjs --only L1,L3 --verbose # 指定层级
 node e2e/run.mjs --allow-writes         # L5 走「接受」路径（会真建公告，收尾自动清理）
 ```
 
-> 密钥放 `e2e/.env.local`（模板见 `e2e/.env.example`，已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、不触发模型调用。退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败（栈不可达、登录失败、种子缺失）/ `3` 参数错误。详见 [docs/14 §85](../../docs/14-BizBuddy未覆盖项与已知限制.md#s85) 与 [docs/17 §85](../../docs/17-BizBuddy实施过程与验证记录.md#s85)。
+> 密钥放 `e2e/.env.local`（模板见 `e2e/.env.example`，已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**；L12 需 JEV 桩已启动（否则 SKIP），L13 走平台密钥（真跑模型）。退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败（栈不可达、登录失败、种子缺失）/ `3` 参数错误。详见 [docs/14 §85](../../../docs/14-BizBuddy未覆盖项与已知限制.md#s85) 与 [docs/17 §85](../../../docs/17-BizBuddy实施过程与验证记录.md#s85)。
 
 ## 5. 已知坑（都踩过，按此排查）
 
