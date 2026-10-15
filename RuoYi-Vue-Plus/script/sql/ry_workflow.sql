@@ -306,7 +306,7 @@ INSERT INTO sys_menu VALUES (1761400000000011804, '流程达式定义修改', 17
 INSERT INTO sys_menu VALUES (1761400000000011805, '流程达式定义删除', 1761400000000011801, 4, '#', '', NULL, 'N', 'Y', 'F', '0', '0', 'workflow:spel:remove', '#', '', '', 1761000000000000103, 1761100000000000001, sysdate(), NULL, NULL, '');
 INSERT INTO sys_menu VALUES (1761400000000011806, '流程达式定义导出', 1761400000000011801, 5, '#', '', NULL, 'N', 'Y', 'F', '0', '0', 'workflow:spel:export', '#', '', '', 1761000000000000103, 1761100000000000001, sysdate(), NULL, NULL, '');
 -- 请假测试相关按钮
-insert into sys_menu VALUES (1761400000000011638, '请假申请', 1761400000000000005, 1, 'leave', 'workflow/leave/index', '', 'N', 'Y', 'C', '0', '0', 'workflow:leave:list', '#', '', '', 1761000000000000103, 1761100000000000001, sysdate(), NULL, NULL, '请假申请菜单');
+insert into sys_menu VALUES (1761400000000011638, '请假申请', 1761400000000011616, 5, 'leave', 'workflow/leave/index', '', 'N', 'Y', 'C', '0', '0', 'workflow:leave:list', '#', '', '', 1761000000000000103, 1761100000000000001, sysdate(), NULL, NULL, '请假申请菜单');
 insert into sys_menu VALUES (1761400000000011639, '请假申请查询', 1761400000000011638, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'workflow:leave:query', '#', '', '', 1761000000000000103, 1761100000000000001, sysdate(), NULL, NULL, '');
 insert into sys_menu VALUES (1761400000000011640, '请假申请新增', 1761400000000011638, 2, '#', '', '', 'N', 'Y', 'F', '0', '0', 'workflow:leave:add', '#', '', '', 1761000000000000103, 1761100000000000001, sysdate(), NULL, NULL, '');
 insert into sys_menu VALUES (1761400000000011641, '请假申请修改', 1761400000000011638, 3, '#', '', '', 'N', 'Y', 'F', '0', '0', 'workflow:leave:edit', '#', '', '', 1761000000000000103, 1761100000000000001, sysdate(), NULL, NULL, '');
