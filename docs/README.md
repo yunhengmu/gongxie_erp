@@ -9,6 +9,7 @@
 | [architecture.md](architecture.md) | 运行时架构：入口智能体 → 专家链路、装配与缓存、三层权限、工具与 MCP、状态与审计 |
 | [development.md](development.md) | **二次开发**：新增一个业务工具（实现 → 工厂登记 → 元数据 → 绑定），含写工具与权限注意事项 |
 | [configuration.md](configuration.md) | 配置项参考（`bizbuddy.ai.*`）与生产必改清单 |
+| [release-checklist.md](release-checklist.md) | **发版门禁清单**：五道门禁（集成测试 / e2e 全量 / 重建冒烟 / 日志与体检 / 存量库升级）与实测基线 |
 
 ## 我要改哪里？
 
@@ -20,6 +21,7 @@
 | 调整模型 / 压缩 / 记忆等运行策略 | [configuration.md](configuration.md) |
 | 部署到服务器 | PostgreSQL 栈 [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md)、MySQL 8.0 栈 [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md)（均含构建前置与已知坑） |
 | **验证「真的跑通了」** | [../e2e/](../e2e)（外部驱动端到端脚本，见下文常用命令） |
+| **发版前要过哪些检查** | [release-checklist.md](release-checklist.md)（五道门禁，含 L12 桩的起停命令） |
 
 ## 常用命令
 
@@ -28,7 +30,7 @@
 cd RuoYi-Vue-Plus
 ./mvnw -o -pl ruoyi-modules/biz-buddy test
 # 覆盖率报告：ruoyi-modules/biz-buddy/target/site/jacoco/index.html
-# 集成测试（真库方言一致性 + 上下文装配；需两栈已运行，设 BIZBUDDY_IT=true 才跑）
+# 集成测试（4 类：真库方言一致性 / 实体↔schema / 技能仓库 / 上下文装配；需两栈已运行，设 BIZBUDDY_IT=true 才跑）
 BIZBUDDY_IT=true ./mvnw -o -pl ruoyi-admin -am test
 
 # 后端
@@ -48,7 +50,7 @@ node e2e/run.mjs --only L1,L3 --verbose            # 指定层级
 node e2e/run.mjs --base-url http://localhost:8081  # 指向 MySQL 栈（PG 栈默认 8080）
 ```
 
-- 覆盖 **L1~L11**：模型连通 → 提示词生成 → 解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端；另含 **RAG 检索质量评测**（`e2e/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；
+- 覆盖 **L1~L13**：模型连通 → 提示词生成 → 解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（需本地桩，见 [release-checklist.md](release-checklist.md)）→ 停止生成（中断专家编排）；另含 **RAG 检索质量评测**（`e2e/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；
 - 配置见 `e2e/.env.example`（唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**，放 `e2e/.env.local`，已 gitignore）；
 - 退出码 `0/1/2/3` = 无失败 / 有 FAIL / 前置检查失败 / 参数错误；**L5 默认「拒绝」路径无副作用**，`--allow-writes` 才真写并在收尾自动清理；
 - 它不进 `mvn test`，与单测互不影响；**改了工具 / 装配 / 路由后，建议「单测 + e2e」两道都过**。
