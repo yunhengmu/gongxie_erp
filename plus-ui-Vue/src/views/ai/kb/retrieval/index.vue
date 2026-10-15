@@ -13,7 +13,7 @@
         <el-row :gutter="16">
           <el-col :xs="24" :sm="12" :md="6">
             <el-form-item label="知识库">
-              <el-select v-model="query.kbId" placeholder="请选择知识库" style="width: 100%">
+              <el-select v-model="query.kbId" placeholder="请选择知识库" style="width: 100%" @change="applyKbDefaults">
                 <el-option v-for="item in kbOptions" :key="item.id" :label="item.kbName" :value="item.id">
                   <span>{{ item.kbName }}</span>
                   <span class="option-meta">{{ item.dimension }} 维 · {{ item.chunkSize }} 字切片</span>
@@ -52,7 +52,7 @@
         <el-form-item>
           <el-button type="primary" icon="Search" :loading="loading" @click="handleSearch">开始检索</el-button>
           <el-button icon="Refresh" @click="handleReset">重置</el-button>
-          <span class="form-tip">Ctrl + Enter 快捷检索；阈值与条数留空时取知识库配置</span>
+          <span class="form-tip">Ctrl + Enter 快捷检索；阈值与条数默认按所选知识库的配置回填，可手动调整</span>
         </el-form-item>
       </el-form>
     </el-card>
@@ -116,6 +116,13 @@ const query = reactive<{ kbId?: string | number; query?: string; topK?: number; 
   threshold: undefined
 });
 
+/** 用所选知识库的配置回填「召回条数 / 相似度阈值」，让该库默认值直接可见（留空时后端同样取该配置） */
+const applyKbDefaults = () => {
+  const kb = kbOptions.value.find((item) => String(item.id) === String(query.kbId));
+  query.topK = kb?.retrievalTopK ?? undefined;
+  query.threshold = kb?.similarityThreshold ?? undefined;
+};
+
 /** 相似度展示 */
 const formatScore = (score?: number) => (score === undefined || score === null ? '-' : score.toFixed(4));
 
@@ -140,6 +147,7 @@ const loadKbOptions = async () => {
   } else if (!query.kbId && kbOptions.value.length === 1) {
     query.kbId = kbOptions.value[0].id;
   }
+  applyKbDefaults();
 };
 
 /** 执行检索 */
@@ -170,8 +178,8 @@ const handleSearch = async () => {
 /** 重置 */
 const handleReset = () => {
   query.query = undefined;
-  query.topK = undefined;
-  query.threshold = undefined;
+  // 条数与阈值回到所选知识库的默认值（而非清空），与页面初始展示保持一致
+  applyKbDefaults();
   hits.value = [];
   searched.value = false;
 };
