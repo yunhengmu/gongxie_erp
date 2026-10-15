@@ -168,10 +168,7 @@
             </span>
           </template>
           <el-select v-model="form.embeddingModelId" placeholder="请选择向量模型" style="width: 100%" @change="handleModelChange">
-            <el-option v-for="item in embeddingModels" :key="item.id" :label="item.configName" :value="item.id">
-              <span>{{ item.configName }}</span>
-              <span class="option-meta">{{ item.modelCode }} · {{ item.dimension ?? '维度未配置' }}</span>
-            </el-option>
+            <el-option v-for="item in embeddingModels" :key="item.id" :label="item.configName" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="向量维度" prop="dimension">
@@ -252,10 +249,7 @@
             </span>
           </template>
           <el-select v-model="form.rerankModelId" placeholder="请选择重排模型" style="width: 100%">
-            <el-option v-for="item in rerankModels" :key="item.id" :label="item.configName" :value="item.id">
-              <span>{{ item.configName }}</span>
-              <span class="option-meta">{{ item.modelCode }}</span>
-            </el-option>
+            <el-option v-for="item in rerankModels" :key="item.id" :label="item.configName" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="生效范围" prop="visibleScope">
@@ -582,13 +576,6 @@ getList();
   color: var(--app-text-muted);
   font-size: 12px;
   line-height: 1.5;
-}
-
-.option-meta {
-  float: right;
-  margin-left: 16px;
-  color: var(--app-text-muted);
-  font-size: 12px;
 }
 
 .detail-summary {

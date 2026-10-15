@@ -61,7 +61,7 @@
             <el-option
               v-for="item in decisionModels"
               :key="String(item.id)"
-              :label="`${item.configName} · ${item.modelCode}`"
+              :label="item.configName"
               :value="item.id"
             />
           </el-select>
