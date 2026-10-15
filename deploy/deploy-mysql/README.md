@@ -70,7 +70,7 @@ docker compose up -d --build
 | `GET http://localhost:81/prod-api/auth/code`（Nginx → 后端代理） | 200 |
 | `GET http://localhost:8081/auth/code`（后端直连） | 200 |
 | `GET http://localhost:8801/snail-job/`（调度控制台） | 200 |
-| 建库结果 | 97 张表（与 PostgreSQL 版一致）；`ai_*` 39 张；`sys_menu` BizBuddy 段 123 行（6 分组 / 30 功能页 / 86 按钮）；`ai_tool` 26、入口小Z 1、专家 3、专家工具绑定 21 行；`ai_model_config` 2（`api_key` 留空）；`sj_job` 已有派发任务 |
+| 建库结果 | 97 张表（与 PostgreSQL 版一致）；`ai_*` 39 张；`sys_menu` BizBuddy 段 123 行（6 分组 / 30 功能页 / 86 按钮）；`ai_tool` 26、入口小Z 1、专家 3、专家工具绑定 21 行；`ai_model_config` **4**（`api_key` 留空）；`sj_job` 已有派发任务 |
 | 中文数据 | `sys_menu.menu_name='BizBuddy'`、`sys_user.nick_name='本部门及以下 密码666666'` 均完好（库字符集 `utf8mb4` / `utf8mb4_unicode_ci`） |
 | 部分唯一索引 | `ai_tool.uk_ai_tool_code` 的表达式落库为 `if((del_flag = '0'),0,NULL)`，即 MySQL 「函数键部分」等价实现 |
 | OSS 端点 | `sys_oss_config.endpoint = minio:9000` |
@@ -78,14 +78,16 @@ docker compose up -d --build
 
 ## 5. 首次启动后必做：配置模型密钥
 
-建库脚本已预置两个**示例模型**（提供商：阿里云百炼 / DashScope，走 OpenAI 兼容协议），但 **`api_key` 一律留空**，需自行补齐：
+建库脚本已预置**四个示例模型**（提供商：阿里云百炼 / DashScope；**协议各异**——对话 / 向量走 OpenAI 兼容，决策走 TypeSafe System One，重排走 DashScope 文本重排端点），但 **`api_key` 一律留空**，需自行补齐：
 
 | 配置名称 | 类型 | 说明 |
 |---|---|---|
 | `deepseek-v4.1-flash` | 对话 | 大语言模型 |
 | `qwen3.7-text-embedding-flash` | 向量 | 维度按 `1024` 预置，须与模型实际输出一致 |
+| `decision-model-preview` | 决策 | 供「安全合规配置 → 结构化决策路由」引用 |
+| `gte-rerank-v2` | 重排 | 供「知识库管理」的检索重排引用 |
 
-1. 登录 →「模型配置」把这两个模型（或你另行新建的模型）的 **API Key** 换成自己的阿里云百炼密钥 —— 换完即可用，无需其它配置；
+1. 登录 →「模型配置」把这四个模型（或你另行新建的模型）的 **API Key** 换成自己的阿里云百炼密钥 —— 换完即可用，无需其它配置；
 2. 内置智能体（小Z 与两个专家）的模型槽位**已指向** `deepseek-v4.1-flash`；若要换模型，到「小Z 配置」「专家配置」改指即可；
 3. 要用知识库检索，向量模型须选上表中的 embedding 模型（维度与知识库一致）。
 
