@@ -73,10 +73,10 @@
       <div class="section-block">
         <div class="section-title">按日期</div>
         <el-table v-loading="overviewLoading" border class="data-table" :data="overview.byDate">
-          <el-table-column label="日期" align="center" prop="label" width="140" />
-          <el-table-column label="输入 Token" align="center" prop="promptTokens" width="130" />
-          <el-table-column label="输出 Token" align="center" prop="completionTokens" width="130" />
-          <el-table-column label="总 Token" align="center" prop="totalTokens" width="130" />
+          <el-table-column label="日期" align="center" prop="label" min-width="140" />
+          <el-table-column label="输入 Token" align="center" prop="promptTokens" min-width="130" />
+          <el-table-column label="输出 Token" align="center" prop="completionTokens" min-width="130" />
+          <el-table-column label="总 Token" align="center" prop="totalTokens" min-width="130" />
           <el-table-column label="请求数" align="center" prop="requestCount" width="100" />
           <el-table-column label="工具调用" align="center" prop="toolCallCount" width="100" />
           <el-table-column label="费用(元)" align="center" width="130">
