@@ -292,7 +292,18 @@
 
     <!-- 工具标签管理（挂在业务工具注册页内，不新增菜单页） -->
     <el-dialog v-model="tagDialog.visible" title="工具标签管理" width="860px" append-to-body>
-      <el-form ref="tagFormRef" :model="tagForm" :rules="tagRules" inline class="tag-form">
+      <div class="tag-search">
+        <el-input
+          v-model="tagQuery.keyword"
+          placeholder="按标签名称搜索"
+          clearable
+          style="width: 240px"
+          @keyup.enter="handleTagQuery"
+        />
+        <el-button icon="Search" @click="handleTagQuery">搜索</el-button>
+      </div>
+
+      <el-form ref="tagFormRef" :model="tagForm" :rules="tagRules" inline label-width="84px" class="tag-form">
         <el-form-item label="标签名称" prop="tagName">
           <el-input v-model="tagForm.tagName" placeholder="如：知识检索 / 通知类 / 实验性" style="width: 200px" />
         </el-form-item>
@@ -307,19 +318,12 @@
         </el-form-item>
       </el-form>
 
-      <div class="tag-search">
-        <el-input
-          v-model="tagQuery.keyword"
-          placeholder="按标签名称搜索"
-          clearable
-          style="width: 240px"
-          @keyup.enter="handleTagQuery"
-        />
-        <el-button icon="Search" @click="handleTagQuery">搜索</el-button>
-      </div>
-
-      <el-table v-loading="tagLoading" border :data="tagList" max-height="360">
-        <el-table-column label="标签名称" align="left" prop="tagName" />
+      <el-table v-loading="tagLoading" border :data="tagList" max-height="360" :row-class-name="tagRowClass">
+        <el-table-column label="标签名称" align="left" min-width="240" :show-overflow-tooltip="true">
+          <template #default="scope">
+            <el-tag size="small" effect="plain">{{ scope.row.tagName }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="使用工具数" align="center" width="110">
           <template #default="scope">
             <el-tag :type="(scope.row.useCount ?? 0) > 0 ? 'primary' : 'info'" size="small" effect="plain">
@@ -327,7 +331,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="备注" align="left" prop="remark" :show-overflow-tooltip="true" />
+        <el-table-column label="备注" align="left" min-width="180" prop="remark" :show-overflow-tooltip="true" />
         <el-table-column label="操作" align="center" width="130" class-name="small-padding fixed-width">
           <template #default="scope">
             <el-tooltip content="编辑" placement="top">
@@ -351,6 +355,8 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <el-empty v-if="!tagLoading && !tagList.length" description="暂无标签，可在上方新增" :image-size="60" />
 
       <pagination
         v-show="tagTotal > 0"
@@ -739,6 +745,9 @@ const editTag = (row: ToolTagVO) => {
   tagForm.value = { id: row.id, tagName: row.tagName, remark: row.remark };
 };
 
+/** 正在编辑的标签行高亮，便于与上方表单对照 */
+const tagRowClass = ({ row }: { row: ToolTagVO }) => (tagForm.value.id && row.id === tagForm.value.id ? 'is-editing' : '');
+
 /** 提交标签表单（新增 / 修改） */
 const submitTagForm = () => {
   tagFormRef.value?.validate(async (valid: boolean) => {
@@ -902,6 +911,16 @@ getList();
   :deep(.el-form-item) {
     margin-bottom: 12px;
   }
+
+  /* 表单 label 不换行：窄窗口下「标签名称」曾被折成两行 */
+  :deep(.el-form-item__label) {
+    white-space: nowrap;
+  }
+}
+
+/* 正在编辑的标签行：整行底色区分（行高亮靠 el-table 的行底色变量，避免逐 td 覆盖） */
+:deep(.el-table .is-editing) {
+  --el-table-tr-bg-color: var(--el-fill-color-light);
 }
 
 .form-tip {

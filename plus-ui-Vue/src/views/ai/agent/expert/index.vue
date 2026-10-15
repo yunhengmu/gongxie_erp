@@ -156,7 +156,7 @@
     </el-card>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" width="720px" append-to-body>
-      <el-form ref="agentFormRef" :model="form" :rules="rules" label-width="110px">
+      <el-form ref="agentFormRef" :model="form" :rules="rules" label-width="130px">
         <el-form-item label="名称" prop="agentName">
           <el-input v-model="form.agentName" placeholder="如：财务专家" />
         </el-form-item>

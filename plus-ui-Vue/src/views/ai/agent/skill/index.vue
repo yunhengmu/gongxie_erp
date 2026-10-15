@@ -146,7 +146,7 @@
     </el-card>
 
     <el-dialog v-model="dialog.visible" :title="dialog.title" width="860px" append-to-body>
-      <el-form ref="skillFormRef" :model="form" :rules="rules" label-width="110px">
+      <el-form ref="skillFormRef" :model="form" :rules="rules" label-width="140px">
         <el-form-item label="技能标识" prop="name">
           <template #label>
             <span class="label-tip">
