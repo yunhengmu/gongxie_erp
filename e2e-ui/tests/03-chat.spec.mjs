@@ -16,6 +16,7 @@
 import { test, expect } from '@playwright/test';
 
 import { CONFIG, stackSkipReason } from '../lib/config.mjs';
+import { sendMessageByEnter } from '../lib/chat-ui.mjs';
 import { watchPage } from '../lib/observe.mjs';
 
 /** 刻意选一条不需要工具、不需要知识库的提问，降低对运行期配置的耦合 */
@@ -42,8 +43,8 @@ test.describe('会话主路径', () => {
       await newSession.click();
     }
 
-    await page.fill('textarea[placeholder="今天帮您干点什么？"]', PROMPT);
-    await page.click('button:has-text("发送")');
+    // 用**裸 Enter** 发送：顺带覆盖「Enter 发送、Shift+Enter 换行」的快捷键绑定（修复 #8）
+    await sendMessageByEnter(page, PROMPT);
 
     // 先等「助手气泡」或「错误提示」二者之一：前者=链路通，后者=前置问题
     await expect(page.locator('.msg-row--assistant, .msg-error').first()).toBeVisible({ timeout: 60_000 });

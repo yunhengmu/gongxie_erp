@@ -92,6 +92,21 @@ export const sendMessage = async (page, text) => {
 };
 
 /**
+ * 用快捷键发送（裸 Enter）。
+ *
+ * 专门用于验证「Enter 发送、Shift+Enter 换行」这条绑定（原先只绑 Ctrl+Enter）；
+ * 其余用例仍走 {@link sendMessage} 点按钮，避免耦合到快捷键实现。
+ *
+ * @param {import('@playwright/test').Page} page 页面
+ * @param {string} text 消息正文
+ * @returns {Promise<void>}
+ */
+export const sendMessageByEnter = async (page, text) => {
+  await page.fill(`textarea[placeholder="${INPUT_PLACEHOLDER}"]`, text);
+  await page.keyboard.press('Enter');
+};
+
+/**
  * 等待流式开始（判据：发送按钮被「停止」替换，chat/index.vue:376-377）。
  *
  * @param {import('@playwright/test').Page} page 页面

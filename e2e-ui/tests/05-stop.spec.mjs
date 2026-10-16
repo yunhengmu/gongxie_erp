@@ -67,6 +67,11 @@ test.describe('停止生成', () => {
     await expect(page.locator('button:has-text("发送")')).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('textarea[placeholder="今天帮您干点什么？"]')).toBeEnabled({ timeout: 10_000 });
 
+    // 修复 #6 的回归护栏：停止后必须给出「已中止」标记（原先点停止后界面无任何反馈）
+    await expect(page.locator('.msg-meta__aborted'), '停止后未出现「已中止」标记').toBeVisible({
+      timeout: 15_000
+    });
+
     // 已流出的正文保留（不应被清空或截断），且不是整轮失败
     const after = (await assistantBody.innerText().catch(() => '')).trim();
     expect(after.length, `停止后助手正文被截断：${before.length} → ${after.length}`).toBeGreaterThanOrEqual(

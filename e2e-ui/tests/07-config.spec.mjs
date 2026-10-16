@@ -92,6 +92,10 @@ test.describe('配置页：保存 → 重载 → 生效', () => {
     const snapshot = await apiGetData(page, '/ai/runtime/security', CONFIG.clientId);
     test.skip(!snapshot, '读取安全合规配置失败（GET /ai/runtime/security 无数据）——请确认接口可用且已登录');
 
+    // 修复 #13 的回归护栏：密钥不再回显明文，只给掩码
+    expect(snapshot.providerApiKey, 'GET /ai/runtime/security 仍回显明文密钥').toBeUndefined();
+    expect(snapshot, '缺少密钥掩码字段 providerApiKeyMask').toHaveProperty('providerApiKeyMask');
+
     // 该字段在「内容审核」卡片内（另一个 PII 卡片也有保存按钮，故用容器限定）
     const field = page.locator('.el-form-item:has-text("命中留证片段字符数") input').first();
     const before = Number(snapshot.excerptChars ?? 200);
