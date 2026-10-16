@@ -23,6 +23,7 @@ node e2e/run.mjs --base-url http://localhost:8081   # MySQL 栈
 ```
 
 - **通过标准**：零 FAIL。`L12`（结构化决策闸门）需本地桩，未起桩会 **SKIP**——不算失败，但发版前应起桩跑掉，做到**零 FAIL、零 SKIP**。
+- **前端关键路径（浏览器层 `e2e-ui`，Playwright）**：`cd e2e-ui && pnpm install && pnpm run install-browser`（首次），再 `pnpm test`（PG 栈默认 `http://localhost`，MySQL 栈用 `BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test`）。栈不可达按 SKIP 处理（不算失败，但发版前应起栈跑掉），**跑完要求零 FAIL**。详见 [../e2e-ui/README.md](../e2e-ui/README.md)。
 
 ### L12 的桩（起 / 停）
 

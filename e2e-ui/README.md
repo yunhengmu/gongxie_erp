@@ -52,9 +52,15 @@ BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test
 
 ## 实跑记录与三个坑（2026-10-16，PG 栈）
 
-环境：WSL **Ubuntu-22.04**、node 22.23.0、pnpm 11.24.0、`@playwright/test` 1.64.1；PG 栈 `docker compose up -d`（未重建）。
+环境：WSL（**发行版按本机实际**，当次为 Ubuntu-22.04）、node 22.23.0、pnpm 11.24.0、`@playwright/test` 1.64.1；PG 栈 `docker compose up -d` 运行中（**最终那次实跑前已重建 `ruoyi-admin`**）。
 
-结果：**6 passed（41.5s）**——登录（含验证码控件不存在的断言）、路由守卫、6 分组菜单、**32/33 页渲染干净**、会话主路径（SSE + nginx + 编排）。
+结果：**13 passed（3.4m，含 1 条登录态 setup）**——登录/路由守卫、菜单与 32/33 页渲染、会话主路径、指定专家、停止生成（「已中止」护栏）、HITL 写工具确认、配置页三组（安全合规 / 结构化决策 / 对话偏好）。
+
+> **必须跑在「已重建」的栈上**：重建后端镜像前，`07-config` 的「密钥不回显」断言会 FAIL——`GET /ai/runtime/security` 仍回显 `providerApiKey`，根因是运行中的 jar 陈旧（源码已实现掩码）。重建 `ruoyi-admin` 后即 13/13；顺带一提，重建容器会换 IP，需 `docker compose restart web` 让 nginx 重新解析。
+
+> 首次运行前先 `pnpm install && pnpm run install-browser`。国内网络下如卡在浏览器下载，走镜像即可（实测可用）：
+> `PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright pnpm run install-browser`
+> （Windows PowerShell：先 `$env:PLAYWRIGHT_DOWNLOAD_HOST='https://cdn.npmmirror.com/binaries/playwright'` 再执行。）
 
 ### 坑 1：请求必须带 `clientid` 头（否则被判未登录）
 

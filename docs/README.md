@@ -20,7 +20,7 @@
 | 改对话交互 / 前端页面 | `plus-ui-Vue`（对话工作台：`src/views/ai/agent/chat`） |
 | 调整模型 / 压缩 / 记忆等运行策略 | [configuration.md](configuration.md) |
 | 部署到服务器 | PostgreSQL 栈 [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md)、MySQL 8.0 栈 [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md)（均含构建前置与已知坑） |
-| **验证「真的跑通了」** | [../e2e/](../e2e)（外部驱动端到端脚本，见下文常用命令） |
+| **验证「真的跑通了」** | [../e2e/](../e2e)（接口层，零依赖 Node）与 [../e2e-ui/](../e2e-ui)（浏览器层，Playwright），见下文常用命令 |
 | **发版前要过哪些检查** | [release-checklist.md](release-checklist.md)（五道门禁，含 L12 桩的起停命令） |
 
 ## 常用命令
@@ -48,6 +48,11 @@ cd ..                       # 回到仓库根（biz-buddy/）
 node e2e/run.mjs                                  # 全量（未配置密钥的层自动 SKIP）
 node e2e/run.mjs --only L1,L3 --verbose            # 指定层级
 node e2e/run.mjs --base-url http://localhost:8081  # 指向 MySQL 栈（PG 栈默认 8080）
+
+# 浏览器层 e2e-ui（Playwright 驱动真实 chromium：页面渲染 / 动态菜单 / 前端关键路径）
+cd e2e-ui
+pnpm install && pnpm run install-browser            # 首次需装依赖与 chromium
+BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test  # MySQL 栈（PG 栈默认 http://localhost）
 ```
 
 - 覆盖 **L1~L13**：模型连通 → 提示词生成 → 解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（需本地桩，见 [release-checklist.md](release-checklist.md)）→ 停止生成（中断专家编排）；另含 **RAG 检索质量评测**（`e2e/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；

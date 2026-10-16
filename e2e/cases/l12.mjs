@@ -206,6 +206,9 @@ const deleteTempDecisionModel = (http, id) => http.request('DELETE', `/ai/model/
  * 平台自身与其它用例都不会用该前缀。<b>清理失败不阻断用例</b>——它只是兜底，
  * 记一条日志继续跑，真正的清理仍由本轮的 {@code finally} 负责。</p>
  *
+ * <p><b>边界</b>：扫描走 {@code /ai/model/options}，该接口只返回**启用中**的模型——
+ * 若遗留的临时模型已被停用则扫不到（本用例建的模型恒为启用态，故实际不触发）。</p>
+ *
  * @param {import('../lib/http.mjs').HttpClient} http HTTP 客户端
  * @param {Function} log 日志
  * @returns {Promise<void>}

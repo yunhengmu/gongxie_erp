@@ -35,6 +35,9 @@ export const run = async (ctx) => {
   }
 
   // 1) 快照当前安全配置（收尾据此恢复）
+  // 注意：GET 返回的是**视图对象**——不含密钥明文、只有掩码 providerApiKeyMask，
+  // 故这份快照天然没有 providerApiKey；PUT 回去时靠后端「密钥留空＝沿用已存值」的合并保住已有密钥
+  //（见 AiRuntimeConfigStore#updateSecurity）。日后若改掉该合并语义，这里会静默清空密钥。
   registry.securityRestore = await http.request('GET', '/ai/runtime/security');
 
   // 2) 新增临时敏感词（写入即刷新词库缓存，立即生效）
