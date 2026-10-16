@@ -155,19 +155,28 @@ public class AiTurnFinisher {
         traceService.appendTransition(state.traceId, "cancelled", CANCELLED_TEXT);
         traceService.accumulate(state.traceId, AiTrace.STATUS_ABORTED, durationMs, null,
             null, null, null, CANCELLED_TEXT);
+        // 与 done 同口径的助手消息主键：首段中止取本次落库的消息，恢复段为同一 messageId
+        Long messageId = resumeMessageId;
         try {
             if (resumeMessageId == null) {
-                sessionService.persistAssistantAborted(sessionId, state.answer.toString(), durationMs, state.sources);
+                AiMessage assistant = sessionService.persistAssistantAborted(sessionId, state.answer.toString(),
+                    durationMs, state.sources);
+                messageId = assistant == null ? null : assistant.getId();
             } else {
-                sessionService.appendAssistantTurn(resumeMessageId, "",
+                messageId = sessionService.appendAssistantTurn(resumeMessageId, "",
                     AiMessage.STATUS_ABORTED, durationMs, buildDoneToolLogs(state, route), state.toTokenUsage(),
-                    state.sources);
+                    state.sources).getId();
             }
         } catch (Exception e) {
             log.error("落库已停止消息异常，sessionId={}, messageId={}", sessionId, resumeMessageId, e);
         }
-        finishRoute(route, resumeMessageId, AiRouteRun.STATUS_ABORTED, CANCELLED_TEXT, durationMs);
-        AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_ABORTED));
+        // 与 done / pending 同口径：写本轮实际落库的助手消息 id（首段中止时 resumeMessageId 为空）
+        finishRoute(route, messageId, AiRouteRun.STATUS_ABORTED, CANCELLED_TEXT, durationMs);
+        // 载荷与 done 同款字段：前端据 messageId 归位、据 durationMs 渲染耗时
+        Map<String, Object> payload = AiSseSupport.envelope(EVENT_ABORTED);
+        payload.put("messageId", messageId);
+        payload.put("durationMs", durationMs);
+        AiSseSupport.send(emitter, payload);
         AiSseSupport.complete(emitter);
     }
 

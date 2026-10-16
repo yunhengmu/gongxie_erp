@@ -264,6 +264,11 @@ public class AiRuntimeConfigStore {
      * @param bo 安全合规配置
      */
     public void updateSecurity(AiSecurityConfigBo bo) {
+        // 密钥留空表示不修改：前端不回显密钥、始终以空值提交，须沿用已存值，
+        // 否则会把已配置的外部审核引擎密钥覆盖成空
+        if (StringUtils.isBlank(bo.getProviderApiKey())) {
+            bo.setProviderApiKey(security().getProviderApiKey());
+        }
         RedisUtils.setCacheObject(SECURITY_KEY, JsonUtils.toJsonString(bo));
         log.info("安全合规配置已更新：enabled={}, engine={}, action={}, input/output/channelOut={}/{}/{}, "
                 + "maskPii={}, holdBack={}, externalProvider={}",

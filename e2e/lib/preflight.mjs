@@ -6,6 +6,8 @@
  * 模型取自 `/ai/model/list`。缺任何一项都给出可操作的报错，而不是抛堆栈。</p>
  */
 
+import { wslDistro } from './env.mjs';
+
 /** 前置检查失败（对应退出码 2） */
 export class PreflightError extends Error {}
 
@@ -27,7 +29,7 @@ export const preflight = async (client, cfg, options = {}) => {
     throw new PreflightError(
       `${error.message}\n` +
         `  排查建议：\n` +
-        `  1) 栈是否在跑：wsl -d Ubuntu-24.04 -- docker ps（应看到 bizbuddy-admin）\n` +
+        `  1) 栈是否在跑：wsl -d ${wslDistro()} -- docker ps（应看到 bizbuddy-admin）\n` +
         `  2) 地址是否可达：浏览器打开 ${cfg.baseUrl}/swagger-ui.html\n` +
         `  3) 账号密码是否正确（默认 admin/admin123，可用 BIZBUDDY_USERNAME/PASSWORD 覆盖）\n` +
         `  4) 接口加密密钥是否与后端一致（默认读 plus-ui-Vue/.env.development）`

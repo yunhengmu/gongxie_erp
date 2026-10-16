@@ -245,7 +245,10 @@
                 <el-icon><WarningFilled /></el-icon>
                 <span>{{ msg.errorMsg || '回复失败' }}</span>
               </div>
-              <div v-else-if="!msg.streaming && msg.durationMs !== undefined" class="msg-meta">
+              <div
+                v-else-if="!msg.streaming && (msg.durationMs !== undefined || msg.status === '3')"
+                class="msg-meta"
+              >
                 <!-- 复制图标：始终显示（左对齐） -->
                 <el-icon
                   class="msg-meta__icon"
@@ -257,9 +260,11 @@
                 >
                   <DocumentCopy />
                 </el-icon>
+                <!-- 中止标记：本地停止或后端 aborted 时给出明确反馈 -->
+                <span v-if="msg.status === '3'" class="msg-meta__aborted">已中止</span>
                 <!-- 文字区域：悬停回复内容才显示；整体前带一个分隔竖线 -->
                 <span class="msg-meta__info">
-                  <span>耗时 {{ msg.durationMs }} ms</span>
+                  <span v-if="msg.durationMs !== undefined">耗时 {{ msg.durationMs }} ms</span>
                   <span v-if="msg.toolCallCount">工具调用 {{ msg.toolCallCount }} 次</span>
                   <span v-if="msg.totalTokens">消耗 {{ msg.totalTokens }} tokens</span>
                 </span>
@@ -284,7 +289,7 @@
           resize="none"
           :disabled="streaming"
           placeholder="今天帮您干点什么？"
-          @keydown.ctrl.enter.prevent="handleSend"
+          @keydown="handleComposerKeydown"
         />
         <div class="composer-actions">
           <!-- 资源选择器（REQ-AI-32）：最左侧一个 +，按分组选资源；选中项以标签跟在 + 后面 -->
@@ -372,7 +377,7 @@
             </div>
           </div>
           <div class="composer-actions-right">
-            <span class="composer-tip">Ctrl + Enter 发送</span>
+            <span class="composer-tip">Enter 发送，Shift + Enter 换行</span>
             <el-button v-if="streaming" type="danger" icon="VideoPause" @click="handleStop">停止</el-button>
             <el-button v-else type="primary" icon="Promotion" :loading="sending" @click="handleSend">发送</el-button>
           </div>
@@ -1526,6 +1531,8 @@ const handleStop = () => {
   const msg = currentAssistant();
   if (msg) {
     msg.streaming = false;
+    // 前端随即关闭 SSE，很可能收不到后端随后的 aborted 事件，故本地即时标记「已中止」
+    msg.status = '3';
   }
   finishStream();
 };
@@ -1733,6 +1740,15 @@ const handleStreamEvent = (raw: string) => {
       void syncExpertConclusions(msg);
       break;
     }
+    case 'aborted': {
+      // 中止也按收尾处理：给用户明确的「已中止」反馈（兜底服务端主动中止等场景）
+      msg.id = event.messageId ?? msg.id;
+      msg.streaming = false;
+      msg.durationMs = event.durationMs ?? msg.durationMs;
+      msg.status = '3';
+      finishStream();
+      break;
+    }
     case 'error': {
       msg.streaming = false;
       msg.status = '1';
@@ -1836,6 +1852,22 @@ const handleRemoveAttachment = async (item: ChatAttachmentVO) => {
       // 暂存件删除失败可忽略，不影响发送
     }
   }
+};
+
+/**
+ * 输入框快捷键：Enter / Ctrl+Enter 发送，Shift+Enter 换行。
+ *
+ * 必须挡掉输入法组合态：中文候选框里按 Enter 是「选词」，不加这个判断会把选词误当发送。
+ */
+const handleComposerKeydown = (event: KeyboardEvent) => {
+  if (event.isComposing || event.keyCode === 229) {
+    return;
+  }
+  if (event.key !== 'Enter' || event.shiftKey) {
+    return;
+  }
+  event.preventDefault();
+  void handleSend();
 };
 
 /** 发送消息：先落库拿 messageId，再建立 SSE 流 */
@@ -2231,6 +2263,13 @@ onMounted(() => {
   min-height: 18px;
   color: var(--app-text-muted);
   font-size: 12px;
+}
+
+/* 中止标记：与元信息同级，沿用次要文字色，视觉克制 */
+.msg-meta__aborted {
+  color: var(--app-text-muted);
+  font-size: 12px;
+  opacity: 0.75;
 }
 
 /* 复制图标：始终显示（左对齐） */

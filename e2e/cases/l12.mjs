@@ -8,25 +8,34 @@
  * <p><b>桩必须跑进 compose 网络</b>：容器解析不到 {@code host.docker.internal}（docker 网关是 WSL 主机），
  * 故桩不能跑在 Windows 上。操作者需**先在 WSL 内**启动桩（用例本身不 shell out，保持纯 HTTP）：</p>
  * <pre>
- *   wsl -d Ubuntu-24.04 -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \
- *     -v /mnt/d/trae/BizBuddy/biz-buddy/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080
+ *   wsl -d &lt;distro&gt; -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \
+ *     -v &lt;repo&gt;/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080
  * </pre>
+ * <p>{@code <distro>}／{@code <repo>} 按本机替换：发行版名取 {@code wsl --list --verbose} 里带 {@code *}
+ * 的那项（开发环境存在 Ubuntu-22.04 与 Ubuntu-24.04 两种）；{@code <repo>} 为仓库根在 WSL 下的绝对路径。
+ * 运行期 SKIP 提示会**自动探测**这两个值（见 {@code lib/env.mjs} 的 {@code wslDistro} / {@code wslRepoPath}），
+ * 也可用 {@code BIZBUDDY_WSL_DISTRO} 覆盖发行版名。</p>
  *
  * <p><b>决策模型从「模型配置」取</b>：结构化决策配置只带「是否启用 + 所选模型主键」，连接信息（地址 / 模型标识 /
  * 密钥）全部来自「模型配置」里的 {@code decision} 类型记录。故本层开始前先<b>建一条临时决策模型</b>
  * （{@code baseUrl} 指向桩、{@code apiKey} 随便填——桩不校验鉴权），选中它跑四分支。</p>
  *
  * <p>前置不满足（桩不可达 / 运行期配置接口不可读 / 平台无对话密钥）→ {@code SKIP}，不判 {@code FAIL}。
- * <b>收尾无条件恢复</b>：开始前先 {@code GET /ai/runtime/jev} <b>快照原配置</b>，{@code finally} 里把
+ * <p><b>收尾无条件恢复</b>：开始前先 {@code GET /ai/runtime/jev} <b>快照原配置</b>，{@code finally} 里把
  * {@code modelConfigId} 与策略字段（{@code timeoutSeconds} / {@code mode} / {@code confidenceThreshold} /
  * {@code stateMaxChars} / {@code persistProbabilities}）连同 {@code enabled=false}
  * 一起 PUT 回去，并<b>删除临时决策模型</b>。会话登记到 {@code registry.sessions} 以便统一清理。</p>
+ *
+ * <p><b>兜底清理</b>：{@code finally} 在进程被中断（Ctrl+C / 超时）时不执行，会把临时决策模型留在库里，
+ * 故每次开跑前按配置名前缀（{@link TEMP_MODEL_PREFIX}）扫一遍并清掉遗留，见
+ * {@link sweepStaleTempDecisionModels}。</p>
  *
  * <p><b>密钥处置</b>：本层不再写任何真实密钥——临时模型自带一把不被校验的占位密钥，收尾随模型一并删除，
  * 故平台已保存的密钥始终不被触碰。</p>
  */
 
 import { readSse, lastOfType } from '../lib/sse.mjs';
+import { wslDistro, wslRepoPath } from '../lib/env.mjs';
 
 export const meta = { layer: 'L12', name: '结构化决策闸门（桩服务四分支）', needsKey: true };
 
@@ -39,10 +48,13 @@ const STUB_BASE_URL = 'http://jev-stub:8080/compatible-mode';
 /** 临时决策模型固定模型标识（桩按 state 标记分支，与模型标识无关） */
 const STUB_MODEL_CODE = 'decision-model-preview';
 
-/** 桩启动命令（写进 SKIP 提示；操作者需先在 WSL 内执行） */
+/** 临时决策模型配置名前缀：本用例自建，故可按前缀安全识别并兜底清理遗留 */
+const TEMP_MODEL_PREFIX = 'E2E_L12_决策模型_';
+
+/** 桩启动命令（写进 SKIP 提示；操作者需先在 WSL 内执行）。发行版名与仓库路径按本机自动解析，不写死 */
 const STUB_START_COMMAND = [
-  'wsl -d Ubuntu-24.04 -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \\',
-  '  -v /mnt/d/trae/BizBuddy/biz-buddy/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080'
+  `wsl -d ${wslDistro()} -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \\`,
+  `  -v ${wslRepoPath()}/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080`
 ].join('\n');
 
 /** 五个子场景：前四条依赖桩（gate 档四分支），最后一条关闭档零写入（不依赖桩） */
@@ -60,6 +72,10 @@ const SCENARIOS = [
  */
 export const run = async (ctx) => {
   const { http, resolved, registry, log } = ctx;
+
+  // 兜底清理：本用例在 finally 里删自建模型，但进程被中断时 finally 不执行，残留会留在库里。
+  // **刻意放在所有前置检查之前**——桩不可达而整层 SKIP 时同样需要把上次的残留清掉。
+  await sweepStaleTempDecisionModels(http, log);
 
   // 前置 1：桩可达（Windows 侧经已发布端口探活）
   if (!(await stubReachable())) {
@@ -147,7 +163,7 @@ export const run = async (ctx) => {
  * @returns {Promise<{ id: number|string, configName: string }>} 临时模型
  */
 const createTempDecisionModel = async (http, stamp) => {
-  const configName = `E2E_L12_决策模型_${stamp}`;
+  const configName = `${TEMP_MODEL_PREFIX}${stamp}`;
   await http.request('POST', '/ai/model', {
     body: {
       configName,
@@ -177,6 +193,50 @@ const createTempDecisionModel = async (http, stamp) => {
  * @returns {Promise<void>}
  */
 const deleteTempDecisionModel = (http, id) => http.request('DELETE', `/ai/model/${id}`);
+
+/**
+ * 兜底清理历史遗留的临时决策模型。
+ *
+ * <p><b>为什么需要</b>：本用例在 {@code finally} 里删掉自己建的模型，但**进程被中断时
+ * （Ctrl+C / 超时 / 机器重启）{@code finally} 不会执行**，残留会一直留在库里
+ * （实测遇到过一次 {@code E2E_L12_决策模型_1791853389762}）。故每次开跑前按前缀扫一遍，
+ * 让用例**自愈**：上一次没清掉的，这一次开头就清掉。</p>
+ *
+ * <p><b>为何按前缀删是安全的</b>：{@link TEMP_MODEL_PREFIX} 是本用例独占的命名空间，
+ * 平台自身与其它用例都不会用该前缀。<b>清理失败不阻断用例</b>——它只是兜底，
+ * 记一条日志继续跑，真正的清理仍由本轮的 {@code finally} 负责。</p>
+ *
+ * <p><b>边界</b>：扫描走 {@code /ai/model/options}，该接口只返回**启用中**的模型——
+ * 若遗留的临时模型已被停用则扫不到（本用例建的模型恒为启用态，故实际不触发）。</p>
+ *
+ * @param {import('../lib/http.mjs').HttpClient} http HTTP 客户端
+ * @param {Function} log 日志
+ * @returns {Promise<void>}
+ */
+const sweepStaleTempDecisionModels = async (http, log) => {
+  let options;
+  try {
+    options = await http.request('GET', '/ai/model/options', { query: { modelType: 'decision' } });
+  } catch (error) {
+    log(`  ! 扫描遗留临时决策模型失败（跳过兜底清理）：${error.message}`);
+    return;
+  }
+  const stale = (Array.isArray(options) ? options : []).filter(
+    (item) => typeof item?.configName === 'string' && item.configName.startsWith(TEMP_MODEL_PREFIX)
+  );
+  if (!stale.length) {
+    return;
+  }
+  log(`  · 发现 ${stale.length} 条遗留临时决策模型（上次运行被中断未清掉）——开始兜底清理`);
+  for (const item of stale) {
+    try {
+      await deleteTempDecisionModel(http, item.id);
+      log(`  ✓ 已清理遗留临时决策模型「${item.configName}」#${item.id}`);
+    } catch (error) {
+      log(`  ! 清理遗留临时决策模型 #${item.id} 失败（不阻断用例）：${error.message}`);
+    }
+  }
+};
 
 /**
  * 跑一个子场景：改配置 → 新建会话（不指定专家）→ 发消息 → 读 SSE → 轮询编排运行。

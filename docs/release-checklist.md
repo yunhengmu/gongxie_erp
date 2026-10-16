@@ -23,17 +23,20 @@ node e2e/run.mjs --base-url http://localhost:8081   # MySQL 栈
 ```
 
 - **通过标准**：零 FAIL。`L12`（结构化决策闸门）需本地桩，未起桩会 **SKIP**——不算失败，但发版前应起桩跑掉，做到**零 FAIL、零 SKIP**。
+- **前端关键路径（浏览器层 `e2e-ui`，Playwright）**：`cd e2e-ui && pnpm install && pnpm run install-browser`（首次），再 `pnpm test`（PG 栈默认 `http://localhost`，MySQL 栈用 `BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test`）。栈不可达按 SKIP 处理（不算失败，但发版前应起栈跑掉），**跑完要求零 FAIL**。详见 [../e2e-ui/README.md](../e2e-ui/README.md)。
 
 ### L12 的桩（起 / 停）
 
 桩必须跑进 compose 网络（容器解析不到 `host.docker.internal`），且**两栈都要能按容器名解析到它**：
 
 ```bash
-# 1) 起桩（加入 PG 栈网络），把 <repo> 换成本机在 WSL 下的绝对路径（如 /mnt/d/trae/BizBuddy/biz-buddy）
-wsl -d Ubuntu-24.04 -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \
+# 先按本机替换两个占位：<distro>＝`wsl --list --verbose` 里带 * 的发行版名（开发环境有 Ubuntu-22.04 与 Ubuntu-24.04 两种）；
+#                          <repo>＝仓库根在 WSL 下的绝对路径（如 /mnt/d/test/mybuddy/biz-buddy）
+# 1) 起桩（加入 PG 栈网络）
+wsl -d <distro> -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \
   -v <repo>/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080
 # 2) 接入 MySQL 栈网络（同一容器可同时属于两个网络）
-wsl -d Ubuntu-24.04 -- docker network connect bizbuddy-mysql_default jev-stub
+wsl -d <distro> -- docker network connect bizbuddy-mysql_default jev-stub
 curl -s -o /dev/null -w '%{http_code}\n' http://localhost:18080/health   # 期望 200
 
 # 3) 补跑 L12（两栈）
@@ -41,8 +44,12 @@ node e2e/run.mjs --only L12
 node e2e/run.mjs --only L12 --base-url http://localhost:8081
 
 # 4) 收尾（--rm 会自动移除容器）
-wsl -d Ubuntu-24.04 -- docker rm -f jev-stub
+wsl -d <distro> -- docker rm -f jev-stub
 ```
+
+> `<distro>` / `<repo>` 是刻意的占位符：开发环境存在 Ubuntu-22.04 与 Ubuntu-24.04 两种，写死会在别的机器上直接撞
+> `WSL_E_DISTRO_NOT_FOUND`。`node e2e/run.mjs --only L12` 的 SKIP 提示会**自动探测**这两个值并打印可直接复制的命令
+> （见 `e2e/lib/env.mjs` 的 `wslDistro` / `wslRepoPath`），发行版名也可用 `BIZBUDDY_WSL_DISTRO` 覆盖。
 
 > L12 收尾会**自动恢复**原结构化决策配置、删除临时决策模型并清理会话；桩只用于确定性覆盖「网关四条分支 + 关闭档」，不接触任何真实密钥。
 
