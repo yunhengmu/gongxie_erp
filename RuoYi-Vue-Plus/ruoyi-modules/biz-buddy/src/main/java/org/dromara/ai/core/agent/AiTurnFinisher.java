@@ -170,7 +170,8 @@ public class AiTurnFinisher {
         } catch (Exception e) {
             log.error("落库已停止消息异常，sessionId={}, messageId={}", sessionId, resumeMessageId, e);
         }
-        finishRoute(route, resumeMessageId, AiRouteRun.STATUS_ABORTED, CANCELLED_TEXT, durationMs);
+        // 与 done / pending 同口径：写本轮实际落库的助手消息 id（首段中止时 resumeMessageId 为空）
+        finishRoute(route, messageId, AiRouteRun.STATUS_ABORTED, CANCELLED_TEXT, durationMs);
         // 载荷与 done 同款字段：前端据 messageId 归位、据 durationMs 渲染耗时
         Map<String, Object> payload = AiSseSupport.envelope(EVENT_ABORTED);
         payload.put("messageId", messageId);

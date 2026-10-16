@@ -224,7 +224,7 @@ public class AiRuntimeController extends BaseController {
     }
 
     /**
-     * 把业务对象映射为视图对象（密钥转掩码，明文的密文仅服务端计算掩码用、由 {@code @JsonIgnore} 拦住）。
+     * 把业务对象映射为视图对象：访问密钥**只转成掩码**，密文一律不进 VO。
      *
      * @param bo 安全合规配置
      * @return 视图对象
@@ -246,7 +246,6 @@ public class AiRuntimeController extends BaseController {
         vo.setHoldBackChars(bo.getHoldBackChars());
         vo.setExcerptChars(bo.getExcerptChars());
         vo.setProviderEndpoint(bo.getProviderEndpoint());
-        vo.setProviderApiKey(bo.getProviderApiKey());
         vo.setProviderApiKeyMask(StringUtils.isNotBlank(bo.getProviderApiKey()) ? KEY_MASK : "");
         return vo;
     }

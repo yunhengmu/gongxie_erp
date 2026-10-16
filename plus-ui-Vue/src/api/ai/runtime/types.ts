@@ -73,7 +73,7 @@ export interface SecurityConfig {
   /** 外部引擎接口地址（engine=external 时使用） */
   providerEndpoint: string;
   /** 外部引擎接口密钥（engine=external 时使用）。**服务端不回显**，仅用于提交；留空＝不修改已保存的密钥 */
-  providerApiKey: string;
+  providerApiKey?: string;
   /** 外部引擎接口密钥掩码（已配置为 `******`，未配置为空串；只读展示用，不参与提交） */
   providerApiKeyMask?: string;
 }

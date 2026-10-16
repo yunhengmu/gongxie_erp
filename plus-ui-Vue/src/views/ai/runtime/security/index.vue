@@ -148,9 +148,12 @@
               v-model="form.providerApiKey"
               type="password"
               show-password
-              placeholder="留空表示不修改已保存的密钥"
+              :placeholder="keyMask ? '留空表示不修改已保存的密钥' : '请输入接口密钥'"
               style="width: 420px"
             />
+            <span class="form-tip">
+              {{ keyMask ? `已配置：${keyMask}（留空提交＝不修改）` : '当前未配置密钥，该引擎将降级为本地词库' }}
+            </span>
           </el-form-item>
         </template>
       </el-form>
@@ -239,6 +242,9 @@ const rules = {
   action: [{ required: true, message: '请选择命中动作', trigger: 'change' }]
 };
 
+/** 已配置密钥的掩码（服务端只回掩码：`******` 表示已配置，空串表示未配置） */
+const keyMask = ref('');
+
 /** 加载当前生效配置 */
 const loadConfig = async () => {
   loading.value = true;
@@ -247,6 +253,7 @@ const loadConfig = async () => {
     if (res.data) {
       // 密钥不回显（服务端只回掩码 providerApiKeyMask）：显式置空后以空值提交，
       // 配合后端「留空＝不修改」的合并，避免把已配置的外部审核引擎密钥覆盖成空
+      keyMask.value = res.data.providerApiKeyMask ?? '';
       form.value = { ...res.data, providerApiKey: undefined };
     }
   } finally {
