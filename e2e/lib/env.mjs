@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 /**
  * 配置解析：环境变量 > `e2e/.env.local` > 默认值；
@@ -10,6 +11,61 @@ import url from 'node:url';
 const here = path.dirname(url.fileURLToPath(import.meta.url));
 const e2eDir = path.resolve(here, '..');
 const repoRoot = path.resolve(e2eDir, '..');
+
+/**
+ * 解析本机 WSL 发行版名——用于生成「给使用者复制」的命令串。
+ *
+ * <p>优先级：`BIZBUDDY_WSL_DISTRO` > 自动探测（`wsl --list --verbose` 里带 `*` 的默认发行版）
+ * > 占位符 `&lt;distro&gt;`。</p>
+ *
+ * <p><b>刻意不写死发行版名</b>：本项目的开发环境同时存在 Ubuntu-22.04 与 Ubuntu-24.04，
+ * 写死会让另一台机器上照抄命令的人直接撞 `WSL_E_DISTRO_NOT_FOUND`。</p>
+ *
+ * @returns {string} 发行版名（探测失败时为占位符）
+ */
+let distroCache;
+export const wslDistro = () => {
+  if (distroCache !== undefined) {
+    return distroCache;
+  }
+  const fromEnv = (process.env.BIZBUDDY_WSL_DISTRO ?? '').trim();
+  if (fromEnv) {
+    distroCache = fromEnv;
+    return distroCache;
+  }
+  distroCache = '<distro>';
+  if (process.platform !== 'win32') {
+    return distroCache;
+  }
+  try {
+    const raw = execFileSync('wsl', ['--list', '--verbose'], { timeout: 3000 });
+    // `wsl -l -v` 在 Windows 上输出 UTF-16LE，按 utf8 解会得到夹 \0 的乱码
+    const text = raw.includes(0) ? raw.toString('utf16le') : raw.toString('utf8');
+    for (const line of text.split(/\r?\n/)) {
+      const matched = line.match(/^\s*\*\s*(\S+)/);
+      if (matched) {
+        distroCache = matched[1];
+        break;
+      }
+    }
+  } catch {
+    // 探测失败：保留占位符，由使用者自行替换
+  }
+  return distroCache;
+};
+
+/**
+ * 仓库根在 WSL 内的路径（`D:\a\b` → `/mnt/d/a/b`）——同类命令必须用 WSL 视角的路径。
+ *
+ * @returns {string} WSL 视角的仓库根
+ */
+export const wslRepoPath = () => {
+  if (!/^[A-Za-z]:[\\/]/.test(repoRoot)) {
+    // 已经在 WSL 内运行，路径本就是 WSL 视角
+    return repoRoot;
+  }
+  return `/mnt/${repoRoot[0].toLowerCase()}${repoRoot.slice(2).replace(/\\/g, '/')}`;
+};
 
 /**
  * 解析 .env 风格文件（兼容 `KEY = 'v'` 的写法与引号）。
