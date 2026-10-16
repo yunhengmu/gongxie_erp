@@ -148,7 +148,7 @@
               v-model="form.providerApiKey"
               type="password"
               show-password
-              placeholder="请输入接口密钥"
+              placeholder="留空表示不修改已保存的密钥"
               style="width: 420px"
             />
           </el-form-item>
@@ -245,7 +245,9 @@ const loadConfig = async () => {
   try {
     const res = await getSecurityConfig();
     if (res.data) {
-      form.value = res.data;
+      // 密钥不回显（服务端只回掩码 providerApiKeyMask）：显式置空后以空值提交，
+      // 配合后端「留空＝不修改」的合并，避免把已配置的外部审核引擎密钥覆盖成空
+      form.value = { ...res.data, providerApiKey: undefined };
     }
   } finally {
     loading.value = false;

@@ -72,8 +72,10 @@ export interface SecurityConfig {
   excerptChars: number;
   /** 外部引擎接口地址（engine=external 时使用） */
   providerEndpoint: string;
-  /** 外部引擎接口密钥（engine=external 时使用） */
+  /** 外部引擎接口密钥（engine=external 时使用）。**服务端不回显**，仅用于提交；留空＝不修改已保存的密钥 */
   providerApiKey: string;
+  /** 外部引擎接口密钥掩码（已配置为 `******`，未配置为空串；只读展示用，不参与提交） */
+  providerApiKeyMask?: string;
 }
 
 /** 结构化决策路由配置（docs/21；决策模型连接信息统一由「模型配置」管理，此处只引用模型主键） */

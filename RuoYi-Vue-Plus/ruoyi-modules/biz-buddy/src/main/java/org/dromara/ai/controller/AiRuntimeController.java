@@ -12,6 +12,7 @@ import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.bo.AiSecurityConfigBo;
 import org.dromara.ai.domain.vo.AiJevConfigVo;
 import org.dromara.ai.domain.vo.AiModelConfigVo;
+import org.dromara.ai.domain.vo.AiSecurityConfigVo;
 import org.dromara.ai.service.IAiModelConfigService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.core.exception.ServiceException;
@@ -40,6 +41,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/ai/runtime")
 public class AiRuntimeController extends BaseController {
+
+    /**
+     * 密钥已配置时的掩码（对外只回带掩码，绝不下发明文）
+     */
+    private static final String KEY_MASK = "******";
 
     private final AiRuntimeConfigStore runtimeConfigStore;
 
@@ -107,11 +113,13 @@ public class AiRuntimeController extends BaseController {
 
     /**
      * 查询当前生效的安全合规配置（脱敏 + 内容安全）
+     *
+     * <p>外部审核引擎密钥以掩码回显（{@code providerApiKeyMask}），不下发明文。</p>
      */
     @SaCheckPermission("ai:runtime:security:query")
     @GetMapping("/security")
-    public R<AiSecurityConfigBo> getSecurity() {
-        return R.ok(runtimeConfigStore.security());
+    public R<AiSecurityConfigVo> getSecurity() {
+        return R.ok(toSecurityVo(runtimeConfigStore.security()));
     }
 
     /**
@@ -121,6 +129,7 @@ public class AiRuntimeController extends BaseController {
     @Log(title = "AI安全合规配置", businessType = BusinessType.UPDATE)
     @PutMapping("/security")
     public R<Void> updateSecurity(@Validated @RequestBody AiSecurityConfigBo bo) {
+        // 密钥留空表示不修改，由 store 沿用已存值（前端不回显密钥，始终以空值提交）
         runtimeConfigStore.updateSecurity(bo);
         return R.ok();
     }
@@ -211,6 +220,34 @@ public class AiRuntimeController extends BaseController {
         vo.setStickyRoutingEnabled(bo.isStickyRoutingEnabled());
         vo.setStickyMinConfidence(bo.getStickyMinConfidence());
         vo.setStickyMaxQueryLength(bo.getStickyMaxQueryLength());
+        return vo;
+    }
+
+    /**
+     * 把业务对象映射为视图对象（密钥转掩码，明文的密文仅服务端计算掩码用、由 {@code @JsonIgnore} 拦住）。
+     *
+     * @param bo 安全合规配置
+     * @return 视图对象
+     */
+    private AiSecurityConfigVo toSecurityVo(AiSecurityConfigBo bo) {
+        AiSecurityConfigVo vo = new AiSecurityConfigVo();
+        vo.setEnabled(bo.isEnabled());
+        vo.setEngine(bo.getEngine());
+        vo.setAction(bo.getAction());
+        vo.setInputCheck(bo.isInputCheck());
+        vo.setOutputCheck(bo.isOutputCheck());
+        vo.setChannelOutCheck(bo.isChannelOutCheck());
+        vo.setToolResultMask(bo.isToolResultMask());
+        vo.setKbIngestCheck(bo.isKbIngestCheck());
+        vo.setMcpOutCheck(bo.isMcpOutCheck());
+        vo.setJevOutboundCheck(bo.isJevOutboundCheck());
+        vo.setPromptHardening(bo.isPromptHardening());
+        vo.setMaskPii(bo.isMaskPii());
+        vo.setHoldBackChars(bo.getHoldBackChars());
+        vo.setExcerptChars(bo.getExcerptChars());
+        vo.setProviderEndpoint(bo.getProviderEndpoint());
+        vo.setProviderApiKey(bo.getProviderApiKey());
+        vo.setProviderApiKeyMask(StringUtils.isNotBlank(bo.getProviderApiKey()) ? KEY_MASK : "");
         return vo;
     }
 
