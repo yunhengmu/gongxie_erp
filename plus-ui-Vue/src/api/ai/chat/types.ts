@@ -54,7 +54,7 @@ export interface ChatMessageVO {
   replyId?: string;
   /** 是否流式中（0已完成 1流式中） */
   streaming?: string;
-  /** 状态（0正常 1失败） */
+  /** 状态（0正常 1失败 3已中止） */
   status?: string;
   /** 失败原因 */
   errorMsg?: string;
@@ -174,7 +174,9 @@ export interface ChatStreamEvent {
     | 'answer_reset'
     | 'references'
     | 'done'
-    | 'error';
+    | 'error'
+    /** 本轮被用户停止/服务器中止（收尾事件，等价于结束） */
+    | 'aborted';
   /** 回复标识（text_delta / tool_call_start / done） */
   replyId?: string;
   /** 文本块标识（text_delta） */
@@ -195,7 +197,7 @@ export interface ChatStreamEvent {
   toolCallCount?: number;
   /** 总 Token 数（done，可选） */
   totalTokens?: number;
-  /** 耗时（毫秒，tool_result / done） */
+  /** 耗时（毫秒，tool_result / done / aborted） */
   durationMs?: number;
   /** 错误信息（error） */
   message?: string;
