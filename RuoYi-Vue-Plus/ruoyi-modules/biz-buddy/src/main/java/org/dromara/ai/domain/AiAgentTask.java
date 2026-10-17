@@ -78,6 +78,14 @@ public class AiAgentTask extends BaseEntity {
     private LocalDateTime lastRunTime;
 
     /**
+     * 产出投递配置（JSON：站内推送目标 + 渠道推送目标；为空表示不投递）
+     *
+     * <p>见 {@code TaskOutputDispatcher} 的 {@code TaskOutputConfig}：任务执行成功后由投递器
+     * 落库日报、站内推送、渠道推送。</p>
+     */
+    private String outputConfig;
+
+    /**
      * 状态（0启用 1停用）
      */
     private String status;

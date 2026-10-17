@@ -15,7 +15,7 @@ SET NAMES utf8mb4;
 --      旧智能体表 ai_agent（REQ-AI-33 已物理拆为 ai_entry_agent / ai_expert_agent）。
 --   2. 章节：
 --      一、菜单与按钮权限（sys_menu，ID 段 1761400000000020000~1761400000000020999）
---      二、36 张 ai_* 业务表（建表 + 列注释 + 索引 + 约束）
+--      二、40 张 ai_* 业务表（建表 + 列注释 + 索引 + 约束）
 --      三、内置模型配置种子（ai_model_config）
 --      四、内置业务工具种子（ai_tool）
 --      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家 / BizBuddy项目介绍专家及其工具绑定，
@@ -33,6 +33,11 @@ SET NAMES utf8mb4;
 --      docs/13-BizBuddy数据库设计.md。
 --
 -- 回滚（按依赖倒序执行；菜单与种子先删，再删表）：
+--   delete from ai_agent_skill where agent_id = 1761400000000020306;
+--   delete from ai_agent_tool where agent_id = 1761400000000020306;
+--   delete from ai_agent_task where id = 1761400000000020601;
+--   delete from ai_skill where id = 1761400000000020501;
+--   delete from ai_expert_agent where id = 1761400000000020306;
 --   delete from ai_agent_kb where agent_id = 1761400000000020305;
 --   delete from ai_agent_tool where agent_id in (1761400000000020303, 1761400000000020304, 1761400000000020305);
 --   delete from ai_expert_agent where id in (1761400000000020303, 1761400000000020304, 1761400000000020305);
@@ -50,6 +55,7 @@ SET NAMES utf8mb4;
 --   drop table if exists ai_scenario_pack;
 --   drop table if exists ai_trace;
 --   drop table if exists ai_permission_decision_log;
+--   drop table if exists ai_daily_digest;
 --   drop table if exists ai_usage_stat;
 --   drop table if exists ai_agent_task_run;
 --   drop table if exists ai_agent_task;
@@ -948,6 +954,7 @@ create table if not exists ai_agent_task (
     run_as_user_id  bigint(20)       not null comment '运行身份用户（会话与数据权限按该用户）',
     run_as_dept_id  bigint(20) comment '运行身份部门（随运行身份用户带出）',
     last_run_time   datetime comment '上次计划执行时间（到点判定与抢占去重基准）',
+    output_config   text comment '产出投递配置（JSON：stationUserIds 站内推送目标 + channel 渠道推送目标；为空表示不投递）',
     status          char(1)      default '0' comment '状态（0启用 1停用）',
     remark          varchar(500),
     create_dept     bigint(20),
@@ -1011,6 +1018,39 @@ create table if not exists ai_usage_stat (
     key idx_ai_usage_user (user_id, stat_date DESC),
     unique key uk_ai_usage (stat_date, agent_id, model_id, user_id)
 ) engine=innodb default charset=utf8mb4 comment='AI 用量统计表（按日期 / 智能体 / 模型 / 用户聚合）';
+
+create table if not exists ai_daily_digest (
+    id                        bigint(20)     not null,
+    digest_date               date           not null comment '日报日期（唯一；重跑按日期 upsert）',
+    level                     char(1)        default '0' comment '结论级别（0平稳 1需关注 2需处理）',
+    digest_text               longtext comment '日报正文（人话版；落库保真，便于回看与推送失败补投）',
+    usage_total_tokens        bigint(20)     default 0 comment '当日总 Token',
+    usage_request_count       int            default 0 comment '当日请求（对话轮次）数',
+    usage_tool_call_count     int            default 0 comment '当日工具调用次数',
+    usage_compare_pct         decimal(6, 2) comment 'Token 环比（%；无上日数据时为 NULL）',
+    quota_usage_pct           decimal(6, 2) comment '配额使用率（%；配额为 0 即不限时为 NULL）',
+    task_run_count            int            default 0 comment '定时任务执行次数',
+    task_fail_count           int            default 0 comment '定时任务失败次数',
+    backlog_count             int            default 0 comment '工作流待办积压条数（按运行中任务计）',
+    backlog_top_node          varchar(100) comment '积压最多的节点名',
+    backlog_max_wait_minutes  int comment '最久滞留分钟数',
+    perm_allow_count          int            default 0 comment '权限决策-允许次数',
+    perm_ask_count            int            default 0 comment '权限决策-需确认次数',
+    perm_deny_count           int            default 0 comment '权限决策-拒绝次数',
+    login_success_count       int            default 0 comment '登录成功次数',
+    login_fail_count          int            default 0 comment '登录失败次数',
+    login_anomaly_count       int            default 0 comment '登录异动次数（异地或新 IP）',
+    task_run_id               bigint(20) comment '来源任务执行记录（ai_agent_task_run.id）',
+    session_id                bigint(20) comment '来源会话（ai_session.id）',
+    remark                    varchar(500),
+    create_dept               bigint(20),
+    create_by                 bigint(20),
+    create_time               datetime,
+    update_by                 bigint(20),
+    update_time               datetime,
+    constraint pk_ai_daily_digest primary key (id),
+    unique key uk_ai_daily_digest_date (digest_date)
+) engine=innodb default charset=utf8mb4 comment='AI 平台运行日报表（每天一条；由任务产出投递器写入）';
 
 create table if not exists ai_permission_decision_log (
     id              bigint(20)       not null,
@@ -1547,6 +1587,61 @@ values (1761400000000020264,
         '0')
 on duplicate key update id = id;
 
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020230,
+        'platform_daily_digest',
+        '平台运行日报',
+        '汇总某一天（默认昨天）的平台运行五块数据：AI 用量与配额、定时任务成败、工作流待办积压、权限决策计数、登录与「新 IP」异动。返回 JSON；某块为 null 表示当日该块无数据（不要当成 0）。生成运行日报时只调本工具一次。',
+        '0',
+        '{"type":"object","properties":{"date":{"type":"string","description":"统计日期（YYYY-MM-DD）；不传则取昨天"}}}',
+        'platform_daily_digest',
+        '0',
+        '0',
+        '内置只读工具，实现见 PlatformDailyDigestTool',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on duplicate key update id = id;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020231,
+        'platform_daily_drill',
+        '运行日报下钻',
+        '下钻某一天（默认昨天）运行日报的明细：block=permission 权限决策明细（决策/工具/用户/是否确认/时间）、login 登录明细（用户/IP/地点/状态/信息/时间）、task 定时任务失败明细、usage 各智能体用量明细。用于追问「昨天登录失败都是哪些 IP」这类问题。',
+        '0',
+        '{"type":"object","properties":{"date":{"type":"string","description":"统计日期（YYYY-MM-DD）；不传则取昨天"},"block":{"type":"string","enum":["permission","login","task","usage"],"description":"要下钻的块名"},"limit":{"type":"integer","description":"返回条数上限（默认 20，最多 100）"}},"required":["block"]}',
+        'platform_daily_drill',
+        '0',
+        '0',
+        '内置只读工具，实现见 PlatformDailyDrillTool',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on duplicate key update id = id;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020232,
+        'ai_usage_by_agent',
+        '按智能体用量',
+        '按智能体拆解某一天（默认昨天）的 AI 用量：Token / 请求数 / 工具调用次数，按 Token 降序。用于回答「昨天谁用得最多」「哪个智能体最费 Token」等问题。',
+        '0',
+        '{"type":"object","properties":{"date":{"type":"string","description":"统计日期（YYYY-MM-DD）；不传则取昨天"},"limit":{"type":"integer","description":"返回条数上限（默认 20，最多 100）"}}}',
+        'ai_usage_by_agent',
+        '0',
+        '0',
+        '内置只读工具，实现见 AiUsageByAgentTool',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on duplicate key update id = id;
+
 -- ============================================================
 -- 五、内置智能体种子
 -- ============================================================
@@ -1790,6 +1885,134 @@ on duplicate key update agent_id = agent_id, kb_id = kb_id;
 insert into ai_agent_tool (id, agent_id, tool_code, decision, remark, create_dept, create_by, create_time)
 values (1761400000000020356, 1761400000000020305, 'search_knowledge_base', '0', '只读：知识库检索', 1761000000000000103, 1761100000000000001, now())
 on duplicate key update agent_id = agent_id, tool_code = tool_code;
+-- ------------------------------------------------------------
+-- 平台运行日报演示种子（技能 / 智能体 / 工具与技能绑定 / 定时任务）
+-- ------------------------------------------------------------
+--   演示场景见 docs/23-平台运行日报方案.md：以「技能 + 定时任务」为主线，
+--   数据全部来自平台自有表（用量 / 任务执行 / 待办 / 权限决策 / 登录日志），
+--   只新增一张日报落库表 ai_daily_digest。跑起来的方式：到「定时 Agent 任务」页
+--   手动触发一次，即可看到首份日报（每日 08:00 也会自动跑）。
+-- ------------------------------------------------------------
+insert into ai_skill (id, name, description, skill_content, source, metadata_json, created_at, updated_at, owner_dept_id, visible_scope, status, remark, create_dept, create_by, update_by)
+values (1761400000000020501,
+        'platform_daily_digest',
+        '平台运行日报：汇总某天五块运行数据，按阈值判异动并输出人话日报',
+        '# 平台运行日报
+
+## 何时使用
+定时任务（每日 08:00）触发时，或用户问「昨天平台运行怎么样」「有没有异常」。
+
+## 步骤
+1. 调用 platform_daily_digest 取昨日五块数据（**只调一次**，不传日期即昨天）
+2. 判异动，按阈值定级（**只用当日值，不做跨日比较**）：
+   - 定时任务失败数 > 0 → 需处理
+   - 登录失败 > 20 次 → 异常
+   - 登录有新 IP（异动数 > 0）→ 需关注
+   - 配额使用率 > 80% → 需关注（配额为 null 表示不限，不显示使用率）
+   - 权限决策中「需确认 + 拒绝」合计 ≥ 5 次 → 需关注
+3. 按模板输出人话日报：**没有数据的块写「无数据」**，不要写成 0，也不要推测原因
+4. **正文第一行必须写明结论级别**，格式固定为「结论级别：平稳」/「结论级别：需关注」/「结论级别：需处理」
+
+## 输出模板
+结论级别：平稳|需关注|需处理
+### 平台运行日报（YYYY-MM-DD）
+- 用量：总 Token X（环比 ±Y%）、请求 N 次、工具 M 次；配额使用率 Z%
+- 任务：执行 A 次，成功 B，失败 C（失败任务：…）
+- 待办：积压 D 条（最多节点：…，最久滞留 … 分钟）——注意这是**当前快照**，不是当日历史
+- 权限：允许 E / 需确认 F / 拒绝 G
+- 登录：成功 H，失败 I；新 IP J 个
+- 一句话结论
+
+## 纪律
+- 所有数字**必须引用工具返回的原值**，不得估算、换算或加工
+- **不推测异动原因**：可以写「建议人工排查」，不许编造可能原因
+- 无数据的块**如实写「无数据」**
+- 只输出日报本身；**不要尝试修改平台状态**（本链路是只读的）
+- **不要输出任何前言 / 开场白**（不要写英文说明或客套话）；**正文第一行就是「结论级别：X」**
+- 正文首行的结论级别格式不得改动（系统据此落库）',
+        'bizbuddy',
+        null,
+        now(),
+        now(),
+        null,
+        '0',
+        '0',
+        '内置技能：配合智能体 platform_ops 与定时任务生成每日运行日报',
+        1761000000000000103,
+        1761100000000000001,
+        1761100000000000001)
+on duplicate key update id = id;
+insert into ai_expert_agent (id, agent_name, agent_code, description, sys_prompt, model_id, memory_model_id, summary_model_id, subagent_model_id, daily_token_quota, daily_request_quota, monthly_token_quota, owner_dept_id, visible_scope, max_iters, status, remark, expert_domain, capability_desc, output_contract, expert_write_enabled, auto_route, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020306,
+        '平台运维助手',
+        'platform_ops',
+        '按技能口径生成平台运行日报（供定时任务使用，也可直接对话追问）',
+        '你是平台运维助手。生成运行日报时严格按技能 platform_daily_digest 的口径执行：先调用 platform_daily_digest 取当日五块数据（只调一次），再判异动并按模板输出；正文第一行写明结论级别。所有数字引用工具返回原值，禁止估算或推测原因；数据为 null 的块如实写「无数据」；待办积压是当前快照，不是当日历史。需要明细时调用 platform_daily_drill；你也可以直接回答用户关于用量的追问。',
+        2109794551143350274,
+        null,
+        null,
+        null,
+        0,
+        0,
+        0,
+        1761000000000000103,
+        '0',
+        10,
+        '0',
+        '内置专家（演示）：只读工具集（platform_daily_digest / platform_daily_drill / ai_usage_by_agent），不绑定写工具；定时任务直接指定该专家执行',
+        null,
+        '负责平台运行数据的汇总与日报口径：回答「昨天平台运行怎么样」「谁用得最多」「昨天登录失败都是哪些 IP」；按技能 platform_daily_digest 输出日报。不受理公告/机构等业务域（归各自专家）。',
+        null,
+        '0',
+        '1',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on duplicate key update id = id;
+insert into ai_agent_skill (id, agent_id, skill_id, remark, create_dept, create_by, create_time, update_by, update_time)
+values (1761400000000020502,
+        1761400000000020306,
+        1761400000000020501,
+        '平台运维助手绑定「平台运行日报」技能',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now())
+on duplicate key update id = id;
+insert into ai_agent_tool (id, agent_id, tool_code, remark, create_dept, create_by, create_time, update_by, update_time, decision)
+values (1761400000000020503, 1761400000000020306, 'platform_daily_digest', '五块汇总（只读）', 1761000000000000103, 1761100000000000001, now(), 1761100000000000001, now(), '0')
+on duplicate key update id = id;
+insert into ai_agent_tool (id, agent_id, tool_code, remark, create_dept, create_by, create_time, update_by, update_time, decision)
+values (1761400000000020504, 1761400000000020306, 'platform_daily_drill', '明细下钻（只读）', 1761000000000000103, 1761100000000000001, now(), 1761100000000000001, now(), '0')
+on duplicate key update id = id;
+insert into ai_agent_tool (id, agent_id, tool_code, remark, create_dept, create_by, create_time, update_by, update_time, decision)
+values (1761400000000020505, 1761400000000020306, 'ai_usage_by_agent', '按智能体用量（只读）', 1761000000000000103, 1761100000000000001, now(), 1761100000000000001, now(), '0')
+on duplicate key update id = id;
+insert into ai_agent_task (id, task_name, agent_id, agent_code, task_prompt, cron_expression, run_as_user_id, run_as_dept_id, last_run_time, output_config, status, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020601,
+        '平台运行日报（每日 08:00）',
+        1761400000000020306,
+        'platform_ops',
+        '执行昨日平台运行日报：调用 platform_daily_digest 取五块数据，按技能口径判异动并按模板输出，正文首行写明结论级别；数据为 null 的块如实写「无数据」。',
+        '0 0 8 * * ?',
+        1761100000000000001,
+        1761000000000000103,
+        null,
+        '{"stationUserIds":[1761100000000000001]}',
+        '0',
+        '内置定时任务：每日 08:00 以 admin 身份生成平台运行日报（运行身份决定可见范围）',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on duplicate key update id = id;
+
 -- ============================================================
 -- 六、SnailJob 派发任务登记（sj_job）
 -- ============================================================

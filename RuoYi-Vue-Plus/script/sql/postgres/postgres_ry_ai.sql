@@ -9,7 +9,7 @@
 --      旧智能体表 ai_agent（REQ-AI-33 已物理拆为 ai_entry_agent / ai_expert_agent）。
 --   2. 章节：
 --      一、菜单与按钮权限（sys_menu，ID 段 1761400000000020000~1761400000000020999）
---      二、36 张 ai_* 业务表（建表 + 列注释 + 索引 + 约束）
+--      二、40 张 ai_* 业务表（建表 + 列注释 + 索引 + 约束）
 --      三、内置模型配置种子（ai_model_config）
 --      四、内置业务工具种子（ai_tool）
 --      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家 / BizBuddy项目介绍专家及其工具绑定，
@@ -27,6 +27,11 @@
 --      docs/13-BizBuddy数据库设计.md。
 --
 -- 回滚（按依赖倒序执行；菜单与种子先删，再删表）：
+--   delete from ai_agent_skill where agent_id = 1761400000000020306;
+--   delete from ai_agent_tool where agent_id = 1761400000000020306;
+--   delete from ai_agent_task where id = 1761400000000020601;
+--   delete from ai_skill where id = 1761400000000020501;
+--   delete from ai_expert_agent where id = 1761400000000020306;
 --   delete from ai_agent_kb where agent_id = 1761400000000020305;
 --   delete from ai_agent_tool where agent_id in (1761400000000020303, 1761400000000020304, 1761400000000020305);
 --   delete from ai_expert_agent where id in (1761400000000020303, 1761400000000020304, 1761400000000020305);
@@ -44,6 +49,7 @@
 --   drop table if exists ai_scenario_pack;
 --   drop table if exists ai_trace;
 --   drop table if exists ai_permission_decision_log;
+--   drop table if exists ai_daily_digest;
 --   drop table if exists ai_usage_stat;
 --   drop table if exists ai_agent_task_run;
 --   drop table if exists ai_agent_task;
@@ -1100,6 +1106,7 @@ create table if not exists ai_agent_task (
     run_as_user_id  bigint       not null,
     run_as_dept_id  bigint,
     last_run_time   timestamp,
+    output_config   text,
     status          char(1)      default '0',
     remark          varchar(500),
     create_dept     bigint,
@@ -1119,6 +1126,7 @@ comment on column ai_agent_task.cron_expression is 'Cron 表达式（Spring 6 �
 comment on column ai_agent_task.run_as_user_id is '运行身份用户（会话与数据权限按该用户）';
 comment on column ai_agent_task.run_as_dept_id is '运行身份部门（随运行身份用户带出）';
 comment on column ai_agent_task.last_run_time is '上次计划执行时间（到点判定与抢占去重基准）';
+comment on column ai_agent_task.output_config is '产出投递配置（JSON：stationUserIds 站内推送目标 + channel 渠道推送目标；为空表示不投递）';
 comment on column ai_agent_task.status is '状态（0启用 1停用）';
 create unique index if not exists uk_ai_agent_task_name on ai_agent_task (task_name) WHERE (del_flag = '0'::bpchar);
 
@@ -1192,6 +1200,61 @@ comment on column ai_usage_stat.tool_call_count is '工具调用次数';
 comment on column ai_usage_stat.cost is '费用估算（元；按模型单价计算，未配置单价按 0 计）';
 create index if not exists idx_ai_usage_user on ai_usage_stat (user_id, stat_date DESC);
 create unique index if not exists uk_ai_usage on ai_usage_stat (stat_date, agent_id, model_id, user_id);
+
+create table if not exists ai_daily_digest (
+    id                        bigint        not null,
+    digest_date               date          not null,
+    level                     char(1)       default '0',
+    digest_text               text,
+    usage_total_tokens        bigint        default 0,
+    usage_request_count       integer       default 0,
+    usage_tool_call_count     integer       default 0,
+    usage_compare_pct         numeric(6, 2),
+    quota_usage_pct           numeric(6, 2),
+    task_run_count            integer       default 0,
+    task_fail_count           integer       default 0,
+    backlog_count             integer       default 0,
+    backlog_top_node          varchar(100),
+    backlog_max_wait_minutes  integer,
+    perm_allow_count          integer       default 0,
+    perm_ask_count            integer       default 0,
+    perm_deny_count           integer       default 0,
+    login_success_count       integer       default 0,
+    login_fail_count          integer       default 0,
+    login_anomaly_count       integer       default 0,
+    task_run_id               bigint,
+    session_id                bigint,
+    remark                    varchar(500),
+    create_dept               bigint,
+    create_by                 bigint,
+    create_time               timestamp,
+    update_by                 bigint,
+    update_time               timestamp,
+    constraint pk_ai_daily_digest primary key (id),
+    constraint uk_ai_daily_digest_date unique (digest_date)
+);
+comment on table ai_daily_digest is 'AI 平台运行日报表（每天一条；由任务产出投递器写入）';
+comment on column ai_daily_digest.digest_date is '日报日期（唯一；重跑按日期 upsert）';
+comment on column ai_daily_digest.level is '结论级别（0平稳 1需关注 2需处理）';
+comment on column ai_daily_digest.digest_text is '日报正文（人话版；落库保真，便于回看与推送失败补投）';
+comment on column ai_daily_digest.usage_total_tokens is '当日总 Token';
+comment on column ai_daily_digest.usage_request_count is '当日请求（对话轮次）数';
+comment on column ai_daily_digest.usage_tool_call_count is '当日工具调用次数';
+comment on column ai_daily_digest.usage_compare_pct is 'Token 环比（%；无上日数据时为 NULL）';
+comment on column ai_daily_digest.quota_usage_pct is '配额使用率（%；配额为 0 即不限时为 NULL）';
+comment on column ai_daily_digest.task_run_count is '定时任务执行次数';
+comment on column ai_daily_digest.task_fail_count is '定时任务失败次数';
+comment on column ai_daily_digest.backlog_count is '工作流待办积压条数（按运行中任务计）';
+comment on column ai_daily_digest.backlog_top_node is '积压最多的节点名';
+comment on column ai_daily_digest.backlog_max_wait_minutes is '最久滞留分钟数';
+comment on column ai_daily_digest.perm_allow_count is '权限决策-允许次数';
+comment on column ai_daily_digest.perm_ask_count is '权限决策-需确认次数';
+comment on column ai_daily_digest.perm_deny_count is '权限决策-拒绝次数';
+comment on column ai_daily_digest.login_success_count is '登录成功次数';
+comment on column ai_daily_digest.login_fail_count is '登录失败次数';
+comment on column ai_daily_digest.login_anomaly_count is '登录异动次数（异地或新 IP）';
+comment on column ai_daily_digest.task_run_id is '来源任务执行记录（ai_agent_task_run.id）';
+comment on column ai_daily_digest.session_id is '来源会话（ai_session.id）';
 
 create table if not exists ai_permission_decision_log (
     id              bigint       not null,
@@ -1440,7 +1503,7 @@ values (1761400000000020400, 'deepseek-v4.1-flash', 'dashscope', 'chat', 'deepse
         null, '0',
         '预置示例（对话模型，阿里云百炼）：部署后请把 API 密钥换成本人的，或另行新建模型',
         1761000000000000103, 1761100000000000001, now(), '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
                              base_url, api_key,
@@ -1450,7 +1513,7 @@ values (1761400000000020401, 'qwen3.7-text-embedding-flash', 'dashscope', 'embed
         1024, '0',
         '预置示例（向量模型，阿里云百炼）：维度须与模型实际输出一致；部署后请换密钥或另行新建模型',
         1761000000000000103, 1761100000000000001, now(), '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
                              base_url, api_key,
@@ -1460,7 +1523,7 @@ values (1761400000000020402, 'decision-model-preview', 'dashscope', 'decision', 
         null, '0',
         '预置示例（决策模型，阿里云百炼 TypeSafe System One）：base_url 必须替换为业务空间专属域名（通用 dashscope 域名无 /v1/systemone，实测 404）；同时补齐 API 密钥',
         1761000000000000103, 1761100000000000001, now(), '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 insert into ai_model_config (id, config_name, provider, model_type, model_code, supports_vision,
                              base_url, api_key,
@@ -1470,7 +1533,7 @@ values (1761400000000020403, 'gte-rerank-v2', 'dashscope', 'rerank', 'gte-rerank
         null, '0',
         '预置示例（重排模型，阿里云百炼文本重排原生接口）：base_url 须填完整重排端点；部署后请换密钥或另行新建模型',
         1761000000000000103, 1761100000000000001, now(), '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 -- ============================================================
 -- 四、内置业务工具种子（ai_tool）
@@ -1497,7 +1560,7 @@ values (1761400000000020201,
         1761100000000000001,
         '2026-09-27 12:49:27.968105',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020202,
         'create_notice',
@@ -1515,10 +1578,10 @@ values (1761400000000020202,
         null,
         '2026-09-26 02:57:35.994701',
         '0')
-on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020203, 'get_current_time', '获取当前时间', '获取当前的日期与时间（精确到秒，含星期与时区）。当回答需要「今天」「现在」「距今还有几天」等依赖当前时间的判断或计算时调用；不要凭猜测回答时间。', '0', '{"type":"object","properties":{}}', 'get_current_time', '0', '0', '平台内置无害只读工具：无需逐智能体绑定即装配，未绑定时默认放行（见 AgentRegistry.BUILTIN_READONLY_TOOL_CODES）', 1761000000000000103, 1761100000000000001, '2026-09-27 13:26:38.443946', 1761100000000000001, '2026-09-27 22:39:58.842278', '0') on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020269, 'get_system_info', '获取系统信息', '获取当前运行主机的系统信息：操作系统名称与版本、系统架构、处理器逻辑核数、物理内存与 JVM 堆内存用量、Java 版本、主机名与时区。用于排查运行环境，或回答「这台机器配置如何」类问题。', '0', '{"type":"object","properties":{}}', 'get_system_info', '0', '1', 'MCP 服务端/客户端联动演示工具：只读、经 /mcp 出口对外暴露（mcp_exposed=1）；实现见 GetSystemInfoTool。仅在对话时经会话资源选择器勾选后才装配', 1761000000000000103, 1761100000000000001, '2026-10-11 10:00:00', 1761100000000000001, '2026-10-11 10:00:00', '0') on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020205, 'get_dept', '查看部门详情', '按部门 ID 查询部门的详细信息（名称、上级部门、类别编码、显示顺序、负责人用户 ID、联系电话、邮箱、状态、创建时间）。属于只读操作。部门 ID 可从「搜索部门」结果中获取。', '0', '{"type":"object","properties":{"dept_id":{"type":"string","description":"部门 ID（数字字符串）"}},"required":["dept_id"]}', 'get_dept', '0', '0', '内置只读工具：按 dept_id 查询部门详情；实现见 GetDeptTool，权限口径 system:dept:query', 1761000000000000103, 1761100000000000001, '2026-09-27 22:07:12.397399', null, '2026-09-27 22:07:12.397399', '0') on conflict (id) do nothing;
+on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020203, 'get_current_time', '获取当前时间', '获取当前的日期与时间（精确到秒，含星期与时区）。当回答需要「今天」「现在」「距今还有几天」等依赖当前时间的判断或计算时调用；不要凭猜测回答时间。', '0', '{"type":"object","properties":{}}', 'get_current_time', '0', '0', '平台内置无害只读工具：无需逐智能体绑定即装配，未绑定时默认放行（见 AgentRegistry.BUILTIN_READONLY_TOOL_CODES）', 1761000000000000103, 1761100000000000001, '2026-09-27 13:26:38.443946', 1761100000000000001, '2026-09-27 22:39:58.842278', '0') on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020269, 'get_system_info', '获取系统信息', '获取当前运行主机的系统信息：操作系统名称与版本、系统架构、处理器逻辑核数、物理内存与 JVM 堆内存用量、Java 版本、主机名与时区。用于排查运行环境，或回答「这台机器配置如何」类问题。', '0', '{"type":"object","properties":{}}', 'get_system_info', '0', '1', 'MCP 服务端/客户端联动演示工具：只读、经 /mcp 出口对外暴露（mcp_exposed=1）；实现见 GetSystemInfoTool。仅在对话时经会话资源选择器勾选后才装配', 1761000000000000103, 1761100000000000001, '2026-10-11 10:00:00', 1761100000000000001, '2026-10-11 10:00:00', '0') on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020205, 'get_dept', '查看部门详情', '按部门 ID 查询部门的详细信息（名称、上级部门、类别编码、显示顺序、负责人用户 ID、联系电话、邮箱、状态、创建时间）。属于只读操作。部门 ID 可从「搜索部门」结果中获取。', '0', '{"type":"object","properties":{"dept_id":{"type":"string","description":"部门 ID（数字字符串）"}},"required":["dept_id"]}', 'get_dept', '0', '0', '内置只读工具：按 dept_id 查询部门详情；实现见 GetDeptTool，权限口径 system:dept:query', 1761000000000000103, 1761100000000000001, '2026-09-27 22:07:12.397399', null, '2026-09-27 22:07:12.397399', '0') on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020206,
         'search_dept',
@@ -1536,7 +1599,7 @@ values (1761400000000020206,
         null,
         '2026-09-27 22:07:12.400462',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020207,
         'create_dept',
@@ -1554,7 +1617,7 @@ values (1761400000000020207,
         null,
         '2026-09-27 22:07:12.4039',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020208,
         'update_dept',
@@ -1572,9 +1635,9 @@ values (1761400000000020208,
         null,
         '2026-09-27 22:07:12.406912',
         '0')
-on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020209, 'delete_dept', '删除部门', '按部门 ID 删除一个部门。只能删除空部门：默认部门、存在下级部门、存在用户或存在岗位的部门会被拒绝（这类部门应改为停用）。属于写入类操作，执行前需要用户确认，删除后不可恢复，请先与用户确认部门 ID 无误。', '1', '{"type":"object","properties":{"dept_id":{"type":"string","description":"要删除的部门 ID（数字字符串）"}},"required":["dept_id"]}', 'delete_dept', '0', '0', '内置写工具：需在智能体定义页配置为「需确认」或「允许」；无人值守通道（定时任务 / 渠道接入）一律拒绝；实现见 DeleteDeptTool', 1761000000000000103, 1761100000000000001, '2026-09-27 22:07:12.410087', null, '2026-09-27 22:07:12.410087', '0') on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020210, 'get_current_user', '获取当前用户信息', '获取当前提问用户本人的账号信息（用户 ID、账号、昵称、所属部门 ID、用户类型、手机号、邮箱、性别、账号状态、创建时间）以及是否为超级管理员。当问题涉及「我是谁」「我的账号 / 联系方式 / 所属部门」时调用，不要凭猜测回答。只读操作，无入参，只返回提问用户本人的信息。', '0', '{"type":"object","properties":{}}', 'get_current_user', '0', '0', '平台内置无害只读工具：无需逐智能体绑定即装配，未绑定时默认放行（见 AgentRegistry.BUILTIN_READONLY_TOOL_CODES）；实现见 GetCurrentUserTool', 1761000000000000103, 1761100000000000001, '2026-09-27 22:30:56.162228', null, '2026-09-27 22:30:56.162228', '0') on conflict (id) do nothing;
+on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020209, 'delete_dept', '删除部门', '按部门 ID 删除一个部门。只能删除空部门：默认部门、存在下级部门、存在用户或存在岗位的部门会被拒绝（这类部门应改为停用）。属于写入类操作，执行前需要用户确认，删除后不可恢复，请先与用户确认部门 ID 无误。', '1', '{"type":"object","properties":{"dept_id":{"type":"string","description":"要删除的部门 ID（数字字符串）"}},"required":["dept_id"]}', 'delete_dept', '0', '0', '内置写工具：需在智能体定义页配置为「需确认」或「允许」；无人值守通道（定时任务 / 渠道接入）一律拒绝；实现见 DeleteDeptTool', 1761000000000000103, 1761100000000000001, '2026-09-27 22:07:12.410087', null, '2026-09-27 22:07:12.410087', '0') on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020210, 'get_current_user', '获取当前用户信息', '获取当前提问用户本人的账号信息（用户 ID、账号、昵称、所属部门 ID、用户类型、手机号、邮箱、性别、账号状态、创建时间）以及是否为超级管理员。当问题涉及「我是谁」「我的账号 / 联系方式 / 所属部门」时调用，不要凭猜测回答。只读操作，无入参，只返回提问用户本人的信息。', '0', '{"type":"object","properties":{}}', 'get_current_user', '0', '0', '平台内置无害只读工具：无需逐智能体绑定即装配，未绑定时默认放行（见 AgentRegistry.BUILTIN_READONLY_TOOL_CODES）；实现见 GetCurrentUserTool', 1761000000000000103, 1761100000000000001, '2026-09-27 22:30:56.162228', null, '2026-09-27 22:30:56.162228', '0') on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020211,
         'get_current_dept',
@@ -1592,9 +1655,9 @@ values (1761400000000020211,
         null,
         '2026-09-27 22:30:56.165227',
         '0')
-on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020212, 'get_current_permissions', '获取当前用户权限信息', '获取当前提问用户本人被授予的角色与功能权限（角色标识、菜单权限标识，以及是否为超级管理员）。当需要判断「该用户是否有权做某件事」或用户直接询问自己的权限时调用，不要凭猜测回答。只读操作，无入参，只返回提问用户本人的权限，不能查询他人权限。', '0', '{"type":"object","properties":{}}', 'get_current_permissions', '0', '0', '平台内置无害只读工具：无需逐智能体绑定即装配，未绑定时默认放行（见 AgentRegistry.BUILTIN_READONLY_TOOL_CODES）；实现见 GetCurrentPermissionsTool', 1761000000000000103, 1761100000000000001, '2026-09-27 22:30:56.167329', null, '2026-09-27 22:30:56.167329', '0') on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020213, 'get_user', '查看用户详情', '按用户 ID 查询用户的详细信息（账号、昵称、所属部门、手机号、邮箱、性别、账号状态、角色、最后登录时间、创建时间）。属于只读操作，不含密码。用户 ID 可从「搜索用户」结果中获取。', '0', '{"type":"object","properties":{"user_id":{"type":"string","description":"用户 ID（数字字符串）"}},"required":["user_id"]}', 'get_user', '0', '0', '内置只读工具：按 user_id 查询用户详情（含部门名与角色名）；实现见 GetUserTool，权限口径 system:user:query', 1761000000000000103, 1761100000000000001, '2026-09-28 12:33:00.280849', null, '2026-09-28 12:33:00.280849', '0') on conflict (id) do nothing;
+on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020212, 'get_current_permissions', '获取当前用户权限信息', '获取当前提问用户本人被授予的角色与功能权限（角色标识、菜单权限标识，以及是否为超级管理员）。当需要判断「该用户是否有权做某件事」或用户直接询问自己的权限时调用，不要凭猜测回答。只读操作，无入参，只返回提问用户本人的权限，不能查询他人权限。', '0', '{"type":"object","properties":{}}', 'get_current_permissions', '0', '0', '平台内置无害只读工具：无需逐智能体绑定即装配，未绑定时默认放行（见 AgentRegistry.BUILTIN_READONLY_TOOL_CODES）；实现见 GetCurrentPermissionsTool', 1761000000000000103, 1761100000000000001, '2026-09-27 22:30:56.167329', null, '2026-09-27 22:30:56.167329', '0') on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020213, 'get_user', '查看用户详情', '按用户 ID 查询用户的详细信息（账号、昵称、所属部门、手机号、邮箱、性别、账号状态、角色、最后登录时间、创建时间）。属于只读操作，不含密码。用户 ID 可从「搜索用户」结果中获取。', '0', '{"type":"object","properties":{"user_id":{"type":"string","description":"用户 ID（数字字符串）"}},"required":["user_id"]}', 'get_user', '0', '0', '内置只读工具：按 user_id 查询用户详情（含部门名与角色名）；实现见 GetUserTool，权限口径 system:user:query', 1761000000000000103, 1761100000000000001, '2026-09-28 12:33:00.280849', null, '2026-09-28 12:33:00.280849', '0') on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020214,
         'search_user',
@@ -1612,7 +1675,7 @@ values (1761400000000020214,
         null,
         '2026-09-28 12:33:00.286224',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020215,
         'create_user',
@@ -1630,7 +1693,7 @@ values (1761400000000020215,
         null,
         '2026-09-28 12:33:00.289023',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020216,
         'update_user',
@@ -1648,8 +1711,8 @@ values (1761400000000020216,
         null,
         '2026-09-28 12:33:00.291629',
         '0')
-on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020217, 'delete_user', '删除用户', '按用户 ID 删除一个用户（同时解除其角色与岗位绑定）。超级管理员与当前操作人本人会被拒绝；属于写入类操作，执行前需要用户确认，删除后该账号无法登录，请先与用户确认用户 ID 无误。如只是暂时停用，请改用「修改用户」把状态改为停用。', '1', '{"type":"object","properties":{"user_id":{"type":"string","description":"要删除的用户 ID（数字字符串）"}},"required":["user_id"]}', 'delete_user', '0', '0', '写入类工具（需人工确认）：逻辑删除并清理角色 / 岗位关联，拒绝删除超管与本人；实现见 DeleteUserTool，权限口径 system:user:remove', 1761000000000000103, 1761100000000000001, '2026-09-28 12:33:00.294601', null, '2026-09-28 12:33:00.294601', '0') on conflict (id) do nothing;
+on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020217, 'delete_user', '删除用户', '按用户 ID 删除一个用户（同时解除其角色与岗位绑定）。超级管理员与当前操作人本人会被拒绝；属于写入类操作，执行前需要用户确认，删除后该账号无法登录，请先与用户确认用户 ID 无误。如只是暂时停用，请改用「修改用户」把状态改为停用。', '1', '{"type":"object","properties":{"user_id":{"type":"string","description":"要删除的用户 ID（数字字符串）"}},"required":["user_id"]}', 'delete_user', '0', '0', '写入类工具（需人工确认）：逻辑删除并清理角色 / 岗位关联，拒绝删除超管与本人；实现见 DeleteUserTool，权限口径 system:user:remove', 1761000000000000103, 1761100000000000001, '2026-09-28 12:33:00.294601', null, '2026-09-28 12:33:00.294601', '0') on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020218,
         'search_notice',
@@ -1667,8 +1730,8 @@ values (1761400000000020218,
         1761100000000000001,
         '2026-09-29 20:10:18.259385',
         '0')
-on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020219, 'get_notice', '查看公告详情', '按公告 ID 查看通知公告的完整内容（标题、类型、状态、正文、备注、创建人、创建与更新时间）。属于只读操作。公告 ID 可从「搜索公告」结果中获取。', '0', '{"type":"object","properties":{"notice_id":{"type":"string","description":"公告 ID（数字字符串）"}},"required":["notice_id"]}', 'get_notice', '0', '1', '内置只读工具：按 notice_id 查看公告详情（含正文与创建人昵称）；实现见 GetNoticeTool，权限口径 system:notice:query', 1761000000000000103, 1761100000000000001, '2026-09-29 11:18:02.834517', 1761100000000000001, '2026-09-29 20:10:18.257721', '0') on conflict (id) do nothing;
+on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020219, 'get_notice', '查看公告详情', '按公告 ID 查看通知公告的完整内容（标题、类型、状态、正文、备注、创建人、创建与更新时间）。属于只读操作。公告 ID 可从「搜索公告」结果中获取。', '0', '{"type":"object","properties":{"notice_id":{"type":"string","description":"公告 ID（数字字符串）"}},"required":["notice_id"]}', 'get_notice', '0', '1', '内置只读工具：按 notice_id 查看公告详情（含正文与创建人昵称）；实现见 GetNoticeTool，权限口径 system:notice:query', 1761000000000000103, 1761100000000000001, '2026-09-29 11:18:02.834517', 1761100000000000001, '2026-09-29 20:10:18.257721', '0') on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020220,
         'update_notice',
@@ -1686,8 +1749,8 @@ values (1761400000000020220,
         null,
         '2026-09-29 11:18:02.836769',
         '0')
-on conflict (id) do nothing;
-insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020221, 'delete_notice', '删除公告', '按公告 ID 删除一条通知公告，删除后不可恢复。属于写入类操作，执行前需要用户确认。公告 ID 必须先通过「搜索公告」取得。如果只是想让公告不再展示，请改用「修改公告」把状态改为关闭。', '1', '{"type":"object","properties":{"notice_id":{"type":"string","description":"要删除的公告 ID（数字字符串）"}},"required":["notice_id"]}', 'delete_notice', '0', '0', '写入工具：按 notice_id 物理删除公告（与页面一致，不可恢复）；实现见 DeleteNoticeTool，权限口径 system:notice:remove，需配「需确认」', 1761000000000000103, 1761100000000000001, '2026-09-29 11:18:02.839277', null, '2026-09-29 11:18:02.839277', '0') on conflict (id) do nothing;
+on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag) values (1761400000000020221, 'delete_notice', '删除公告', '按公告 ID 删除一条通知公告，删除后不可恢复。属于写入类操作，执行前需要用户确认。公告 ID 必须先通过「搜索公告」取得。如果只是想让公告不再展示，请改用「修改公告」把状态改为关闭。', '1', '{"type":"object","properties":{"notice_id":{"type":"string","description":"要删除的公告 ID（数字字符串）"}},"required":["notice_id"]}', 'delete_notice', '0', '0', '写入工具：按 notice_id 物理删除公告（与页面一致，不可恢复）；实现见 DeleteNoticeTool，权限口径 system:notice:remove，需配「需确认」', 1761000000000000103, 1761100000000000001, '2026-09-29 11:18:02.839277', null, '2026-09-29 11:18:02.839277', '0') on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020260,
         'search_roles',
@@ -1705,7 +1768,7 @@ values (1761400000000020260,
         null,
         '2026-10-04 00:00:00.000000',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020261,
         'get_role',
@@ -1723,7 +1786,7 @@ values (1761400000000020261,
         null,
         '2026-10-04 00:00:00.000000',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020262,
         'search_menus',
@@ -1741,7 +1804,7 @@ values (1761400000000020262,
         null,
         '2026-10-04 00:00:00.000000',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020263,
         'get_menu',
@@ -1759,7 +1822,7 @@ values (1761400000000020263,
         null,
         '2026-10-04 00:00:00.000000',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020264,
         'get_role_permissions',
@@ -1777,7 +1840,62 @@ values (1761400000000020264,
         null,
         '2026-10-04 00:00:00.000000',
         '0')
-on conflict (id) do nothing;
+on conflict do nothing;
+
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020230,
+        'platform_daily_digest',
+        '平台运行日报',
+        '汇总某一天（默认昨天）的平台运行五块数据：AI 用量与配额、定时任务成败、工作流待办积压、权限决策计数、登录与「新 IP」异动。返回 JSON；某块为 null 表示当日该块无数据（不要当成 0）。生成运行日报时只调本工具一次。',
+        '0',
+        '{"type":"object","properties":{"date":{"type":"string","description":"统计日期（YYYY-MM-DD）；不传则取昨天"}}}',
+        'platform_daily_digest',
+        '0',
+        '0',
+        '内置只读工具，实现见 PlatformDailyDigestTool',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020231,
+        'platform_daily_drill',
+        '运行日报下钻',
+        '下钻某一天（默认昨天）运行日报的明细：block=permission 权限决策明细（决策/工具/用户/是否确认/时间）、login 登录明细（用户/IP/地点/状态/信息/时间）、task 定时任务失败明细、usage 各智能体用量明细。用于追问「昨天登录失败都是哪些 IP」这类问题。',
+        '0',
+        '{"type":"object","properties":{"date":{"type":"string","description":"统计日期（YYYY-MM-DD）；不传则取昨天"},"block":{"type":"string","enum":["permission","login","task","usage"],"description":"要下钻的块名"},"limit":{"type":"integer","description":"返回条数上限（默认 20，最多 100）"}},"required":["block"]}',
+        'platform_daily_drill',
+        '0',
+        '0',
+        '内置只读工具，实现见 PlatformDailyDrillTool',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on conflict do nothing;
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020232,
+        'ai_usage_by_agent',
+        '按智能体用量',
+        '按智能体拆解某一天（默认昨天）的 AI 用量：Token / 请求数 / 工具调用次数，按 Token 降序。用于回答「昨天谁用得最多」「哪个智能体最费 Token」等问题。',
+        '0',
+        '{"type":"object","properties":{"date":{"type":"string","description":"统计日期（YYYY-MM-DD）；不传则取昨天"},"limit":{"type":"integer","description":"返回条数上限（默认 20，最多 100）"}}}',
+        'ai_usage_by_agent',
+        '0',
+        '0',
+        '内置只读工具，实现见 AiUsageByAgentTool',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on conflict do nothing;
 
 -- ============================================================
 -- 五、内置智能体种子
@@ -1817,7 +1935,7 @@ values (1761400000000020302, '小Z（入口智能体）', 'entry_agent',
         1761400000000020400, 1761000000000000103, '0', 10, '0',
         '平台预置入口智能体：不绑业务工具、知识库与技能；路由决策由内置工具 route_decision 承担，专家直答',
         '1', 1761000000000000103, 1761100000000000001, now(), null, now(), '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 -- 内置专家「机构管理专家」（绑定部门、用户、角色与权限共 15 个工具：只读放行、写入需确认）
 insert into ai_expert_agent (id, agent_name, agent_code, description, sys_prompt, model_id,
@@ -1861,7 +1979,7 @@ values (1761400000000020304, '机构管理专家', 'org_admin_expert',
         '平台预置专家：绑定部门、用户、角色与权限共 15 个工具（只读放行、写入需确认）',
         '用户问「公司有几个部门」「部门列表」「某部门有哪些人」「加个部门」「禁用账号」「有哪些角色」；负责部门与用户增删改、部门/用户/角色/权限查询。不受理公告类（归公告管理专家）', '1', '1',
         1761000000000000103, 1761100000000000001, now(), null, now(), '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 insert into ai_agent_tool (id, agent_id, tool_code, decision, remark, create_dept, create_by, create_time)
 values (1761400000000020341, 1761400000000020304, 'search_dept', '0', '只读：搜索部门', 1761000000000000103, 1761100000000000001, now()),
@@ -1923,7 +2041,7 @@ values (1761400000000020303, '公告管理专家', 'notice_admin_expert',
         '平台预置专家：绑定公告共 5 个工具（只读放行、写入需确认）',
         '用户问「有哪些公告」「发个放假通知」「改一下那条公告」「删掉某条公告」；负责公告与通知的查询、发布、修改、删除。不受理部门/人员/角色类（归机构管理专家）', '1', '1',
         1761000000000000103, 1761100000000000001, now(), null, now(), '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 insert into ai_agent_tool (id, agent_id, tool_code, decision, remark, create_dept, create_by, create_time)
 values (1761400000000020336, 1761400000000020303, 'search_notice', '0', '只读：搜索公告', 1761000000000000103, 1761100000000000001, now()),
@@ -1956,7 +2074,7 @@ values (1761400000000021001, 'BizBuddy介绍演示库', 'bizbuddy_demo_kb',
         '0', '平台预置演示知识库（向量模型同预置 qwen3.7-text-embedding-flash，公开可用）',
         1761000000000000103, 1761100000000000001, now(), null, now(),
         '0', null, '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 -- 演示文档的 OSS 记录：file_name 即对象键（demo/bizbuddy_intro.txt），与 minio-init 写入 MinIO 的路径一致；
 -- url 留空避免写死 http://localhost:9000 这类主机相关地址（读取按 endpoint 动态生成）。
@@ -1988,7 +2106,7 @@ BizBuddy平台全量开源，托管在Gitee上，访问地址为 https://gitee.c
 
 BizBuddy平台发起人及作者是资深软件架构师张磊，持有PMP、系统架构设计师证书，华为开发者专家(HDE)、华为云开发者专家(HCDE)、官方认证首批鸿蒙极客，仓颉语言社区卓越贡献者，著有《HarmonyOS网络编程》、《仓颉语言网络编程》、《仓颉语言元编程》、《仓颉语言实战》、《鲲鹏架构入门与实战》、《鲲鹏开发套件应用快速入门》等图书，清华大学出版社出版，B站地址：https://space.bilibili.com/482393709。',
         '0', '')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 insert into ai_expert_agent (id, agent_name, agent_code, description, sys_prompt, model_id,
                              owner_dept_id, visible_scope, max_iters, status, remark,
@@ -2013,7 +2131,7 @@ values (1761400000000020305, 'BizBuddy项目介绍专家', 'bizbuddy_intro_exper
         '平台预置专家：绑定演示知识库「BizBuddy介绍演示库」与知识库检索工具（只读，不允许写入）',
         '基于绑定的知识库检索回答 BizBuddy 平台的定位、核心能力、集成方式与部署形态等信息', '0', '1',
         1761000000000000103, 1761100000000000001, now(), null, now(), '0')
-on conflict (id) do nothing;
+on conflict do nothing;
 
 insert into ai_agent_kb (id, agent_id, kb_id, remark, create_dept, create_by, create_time)
 values (1761400000000020357, 1761400000000020305, 1761400000000021001, '绑定演示知识库「BizBuddy介绍演示库」', 1761000000000000103, 1761100000000000001, now())
@@ -2022,6 +2140,134 @@ on conflict (agent_id, kb_id) do nothing;
 insert into ai_agent_tool (id, agent_id, tool_code, decision, remark, create_dept, create_by, create_time)
 values (1761400000000020356, 1761400000000020305, 'search_knowledge_base', '0', '只读：知识库检索', 1761000000000000103, 1761100000000000001, now())
 on conflict (agent_id, tool_code) do nothing;
+-- ------------------------------------------------------------
+-- 平台运行日报演示种子（技能 / 智能体 / 工具与技能绑定 / 定时任务）
+-- ------------------------------------------------------------
+--   演示场景见 docs/23-平台运行日报方案.md：以「技能 + 定时任务」为主线，
+--   数据全部来自平台自有表（用量 / 任务执行 / 待办 / 权限决策 / 登录日志），
+--   只新增一张日报落库表 ai_daily_digest。跑起来的方式：到「定时 Agent 任务」页
+--   手动触发一次，即可看到首份日报（每日 08:00 也会自动跑）。
+-- ------------------------------------------------------------
+insert into ai_skill (id, name, description, skill_content, source, metadata_json, created_at, updated_at, owner_dept_id, visible_scope, status, remark, create_dept, create_by, update_by)
+values (1761400000000020501,
+        'platform_daily_digest',
+        '平台运行日报：汇总某天五块运行数据，按阈值判异动并输出人话日报',
+        '# 平台运行日报
+
+## 何时使用
+定时任务（每日 08:00）触发时，或用户问「昨天平台运行怎么样」「有没有异常」。
+
+## 步骤
+1. 调用 platform_daily_digest 取昨日五块数据（**只调一次**，不传日期即昨天）
+2. 判异动，按阈值定级（**只用当日值，不做跨日比较**）：
+   - 定时任务失败数 > 0 → 需处理
+   - 登录失败 > 20 次 → 异常
+   - 登录有新 IP（异动数 > 0）→ 需关注
+   - 配额使用率 > 80% → 需关注（配额为 null 表示不限，不显示使用率）
+   - 权限决策中「需确认 + 拒绝」合计 ≥ 5 次 → 需关注
+3. 按模板输出人话日报：**没有数据的块写「无数据」**，不要写成 0，也不要推测原因
+4. **正文第一行必须写明结论级别**，格式固定为「结论级别：平稳」/「结论级别：需关注」/「结论级别：需处理」
+
+## 输出模板
+结论级别：平稳|需关注|需处理
+### 平台运行日报（YYYY-MM-DD）
+- 用量：总 Token X（环比 ±Y%）、请求 N 次、工具 M 次；配额使用率 Z%
+- 任务：执行 A 次，成功 B，失败 C（失败任务：…）
+- 待办：积压 D 条（最多节点：…，最久滞留 … 分钟）——注意这是**当前快照**，不是当日历史
+- 权限：允许 E / 需确认 F / 拒绝 G
+- 登录：成功 H，失败 I；新 IP J 个
+- 一句话结论
+
+## 纪律
+- 所有数字**必须引用工具返回的原值**，不得估算、换算或加工
+- **不推测异动原因**：可以写「建议人工排查」，不许编造可能原因
+- 无数据的块**如实写「无数据」**
+- 只输出日报本身；**不要尝试修改平台状态**（本链路是只读的）
+- **不要输出任何前言 / 开场白**（不要写英文说明或客套话）；**正文第一行就是「结论级别：X」**
+- 正文首行的结论级别格式不得改动（系统据此落库）',
+        'bizbuddy',
+        null,
+        now(),
+        now(),
+        null,
+        '0',
+        '0',
+        '内置技能：配合智能体 platform_ops 与定时任务生成每日运行日报',
+        1761000000000000103,
+        1761100000000000001,
+        1761100000000000001)
+on conflict do nothing;
+insert into ai_expert_agent (id, agent_name, agent_code, description, sys_prompt, model_id, memory_model_id, summary_model_id, subagent_model_id, daily_token_quota, daily_request_quota, monthly_token_quota, owner_dept_id, visible_scope, max_iters, status, remark, expert_domain, capability_desc, output_contract, expert_write_enabled, auto_route, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020306,
+        '平台运维助手',
+        'platform_ops',
+        '按技能口径生成平台运行日报（供定时任务使用，也可直接对话追问）',
+        '你是平台运维助手。生成运行日报时严格按技能 platform_daily_digest 的口径执行：先调用 platform_daily_digest 取当日五块数据（只调一次），再判异动并按模板输出；正文第一行写明结论级别。所有数字引用工具返回原值，禁止估算或推测原因；数据为 null 的块如实写「无数据」；待办积压是当前快照，不是当日历史。需要明细时调用 platform_daily_drill；你也可以直接回答用户关于用量的追问。',
+        2109794551143350274,
+        null,
+        null,
+        null,
+        0,
+        0,
+        0,
+        1761000000000000103,
+        '0',
+        10,
+        '0',
+        '内置专家（演示）：只读工具集（platform_daily_digest / platform_daily_drill / ai_usage_by_agent），不绑定写工具；定时任务直接指定该专家执行',
+        null,
+        '负责平台运行数据的汇总与日报口径：回答「昨天平台运行怎么样」「谁用得最多」「昨天登录失败都是哪些 IP」；按技能 platform_daily_digest 输出日报。不受理公告/机构等业务域（归各自专家）。',
+        null,
+        '0',
+        '1',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on conflict do nothing;
+insert into ai_agent_skill (id, agent_id, skill_id, remark, create_dept, create_by, create_time, update_by, update_time)
+values (1761400000000020502,
+        1761400000000020306,
+        1761400000000020501,
+        '平台运维助手绑定「平台运行日报」技能',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now())
+on conflict do nothing;
+insert into ai_agent_tool (id, agent_id, tool_code, remark, create_dept, create_by, create_time, update_by, update_time, decision)
+values (1761400000000020503, 1761400000000020306, 'platform_daily_digest', '五块汇总（只读）', 1761000000000000103, 1761100000000000001, now(), 1761100000000000001, now(), '0')
+on conflict do nothing;
+insert into ai_agent_tool (id, agent_id, tool_code, remark, create_dept, create_by, create_time, update_by, update_time, decision)
+values (1761400000000020504, 1761400000000020306, 'platform_daily_drill', '明细下钻（只读）', 1761000000000000103, 1761100000000000001, now(), 1761100000000000001, now(), '0')
+on conflict do nothing;
+insert into ai_agent_tool (id, agent_id, tool_code, remark, create_dept, create_by, create_time, update_by, update_time, decision)
+values (1761400000000020505, 1761400000000020306, 'ai_usage_by_agent', '按智能体用量（只读）', 1761000000000000103, 1761100000000000001, now(), 1761100000000000001, now(), '0')
+on conflict do nothing;
+insert into ai_agent_task (id, task_name, agent_id, agent_code, task_prompt, cron_expression, run_as_user_id, run_as_dept_id, last_run_time, output_config, status, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020601,
+        '平台运行日报（每日 08:00）',
+        1761400000000020306,
+        'platform_ops',
+        '执行昨日平台运行日报：调用 platform_daily_digest 取五块数据，按技能口径判异动并按模板输出，正文首行写明结论级别；数据为 null 的块如实写「无数据」。',
+        '0 0 8 * * ?',
+        1761100000000000001,
+        1761000000000000103,
+        null,
+        '{"stationUserIds":[1761100000000000001]}',
+        '0',
+        '内置定时任务：每日 08:00 以 admin 身份生成平台运行日报（运行身份决定可见范围）',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on conflict do nothing;
+
 -- ============================================================
 -- 六、SnailJob 派发任务登记（sj_job）
 -- ============================================================

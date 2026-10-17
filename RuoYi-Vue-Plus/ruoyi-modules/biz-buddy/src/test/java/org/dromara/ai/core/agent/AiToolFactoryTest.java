@@ -5,6 +5,7 @@ import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.domain.AiTool;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiVectorService;
+import org.dromara.ai.service.IPlatformDigestService;
 import org.dromara.common.core.service.PermissionService;
 import org.dromara.ai.test.AiTestSupport;
 import org.dromara.system.api.DeptService;
@@ -32,7 +33,8 @@ class AiToolFactoryTest {
     private final AiToolFactory factory = new AiToolFactory(
         mock(IAiVectorService.class), mock(IAiKnowledgeBaseService.class), mock(NoticeService.class),
         mock(PermissionService.class), new AiProperties(), mock(DeptService.class), mock(UserService.class),
-        mock(RoleService.class), mock(MenuService.class), new org.dromara.ai.core.AiRetrievalSourceRegistry());
+        mock(RoleService.class), mock(MenuService.class), new org.dromara.ai.core.AiRetrievalSourceRegistry(),
+        mock(IPlatformDigestService.class));
 
     @BeforeAll
     static void init() {
@@ -68,7 +70,9 @@ class AiToolFactoryTest {
             AiToolFactory.IMPL_GET_CURRENT_PERMISSIONS, AiToolFactory.IMPL_GET_USER, AiToolFactory.IMPL_SEARCH_USER,
             AiToolFactory.IMPL_CREATE_USER, AiToolFactory.IMPL_UPDATE_USER, AiToolFactory.IMPL_DELETE_USER,
             AiToolFactory.IMPL_SEARCH_ROLES, AiToolFactory.IMPL_GET_ROLE, AiToolFactory.IMPL_SEARCH_MENUS,
-            AiToolFactory.IMPL_GET_MENU, AiToolFactory.IMPL_GET_ROLE_PERMISSIONS
+            AiToolFactory.IMPL_GET_MENU, AiToolFactory.IMPL_GET_ROLE_PERMISSIONS,
+            AiToolFactory.IMPL_PLATFORM_DAILY_DIGEST, AiToolFactory.IMPL_PLATFORM_DAILY_DRILL,
+            AiToolFactory.IMPL_AI_USAGE_BY_AGENT
         };
         for (String impl : impls) {
             Optional<AgentTool> created = factory.create(tool(impl), List.of(1L));

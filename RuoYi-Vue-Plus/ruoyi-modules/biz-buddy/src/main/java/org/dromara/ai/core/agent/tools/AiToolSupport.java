@@ -7,6 +7,8 @@ import org.dromara.common.core.service.PermissionService;
 import org.dromara.common.core.utils.StringUtils;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -74,6 +76,41 @@ final class AiToolSupport {
             return false;
         }
         return perms.contains(PERM_ALL) || perms.contains(perm);
+    }
+
+    /**
+     * 解析日期入参（{@code YYYY-MM-DD}）。
+     *
+     * @param raw 原始值
+     * @return 日期；空值或非法时返回 null（调用方据此区分「未提供」与「格式错误」）
+     */
+    static LocalDate parseDate(Object raw) {
+        String value = StringUtils.trim(stringValue(raw));
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    /**
+     * 解析条数入参并收敛区间。
+     *
+     * @param raw          原始值
+     * @param defaultValue 默认值（未提供或非正数时使用）
+     * @param maxValue     上限
+     * @return 收敛后的条数
+     */
+    static int parseLimit(Object raw, int defaultValue, int maxValue) {
+        Long parsed = parseId(raw);
+        int value = parsed == null ? defaultValue : parsed.intValue();
+        if (value <= 0) {
+            value = defaultValue;
+        }
+        return Math.min(value, maxValue);
     }
 
     /**
