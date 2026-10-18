@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiRetrievalContextAssembler;
 import org.dromara.ai.core.AiRetrievalSourceRegistry;
+import org.dromara.ai.core.agent.tools.AiUsageByAgentTool;
 import org.dromara.ai.core.agent.tools.CreateDeptTool;
 import org.dromara.ai.core.agent.tools.CreateNoticeTool;
 import org.dromara.ai.core.agent.tools.CreateUserTool;
@@ -24,6 +25,8 @@ import org.dromara.ai.core.agent.tools.GetRoleTool;
 import org.dromara.ai.core.agent.tools.GetSystemInfoTool;
 import org.dromara.ai.core.agent.tools.GetUserTool;
 import org.dromara.ai.core.agent.tools.KnowledgeSearchTool;
+import org.dromara.ai.core.agent.tools.PlatformDailyDigestTool;
+import org.dromara.ai.core.agent.tools.PlatformDailyDrillTool;
 import org.dromara.ai.core.agent.tools.SearchDeptTool;
 import org.dromara.ai.core.agent.tools.SearchMenusTool;
 import org.dromara.ai.core.agent.tools.SearchNoticeTool;
@@ -32,9 +35,12 @@ import org.dromara.ai.core.agent.tools.SearchUserTool;
 import org.dromara.ai.core.agent.tools.UpdateDeptTool;
 import org.dromara.ai.core.agent.tools.UpdateNoticeTool;
 import org.dromara.ai.core.agent.tools.UpdateUserTool;
+import org.dromara.ai.core.agent.tools.WriteDailyDigestTool;
+import org.dromara.ai.core.digest.DailyDigestPublisher;
 import org.dromara.ai.domain.AiTool;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiVectorService;
+import org.dromara.ai.service.IPlatformDigestService;
 import org.dromara.common.core.service.PermissionService;
 import org.dromara.system.api.DeptService;
 import org.dromara.system.api.MenuService;
@@ -189,6 +195,26 @@ public class AiToolFactory {
      */
     public static final String IMPL_GET_SYSTEM_INFO = "get_system_info";
 
+    /**
+     * 平台运行日报 —— 五块汇总实现标识（只读）
+     */
+    public static final String IMPL_PLATFORM_DAILY_DIGEST = "platform_daily_digest";
+
+    /**
+     * 平台运行日报 —— 明细下钻实现标识（只读）
+     */
+    public static final String IMPL_PLATFORM_DAILY_DRILL = "platform_daily_drill";
+
+    /**
+     * 平台运行日报 —— 按智能体用量实现标识（只读）
+     */
+    public static final String IMPL_AI_USAGE_BY_AGENT = "ai_usage_by_agent";
+
+    /**
+     * 平台运行日报 —— 落库实现标识（写入；数值由服务端现取）
+     */
+    public static final String IMPL_WRITE_DAILY_DIGEST = "write_daily_digest";
+
     private final IAiVectorService vectorService;
 
     private final IAiKnowledgeBaseService knowledgeBaseService;
@@ -211,6 +237,16 @@ public class AiToolFactory {
      * 检索来源注册表：知识库检索工具命中时按 toolCallId 暂存结构化来源（供「参考来源」下发）
      */
     private final AiRetrievalSourceRegistry retrievalSourceRegistry;
+
+    /**
+     * 平台运行日报统计服务（工具与投递器共用的唯一口径）
+     */
+    private final IPlatformDigestService platformDigestService;
+
+    /**
+     * 平台运行日报落库服务（写工具使用；只落库、不做通知）
+     */
+    private final DailyDigestPublisher dailyDigestPublisher;
 
     /**
      * 判断实现标识是否已在代码侧登记。
@@ -244,7 +280,11 @@ public class AiToolFactory {
             || IMPL_SEARCH_MENUS.equals(implName)
             || IMPL_GET_MENU.equals(implName)
             || IMPL_GET_ROLE_PERMISSIONS.equals(implName)
-            || IMPL_GET_SYSTEM_INFO.equals(implName);
+            || IMPL_GET_SYSTEM_INFO.equals(implName)
+            || IMPL_PLATFORM_DAILY_DIGEST.equals(implName)
+            || IMPL_PLATFORM_DAILY_DRILL.equals(implName)
+            || IMPL_AI_USAGE_BY_AGENT.equals(implName)
+            || IMPL_WRITE_DAILY_DIGEST.equals(implName);
     }
 
     /**
@@ -347,6 +387,18 @@ public class AiToolFactory {
         }
         if (IMPL_GET_SYSTEM_INFO.equals(implName)) {
             return Optional.of(new GetSystemInfoTool());
+        }
+        if (IMPL_PLATFORM_DAILY_DIGEST.equals(implName)) {
+            return Optional.of(new PlatformDailyDigestTool(platformDigestService));
+        }
+        if (IMPL_PLATFORM_DAILY_DRILL.equals(implName)) {
+            return Optional.of(new PlatformDailyDrillTool(platformDigestService));
+        }
+        if (IMPL_AI_USAGE_BY_AGENT.equals(implName)) {
+            return Optional.of(new AiUsageByAgentTool(platformDigestService));
+        }
+        if (IMPL_WRITE_DAILY_DIGEST.equals(implName)) {
+            return Optional.of(new WriteDailyDigestTool(dailyDigestPublisher));
         }
         log.warn("工具实现未在代码侧登记，跳过装配：toolCode={}, implName={}", definition.getToolCode(), implName);
         return Optional.empty();
