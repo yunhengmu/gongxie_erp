@@ -112,10 +112,11 @@ flowchart LR
 | `ai_route_run` / `ai_route_expert_call` | 小Z 的路由决策、每次专家调用 |
 | `ai_tool_call_log` | 工具名、入参、出参、状态、耗时、归属智能体 |
 | `ai_permission_decision_log` | 每次权限决策与人工确认 |
+| `ai_daily_digest` | 平台运行日报落库（每天一条：五块快照 + 日报正文 + 溯源 id），由写工具 `write_daily_digest` 按 `digest_date` upsert |
 
 ## 7. 定时与多渠道
 
-- **定时任务**：AI 任务由 SnailJob 调度（`ruoyi-extend/ruoyi-snailjob-server` + `ruoyi-job`），无人值守链路**不允许自动写操作**；
+- **定时任务**：AI 任务由 SnailJob 调度（`ruoyi-extend/ruoyi-snailjob-server` + `ruoyi-job`）——任务只按 cron 调用智能体并记执行记录（`ai_agent_task_run`），**不承载场景化投递**（场景产出由智能体自己用工具完成）。无人值守链路**没有人类可确认**：命中「需确认」档的写工具被改写为**拒绝**（不暂停、不悬挂），只有**显式配为「允许」**的写工具才会执行——典型例子是**平台运行日报**：专家 `platform_ops` 调 `write_daily_digest` 把五块结果 upsert 进 `ai_daily_digest`（落库属于「记录」，不是状态变更）；
 - **渠道入站**：飞书 / 企业微信 / 钉钉 / GitHub Webhook 回调，安全边界由平台验签/解密与渠道口令承担（见 `application.yml` 的 `security.excludes`）。
 
 ## 8. 相关文档

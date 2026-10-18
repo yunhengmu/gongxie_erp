@@ -17,6 +17,7 @@
 |---|---|
 | 加一个业务工具 | [development.md](development.md) |
 | 改智能体装配 / 路由 / 权限 | `biz-buddy` 的 `core/agent`（先读 [architecture.md](architecture.md)） |
+| **做「定时任务 × 技能」的无人值守产出** | 参考「平台运行日报」样板：只读工具 + 写工具（`core/agent/tools`）+ 落库服务（`core/digest`）+ 技能正文 + 1 行任务配置；注意无人值守下写工具须配「允许」 |
 | 改对话交互 / 前端页面 | `plus-ui-Vue`（对话工作台：`src/views/ai/agent/chat`） |
 | 调整模型 / 压缩 / 记忆等运行策略 | [configuration.md](configuration.md) |
 | 部署到服务器 | PostgreSQL 栈 [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md)、MySQL 8.0 栈 [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md)（均含构建前置与已知坑） |
@@ -67,7 +68,8 @@ AI 能力集中在 `ruoyi-modules/biz-buddy`（包 `org.dromara.ai`）：
 | 包 | 职责 |
 |---|---|
 | `core/agent` | 智能体注册与装配、路由编排、权限决策、流式事件桥、工具工厂 |
-| `core/agent/tools` | 内置业务工具实现 |
+| `core/agent/tools` | 内置业务工具实现（含日报只读汇总 / 下钻与写入工具 `write_daily_digest`） |
+| `core/digest` | 平台运行日报落库（五块现取 / 级别解析 / 平稳日压缩 / 按 `digest_date` upsert） |
 | `core/mcp` | 自建 MCP 出口与 MCP 客户端封装 |
 | `core/channel` | 飞书 / 企业微信 / 钉钉 / GitHub 入站 |
 | `controller` / `service` | 各管理接口与业务实现 |

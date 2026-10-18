@@ -90,7 +90,7 @@ comment on column ai_knowledge_base.rerank_model_id is '检索重排模型（ai_
 | `GET http://localhost:8800/snail-job/`（调度控制台） | 200 |
 | 后端数据源 | HikariPool 初始化成功 |
 | 后端 Redis | Redisson 已连接 `redis:6379` |
-| 建库结果 | 97 张表（`ai_*` **39** / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 / `test_*` 3 / `gen_*` 2）；`admin` 等初始账号在位；`sys_menu` BizBuddy 段 123 行（6 分组 / 30 功能页 / 86 按钮）；`ai_tool` 26、入口小Z 1、专家 **3**（机构管理 / 公告管理 / 演示「BizBuddy项目介绍专家」）、`ai_model_config` **4**（`api_key` 留空）；演示种子一套（知识库 `bizbuddy_demo_kb` + 文档 `BizBuddy简介.txt` + `sys_oss` 行）；`sj_job` 已有派发任务 |
+| 建库结果 | 98 张表（`ai_*` **40** / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 / `test_*` 3 / `gen_*` 2）；`admin` 等初始账号在位；`sys_menu` BizBuddy 段 **136** 行（6 分组 / **34** 功能页 / **95** 按钮）；`ai_tool` **30**、入口小Z 1、专家 **4**（机构管理 / 公告管理 / 演示「BizBuddy项目介绍专家」/ **平台运维助手**）、技能 **1**（平台运行日报）、定时任务 **1**、`ai_model_config` **4**（`api_key` 留空）；演示种子一套（知识库 `bizbuddy_demo_kb` + 文档 `BizBuddy简介.txt` + `sys_oss` 行）；`sj_job` 已有派发任务 |
 
 > **可一键自检**：仓库自带端到端测试脚本 [`../../e2e/`](../../e2e)——对**已运行**的栈发真实 HTTP 断言，覆盖 **L1~L13**：「模型连通 → 专家提示词生成 → 知识库解析+向量化+检索 → 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（JEV 桩）→ 停止生成（中断专家编排）」；另含 RAG 检索质量评测（`e2e/eval/`）。用法：
 

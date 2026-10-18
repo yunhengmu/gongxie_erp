@@ -103,7 +103,7 @@ clientid: import.meta.env.VITE_APP_CLIENT_ID
 |---|---|---|
 | `tests/00-auth.setup.mjs` | UI 登录并落 `storageState`（供后续复用） | 否 |
 | `tests/01-login.spec.mjs` | 未登录访问受保护路由 → 跳登录；登录成功进入主框架；**验证码控件不存在**（锁 `docs/00 #4` 口径） | 否 |
-| `tests/02-menu.spec.mjs` | 侧边栏由后端菜单生成（6 分组）；**33 个功能页逐个渲染干净** | 否 |
+| `tests/02-menu.spec.mjs` | 侧边栏由后端菜单生成（6 分组）；**34 个功能页逐个渲染干净** | 否 |
 | `tests/03-chat.spec.mjs` | 新建任务 → 发送 → 助手流式回答结束（覆盖 **SSE + nginx + 编排**） | 是 |
 | `tests/04-pinned.spec.mjs` | **指定专家**：①选中即出指定 chip 且可取消（纯前端）②建会话请求带 `pinnedExpertId` + 路由提示标「已指定专家」 | ②是 |
 | `tests/05-stop.spec.mjs` | **停止生成**：流式中点「停止」→ 游标消失、发送回归、**已流出正文保留**、取消请求成功 | 是 |
