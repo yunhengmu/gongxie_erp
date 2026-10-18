@@ -87,7 +87,7 @@
 -- 一、菜单与按钮权限（sys_menu）
 -- ============================================================
 --   一级菜单「BizBuddy」+ 6 个二级分组（智能体 / 模型与推理 / 知识库 / 工具与集成 /
---   审计与观测 / 安全合规）+ 功能页与按钮权限，共 134 行（6 分组 / 33 功能页 / 94 按钮）；权限标识统一为 ai:{模块}:{动作}。
+--   审计与观测 / 安全合规）+ 功能页与按钮权限，共 136 行（6 分组 / 34 功能页 / 95 按钮）；权限标识统一为 ai:{模块}:{动作}。
 -- ============================================================
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020000, 'BizBuddy', 0, 2, 'bizbuddy', null, '', 'N', 'Y', 'M', '0', '0', '', 'skill', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.116279', null, null, 'BizBuddy 智能业务平台') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020010, '智能体', 1761400000000020000, 1, 'agent', '', '', 'N', 'Y', 'M', '0', '0', '', 'model', '', '', 1761000000000000103, 1761100000000000001, '2026-09-25 10:12:38.119194', null, null, '智能体定义、会话与对话工作台') on conflict (menu_id) do nothing;
@@ -225,9 +225,12 @@ insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component,
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020269, '健康自检', 1761400000000020040, 6, 'health', 'ai/health/index', '', 'N', 'Y', 'C', '0', '0', 'ai:health', 'system', '', '', 1761000000000000103, 1761100000000000001, '2026-10-12 12:00:00', null, null, '平台健康自检：密钥 / 向量维度 / Milvus / MCP / 时区 / 出厂密钥收口等 14 项体检，只读不给一键修复') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020270, '健康自检查询', 1761400000000020269, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:health:query', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-12 12:00:00', null, null, '') on conflict (menu_id) do nothing;
 insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020271, '健康自检探测', 1761400000000020269, 2, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:health:probe', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-12 12:00:00', null, null, '') on conflict (menu_id) do nothing;
+-- 「平台运行日报」功能页：挂「审计与观测」分组，排「健康自检」之后（报表由定时任务产出投递器按日落库）
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020280, '平台运行日报', 1761400000000020040, 7, 'digest', 'ai/digest/index', '', 'N', 'Y', 'C', '0', '0', 'ai:digest:list', 'chart', '', '', 1761000000000000103, 1761100000000000001, '2026-10-18 00:00:00', null, null, '平台运行日报：每天一条，查看五块运行快照与日报正文（数据由定时任务产出投递器落库）') on conflict (menu_id) do nothing;
+insert into sys_menu (menu_id, menu_name, parent_id, order_num, path, component, query_param, is_frame, is_cache, menu_type, visible, status, perms, icon, active_menu, ext, create_dept, create_by, create_time, update_by, update_time, remark) values (1761400000000020281, '平台运行日报详情', 1761400000000020280, 1, '#', '', '', 'N', 'Y', 'F', '0', '0', 'ai:digest:query', '#', '', '', 1761000000000000103, 1761100000000000001, '2026-10-18 00:00:00', null, null, '') on conflict (menu_id) do nothing;
 
 -- ============================================================
--- 二、AI 业务表（36 张 ai_*）
+-- 二、AI 业务表（40 张 ai_*）
 -- ============================================================
 --   按业务域组织：模型与知识库 / 智能体与会话 / 工具与集成 / 技能 / 子智能体 /
 --   渠道接入 / 定时任务 / 治理与观测 / 场景包。
@@ -1106,7 +1109,6 @@ create table if not exists ai_agent_task (
     run_as_user_id  bigint       not null,
     run_as_dept_id  bigint,
     last_run_time   timestamp,
-    output_config   text,
     status          char(1)      default '0',
     remark          varchar(500),
     create_dept     bigint,
@@ -1126,7 +1128,6 @@ comment on column ai_agent_task.cron_expression is 'Cron 表达式（Spring 6 �
 comment on column ai_agent_task.run_as_user_id is '运行身份用户（会话与数据权限按该用户）';
 comment on column ai_agent_task.run_as_dept_id is '运行身份部门（随运行身份用户带出）';
 comment on column ai_agent_task.last_run_time is '上次计划执行时间（到点判定与抢占去重基准）';
-comment on column ai_agent_task.output_config is '产出投递配置（JSON：stationUserIds 站内推送目标 + channel 渠道推送目标；为空表示不投递）';
 comment on column ai_agent_task.status is '状态（0启用 1停用）';
 create unique index if not exists uk_ai_agent_task_name on ai_agent_task (task_name) WHERE (del_flag = '0'::bpchar);
 
@@ -1897,6 +1898,25 @@ values (1761400000000020232,
         '0')
 on conflict do nothing;
 
+insert into ai_tool (id, tool_code, tool_name, description, tool_type, params_schema, impl_name, status, mcp_exposed, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+values (1761400000000020233,
+        'write_daily_digest',
+        '写入运行日报',
+        '把某一天的平台运行日报写入平台（按日期覆盖更新）。只需传入日报正文与日期：五块数值（用量 / 任务 / 待办 / 权限 / 登录）由平台按该日期现取，不要自行编造或换算数字。正文首行写明「结论级别：平稳 / 需关注 / 需处理」。不传 date 表示昨天。',
+        '1',
+        '{"type":"object","properties":{"date":{"type":"string","description":"日报日期（YYYY-MM-DD）；不传则取昨天"},"digest_text":{"type":"string","description":"日报正文（首行写明「结论级别：平稳 / 需关注 / 需处理」）"}},"required":["digest_text"]}',
+        'write_daily_digest',
+        '0',
+        '0',
+        '内置写工具，只写 ai_daily_digest（落库）；实现见 WriteDailyDigestTool',
+        1761000000000000103,
+        1761100000000000001,
+        now(),
+        1761100000000000001,
+        now(),
+        '0')
+on conflict do nothing;
+
 -- ============================================================
 -- 五、内置智能体种子
 -- ============================================================
@@ -2182,7 +2202,8 @@ values (1761400000000020501,
 - 所有数字**必须引用工具返回的原值**，不得估算、换算或加工
 - **不推测异动原因**：可以写「建议人工排查」，不许编造可能原因
 - 无数据的块**如实写「无数据」**
-- 只输出日报本身；**不要尝试修改平台状态**（本链路是只读的）
+- 只输出日报本身；**不要尝试修改平台状态**（除日报落库外没有任何写权限）
+- **输出日报正文后必须调用 `write_daily_digest` 落库**（只写日报表，按日期覆盖更新；不传 date 即昨日）
 - **不要输出任何前言 / 开场白**（不要写英文说明或客套话）；**正文第一行就是「结论级别：X」**
 - 正文首行的结论级别格式不得改动（系统据此落库）',
         'bizbuddy',
@@ -2202,8 +2223,8 @@ values (1761400000000020306,
         '平台运维助手',
         'platform_ops',
         '按技能口径生成平台运行日报（供定时任务使用，也可直接对话追问）',
-        '你是平台运维助手。生成运行日报时严格按技能 platform_daily_digest 的口径执行：先调用 platform_daily_digest 取当日五块数据（只调一次），再判异动并按模板输出；正文第一行写明结论级别。所有数字引用工具返回原值，禁止估算或推测原因；数据为 null 的块如实写「无数据」；待办积压是当前快照，不是当日历史。需要明细时调用 platform_daily_drill；你也可以直接回答用户关于用量的追问。',
-        2109794551143350274,
+        '你是平台运维助手。生成运行日报时严格按技能 platform_daily_digest 的口径执行：先调用 platform_daily_digest 取当日五块数据（只调一次），再判异动并按模板输出；正文第一行写明结论级别。所有数字引用工具返回原值，禁止估算或推测原因；数据为 null 的块如实写「无数据」；待办积压是当前快照，不是当日历史。需要明细时调用 platform_daily_drill；你也可以直接回答用户关于用量的追问。输出日报正文后，必须调用 write_daily_digest 把日报落库（date 取本次统计日期，缺省即昨日）。',
+        1761400000000020400,
         null,
         null,
         null,
@@ -2214,11 +2235,11 @@ values (1761400000000020306,
         '0',
         10,
         '0',
-        '内置专家（演示）：只读工具集（platform_daily_digest / platform_daily_drill / ai_usage_by_agent），不绑定写工具；定时任务直接指定该专家执行',
+        '内置专家（演示）：只读工具集（platform_daily_digest / platform_daily_drill / ai_usage_by_agent）+ 写工具 write_daily_digest（允许档）；定时任务直接指定该专家执行',
         null,
         '负责平台运行数据的汇总与日报口径：回答「昨天平台运行怎么样」「谁用得最多」「昨天登录失败都是哪些 IP」；按技能 platform_daily_digest 输出日报。不受理公告/机构等业务域（归各自专家）。',
         null,
-        '0',
+        '1',
         '1',
         1761000000000000103,
         1761100000000000001,
@@ -2247,17 +2268,19 @@ on conflict do nothing;
 insert into ai_agent_tool (id, agent_id, tool_code, remark, create_dept, create_by, create_time, update_by, update_time, decision)
 values (1761400000000020505, 1761400000000020306, 'ai_usage_by_agent', '按智能体用量（只读）', 1761000000000000103, 1761100000000000001, now(), 1761100000000000001, now(), '0')
 on conflict do nothing;
-insert into ai_agent_task (id, task_name, agent_id, agent_code, task_prompt, cron_expression, run_as_user_id, run_as_dept_id, last_run_time, output_config, status, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
+insert into ai_agent_tool (id, agent_id, tool_code, remark, create_dept, create_by, create_time, update_by, update_time, decision)
+values (1761400000000020506, 1761400000000020306, 'write_daily_digest', '写入日报（落库，允许）', 1761000000000000103, 1761100000000000001, now(), 1761100000000000001, now(), '0')
+on conflict do nothing;
+insert into ai_agent_task (id, task_name, agent_id, agent_code, task_prompt, cron_expression, run_as_user_id, run_as_dept_id, last_run_time, status, remark, create_dept, create_by, create_time, update_by, update_time, del_flag)
 values (1761400000000020601,
         '平台运行日报（每日 08:00）',
         1761400000000020306,
         'platform_ops',
-        '执行昨日平台运行日报：调用 platform_daily_digest 取五块数据，按技能口径判异动并按模板输出，正文首行写明结论级别；数据为 null 的块如实写「无数据」。',
+        '执行昨日平台运行日报：调用 platform_daily_digest 取五块数据，按技能口径判异动并按模板输出，正文首行写明结论级别；数据为 null 的块如实写「无数据」；最后必须调用 write_daily_digest 把日报落库（date 取昨日）。',
         '0 0 8 * * ?',
         1761100000000000001,
         1761000000000000103,
         null,
-        '{"stationUserIds":[1761100000000000001]}',
         '0',
         '内置定时任务：每日 08:00 以 admin 身份生成平台运行日报（运行身份决定可见范围）',
         1761000000000000103,

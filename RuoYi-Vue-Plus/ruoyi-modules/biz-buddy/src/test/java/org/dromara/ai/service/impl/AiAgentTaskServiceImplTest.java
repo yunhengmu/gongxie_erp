@@ -3,7 +3,6 @@ package org.dromara.ai.service.impl;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.dromara.ai.core.agent.AiAgentTaskRunner;
 import org.dromara.ai.core.agent.AiChatFacade;
-import org.dromara.ai.core.task.TaskOutputDispatcher;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentTask;
 import org.dromara.ai.domain.AiAgentTaskRun;
@@ -68,9 +67,6 @@ class AiAgentTaskServiceImplTest {
 
     @Mock
     private AiAgentTaskRunner taskRunner;
-
-    @Mock
-    private TaskOutputDispatcher outputDispatcher;
 
     @Mock
     private UserService userService;

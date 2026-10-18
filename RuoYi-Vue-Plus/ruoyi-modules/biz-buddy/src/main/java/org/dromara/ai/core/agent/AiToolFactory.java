@@ -35,6 +35,8 @@ import org.dromara.ai.core.agent.tools.SearchUserTool;
 import org.dromara.ai.core.agent.tools.UpdateDeptTool;
 import org.dromara.ai.core.agent.tools.UpdateNoticeTool;
 import org.dromara.ai.core.agent.tools.UpdateUserTool;
+import org.dromara.ai.core.agent.tools.WriteDailyDigestTool;
+import org.dromara.ai.core.digest.DailyDigestPublisher;
 import org.dromara.ai.domain.AiTool;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiVectorService;
@@ -208,6 +210,11 @@ public class AiToolFactory {
      */
     public static final String IMPL_AI_USAGE_BY_AGENT = "ai_usage_by_agent";
 
+    /**
+     * 平台运行日报 —— 落库实现标识（写入；数值由服务端现取）
+     */
+    public static final String IMPL_WRITE_DAILY_DIGEST = "write_daily_digest";
+
     private final IAiVectorService vectorService;
 
     private final IAiKnowledgeBaseService knowledgeBaseService;
@@ -235,6 +242,11 @@ public class AiToolFactory {
      * 平台运行日报统计服务（工具与投递器共用的唯一口径）
      */
     private final IPlatformDigestService platformDigestService;
+
+    /**
+     * 平台运行日报落库服务（写工具使用；只落库、不做通知）
+     */
+    private final DailyDigestPublisher dailyDigestPublisher;
 
     /**
      * 判断实现标识是否已在代码侧登记。
@@ -271,7 +283,8 @@ public class AiToolFactory {
             || IMPL_GET_SYSTEM_INFO.equals(implName)
             || IMPL_PLATFORM_DAILY_DIGEST.equals(implName)
             || IMPL_PLATFORM_DAILY_DRILL.equals(implName)
-            || IMPL_AI_USAGE_BY_AGENT.equals(implName);
+            || IMPL_AI_USAGE_BY_AGENT.equals(implName)
+            || IMPL_WRITE_DAILY_DIGEST.equals(implName);
     }
 
     /**
@@ -383,6 +396,9 @@ public class AiToolFactory {
         }
         if (IMPL_AI_USAGE_BY_AGENT.equals(implName)) {
             return Optional.of(new AiUsageByAgentTool(platformDigestService));
+        }
+        if (IMPL_WRITE_DAILY_DIGEST.equals(implName)) {
+            return Optional.of(new WriteDailyDigestTool(dailyDigestPublisher));
         }
         log.warn("工具实现未在代码侧登记，跳过装配：toolCode={}, implName={}", definition.getToolCode(), implName);
         return Optional.empty();

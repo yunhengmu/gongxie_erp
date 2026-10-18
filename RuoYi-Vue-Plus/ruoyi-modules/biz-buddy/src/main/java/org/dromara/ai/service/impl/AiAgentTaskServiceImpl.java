@@ -8,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.core.agent.AiAgentTaskRunner;
 import org.dromara.ai.core.agent.AiChatFacade;
-import org.dromara.ai.core.task.TaskOutputDispatcher;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentTask;
 import org.dromara.ai.domain.AiAgentTaskRun;
@@ -73,11 +72,6 @@ public class AiAgentTaskServiceImpl implements IAiAgentTaskService {
 
     private final AiAgentTaskRunner taskRunner;
 
-    /**
-     * 任务产出投递器（按 output_config 落库 / 推送，未配置则不投递）
-     */
-    private final TaskOutputDispatcher outputDispatcher;
-
     private final UserService userService;
 
     private final DeptService deptService;
@@ -124,8 +118,6 @@ public class AiAgentTaskServiceImpl implements IAiAgentTaskService {
         validTaskNameUnique(update);
         // 排期基准沿用原值：改 Cron 不会触发补跑，也不影响原有到点判定
         update.setLastRunTime(exists.getLastRunTime());
-        // 产出投递配置由系统维护（管理页不编辑），修改任务时保持原值
-        update.setOutputConfig(exists.getOutputConfig());
         return baseMapper.updateById(update) > 0;
     }
 
@@ -143,8 +135,7 @@ public class AiAgentTaskServiceImpl implements IAiAgentTaskService {
     @Override
     public Long runNow(Long taskId) {
         AiAgentTask task = requireTask(taskId);
-        // 手动触发没有「计划时间」：投递幂等键按日报日期归并（见 TaskOutputDispatcher）
-        return startRun(task, AiAgentTaskRun.TRIGGER_MANUAL, null);
+        return startRun(task, AiAgentTaskRun.TRIGGER_MANUAL);
     }
 
     @Override
@@ -167,7 +158,7 @@ public class AiAgentTaskServiceImpl implements IAiAgentTaskService {
             if (scheduled == null || !claim(task.getId(), scheduled)) {
                 continue;
             }
-            startRun(task, AiAgentTaskRun.TRIGGER_CRON, scheduled);
+            startRun(task, AiAgentTaskRun.TRIGGER_CRON);
             triggered++;
         }
         return triggered;
@@ -217,12 +208,11 @@ public class AiAgentTaskServiceImpl implements IAiAgentTaskService {
     /**
      * 登记执行记录并提交异步执行。
      *
-     * @param task          任务实体
-     * @param triggerType   触发方式
-     * @param scheduledTime 本次计划执行时间（定时触发为到点时刻；手动触发为 null）
+     * @param task        任务实体
+     * @param triggerType 触发方式
      * @return 执行记录主键
      */
-    private Long startRun(AiAgentTask task, String triggerType, LocalDateTime scheduledTime) {
+    private Long startRun(AiAgentTask task, String triggerType) {
         AiAgentTaskRun run = new AiAgentTaskRun();
         run.setTaskId(task.getId());
         run.setTaskName(task.getTaskName());
@@ -233,18 +223,17 @@ public class AiAgentTaskServiceImpl implements IAiAgentTaskService {
         run.setToolCallCount(0);
         runMapper.insert(run);
         // 异步执行：派发不阻塞调度线程，「立即执行」也不占用 HTTP 请求；结果由执行记录跟踪
-        taskRunner.submit(() -> executeRun(task, run.getId(), scheduledTime));
+        taskRunner.submit(() -> executeRun(task, run.getId()));
         return run.getId();
     }
 
     /**
      * 执行一次任务：以运行身份用户落库会话与消息，产出的结果即「后台任务结果」。
      *
-     * @param task          任务实体
-     * @param runId         执行记录主键
-     * @param scheduledTime 本次计划执行时间（投递幂等键用；手动触发为 null）
+     * @param task  任务实体
+     * @param runId 执行记录主键
      */
-    private void executeRun(AiAgentTask task, Long runId, LocalDateTime scheduledTime) {
+    private void executeRun(AiAgentTask task, Long runId) {
         Long sessionId = null;
         AiTaskExecution execution;
         try {
@@ -263,11 +252,6 @@ public class AiAgentTaskServiceImpl implements IAiAgentTaskService {
         finishRun(runId, execution.sessionId(), execution.messageId(),
             execution.success() ? AiAgentTaskRun.STATUS_SUCCESS : AiAgentTaskRun.STATUS_FAILED,
             execution.errorMsg(), execution);
-        // 产出投递（落库 / 推送）：只在执行成功时投递；失败即静默（执行记录已留失败原因），不推送日报
-        if (execution.success()) {
-            outputDispatcher.dispatch(task, runId, execution.sessionId(), execution.messageId(),
-                scheduledTime);
-        }
     }
 
     /**
