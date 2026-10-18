@@ -48,7 +48,8 @@
               <div class="table-heading">
                 <h3>渠道接入</h3>
                 <p>
-                  接入飞书 / 企业微信 / GitHub / 钉钉：前三个为 Webhook（平台回调），钉钉为长连接（应用主动建连、无需回调地址）。
+                  接入飞书 / 企业微信 / GitHub / 钉钉：企业微信 / GitHub 为 Webhook（平台回调），
+                  飞书可选 Webhook 或长连接，钉钉为长连接（应用主动建连、无需公网 IP 与回调地址）。
                   外部身份需在「外部身份映射」中绑定平台账号，消息线程按「会话映射」续接同一条会话。
                   执行走无人值守通道（写工具一律拒绝），产出落在会话管理页并标记来源为「渠道接入」。
                 </p>
@@ -99,13 +100,13 @@
             </el-table-column>
             <el-table-column label="接入地址 / 方式" align="left" :show-overflow-tooltip="true">
               <template #default="scope">
-                <span v-if="scope.row.platformType === 'dingtalk'" class="text-muted">长连接订阅（无需回调地址）</span>
+                <span v-if="isLongConnection(scope.row)" class="text-muted">长连接订阅（无需回调地址）</span>
                 <code v-else class="callback-path">{{ callbackPath(scope.row) }}</code>
               </template>
             </el-table-column>
             <el-table-column label="连接状态" align="center" width="120">
               <template #default="scope">
-                <template v-if="scope.row.platformType === 'dingtalk'">
+                <template v-if="isLongConnection(scope.row)">
                   <el-tooltip
                     :disabled="scope.row.streamStatus !== 'failed' || !scope.row.streamStatusDetail"
                     :content="scope.row.streamStatusDetail || ''"
@@ -367,8 +368,11 @@
               <el-tooltip placement="top">
                 <template #content>
                   <div class="tip-content">
-                    仅字母 / 数字 / 下划线 / 短横线；回调地址为
-                    <code>{{ callbackPath(form) }}</code>
+                    <template v-if="formIsLongConnection">仅字母 / 数字 / 下划线 / 短横线；该渠道为长连接，无需回调地址。</template>
+                    <template v-else>
+                      仅字母 / 数字 / 下划线 / 短横线；回调地址为
+                      <code>{{ callbackPath(form) }}</code>
+                    </template>
                   </div>
                 </template>
                 <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
@@ -403,45 +407,70 @@
         </el-form-item>
 
         <template v-if="form.platformType === 'feishu'">
+          <el-form-item label="接入形态" prop="mode">
+            <template #label>
+              <span class="label-tip">
+                接入形态
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div class="tip-content">须与飞书后台「事件订阅方式」保持一致；选「长连接」则无需公网 IP 与回调地址。</div>
+                  </template>
+                  <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+                </el-tooltip>
+              </span>
+            </template>
+            <el-radio-group v-model="form.mode">
+              <el-radio value="webhook">Webhook 回调</el-radio>
+              <el-radio value="ws">长连接</el-radio>
+            </el-radio-group>
+          </el-form-item>
           <el-form-item label="App ID" prop="appId">
             <el-input v-model="form.appId" placeholder="飞书自建应用 appId（cli_xxx）" />
           </el-form-item>
           <el-form-item label="App Secret" prop="appSecret">
             <el-input v-model="form.appSecret" type="password" show-password :placeholder="secretPlaceholder(form.appSecretSet)" />
           </el-form-item>
-          <el-form-item label="Encrypt Key" prop="encryptKey">
-            <template #label>
-              <span class="label-tip">
-                Encrypt Key
-                <el-tooltip placement="top">
-                  <template #content>
-                    <div class="tip-content">选填；配置后回调报文体为 AES 密文，且校验 X-Lark-Signature。</div>
-                  </template>
-                  <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
-                </el-tooltip>
-              </span>
-            </template>
-            <el-input v-model="form.encryptKey" type="password" show-password :placeholder="secretPlaceholder(form.encryptKeySet)" />
-          </el-form-item>
-          <el-form-item label="Verification Token" prop="verificationToken">
-            <template #label>
-              <span class="label-tip">
-                Verification Token
-                <el-tooltip placement="top">
-                  <template #content>
-                    <div class="tip-content">选填；配置后 URL 校验握手会比对报文中的 token。</div>
-                  </template>
-                  <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
-                </el-tooltip>
-              </span>
-            </template>
-            <el-input
-              v-model="form.verificationToken"
-              type="password"
-              show-password
-              :placeholder="secretPlaceholder(form.verificationTokenSet)"
-            />
-          </el-form-item>
+          <template v-if="formIsLongConnection">
+            <div class="form-tip form-tip-block">
+              飞书为长连接：应用主动外连，<b>无需公网 IP 与回调地址</b>；请在飞书后台把事件订阅方式选为「长连接」
+              并开通接收消息事件 im.message.receive_v1。建连时即完成鉴权，故不需要 Encrypt Key / Verification Token。
+            </div>
+          </template>
+          <template v-else>
+            <el-form-item label="Encrypt Key" prop="encryptKey">
+              <template #label>
+                <span class="label-tip">
+                  Encrypt Key
+                  <el-tooltip placement="top">
+                    <template #content>
+                      <div class="tip-content">选填；配置后回调报文体为 AES 密文，且校验 X-Lark-Signature。</div>
+                    </template>
+                    <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
+              <el-input v-model="form.encryptKey" type="password" show-password :placeholder="secretPlaceholder(form.encryptKeySet)" />
+            </el-form-item>
+            <el-form-item label="Verification Token" prop="verificationToken">
+              <template #label>
+                <span class="label-tip">
+                  Verification Token
+                  <el-tooltip placement="top">
+                    <template #content>
+                      <div class="tip-content">选填；配置后 URL 校验握手会比对报文中的 token。</div>
+                    </template>
+                    <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
+              <el-input
+                v-model="form.verificationToken"
+                type="password"
+                show-password
+                :placeholder="secretPlaceholder(form.verificationTokenSet)"
+              />
+            </el-form-item>
+          </template>
         </template>
 
         <template v-else-if="form.platformType === 'wecom'">
@@ -676,6 +705,7 @@ const initFormData: ChannelForm = {
   channelName: undefined,
   channelCode: undefined,
   platformType: 'feishu',
+  mode: 'webhook',
   agentId: undefined,
   appId: undefined,
   appSecret: undefined,
@@ -760,14 +790,25 @@ const platformLabel = (type?: string) => {
   return type || '-';
 };
 
-/** API 基地址输入提示（钉钉为 OpenAPI + 长连接注册地址前缀） */
-const apiBasePlaceholder = computed(() =>
-  form.value.platformType === 'dingtalk'
-    ? '留空使用 https://api.dingtalk.com'
-    : '留空使用各平台默认地址（企业内网 / 私有部署时填写）'
-);
+/** 是否长连接渠道（钉钉恒为长连接；飞书按 mode=ws） */
+const isLongConnection = (row: Partial<ChannelVO>) =>
+  row.platformType === 'dingtalk' || (row.platformType === 'feishu' && row.mode === 'ws');
 
-/** 长连接状态展示名（仅钉钉渠道有值） */
+/** 当前表单是否为「长连接」形态（仅飞书有此开关，钉钉走独立分支） */
+const formIsLongConnection = computed(() => form.value.platformType === 'feishu' && form.value.mode === 'ws');
+
+/** API 基地址输入提示（钉钉为 OpenAPI + 长连接注册地址前缀；飞书长连接为 domain） */
+const apiBasePlaceholder = computed(() => {
+  if (form.value.platformType === 'dingtalk') {
+    return '留空使用 https://api.dingtalk.com';
+  }
+  if (formIsLongConnection.value) {
+    return '长连接 domain，留空使用 https://open.feishu.cn';
+  }
+  return '留空使用各平台默认地址（企业内网 / 私有部署时填写）';
+});
+
+/** 长连接状态展示名（长连接渠道有值） */
 const streamLabel = (status?: string) => {
   if (status === 'running') return '运行中';
   if (status === 'failed') return '启动失败';
@@ -859,6 +900,7 @@ const handleUpdate = async (row?: Partial<ChannelVO>) => {
     channelName: detail.channelName,
     channelCode: detail.channelCode,
     platformType: detail.platformType,
+    mode: detail.mode ?? 'webhook',
     agentId: detail.agentId,
     appId: detail.appId,
     appSecret: undefined,

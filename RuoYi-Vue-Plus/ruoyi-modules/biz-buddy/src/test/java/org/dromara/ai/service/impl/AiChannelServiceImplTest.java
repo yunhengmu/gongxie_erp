@@ -284,14 +284,12 @@ class AiChannelServiceImplTest {
     }
 
     @Test
-    @DisplayName("启用渠道编码：空类型返回空列表")
-    void shouldListEnabledChannelCodes() {
-        assertTrue(service.listEnabledChannelCodes(" ").isEmpty());
-
+    @DisplayName("启用长连接渠道编码：返回可拉起的渠道（钉钉恒为长连接、飞书仅 mode=ws）")
+    void shouldListEnabledLongConnectionChannelCodes() {
         AiChannel c1 = new AiChannel();
         c1.setChannelCode("c1");
         when(baseMapper.selectList(any())).thenReturn(List.of(c1));
-        assertEquals(List.of("c1"), service.listEnabledChannelCodes("feishu"));
+        assertEquals(List.of("c1"), service.listEnabledLongConnectionChannelCodes());
     }
 
     @Test

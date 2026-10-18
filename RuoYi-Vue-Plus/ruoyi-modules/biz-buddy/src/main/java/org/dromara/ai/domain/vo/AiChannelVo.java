@@ -44,6 +44,11 @@ public class AiChannelVo implements Serializable {
     private String platformType;
 
     /**
+     * 接入形态（webhook / ws）
+     */
+    private String mode;
+
+    /**
      * 默认智能体主键
      */
     private Long agentId;

@@ -76,12 +76,13 @@ public interface IAiChannelService {
     AiChannel loadRuntimeConfig(String channelCode);
 
     /**
-     * 查询启用中的渠道编码清单（供长连接平台在应用启动时按需拉起连接）。
+     * 查询启用中的**长连接**渠道编码清单（供应用启动时按需拉起连接）。
      *
-     * @param platformType 平台类型（如 {@code dingtalk}）
+     * <p>钉钉恒为长连接；飞书按 {@code mode=ws} 判定；其余平台为 Webhook（由外部平台回调驱动），不在此列。</p>
+     *
      * @return 渠道编码清单
      */
-    List<String> listEnabledChannelCodes(String platformType);
+    List<String> listEnabledLongConnectionChannelCodes();
 
     // -----------------------------------------------------------------
     //  外部身份映射

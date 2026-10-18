@@ -98,6 +98,7 @@ public class AiChannelServiceImpl implements IAiChannelService {
         add.setChannelName(StringUtils.trim(bo.getChannelName()));
         add.setChannelCode(StringUtils.trim(bo.getChannelCode()));
         add.setPlatformType(normalizePlatformType(bo.getPlatformType()));
+        add.setMode(normalizeMode(bo.getMode()));
         add.setApiBase(StringUtils.trim(bo.getApiBase()));
         add.setPlatformAgentId(StringUtils.trim(bo.getPlatformAgentId()));
         add.setAppId(StringUtils.trim(bo.getAppId()));
@@ -123,6 +124,7 @@ public class AiChannelServiceImpl implements IAiChannelService {
         update.setChannelName(StringUtils.trim(bo.getChannelName()));
         update.setChannelCode(StringUtils.trim(bo.getChannelCode()));
         update.setPlatformType(normalizePlatformType(bo.getPlatformType()));
+        update.setMode(normalizeMode(bo.getMode()));
         update.setApiBase(StringUtils.trim(bo.getApiBase()));
         update.setPlatformAgentId(StringUtils.trim(bo.getPlatformAgentId()));
         update.setAppId(StringUtils.trim(bo.getAppId()));
@@ -170,6 +172,7 @@ public class AiChannelServiceImpl implements IAiChannelService {
         runtime.setId(channel.getId());
         runtime.setChannelCode(channel.getChannelCode());
         runtime.setPlatformType(channel.getPlatformType());
+        runtime.setMode(channel.getMode());
         runtime.setAgentId(channel.getAgentId());
         runtime.setAppId(channel.getAppId());
         runtime.setAppSecret(secretManager.decrypt(channel.getAppSecret()));
@@ -184,14 +187,14 @@ public class AiChannelServiceImpl implements IAiChannelService {
     }
 
     @Override
-    public List<String> listEnabledChannelCodes(String platformType) {
-        if (StringUtils.isBlank(platformType)) {
-            return List.of();
-        }
+    public List<String> listEnabledLongConnectionChannelCodes() {
         LambdaQueryWrapper<AiChannel> lqw = Wrappers.lambdaQuery();
         lqw.select(AiChannel::getChannelCode);
-        lqw.eq(AiChannel::getPlatformType, platformType);
         lqw.eq(AiChannel::getStatus, AiChannel.STATUS_ENABLED);
+        // 钉钉恒为长连接；飞书仅 mode=ws 时长连接（其余为 Webhook，由外部平台回调驱动）
+        lqw.and(w -> w.eq(AiChannel::getPlatformType, AiChannel.PLATFORM_DINGTALK)
+            .or(f -> f.eq(AiChannel::getPlatformType, AiChannel.PLATFORM_FEISHU)
+                .eq(AiChannel::getMode, AiChannel.MODE_WS)));
         return baseMapper.selectList(lqw).stream().map(AiChannel::getChannelCode).toList();
     }
 
@@ -329,6 +332,23 @@ public class AiChannelServiceImpl implements IAiChannelService {
             throw new ServiceException("平台类型仅支持 feishu / wecom / github / dingtalk");
         }
         return type;
+    }
+
+    /**
+     * 归一化接入形态：留空默认 Webhook；仅接受 webhook / ws。
+     *
+     * @param mode 接入形态
+     * @return 归一化后的接入形态
+     */
+    private String normalizeMode(String mode) {
+        String value = StringUtils.trim(mode);
+        if (StringUtils.isBlank(value)) {
+            return AiChannel.MODE_WEBHOOK;
+        }
+        if (!AiChannel.MODE_WEBHOOK.equals(value) && !AiChannel.MODE_WS.equals(value)) {
+            throw new ServiceException("接入形态仅支持 webhook / ws");
+        }
+        return value;
     }
 
     /**
@@ -511,8 +531,11 @@ public class AiChannelServiceImpl implements IAiChannelService {
             vo.setVerificationTokenSet(raw != null && StringUtils.isNotBlank(raw.getVerificationToken()));
             vo.setWebhookSecretSet(raw != null && StringUtils.isNotBlank(raw.getWebhookSecret()));
             vo.setApiTokenSet(raw != null && StringUtils.isNotBlank(raw.getApiToken()));
-            // 长连接平台（钉钉）额外回显「是否已拉起」（Webhook 平台无此列）
-            if (raw != null && AiChannel.PLATFORM_DINGTALK.equals(raw.getPlatformType())) {
+            // 长连接渠道（钉钉 / 飞书 mode=ws）额外回显「是否已拉起」（Webhook 平台无此列）
+            if (raw != null
+                && (AiChannel.PLATFORM_DINGTALK.equals(raw.getPlatformType())
+                    || (AiChannel.PLATFORM_FEISHU.equals(raw.getPlatformType())
+                        && AiChannel.MODE_WS.equals(raw.getMode())))) {
                 AiChannelStreamStatus.Snapshot snapshot = streamStatus.get(raw.getChannelCode());
                 vo.setStreamStatus(snapshot == null ? AiChannelStreamStatus.STOPPED : snapshot.status());
                 vo.setStreamStatusDetail(snapshot == null ? null : snapshot.detail());

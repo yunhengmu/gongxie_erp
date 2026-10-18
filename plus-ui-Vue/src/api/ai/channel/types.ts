@@ -11,6 +11,8 @@ export interface ChannelVO {
   channelCode?: string;
   /** 平台类型（feishu / wecom / github / dingtalk） */
   platformType?: string;
+  /** 接入形态（webhook / ws）；仅飞书区分，钉钉恒为长连接 */
+  mode?: string;
   /** 默认智能体主键 */
   agentId?: string | number;
   /** 默认智能体名称 */
@@ -33,7 +35,7 @@ export interface ChannelVO {
   webhookSecretSet?: boolean;
   /** 是否已配置平台访问令牌 */
   apiTokenSet?: boolean;
-  /** 长连接渠道（钉钉）的运行状态（stopped / running / failed） */
+  /** 长连接渠道（钉钉 / 飞书长连接）的运行状态（stopped / running / failed） */
   streamStatus?: string;
   /** 长连接启动失败原因 */
   streamStatusDetail?: string;
@@ -65,6 +67,8 @@ export interface ChannelForm {
   channelCode?: string;
   /** 平台类型 */
   platformType?: string;
+  /** 接入形态（webhook / ws）；留空默认 webhook。仅飞书区分，钉钉恒为长连接 */
+  mode?: string;
   /** 默认智能体 */
   agentId?: string | number;
   /** 应用标识 */

@@ -58,6 +58,13 @@ public class AiChannelBo implements Serializable {
     private String platformType;
 
     /**
+     * 接入形态（webhook / ws）；留空默认 webhook。仅飞书区分 Webhook / 长连接，钉钉恒为长连接、不读本字段。
+     */
+    @Size(max = 16, message = "接入形态长度不能超过 16 个字符", groups = {AddGroup.class, EditGroup.class})
+    @Pattern(regexp = "^(webhook|ws)?$", message = "接入形态只能为 webhook 或 ws", groups = {AddGroup.class, EditGroup.class})
+    private String mode;
+
+    /**
      * 默认智能体（ai_agent.id）
      */
     @NotNull(message = "默认智能体不能为空", groups = {AddGroup.class, EditGroup.class})
