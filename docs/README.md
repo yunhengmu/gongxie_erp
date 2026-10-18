@@ -71,7 +71,7 @@ AI 能力集中在 `ruoyi-modules/biz-buddy`（包 `org.dromara.ai`）：
 | `core/agent/tools` | 内置业务工具实现（含日报只读汇总 / 下钻与写入工具 `write_daily_digest`） |
 | `core/digest` | 平台运行日报落库（五块现取 / 级别解析 / 平稳日压缩 / 按 `digest_date` upsert） |
 | `core/mcp` | 自建 MCP 出口与 MCP 客户端封装 |
-| `core/channel` | 飞书 / 企业微信 / 钉钉 / GitHub 入站 |
+| `core/channel` | 飞书 / 企业微信 / 钉钉 / GitHub 入站（Webhook + 长连接：飞书 `mode=ws` / 钉钉） |
 | `controller` / `service` | 各管理接口与业务实现 |
 
 ## 许可与署名
