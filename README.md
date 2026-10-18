@@ -39,18 +39,19 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 | [`RuoYi-Vue-Plus/docs/`](RuoYi-Vue-Plus/docs) | 平台功能说明（含 9 张运行界面截图） |
 | [`deploy/deploy-pg/`](deploy/deploy-pg) | **PostgreSQL 全栈容器编排**：PG 14 + Redis + Milvus + 后端 + 调度 + Nginx（`docker compose up -d --build` 即「有表有数据可登录」） |
 | [`deploy/deploy-mysql/`](deploy/deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
-| [`e2e/`](e2e) | **端到端测试脚本**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP 断言，见下文「测试与覆盖率」 |
+| [`e2e/`](e2e) | **端到端测试脚本（接口层）**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP / SSE 断言，见下文「测试与覆盖率」 |
+| [`e2e-ui/`](e2e-ui) | **端到端测试套件（浏览器层）**（Playwright + chromium，独立目录承载重依赖）：登录 / 菜单可达性 / 会话主路径 / 指定专家 / 停止生成 / HITL 等前端关键路径，见下文「测试与覆盖率」 |
 
 ## 功能说明
 
 平台完整功能说明见 **[RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md)**，按真实菜单与代码梳理，涵盖：
 
-- **功能地图与权限模型**——6 个分组、33 个功能页与权限标识约定、工具三档授权；
+- **功能地图与权限模型**——6 个分组、34 个功能页与权限标识约定、工具三档授权（含无人值守链路的口径）；
 - **智能体与对话**——任务工作台、入口智能体「小Z」配置、专家配置（含提示词 **AI 辅助生成 / 模板套用 / 克隆专家 / 保存前体检**）、任务管理、定时任务、计划模式、技能仓库、长期记忆、工作区文件、子智能体、场景包；
 - **模型与推理 / 知识库与检索**——模型配置与连通性测试、用量与配额、上下文压缩策略、编排预算（运行期可调）；知识库、文档与切片、检索测试；**RAG 检索增强**（Rerank 重排默认开启 + 结果去重 / 相邻合并的上下文装配 + Token 预算）；
 - **工具与集成**——业务工具注册、MCP 服务端（对外出口）与客户端（接入外部）、飞书 / 企业微信 / 钉钉 / GitHub 渠道接入；**MCP 自演示**（系统信息工具 `get_system_info` + 启动时登记一条指向自身 `/mcp` 的客户端连接）；业务工具与**外部 MCP 回参**一律过脱敏；
 - **安全合规**——敏感词库、安全事件留痕、安全合规配置（输入 / 输出 / 渠道出站 / 工具结果 / 知识库入库 / MCP 出口全链路过审 + PII 脱敏 + 提示词注入防护）；审核引擎可选**本地词库 / 外部内容安全 API**（缺端点或密钥自动降级本地词库）；
-- **审计与观测**——会话与消息、工具调用、权限决策、链路追踪、编排运行五类留痕；
+- **审计与观测**——会话与消息、工具调用、权限决策、链路追踪、编排运行、**平台运行日报**六类留痕；其中「平台运行日报」是**定时任务 × 技能**的样板场景：内置专家「平台运维助手」每天 08:00 生成昨日运行日报（五块：用量 / 任务 / 待办 / 权限 / 登录），**数字由服务端现取、模型只出结论**，由写工具 `write_daily_digest` 按日期 upsert 落库，页面只读并提示「近 7 天缺失日期」；
 - **配置项与运行依赖**——`bizbuddy.ai` 配置清单与依赖组件。
 
 ## 技术栈
@@ -107,10 +108,11 @@ RuoYi-Vue-Plus
 | 包 | 职责 |
 |---|---|
 | `core/agent` | 智能体注册与装配、路由编排（入口智能体 → 专家）、权限决策、流式事件桥、工具工厂 |
-| `core/agent/tools` | 内置工具集：部门 / 用户 / 公告 / 角色 / 权限的查询与写入、知识库检索、当前时间等 |
+| `core/agent/tools` | 内置工具集：部门 / 用户 / 公告 / 角色 / 权限的查询与写入、知识库检索、当前时间，以及平台运行日报的只读汇总 / 下钻（`platform_daily_digest` / `platform_daily_drill` / `ai_usage_by_agent`）与写入工具 `write_daily_digest` |
+| `core/digest` | 平台运行日报落库（`DailyDigestPublisher`：五块现取 / 级别解析 / 平稳日压缩 / 按 `digest_date` upsert） |
 | `core/mcp` | 自建 MCP 出口与 MCP 客户端封装（含访问口令校验、工具名归一化） |
 | `core/channel` | 多渠道入站（飞书 / 企业微信 / 钉钉 / GitHub）与运行时注册 |
-| `controller` / `service` | 模型配置、智能体、会话、路由、知识库、文档、MCP、渠道、审计、用量、配额、技能、记忆、场景包等管理接口 |
+| `controller` / `service` | 模型配置、智能体、会话、路由、知识库、文档、MCP、渠道、审计、用量、配额、技能、记忆、场景包、平台运行日报等管理接口 |
 | `job` | 定时 Agent 任务执行器（由 SnailJob 调度） |
 
 关键机制：
@@ -236,6 +238,21 @@ node e2e/run.mjs --base-url http://localhost:8081   # 指向 MySQL 栈（PG 栈�
 ```bash
 node e2e/eval/eval-rag.mjs --base-url http://localhost:8081 --rebuild
 ```
+
+### 浏览器端 e2e（`e2e-ui`）
+
+接口层的 `e2e/` 看不到「页面到底渲染没渲染」。`e2e-ui/` 用 **Playwright 驱动真实 chromium** 打在**已部署的容器栈**上，覆盖登录与路由守卫、**菜单可达性巡检（34 个功能页逐个渲染干净）**、会话主路径（SSE 流式）、指定专家、停止生成、HITL 写工具确认与各配置页。
+
+```bash
+cd e2e-ui
+pnpm install && pnpm run install-browser             # 首次：装依赖 + 下载 chromium
+pnpm test                                            # PG 栈（前端 http://localhost）
+BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test   # MySQL 栈
+```
+
+- 判定为**三条同时成立**：`console.error` / 未捕获异常计数为 0、网络层无 4xx·5xx、关键元素可见（静态资源类噪声在白名单里）；
+- 栈不可达 / 入口智能体未启用 / 未配模型密钥 → **SKIP**（属环境问题，不是代码缺陷）；
+- 因是**重依赖**（`@playwright/test`），**独立目录**承载，刻意不破坏 `e2e/` 的零依赖设计；细节见 [`e2e-ui/README.md`](e2e-ui/README.md)。
 
 ## 文档
 

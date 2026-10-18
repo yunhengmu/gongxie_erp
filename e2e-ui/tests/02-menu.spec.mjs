@@ -1,7 +1,7 @@
 /**
  * 关键路径 ②：菜单可达性巡检。
  *
- * 一次巡检覆盖 BizBuddy 全部 33 个功能页，专抓「改了一处组件、崩了别的页」这类
+ * 一次巡检覆盖 BizBuddy 全部 34 个功能页，专抓「改了一处组件、崩了别的页」这类
  * 跨页回归——这是前端投入产出最高的一条用例。
  *
  * 做法说明（两个刻意的选择）：
@@ -29,7 +29,7 @@ const GROUPS = [
   '/bizbuddy/safety/'
 ];
 
-/** 33 个功能页（顺序与菜单种子一致，便于对照 docs/15） */
+/** 34 个功能页（顺序与菜单种子一致，便于对照 docs/15） */
 const PAGES = [
   // 智能体（13）
   ['/bizbuddy/agent/chat', '对话工作台'],
@@ -59,13 +59,14 @@ const PAGES = [
   ['/bizbuddy/integration/mcp-server', 'MCP 服务端'],
   ['/bizbuddy/integration/mcp-client', 'MCP 客户端'],
   ['/bizbuddy/integration/channel', '渠道接入'],
-  // 审计与观测（6）
+  // 审计与观测（7）
   ['/bizbuddy/audit/message', '消息审计'],
   ['/bizbuddy/audit/toolCall', '工具调用'],
   ['/bizbuddy/audit/permission', '权限决策'],
   ['/bizbuddy/audit/trace', '链路追踪'],
   ['/bizbuddy/audit/routeRun', '编排运行'],
   ['/bizbuddy/audit/health', '健康自检'],
+  ['/bizbuddy/audit/digest', '平台运行日报'],
   // 安全合规（3）
   ['/bizbuddy/safety/safetyWord', '敏感词库'],
   ['/bizbuddy/safety/safetyEvent', '安全事件'],
