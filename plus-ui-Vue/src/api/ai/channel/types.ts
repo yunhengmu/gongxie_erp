@@ -168,3 +168,14 @@ export interface ChannelThreadVO {
   /** 最后活跃时间 */
   lastActiveTime?: string;
 }
+
+export interface ChannelUserLookupVO {
+  /** 是否查到（false 表示手机号不在企业通讯录 / 平台未识别） */
+  found?: boolean;
+  /** 外部用户标识（钉钉 userid / 飞书 open_id）；未查到时为空 */
+  externalUserId?: string;
+  /** 平台返回的用户名（可空；飞书该接口不返回名称） */
+  displayName?: string;
+  /** 平台类型（feishu / dingtalk） */
+  platformType?: string;
+}

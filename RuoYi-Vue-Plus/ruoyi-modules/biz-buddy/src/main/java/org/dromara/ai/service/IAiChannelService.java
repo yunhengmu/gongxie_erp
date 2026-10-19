@@ -7,6 +7,7 @@ import org.dromara.ai.domain.bo.AiChannelIdentityBo;
 import org.dromara.ai.domain.vo.AiChannelIdentityVo;
 import org.dromara.ai.domain.vo.AiChannelThreadVo;
 import org.dromara.ai.domain.vo.AiChannelVo;
+import org.dromara.ai.domain.vo.ChannelUserLookupVo;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.mybatis.core.page.PageQuery;
 
@@ -83,6 +84,18 @@ public interface IAiChannelService {
      * @return 渠道编码清单
      */
     List<String> listEnabledLongConnectionChannelCodes();
+
+    /**
+     * 按手机号查询外部平台的用户标识（钉钉 userid / 飞书 open_id）。
+     *
+     * <p>仅**钉钉与飞书**支持（用渠道已存的应用凭据调平台通讯录接口）；其余平台抛业务异常。
+     * 平台侧未查到该手机号时以返回值的 {@code found=false} 表达，不作为异常。</p>
+     *
+     * @param channelId 渠道主键
+     * @param mobile    11 位手机号
+     * @return 查询结果
+     */
+    ChannelUserLookupVo lookupExternalUserId(Long channelId, String mobile);
 
     // -----------------------------------------------------------------
     //  外部身份映射

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiSecretManager;
 import org.dromara.ai.core.channel.AiChannelStreamStatus;
+import org.dromara.ai.core.channel.AiChannelUserLookupClient;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiChannel;
 import org.dromara.ai.domain.AiChannelIdentity;
@@ -17,6 +18,7 @@ import org.dromara.ai.domain.bo.AiChannelIdentityBo;
 import org.dromara.ai.domain.vo.AiChannelIdentityVo;
 import org.dromara.ai.domain.vo.AiChannelThreadVo;
 import org.dromara.ai.domain.vo.AiChannelVo;
+import org.dromara.ai.domain.vo.ChannelUserLookupVo;
 import org.dromara.ai.mapper.AiChannelIdentityMapper;
 import org.dromara.ai.mapper.AiChannelMapper;
 import org.dromara.ai.mapper.AiChannelThreadMapper;
@@ -38,6 +40,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -71,6 +74,8 @@ public class AiChannelServiceImpl implements IAiChannelService {
     private final AiSecretManager secretManager;
 
     private final AiChannelStreamStatus streamStatus;
+
+    private final AiChannelUserLookupClient userLookupClient;
 
     private final UserService userService;
 
@@ -196,6 +201,54 @@ public class AiChannelServiceImpl implements IAiChannelService {
             .or(f -> f.eq(AiChannel::getPlatformType, AiChannel.PLATFORM_FEISHU)
                 .eq(AiChannel::getMode, AiChannel.MODE_WS)));
         return baseMapper.selectList(lqw).stream().map(AiChannel::getChannelCode).toList();
+    }
+
+    @Override
+    public ChannelUserLookupVo lookupExternalUserId(Long channelId, String mobile) {
+        AiChannel channel = requireChannel(channelId);
+        String platformType = channel.getPlatformType();
+        if (!userLookupClient.supports(platformType)) {
+            throw new ServiceException("该平台暂不支持按手机号查找外部用户标识（仅钉钉 / 飞书支持）");
+        }
+        String normalizedMobile = StringUtils.trim(mobile);
+        String appId = StringUtils.trim(channel.getAppId());
+        requireText(appId, "该渠道未配置应用标识，无法查询");
+        String appSecret = secretManager.decrypt(channel.getAppSecret());
+        requireText(appSecret, "该渠道未配置应用密钥，无法查询");
+
+        ChannelUserLookupVo vo = new ChannelUserLookupVo();
+        vo.setPlatformType(platformType);
+        Optional<AiChannelUserLookupClient.LookupResult> result;
+        try {
+            result = userLookupClient.lookup(platformType, channel.getApiBase(), appId, appSecret, normalizedMobile);
+        } catch (ServiceException e) {
+            log.warn("渠道外部用户标识查询失败：channelCode={}, platform={}, mobile={}, 原因={}",
+                channel.getChannelCode(), platformType, maskMobile(normalizedMobile), e.getMessage());
+            throw e;
+        }
+        if (result.isEmpty()) {
+            vo.setFound(false);
+            return vo;
+        }
+        vo.setFound(true);
+        vo.setExternalUserId(result.get().externalUserId());
+        vo.setDisplayName(result.get().displayName());
+        log.info("渠道外部用户标识查询命中：channelCode={}, platform={}, mobile={}",
+            channel.getChannelCode(), platformType, maskMobile(normalizedMobile));
+        return vo;
+    }
+
+    /**
+     * 手机号脱敏（仅打日志用，避免手机号明文落日志）。
+     *
+     * @param mobile 手机号
+     * @return 脱敏后的手机号
+     */
+    private static String maskMobile(String mobile) {
+        if (StringUtils.isBlank(mobile) || mobile.length() < 7) {
+            return mobile;
+        }
+        return mobile.substring(0, 3) + "****" + mobile.substring(mobile.length() - 4);
     }
 
     // -----------------------------------------------------------------

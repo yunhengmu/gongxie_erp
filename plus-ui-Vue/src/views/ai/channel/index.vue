@@ -127,7 +127,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" align="center" width="130" class-name="small-padding fixed-width">
+            <el-table-column label="操作" align="center" width="170" class-name="small-padding fixed-width">
               <template #default="scope">
                 <el-tooltip content="修改" placement="top">
                   <el-button
@@ -145,6 +145,15 @@
                     type="primary"
                     icon="Delete"
                     @click="handleDelete(scope.row)"
+                  ></el-button>
+                </el-tooltip>
+                <el-tooltip v-if="supportsUserLookup(scope.row)" content="按手机号查平台标识" placement="top">
+                  <el-button
+                    v-hasPermi="['ai:channel:query']"
+                    link
+                    type="primary"
+                    icon="Cellphone"
+                    @click="handleLookup(scope.row)"
                   ></el-button>
                 </el-tooltip>
               </template>
@@ -642,6 +651,60 @@
       </template>
     </el-dialog>
 
+    <!-- 按手机号查外部用户标识 -->
+    <el-dialog v-model="lookupDialog.visible" title="按手机号查找外部用户标识" width="520px" append-to-body>
+      <el-form ref="lookupFormRef" :model="lookupForm" :rules="lookupRules" label-width="110px">
+        <el-form-item label="渠道">
+          <el-input :model-value="lookupDialog.channelName" readonly />
+        </el-form-item>
+        <el-form-item label="手机号" prop="mobile">
+          <el-input
+            v-model="lookupForm.mobile"
+            placeholder="成员在该平台登记的 11 位手机号"
+            clearable
+            @keyup.enter="submitLookup"
+          />
+        </el-form-item>
+      </el-form>
+      <div class="form-tip form-tip-inline">
+        用该渠道已配置的应用凭据向平台查询；号码须已登记在企业通讯录，且应用已开通通讯录读取权限。
+      </div>
+      <el-alert
+        v-if="lookupDialog.searched && !lookupDialog.found"
+        class="lookup-alert"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="未查到该手机号对应的用户"
+        description="请确认号码已登记在企业通讯录、或该应用已获通讯录读取权限。"
+      />
+      <el-descriptions v-if="lookupDialog.found" class="lookup-result" :column="1" size="small" border>
+        <el-descriptions-item label="外部用户标识">
+          <span class="lookup-value">{{ lookupDialog.externalUserId }}</span>
+          <el-button
+            v-copyText="lookupDialog.externalUserId"
+            v-copyText:callback="lookupCopySuccess"
+            link
+            type="primary"
+            icon="CopyDocument"
+            class="lookup-copy"
+          ></el-button>
+        </el-descriptions-item>
+        <el-descriptions-item v-if="lookupDialog.displayName" label="平台用户名">
+          {{ lookupDialog.displayName }}
+        </el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button :loading="lookupDialog.loading" type="primary" @click="submitLookup">查 询</el-button>
+          <el-button v-if="lookupDialog.found" type="success" plain @click="prefillIdentityFromLookup">
+            预填到外部身份映射
+          </el-button>
+          <el-button @click="lookupDialog.visible = false">关 闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <UserSelect ref="userSelectRef" :multiple="false" @confirm-call-back="handlePlatformUserSelected"></UserSelect>
   </div>
 </template>
@@ -663,6 +726,7 @@ import {
   delChannel,
   delIdentity,
   delThread,
+  findExternalUserId,
   getChannel,
   listChannel,
   listIdentity,
@@ -965,6 +1029,91 @@ const handleDelete = async (row?: Partial<ChannelVO>) => {
 };
 
 // ------------------------------------------------------------------
+//  按手机号查外部用户标识
+// ------------------------------------------------------------------
+
+/** 支持按手机号查外部用户标识的平台（企微需独立通讯录 secret、GitHub 无手机号，均不支持） */
+const LOOKUP_PLATFORMS = ['dingtalk', 'feishu'];
+
+/** 该渠道是否展示「查外部用户标识」入口 */
+const supportsUserLookup = (row: Partial<ChannelVO>) => LOOKUP_PLATFORMS.includes(row.platformType || '');
+
+const lookupFormRef = ref<ElFormInstance>();
+const lookupForm = ref<{ mobile?: string }>({ mobile: undefined });
+const lookupDialog = reactive({
+  visible: false,
+  loading: false,
+  searched: false,
+  found: false,
+  channelId: undefined as string | number | undefined,
+  channelName: undefined as string | undefined,
+  externalUserId: undefined as string | undefined,
+  displayName: undefined as string | undefined
+});
+
+const lookupRules: ElFormRules = {
+  mobile: [
+    { required: true, message: '手机号不能为空', trigger: 'blur' },
+    { pattern: /^1\d{10}$/, message: '手机号格式不正确', trigger: 'blur' }
+  ]
+};
+
+/** 打开「按手机号查外部用户标识」弹窗 */
+const handleLookup = (row: Partial<ChannelVO>) => {
+  lookupForm.value = { mobile: undefined };
+  lookupDialog.visible = true;
+  lookupDialog.loading = false;
+  lookupDialog.searched = false;
+  lookupDialog.found = false;
+  lookupDialog.channelId = row.id;
+  lookupDialog.channelName = row.channelName;
+  lookupDialog.externalUserId = undefined;
+  lookupDialog.displayName = undefined;
+  lookupFormRef.value?.clearValidate();
+};
+
+/** 执行查询 */
+const submitLookup = () => {
+  lookupFormRef.value?.validate(async (valid: boolean) => {
+    const channelId = lookupDialog.channelId;
+    const mobile = lookupForm.value.mobile;
+    if (!valid || channelId == null || !mobile) {
+      return;
+    }
+    lookupDialog.loading = true;
+    try {
+      const res = await findExternalUserId(channelId, mobile);
+      const data = res.data;
+      lookupDialog.searched = true;
+      lookupDialog.found = data?.found === true;
+      lookupDialog.externalUserId = data?.externalUserId ?? undefined;
+      lookupDialog.displayName = data?.displayName ?? undefined;
+    } finally {
+      lookupDialog.loading = false;
+    }
+  });
+};
+
+/** 复制成功提示 */
+const lookupCopySuccess = () => {
+  modal.msgSuccess('已复制到剪贴板');
+};
+
+/** 把查询结果预填到「外部身份映射」新增表单 */
+const prefillIdentityFromLookup = () => {
+  const channelId = lookupDialog.channelId;
+  const externalUserId = lookupDialog.externalUserId;
+  if (channelId == null || !externalUserId) {
+    return;
+  }
+  lookupDialog.visible = false;
+  activeTab.value = 'identity';
+  handleIdentityAdd();
+  identityForm.value.channelId = channelId;
+  identityForm.value.externalUserId = externalUserId;
+};
+
+// ------------------------------------------------------------------
 //  外部身份映射
 // ------------------------------------------------------------------
 const identityList = ref<ChannelIdentityVO[]>([]);
@@ -1219,5 +1368,22 @@ getThreadList();
 .callback-path {
   color: var(--el-color-primary);
   font-size: 12px;
+}
+
+.form-tip-inline {
+  margin: -8px 0 12px 110px;
+}
+
+.lookup-alert {
+  margin-bottom: 12px;
+}
+
+.lookup-value {
+  font-family: var(--font-mono, monospace);
+  word-break: break-all;
+}
+
+.lookup-copy {
+  margin-left: 4px;
 }
 </style>
