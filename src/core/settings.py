@@ -101,6 +101,15 @@ class Settings(BaseSettings):
     COMPATIBLE_API_KEY: SecretStr | None = None
     COMPATIBLE_BASE_URL: str | None = None
 
+    # Mellea / vLLM backend (used by core/mellea_client.py)
+    # .env 示例
+    # VLLM_BASE_URL=http://localhost:8000/v1
+    # VLLM_MODEL=Qwen/Qwen3-32B
+    # VLLM_API_KEY=EMPTY
+    VLLM_BASE_URL: str | None = None
+    VLLM_MODEL: str | None = None
+    VLLM_API_KEY: SecretStr | None = None
+
     OPENWEATHERMAP_API_KEY: SecretStr | None = None
 
     # MCP Configuration

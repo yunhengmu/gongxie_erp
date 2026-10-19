@@ -1,60 +1,46 @@
+"""Interrupt + long-term memory demo built on the prebuilt `create_agent`.
+
+The hand-written graph was `background -> determine_birthdate -> generate_response`
+with a `wrap_model` preprocessor. Those three nodes are not part of the model/tool
+loop, so they become three small middleware instead:
+
+1. `BackgroundNoteMiddleware` - one extra model turn before the loop. It stays a
+   separate `before_agent` node, so its message is committed and streamed *before*
+   the interrupt fires (an interrupt rolls back the node it happens in).
+2. `BirthdateMiddleware` - reuses the birthdate from the store, asks the user through
+   `interrupt()` when it is missing, then persists the answer.
+3. `BirthdateResponseMiddleware` - builds the final system prompt from the birthdate.
+
+Async-only: the service drives agents through `astream()`.
+"""
+
 import logging
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from langchain_core.language_models.base import LanguageModelInput
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-from langchain_core.prompts import SystemMessagePromptTemplate
-from langchain_core.runnables import Runnable, RunnableConfig, RunnableLambda, RunnableSerializable
-from langgraph.graph import END, MessagesState, StateGraph
+from langchain.agents import AgentState, create_agent
+from langchain.agents.middleware import AgentMiddleware, ModelRequest, Runtime
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
+from langgraph.config import get_config
 from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
+from agents.middleware import MiddlewareList, ModelSelectionMiddleware, run_model
 from core import get_model, settings
 
-# Added logger
 logger = logging.getLogger(__name__)
 
+BIRTHDATE_KEY = "birthdate"
 
-class AgentState(MessagesState, total=False):
-    """`total=False` is PEP589 specs.
-
-    documentation: https://typing.readthedocs.io/en/latest/spec/typeddict.html#totality
-    """
-
-    birthdate: datetime | None
-
-
-def wrap_model(
-    model: BaseChatModel | Runnable[LanguageModelInput, Any], system_prompt: BaseMessage
-) -> RunnableSerializable[AgentState, Any]:
-    preprocessor = RunnableLambda(
-        lambda state: [system_prompt] + state["messages"],
-        name="StateModifier",
-    )
-    return preprocessor | model
-
-
-background_prompt = SystemMessagePromptTemplate.from_template("""
+BACKGROUND_PROMPT = """
 You are a helpful assistant that tells users there zodiac sign.
 Provide a one sentence summary of the origin of zodiac signs.
 Don't tell the user what their sign is, you are just demonstrating your knowledge on the topic.
-""")
+"""
 
-
-async def background(state: AgentState, config: RunnableConfig) -> AgentState:
-    """This node is to demonstrate doing work before the interrupt"""
-
-    m = get_model(config["configurable"].get("model", settings.DEFAULT_MODEL))
-    model_runnable = wrap_model(m, background_prompt.format())
-    response = await model_runnable.ainvoke(state, config)
-
-    return {"messages": [AIMessage(content=response.content)]}
-
-
-birthdate_extraction_prompt = SystemMessagePromptTemplate.from_template("""
+EXTRACTION_PROMPT = """
 You are an expert at extracting birthdates from conversational text.
 
 Rules for extraction:
@@ -62,117 +48,9 @@ Rules for extraction:
 - Consider various date formats (MM/DD/YYYY, YYYY-MM-DD, Month Day, Year)
 - Validate that the date is reasonable (not in the future)
 - If no clear birthdate was provided by the user, return None
-""")
+"""
 
-
-class BirthdateExtraction(BaseModel):
-    birthdate: str | None = Field(
-        description="The extracted birthdate in YYYY-MM-DD format. If no birthdate is found, this should be None."
-    )
-    reasoning: str = Field(
-        description="Explanation of how the birthdate was extracted or why no birthdate was found"
-    )
-
-
-async def determine_birthdate(
-    state: AgentState, config: RunnableConfig, store: BaseStore
-) -> AgentState:
-    """This node examines the conversation history to determine user's birthdate, checking store first."""
-
-    # Attempt to get user_id for unique storage per user
-    user_id = config["configurable"].get("user_id")
-    logger.info(f"[determine_birthdate] Extracted user_id: {user_id}")
-    namespace = None
-    key = "birthdate"
-    birthdate = None  # Initialize birthdate
-
-    if user_id:
-        # Use user_id in the namespace to ensure uniqueness per user
-        namespace = (user_id,)
-
-        # Check if we already have the birthdate in the store for this user
-        try:
-            result = await store.aget(namespace, key=key)
-            # Handle cases where store.aget might return Item directly or a list
-            user_data = None
-            if result:  # Check if anything was returned
-                if isinstance(result, list):
-                    if result:  # Check if list is not empty
-                        user_data = result[0]
-                else:  # Assume it's the Item object directly
-                    user_data = result
-
-            if user_data and user_data.value.get("birthdate"):
-                # Convert ISO format string back to datetime object
-                birthdate_str = user_data.value["birthdate"]
-                birthdate = datetime.fromisoformat(birthdate_str) if birthdate_str else None
-                # We already have the birthdate, return it
-                logger.info(
-                    f"[determine_birthdate] Found birthdate in store for user {user_id}: {birthdate}"
-                )
-                return {
-                    "birthdate": birthdate,
-                    "messages": [],
-                }
-        except Exception as e:
-            # Log the error or handle cases where the store might be unavailable
-            logger.error(f"Error reading from store for namespace {namespace}, key {key}: {e}")
-            # Proceed with extraction if read fails
-            pass
-    else:
-        # If no user_id, we cannot reliably store/retrieve user-specific data.
-        # Consider logging this situation.
-        logger.warning(
-            "Warning: user_id not found in config. Skipping persistent birthdate storage/retrieval for this run."
-        )
-
-    # If birthdate wasn't retrieved from store, proceed with extraction
-    m = get_model(config["configurable"].get("model", settings.DEFAULT_MODEL))
-    model_runnable = wrap_model(
-        m.with_structured_output(BirthdateExtraction), birthdate_extraction_prompt.format()
-    ).with_config(tags=["skip_stream"])
-    response: BirthdateExtraction = await model_runnable.ainvoke(state, config)
-
-    # If no birthdate found after extraction attempt, interrupt
-    if response.birthdate is None:
-        birthdate_input = interrupt(f"{response.reasoning}\nPlease tell me your birthdate?")
-        # Re-run extraction with the new input
-        state["messages"].append(HumanMessage(birthdate_input))
-        # Note: Recursive call might need careful handling of depth or state updates
-        return await determine_birthdate(state, config, store)
-
-    # Birthdate found - convert string to datetime
-    try:
-        birthdate = datetime.fromisoformat(response.birthdate)
-    except ValueError:
-        # If parsing fails, ask for clarification
-        birthdate_input = interrupt(
-            "I couldn't understand the date format. Please provide your birthdate in YYYY-MM-DD format."
-        )
-        # Re-run extraction with the new input
-        state["messages"].append(HumanMessage(birthdate_input))
-        # Note: Recursive call might need careful handling of depth or state updates
-        return await determine_birthdate(state, config, store)
-
-    # Store the newly extracted birthdate only if we have a user_id
-    if user_id and namespace:
-        # Convert datetime to ISO format string for JSON serialization
-        birthdate_str = birthdate.isoformat() if birthdate else None
-        try:
-            await store.aput(namespace, key, {"birthdate": birthdate_str})
-        except Exception as e:
-            # Log the error or handle cases where the store write might fail
-            logger.error(f"Error writing to store for namespace {namespace}, key {key}: {e}")
-
-    # Return the determined birthdate (either from store or extracted)
-    logger.info(f"[determine_birthdate] Returning birthdate {birthdate} for user {user_id}")
-    return {
-        "birthdate": birthdate,
-        "messages": [],
-    }
-
-
-response_prompt = SystemMessagePromptTemplate.from_template("""
+RESPONSE_PROMPT = """
 You are a helpful assistant.
 
 Known information:
@@ -184,49 +62,169 @@ Based on the known information and the user's message, provide a helpful and rel
 If the user asked for their birthdate, confirm it.
 If the user asked for their zodiac sign, calculate it and tell them.
 Otherwise, respond conversationally based on their message.
-""")
+"""
 
 
-async def generate_response(state: AgentState, config: RunnableConfig) -> AgentState:
-    """Generates the final response based on the user's query and the available birthdate."""
-    birthdate = state.get("birthdate")
-    if state.get("messages") and isinstance(state["messages"][-1], HumanMessage):
-        last_user_message = state["messages"][-1].content
-    else:
-        last_user_message = ""
-
-    if not birthdate:
-        # This should ideally not be reached if determine_birthdate worked correctly and possibly interrupted.
-        # Handle cases where birthdate might still be missing.
-        return {
-            "messages": [
-                AIMessage(
-                    content="I couldn't determine your birthdate. Could you please provide it?"
-                )
-            ]
-        }
-
-    birthdate_str = birthdate.strftime("%B %d, %Y")  # Format for display
-
-    m = get_model(config["configurable"].get("model", settings.DEFAULT_MODEL))
-    model_runnable = wrap_model(
-        m, response_prompt.format(birthdate_str=birthdate_str, last_user_message=last_user_message)
+class BirthdateExtraction(BaseModel):
+    birthdate: str | None = Field(
+        description=(
+            "The extracted birthdate in YYYY-MM-DD format. "
+            "If no birthdate is found, this should be None."
+        )
     )
-    response = await model_runnable.ainvoke(state, config)
+    reasoning: str = Field(
+        description="Explanation of how the birthdate was extracted or why no birthdate was found"
+    )
 
-    return {"messages": [AIMessage(content=response.content)]}
+
+class InterruptAgentState(AgentState):
+    """Agent state plus the (long-term) birthdate resolved for this user."""
+
+    birthdate: datetime | None
 
 
-# Define the graph
-agent = StateGraph(AgentState)
-agent.add_node("background", background)
-agent.add_node("determine_birthdate", determine_birthdate)
-agent.add_node("generate_response", generate_response)
+def _config_value(key: str) -> Any | None:
+    try:
+        config = get_config()
+    except RuntimeError:
+        return None
+    return config.get("configurable", {}).get(key)
 
-agent.set_entry_point("background")
-agent.add_edge("background", "determine_birthdate")
-agent.add_edge("determine_birthdate", "generate_response")
-agent.add_edge("generate_response", END)
 
-interrupt_agent = agent.compile()
-interrupt_agent.name = "interrupt-agent"
+async def _extract_birthdate(messages: list[AnyMessage]) -> tuple[datetime | None, str]:
+    """One extraction attempt; returns the parsed date (if any) and the reasoning."""
+    model = (
+        run_model().with_structured_output(BirthdateExtraction).with_config(tags=["skip_stream"])
+    )
+    result: BirthdateExtraction = await model.ainvoke(
+        [SystemMessage(content=EXTRACTION_PROMPT), *messages]
+    )
+
+    if not result.birthdate:
+        return None, result.reasoning
+    try:
+        return datetime.fromisoformat(result.birthdate), result.reasoning
+    except ValueError:
+        return None, "I couldn't understand the date format."
+
+
+class BackgroundNoteMiddleware(AgentMiddleware[InterruptAgentState, None]):
+    """Run one model turn before the agent loop, as the old `background` node did."""
+
+    async def abefore_agent(
+        self, state: InterruptAgentState, runtime: Runtime
+    ) -> dict[str, Any] | None:
+        response = await run_model().ainvoke(
+            [SystemMessage(content=BACKGROUND_PROMPT), *state["messages"]]
+        )
+        return {"messages": [AIMessage(content=response.content)]}
+
+
+class BirthdateMiddleware(AgentMiddleware[InterruptAgentState, None]):
+    """Resolve the user's birthdate from the store, the conversation, or the user."""
+
+    state_schema = InterruptAgentState
+
+    @staticmethod
+    async def _from_store(store: BaseStore, user_id: str) -> datetime | None:
+        try:
+            item = await store.aget((user_id,), BIRTHDATE_KEY)
+            # Some store implementations return a list for a single key lookup.
+            if isinstance(item, list):
+                item = item[0] if item else None
+            raw = item.value.get("birthdate") if item else None
+            return datetime.fromisoformat(raw) if raw else None
+        except Exception as e:
+            # A missing/broken store should fall back to extraction, not fail the run.
+            logger.error(f"Error reading birthdate for user {user_id}: {e}")
+            return None
+
+    async def abefore_agent(
+        self, state: InterruptAgentState, runtime: Runtime
+    ) -> dict[str, Any] | None:
+        if state.get("birthdate"):
+            return None
+
+        user_id = _config_value("user_id")
+        store: BaseStore | None = runtime.store
+        if user_id and store is not None:
+            if stored := await self._from_store(store, user_id):
+                logger.info(f"Found birthdate in store for user {user_id}: {stored}")
+                return {"birthdate": stored}
+
+        birthdate: datetime | None = None
+        messages = list(state["messages"])
+        for _ in range(2):
+            birthdate, reasoning = await _extract_birthdate(messages)
+            if birthdate is not None:
+                break
+            answer = interrupt(f"{reasoning}\nPlease tell me your birthdate?")
+            messages.append(HumanMessage(content=str(answer)))
+
+        if birthdate is not None and user_id and store is not None:
+            try:
+                await store.aput((user_id,), BIRTHDATE_KEY, {"birthdate": birthdate.isoformat()})
+            except Exception as e:
+                logger.error(f"Error writing birthdate for user {user_id}: {e}")
+
+        logger.info(f"Returning birthdate {birthdate} for user {user_id}")
+        return {"birthdate": birthdate}
+
+
+class BirthdateResponseMiddleware(AgentMiddleware[InterruptAgentState, None]):
+    """Answer with a prompt tailored to the resolved birthdate."""
+
+    state_schema = InterruptAgentState
+
+    @staticmethod
+    def _last_user_message(state: Mapping[str, Any]) -> str:
+        for message in reversed(state["messages"]):
+            if isinstance(message, HumanMessage):
+                return str(message.content)
+        return ""
+
+    def _prompt(self, state: Mapping[str, Any]) -> str:
+        birthdate: datetime | None = state.get("birthdate")
+        return RESPONSE_PROMPT.format(
+            birthdate_str=birthdate.strftime("%B %d, %Y") if birthdate else "unknown",
+            last_user_message=self._last_user_message(state),
+        )
+
+    @staticmethod
+    def _missing_birthdate(state: Mapping[str, Any]) -> AIMessage | None:
+        if state.get("birthdate") is None:
+            return AIMessage(
+                content="I couldn't determine your birthdate. Could you please provide it?"
+            )
+        return None
+
+    def wrap_model_call(self, request: ModelRequest, handler):
+        if fallback := self._missing_birthdate(request.state):
+            return fallback
+        return handler(
+            request.override(system_message=SystemMessage(content=self._prompt(request.state)))
+        )
+
+    async def awrap_model_call(self, request: ModelRequest, handler):
+        if fallback := self._missing_birthdate(request.state):
+            return fallback
+        return await handler(
+            request.override(system_message=SystemMessage(content=self._prompt(request.state)))
+        )
+
+
+middleware: MiddlewareList = [
+    ModelSelectionMiddleware(),
+    # Order matters for the `before_agent` hooks: the background note has to be its own
+    # node so its message is committed before `BirthdateMiddleware` interrupts.
+    BackgroundNoteMiddleware(),
+    BirthdateMiddleware(),
+    BirthdateResponseMiddleware(),
+]
+
+interrupt_agent = create_agent(
+    model=get_model(settings.DEFAULT_MODEL),  # fallback; middleware overrides per call
+    tools=[],
+    middleware=middleware,
+    name="interrupt-agent",
+)

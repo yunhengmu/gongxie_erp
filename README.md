@@ -103,7 +103,7 @@ The repository is structured as follows:
 
 To customize the agent for your own use case:
 
-1. Add your new agent to the `src/agents` directory. You can copy `research_assistant.py` or `chatbot.py` and modify it to change the agent's behavior and tools.
+1. Add your new agent to the `src/agents` directory. Every agent here is built with the prebuilt `create_agent` (`langchain.agents`), so you only declare its model, tools and system prompt: copy `prebuilt_agent.py` for a minimal starting point, or `research_assistant.py` to also see the shared middleware in `src/agents/middleware.py` (runtime model selection, input safeguard, loop limit) wired in.
 1. Import and add your new agent to the `agents` dictionary in `src/agents/agents.py`. Your agent can be called by `/<your_agent_name>/invoke` or `/<your_agent_name>/stream`.
 1. Adjust the Streamlit interface in `src/streamlit_app.py` to match your agent's capabilities.
 

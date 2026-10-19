@@ -1,174 +1,138 @@
+"""Bedrock Knowledge Base RAG agent built on the prebuilt `create_agent`.
+
+The old version was three hand-wired nodes (`retrieve_documents` ->
+`prepare_augmented_prompt` -> `model`) plus a `wrap_model` preprocessor. Retrieval and
+prompt augmentation are now one middleware: it fetches documents before the agent
+starts and injects them into the system prompt for the (single) model call. The agent
+has no tools, so there is nothing else to wire.
+"""
+
 import logging
 import os
 from typing import Any, cast
 
+from langchain.agents import AgentState, create_agent
+from langchain.agents.middleware import AgentMiddleware, ModelRequest, Runtime
 from langchain_aws import AmazonKnowledgeBasesRetriever
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_core.runnables import RunnableConfig, RunnableLambda, RunnableSerializable
-from langchain_core.runnables.base import RunnableSequence
-from langgraph.graph import END, MessagesState, StateGraph
-from langgraph.managed import RemainingSteps
+from langchain_core.messages import HumanMessage, SystemMessage
 
+from agents.middleware import MiddlewareList, ModelSelectionMiddleware
 from core import get_model, settings
 
 logger = logging.getLogger(__name__)
 
+BASE_PROMPT = """You are a helpful assistant that provides accurate information based on retrieved documents.
 
-# Define the state
-class AgentState(MessagesState, total=False):
-    """State for Knowledge Base agent."""
+You will receive a query along with relevant documents retrieved from a knowledge base. Use these documents to inform your response.
 
-    remaining_steps: RemainingSteps
+Follow these guidelines:
+1. Base your answer primarily on the retrieved documents
+2. If the documents contain the answer, provide it clearly and concisely
+3. If the documents are insufficient, state that you don't have enough information
+4. Never make up facts or information not present in the documents
+5. Always cite the source documents when referring to specific information
+6. If the documents contradict each other, acknowledge this and explain the different perspectives
+
+Format your response in a clear, conversational manner. Use markdown formatting when appropriate.
+"""
+
+WITH_DOCUMENTS_PROMPT = (
+    "\n\nI've retrieved the following documents that may be relevant to the query:\n\n"
+    "{documents}\n\nPlease use these documents to inform your response to the user's query. "
+    "Only use information from these documents and clearly indicate when you are unsure."
+)
+
+NO_DOCUMENTS_PROMPT = "\n\nNo relevant documents were found in the knowledge base for this query."
+
+
+class KnowledgeBaseState(AgentState):
+    """Agent state plus the documents retrieved for this turn."""
+
     retrieved_documents: list[dict[str, Any]]
     kb_documents: str
 
 
-# Create the retriever
-def get_kb_retriever():
+def get_kb_retriever() -> AmazonKnowledgeBasesRetriever:
     """Create and return a Knowledge Base retriever instance."""
-    # Get the Knowledge Base ID from environment
     kb_id = os.environ.get("AWS_KB_ID", "")
     if not kb_id:
         raise ValueError("AWS_KB_ID environment variable must be set")
 
-    # Create the retriever with the specified Knowledge Base ID
-    retriever = AmazonKnowledgeBasesRetriever(
+    return AmazonKnowledgeBasesRetriever(
         knowledge_base_id=kb_id,
-        retrieval_config={
-            "vectorSearchConfiguration": {
-                "numberOfResults": 3,
-            }
-        },
-    )
-    return retriever
-
-
-def wrap_model(model: BaseChatModel) -> RunnableSerializable[AgentState, AIMessage]:
-    """Wrap the model with a system prompt for the Knowledge Base agent."""
-
-    def create_system_message(state):
-        base_prompt = """You are a helpful assistant that provides accurate information based on retrieved documents.
-
-        You will receive a query along with relevant documents retrieved from a knowledge base. Use these documents to inform your response.
-
-        Follow these guidelines:
-        1. Base your answer primarily on the retrieved documents
-        2. If the documents contain the answer, provide it clearly and concisely
-        3. If the documents are insufficient, state that you don't have enough information
-        4. Never make up facts or information not present in the documents
-        5. Always cite the source documents when referring to specific information
-        6. If the documents contradict each other, acknowledge this and explain the different perspectives
-
-        Format your response in a clear, conversational manner. Use markdown formatting when appropriate.
-        """
-
-        # Check if documents were retrieved
-        if "kb_documents" in state:
-            # Append document information to the system prompt
-            document_prompt = f"\n\nI've retrieved the following documents that may be relevant to the query:\n\n{state['kb_documents']}\n\nPlease use these documents to inform your response to the user's query. Only use information from these documents and clearly indicate when you are unsure."
-            return [SystemMessage(content=base_prompt + document_prompt)] + state["messages"]
-        else:
-            # No documents were retrieved
-            no_docs_prompt = (
-                "\n\nNo relevant documents were found in the knowledge base for this query."
-            )
-            return [SystemMessage(content=base_prompt + no_docs_prompt)] + state["messages"]
-
-    preprocessor = RunnableLambda(
-        create_system_message,
-        name="StateModifier",
-    )
-    return RunnableSequence(preprocessor, model)
-
-
-async def retrieve_documents(state: AgentState, config: RunnableConfig) -> AgentState:
-    """Retrieve relevant documents from the knowledge base."""
-    # Get the last human message
-    human_messages = [msg for msg in state["messages"] if isinstance(msg, HumanMessage)]
-    if not human_messages:
-        # Include messages from original state
-        return {"messages": [], "retrieved_documents": []}
-
-    # Use the last human message as the query
-    query = cast(str, human_messages[-1].content)
-
-    try:
-        # Initialize the retriever
-        retriever = get_kb_retriever()
-
-        # Retrieve documents
-        retrieved_docs = await retriever.ainvoke(query)
-
-        # Create document summaries for the state
-        document_summaries = []
-        for i, doc in enumerate(retrieved_docs, 1):
-            summary = {
-                "id": doc.metadata.get("id", f"doc-{i}"),
-                "source": doc.metadata.get("source", "Unknown"),
-                "title": doc.metadata.get("title", f"Document {i}"),
-                "content": doc.page_content,
-                "relevance_score": doc.metadata.get("score", 0),
-            }
-            document_summaries.append(summary)
-
-        logger.info(f"Retrieved {len(document_summaries)} documents for query: {query[:50]}...")
-
-        return {"retrieved_documents": document_summaries, "messages": []}
-
-    except Exception as e:
-        logger.error(f"Error retrieving documents: {str(e)}")
-        return {"retrieved_documents": [], "messages": []}
-
-
-async def prepare_augmented_prompt(state: AgentState, config: RunnableConfig) -> AgentState:
-    """Prepare a prompt augmented with retrieved document content."""
-    # Get retrieved documents
-    documents = state.get("retrieved_documents", [])
-
-    if not documents:
-        return {"messages": []}
-
-    # Format retrieved documents for the model
-    formatted_docs = "\n\n".join(
-        [
-            f"--- Document {i + 1} ---\n"
-            f"Source: {doc.get('source', 'Unknown')}\n"
-            f"Title: {doc.get('title', 'Unknown')}\n\n"
-            f"{doc.get('content', '')}"
-            for i, doc in enumerate(documents)
-        ]
+        retrieval_config={"vectorSearchConfiguration": {"numberOfResults": 3}},
     )
 
-    # Store formatted documents in the state
-    return {"kb_documents": formatted_docs, "messages": []}
+
+def _summarize(documents: list[Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": doc.metadata.get("id", f"doc-{i}"),
+            "source": doc.metadata.get("source", "Unknown"),
+            "title": doc.metadata.get("title", f"Document {i}"),
+            "content": doc.page_content,
+            "relevance_score": doc.metadata.get("score", 0),
+        }
+        for i, doc in enumerate(documents, 1)
+    ]
 
 
-async def acall_model(state: AgentState, config: RunnableConfig) -> AgentState:
-    """Generate a response based on the retrieved documents."""
-    m = get_model(config["configurable"].get("model", settings.DEFAULT_MODEL))
-    model_runnable = wrap_model(m)
+def _format(documents: list[dict[str, Any]]) -> str:
+    return "\n\n".join(
+        f"--- Document {i} ---\n"
+        f"Source: {doc.get('source', 'Unknown')}\n"
+        f"Title: {doc.get('title', 'Unknown')}\n\n"
+        f"{doc.get('content', '')}"
+        for i, doc in enumerate(documents, 1)
+    )
 
-    response = await model_runnable.ainvoke(state, config)
 
-    return {"messages": [response]}
+class KnowledgeBaseMiddleware(AgentMiddleware[KnowledgeBaseState, None]):
+    """Retrieve documents before the run, then put them in the system prompt.
+
+    Async-only: the service drives agents through `astream()`, and the retriever call
+    is the only reason this hook needs I/O at all.
+    """
+
+    state_schema = KnowledgeBaseState
+
+    async def abefore_agent(
+        self, state: KnowledgeBaseState, runtime: Runtime
+    ) -> dict[str, Any] | None:
+        human_messages = [msg for msg in state["messages"] if isinstance(msg, HumanMessage)]
+        if not human_messages:
+            return {"retrieved_documents": [], "kb_documents": ""}
+
+        query = cast(str, human_messages[-1].content)
+        try:
+            documents = await get_kb_retriever().ainvoke(query)
+        except Exception as e:
+            logger.error(f"Error retrieving documents: {e}")
+            return {"retrieved_documents": [], "kb_documents": ""}
+
+        summaries = _summarize(documents)
+        logger.info(f"Retrieved {len(summaries)} documents for query: {query[:50]}...")
+        return {"retrieved_documents": summaries, "kb_documents": _format(summaries)}
+
+    def _augment(self, request: ModelRequest) -> ModelRequest:
+        documents = request.state.get("kb_documents")
+        prompt = BASE_PROMPT + (
+            WITH_DOCUMENTS_PROMPT.format(documents=documents) if documents else NO_DOCUMENTS_PROMPT
+        )
+        return request.override(system_message=SystemMessage(content=prompt))
+
+    def wrap_model_call(self, request: ModelRequest, handler):
+        return handler(self._augment(request))
+
+    async def awrap_model_call(self, request: ModelRequest, handler):
+        return await handler(self._augment(request))
 
 
-# Define the graph
-agent = StateGraph(AgentState)
+middleware: MiddlewareList = [ModelSelectionMiddleware(), KnowledgeBaseMiddleware()]
 
-# Add nodes
-agent.add_node("retrieve_documents", retrieve_documents)
-agent.add_node("prepare_augmented_prompt", prepare_augmented_prompt)
-agent.add_node("model", acall_model)
-
-# Set entry point
-agent.set_entry_point("retrieve_documents")
-
-# Add edges to define the flow
-agent.add_edge("retrieve_documents", "prepare_augmented_prompt")
-agent.add_edge("prepare_augmented_prompt", "model")
-agent.add_edge("model", END)
-
-# Compile the agent
-kb_agent = agent.compile()
+kb_agent = create_agent(
+    model=get_model(settings.DEFAULT_MODEL),  # fallback; middleware overrides per call
+    tools=[],
+    middleware=middleware,
+    name="knowledge-base-agent",
+)

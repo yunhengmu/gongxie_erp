@@ -1,23 +1,19 @@
-from langchain_core.messages import BaseMessage
-from langchain_core.runnables import RunnableConfig
-from langgraph.func import entrypoint
+"""Plain chatbot: one model call per turn, no tools.
 
+Previously an `@entrypoint` function that hand-managed conversation history through
+`entrypoint.final(save=...)`. `create_agent` keeps the message list in state for us
+(the service attaches the checkpointer), so the only thing left to declare is the
+model - plus the shared middleware that honours the UI's model selector.
+"""
+
+from langchain.agents import create_agent
+
+from agents.middleware import ModelSelectionMiddleware
 from core import get_model, settings
 
-
-@entrypoint()
-async def chatbot(
-    inputs: dict[str, list[BaseMessage]],
-    *,
-    previous: dict[str, list[BaseMessage]],
-    config: RunnableConfig,
-):
-    messages = inputs["messages"]
-    if previous:
-        messages = previous["messages"] + messages
-
-    model = get_model(config["configurable"].get("model", settings.DEFAULT_MODEL))
-    response = await model.ainvoke(messages)
-    return entrypoint.final(
-        value={"messages": [response]}, save={"messages": messages + [response]}
-    )
+chatbot = create_agent(
+    model=get_model(settings.DEFAULT_MODEL),  # fallback; middleware overrides per call
+    tools=[],
+    middleware=[ModelSelectionMiddleware()],
+    name="chatbot",
+)

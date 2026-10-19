@@ -1,3 +1,10 @@
+"""Command-routing demo - intentionally kept as a raw `StateGraph`.
+
+This agent has no model and no tool loop: its purpose is to show `Command(update=...,
+goto=...)` replacing conditional edges, which `create_agent` cannot express. It is the
+only agent in this package that stays hand-wired.
+"""
+
 import random
 from typing import Literal
 

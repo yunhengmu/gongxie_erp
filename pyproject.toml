@@ -58,6 +58,7 @@ dependencies = [
     "langchain-mcp-adapters>=0.3.0",
     "ddgs>=9.14.4",
     "ag-ui-langgraph~=0.0.42",
+    "mellea",
 ]
 
 # Supply-chain cooldown: resolution only considers releases >=14 days old. Needs the
@@ -65,6 +66,10 @@ dependencies = [
 # Policy and override procedure: .claude/skills/dependency-refresh/SKILL.md
 [tool.uv]
 exclude-newer = "14 days"
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
 
 [dependency-groups]
 dev = [
