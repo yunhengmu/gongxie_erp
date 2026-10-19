@@ -5,6 +5,7 @@ import type {
   ChannelIdentityVO,
   ChannelQuery,
   ChannelThreadVO,
+  ChannelUserLookupVO,
   ChannelVO
 } from '@/api/ai/channel/types';
 import type { AgentVO } from '@/api/ai/agent/types';
@@ -77,6 +78,19 @@ export const delChannel = (id: string | number | Array<string | number>) => {
   return request({
     url: '/ai/channel/' + id,
     method: 'delete'
+  });
+};
+
+/**
+ * 按手机号查询外部用户标识（仅钉钉 / 飞书渠道支持）
+ * @param id 渠道主键
+ * @param mobile 11 位手机号
+ */
+export const findExternalUserId = (id: string | number, mobile: string): AxiosPromise<ChannelUserLookupVO> => {
+  return request({
+    url: '/ai/channel/' + id + '/external-user-id',
+    method: 'get',
+    params: { mobile }
   });
 };
 

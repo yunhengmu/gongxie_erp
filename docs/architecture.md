@@ -117,7 +117,7 @@ flowchart LR
 ## 7. 定时与多渠道
 
 - **定时任务**：AI 任务由 SnailJob 调度（`ruoyi-extend/ruoyi-snailjob-server` + `ruoyi-job`）——任务只按 cron 调用智能体并记执行记录（`ai_agent_task_run`），**不承载场景化投递**（场景产出由智能体自己用工具完成）。无人值守链路**没有人类可确认**：命中「需确认」档的写工具被改写为**拒绝**（不暂停、不悬挂），只有**显式配为「允许」**的写工具才会执行——典型例子是**平台运行日报**：专家 `platform_ops` 调 `write_daily_digest` 把五块结果 upsert 进 `ai_daily_digest`（落库属于「记录」，不是状态变更）；
-- **渠道入站**：飞书 / 企业微信 / 钉钉 / GitHub Webhook 回调，安全边界由平台验签/解密与渠道口令承担（见 `application.yml` 的 `security.excludes`）。
+- **渠道入站**：**Webhook 平台**（飞书 / 企业微信 / GitHub）由外部平台回调驱动，安全边界由平台验签 / 解密与渠道口令承担（见 `application.yml` 的 `security.excludes`）；**长连接**渠道（钉钉、飞书 `mode=ws`）由应用主动外连、**免公网 IP 与回调地址**——生命周期统一由 `AiChannelRuntimeRegistry` 承载（应用就绪后拉起、配置变更**先停后建**、关闭时全停），入站报文经各平台 mapper 归一化后走**同一条**无人值守链路（钉钉零依赖自实现，飞书用官方 Larksuite OAPI SDK 薄封装）。渠道管理面另提供「按手机号查外部用户标识」辅助接口（`GET /ai/channel/{id}/external-user-id`，仅钉钉 / 飞书；由无状态客户端 `AiChannelUserLookupClient` 用渠道已存凭据调平台通讯录接口）。
 
 ## 8. 相关文档
 

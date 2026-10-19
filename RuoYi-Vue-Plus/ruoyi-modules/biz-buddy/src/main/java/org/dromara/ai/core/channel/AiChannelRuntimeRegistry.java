@@ -21,9 +21,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * 渠道配置（凭据 / 默认智能体 / 启停）变更后指纹变化，下一次装配即**自动重建**，
  * 无需重启应用。</p>
  *
- * <p><b>长连接平台（钉钉）与 Webhook 平台的区别</b>：Webhook 平台由外部平台回调驱动，
- * 装配在被回调时按需建立即可；钉钉需**应用主动建连**，故本类额外承担其生命周期：
- * ① 应用就绪后按启用中的钉钉渠道拉起连接（{@link #startLongConnectionChannels()}）；
+ * <p><b>长连接渠道（钉钉 / 飞书 {@code mode=ws}）与 Webhook 平台的区别</b>：Webhook 平台由外部平台回调驱动，
+ * 装配在被回调时按需建立即可；长连接渠道需**应用主动建连**，故本类额外承担其生命周期：
+ * ① 应用就绪后按启用中的长连接渠道拉起连接（{@link #startLongConnectionChannels()}）；
  * ② 管理面保存 / 删除渠道后由控制层调用 {@link #refresh(String)} 重建或断连；
  * ③ 应用关闭时 {@link #shutdown()} 全部停机。</p>
  *
@@ -56,11 +56,11 @@ public class AiChannelRuntimeRegistry {
     private final Map<String, AiChannelRuntime> cache = new ConcurrentHashMap<>();
 
     /**
-     * 应用就绪后拉起启用中的长连接渠道（钉钉）。
+     * 应用就绪后拉起启用中的长连接渠道（钉钉 / 飞书 mode=ws）。
      */
     @EventListener(ApplicationReadyEvent.class)
     public void startLongConnectionChannels() {
-        List<String> codes = channelService.listEnabledChannelCodes(AiChannel.PLATFORM_DINGTALK);
+        List<String> codes = channelService.listEnabledLongConnectionChannelCodes();
         for (String code : codes) {
             resolve(code);
         }
@@ -147,7 +147,7 @@ public class AiChannelRuntimeRegistry {
     private void startRuntime(AiChannelRuntime runtime) {
         try {
             runtime.start();
-            if (AiChannel.PLATFORM_DINGTALK.equals(runtime.getPlatformType())) {
+            if (runtime.isLongConnection()) {
                 streamStatus.markRunning(runtime.getChannelCode());
             }
         } catch (Exception e) {

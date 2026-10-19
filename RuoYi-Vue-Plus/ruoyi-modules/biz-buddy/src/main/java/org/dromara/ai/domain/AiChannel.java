@@ -47,6 +47,16 @@ public class AiChannel extends BaseEntity {
     public static final String PLATFORM_DINGTALK = "dingtalk";
 
     /**
+     * 接入形态：Webhook 回调（默认；由外部平台回调驱动，要求平台公网可达）
+     */
+    public static final String MODE_WEBHOOK = "webhook";
+
+    /**
+     * 接入形态：长连接（应用主动外连、免公网 IP；目前仅飞书支持）
+     */
+    public static final String MODE_WS = "ws";
+
+    /**
      * 状态：启用
      */
     public static final String STATUS_ENABLED = "0";
@@ -76,6 +86,12 @@ public class AiChannel extends BaseEntity {
      * 平台类型（feishu / wecom / github / dingtalk）
      */
     private String platformType;
+
+    /**
+     * 接入形态（webhook / ws）。Webhook 由外部平台回调驱动；长连接由应用主动外连、免公网 IP。
+     * 钉钉恒为长连接，不读本字段；飞书按本字段在 Webhook / 长连接间二选一（对应飞书后台「事件订阅方式」）。
+     */
+    private String mode;
 
     /**
      * 默认智能体（ai_agent.id）

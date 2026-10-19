@@ -1,8 +1,10 @@
 package org.dromara.ai.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.dromara.ai.core.channel.AiChannelRuntimeRegistry;
 import org.dromara.ai.domain.bo.AiChannelBo;
@@ -11,6 +13,7 @@ import org.dromara.ai.domain.vo.AiAgentVo;
 import org.dromara.ai.domain.vo.AiChannelIdentityVo;
 import org.dromara.ai.domain.vo.AiChannelThreadVo;
 import org.dromara.ai.domain.vo.AiChannelVo;
+import org.dromara.ai.domain.vo.ChannelUserLookupVo;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiChannelService;
 import org.dromara.common.core.domain.PageResult;
@@ -86,6 +89,22 @@ public class AiChannelController extends BaseController {
     public R<AiChannelVo> getInfo(@NotNull(message = "主键不能为空")
                                   @PathVariable("id") Long id) {
         return R.ok(aiChannelService.queryById(id));
+    }
+
+    /**
+     * 按手机号查询外部用户标识（辅助绑定「外部身份映射」；仅钉钉 / 飞书渠道支持）
+     *
+     * @param id     渠道主键
+     * @param mobile 11 位手机号
+     */
+    @SaCheckPermission("ai:channel:query")
+    @GetMapping("/{id}/external-user-id")
+    public R<ChannelUserLookupVo> externalUserId(@NotNull(message = "主键不能为空")
+                                                 @PathVariable("id") Long id,
+                                                 @NotBlank(message = "手机号不能为空")
+                                                 @Pattern(regexp = "^1\\d{10}$", message = "手机号格式不正确")
+                                                 @RequestParam("mobile") String mobile) {
+        return R.ok(aiChannelService.lookupExternalUserId(id, mobile));
     }
 
     /**

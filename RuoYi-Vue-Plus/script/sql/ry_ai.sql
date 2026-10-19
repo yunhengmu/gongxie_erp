@@ -61,6 +61,7 @@ SET NAMES utf8mb4;
 --   drop table if exists ai_agent_task;
 --   drop table if exists ai_channel_thread;
 --   drop table if exists ai_channel_identity;
+--   alter table ai_channel drop column mode;  -- 存量库仅回退增量列（全新库直接删表即可）
 --   drop table if exists ai_channel;
 --   drop table if exists ai_agent_subagent;
 --   drop table if exists ai_subagent;
@@ -894,6 +895,7 @@ create table if not exists ai_channel (
     channel_name       varchar(100) not null comment '渠道名称',
     channel_code       varchar(64)  not null comment '渠道编码（唯一，回调地址中的路径标识）',
     platform_type      varchar(20)  not null comment '平台类型：feishu 飞书 / wecom 企业微信 / github GitHub / dingtalk 钉钉（长连接）',
+    mode               varchar(16)  not null default 'webhook' comment '接入形态：webhook Webhook 回调（默认，需平台公网可达） / ws 长连接（应用主动外连、免公网 IP；仅飞书区分）',
     agent_id           bigint(20)       not null comment '默认智能体（ai_agent.id）',
     app_id             varchar(200) comment '应用标识（飞书 appId / 企微 corpId / 钉钉 AppKey；GitHub 为空）',
     app_secret         varchar(500) comment '应用密钥（AES 密文；飞书 appSecret / 企微 secret / 钉钉 AppSecret）',
@@ -914,6 +916,22 @@ create table if not exists ai_channel (
     constraint pk_ai_channel primary key (id),
     unique key uk_ai_channel_code (channel_code, (if(del_flag = '0', 0, null)))
 ) engine=innodb default charset=utf8mb4 comment='AI 渠道接入配置（REQ-AI-24）';
+
+-- 存量库增量（幂等）：为已存在的 ai_channel 补充接入形态列。
+-- MySQL 8.0 不支持 ADD COLUMN IF NOT EXISTS，故用 information_schema 判断后动态执行；全新库由上方建表语句
+-- 已含该列，重复执行安全（需客户端支持 DELIMITER 指令）。
+delimiter //
+drop procedure if exists add_ai_channel_mode_column //
+create procedure add_ai_channel_mode_column()
+begin
+    if not exists (select 1 from information_schema.columns
+                   where table_schema = database() and table_name = 'ai_channel' and column_name = 'mode') then
+        alter table ai_channel add column mode varchar(16) not null default 'webhook' comment '接入形态：webhook Webhook 回调（默认，需平台公网可达） / ws 长连接（应用主动外连、免公网 IP；仅飞书区分）';
+    end if;
+end //
+delimiter ;
+call add_ai_channel_mode_column();
+drop procedure if exists add_ai_channel_mode_column;
 
 create table if not exists ai_channel_identity (
     id               bigint(20)       not null,

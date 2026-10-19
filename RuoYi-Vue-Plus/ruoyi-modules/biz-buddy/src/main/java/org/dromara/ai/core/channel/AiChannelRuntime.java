@@ -49,7 +49,8 @@ import java.util.function.Consumer;
  * 以便纳入会话、消息、工具明细、配额与链路追踪等治理面。</p>
  *
  * <p>构件本身无外部依赖、构造期不发网络请求，可随配置变更安全重建。
- * 钉钉为**长连接**（无回调地址），额外持有 {@link DingTalkStreamClient}，
+ * **长连接**渠道（钉钉恒为长连接；飞书按 {@code mode=ws}）无回调地址，额外持有长连接客户端
+ * （钉钉 {@link DingTalkStreamClient} / 飞书 {@link FeishuStreamClient}），
  * 由 {@link #start()} / {@link #stop()} 管理连接生命周期。</p>
  *
  * @author BizBuddy
@@ -209,7 +210,12 @@ public final class AiChannelRuntime {
     private final DingTalkStreamClient dingTalkStream;
 
     /**
-     * 归一化入站消息的处理入口（钉钉长连接用它接收报文；Webhook 平台不使用）
+     * 飞书：长连接客户端（仅 {@code mode=ws} 的飞书渠道构建，其余为 null）；由 {@link #start()} / {@link #stop()} 管理
+     */
+    private final FeishuStreamClient feishuStream;
+
+    /**
+     * 归一化入站消息的处理入口（长连接用它接收报文；Webhook 平台不使用）
      */
     private final Consumer<InboundMessage> inboundHandler;
 
@@ -241,13 +247,19 @@ public final class AiChannelRuntime {
         DingTalkStreamClient dingTalkStreamLocal = null;
         DingTalkAccessTokenProvider dingTalkTokenProviderLocal = null;
         String dingTalkRobotCodeLocal = null;
+        FeishuStreamClient feishuStreamLocal = null;
         String resolvedBase = null;
 
         switch (channel.getPlatformType()) {
             case AiChannel.PLATFORM_FEISHU -> {
                 String base = StringUtils.isBlank(apiBase) ? DEFAULT_FEISHU_API_BASE : apiBase;
                 resolvedBase = base;
-                if (StringUtils.isNotBlank(channel.getEncryptKey())) {
+                if (AiChannel.MODE_WS.equals(channel.getMode())) {
+                    // 长连接：建连即鉴权、报文明文，不建验签 / 解密件；
+                    // 出站回复与媒体下载仍走 OpenAPI，故 token 提供者与出站客户端照常装配。
+                    feishuStreamLocal = new FeishuStreamClient(
+                        channel.getAppId(), channel.getAppSecret(), base, this::onFeishuPayload);
+                } else if (StringUtils.isNotBlank(channel.getEncryptKey())) {
                     feishuCryptoLocal = new FeishuCrypto(channel.getEncryptKey());
                 }
                 feishuTokenProviderLocal =
@@ -315,6 +327,7 @@ public final class AiChannelRuntime {
         this.dingTalkMapper = dingTalkMapperLocal;
         this.dingTalkOutbound = dingTalkOutboundLocal;
         this.dingTalkStream = dingTalkStreamLocal;
+        this.feishuStream = feishuStreamLocal;
         this.feishuTokenProvider = feishuTokenProviderLocal;
         this.weComTokenProvider = weComTokenProviderLocal;
         this.dingTalkTokenProvider = dingTalkTokenProviderLocal;
@@ -352,13 +365,29 @@ public final class AiChannelRuntime {
     }
 
     /**
-     * 启动渠道的运行期资源：钉钉建立长连接（其它平台为 no-op，由外部平台回调驱动）。
+     * 是否为「长连接」渠道（无回调地址，需由应用主动建连）：钉钉恒为长连接，飞书按 {@code mode=ws} 判定。
+     *
+     * @return true 表示本渠道持有长连接客户端
+     */
+    public boolean isLongConnection() {
+        return dingTalkStream != null || feishuStream != null;
+    }
+
+    /**
+     * 启动渠道的运行期资源：长连接渠道主动建连（Webhook 平台为 no-op，由外部平台回调驱动）。
      */
     public void start() {
-        if (dingTalkStream == null) {
+        if (feishuStream != null) {
+            try {
+                feishuStream.start();
+            } catch (Exception e) {
+                throw new IllegalStateException("飞书长连接启动失败：" + e.getMessage(), e);
+            }
+        } else if (dingTalkStream != null) {
+            dingTalkStream.start();
+        } else {
             return;
         }
-        dingTalkStream.start();
         log.info("渠道长连接已启动：channelCode={}", channelCode);
     }
 
@@ -366,10 +395,13 @@ public final class AiChannelRuntime {
      * 停止渠道的运行期资源并释放连接。
      */
     public void stop() {
-        if (dingTalkStream == null) {
+        if (feishuStream != null) {
+            feishuStream.stop();
+        } else if (dingTalkStream != null) {
+            dingTalkStream.stop();
+        } else {
             return;
         }
-        dingTalkStream.stop();
         log.info("渠道长连接已停止：channelCode={}", channelCode);
     }
 
@@ -397,6 +429,36 @@ public final class AiChannelRuntime {
         }
         if (inboundHandler == null) {
             log.warn("钉钉长连接未配置入站处理入口，丢弃消息：channelCode={}", channelCode);
+            return;
+        }
+        inboundHandler.accept(message);
+    }
+
+    /**
+     * 飞书长连接入站报文处理：幂等（event_id）→ 归一化 → 防自环 → 交上层处理。
+     *
+     * <p>与钉钉长连接及三个 Webhook 平台同口径：非文本 / 结构异常静默丢弃，不落库、不执行。
+     * 报文为 schema 2.0 信封明文，直接交给 {@link FeishuInboundMapper}（与飞书 Webhook 形态同一份解析）。</p>
+     *
+     * @param payload 飞书长连接下发的事件报文（schema 2.0 信封）
+     */
+    private void onFeishuPayload(JsonNode payload) {
+        Optional<String> eventId = FeishuInboundMapper.extractEventId(payload);
+        if (eventId.isPresent() && !idempotency.firstSeen(channelCode + "|" + eventId.get())) {
+            log.debug("飞书长连接重复事件被丢弃：channelCode={}, eventId={}", channelCode, eventId.get());
+            return;
+        }
+        Optional<InboundMessage> inbound = feishuMapper.map(payload);
+        if (inbound.isEmpty()) {
+            return;
+        }
+        InboundMessage message = inbound.get();
+        if (!rateLimiter.allow(channelCode, message.peer().key())) {
+            log.warn("飞书长连接触发防自环限流：channelCode={}, peer={}", channelCode, message.peer().key());
+            return;
+        }
+        if (inboundHandler == null) {
+            log.warn("飞书长连接未配置入站处理入口，丢弃消息：channelCode={}", channelCode);
             return;
         }
         inboundHandler.accept(message);

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiSecretManager;
 import org.dromara.ai.core.channel.AiChannelStreamStatus;
+import org.dromara.ai.core.channel.AiChannelUserLookupClient;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiChannel;
 import org.dromara.ai.domain.AiChannelIdentity;
@@ -17,6 +18,7 @@ import org.dromara.ai.domain.bo.AiChannelIdentityBo;
 import org.dromara.ai.domain.vo.AiChannelIdentityVo;
 import org.dromara.ai.domain.vo.AiChannelThreadVo;
 import org.dromara.ai.domain.vo.AiChannelVo;
+import org.dromara.ai.domain.vo.ChannelUserLookupVo;
 import org.dromara.ai.mapper.AiChannelIdentityMapper;
 import org.dromara.ai.mapper.AiChannelMapper;
 import org.dromara.ai.mapper.AiChannelThreadMapper;
@@ -38,6 +40,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -72,6 +75,8 @@ public class AiChannelServiceImpl implements IAiChannelService {
 
     private final AiChannelStreamStatus streamStatus;
 
+    private final AiChannelUserLookupClient userLookupClient;
+
     private final UserService userService;
 
     @Override
@@ -98,6 +103,7 @@ public class AiChannelServiceImpl implements IAiChannelService {
         add.setChannelName(StringUtils.trim(bo.getChannelName()));
         add.setChannelCode(StringUtils.trim(bo.getChannelCode()));
         add.setPlatformType(normalizePlatformType(bo.getPlatformType()));
+        add.setMode(normalizeMode(bo.getMode()));
         add.setApiBase(StringUtils.trim(bo.getApiBase()));
         add.setPlatformAgentId(StringUtils.trim(bo.getPlatformAgentId()));
         add.setAppId(StringUtils.trim(bo.getAppId()));
@@ -123,6 +129,7 @@ public class AiChannelServiceImpl implements IAiChannelService {
         update.setChannelName(StringUtils.trim(bo.getChannelName()));
         update.setChannelCode(StringUtils.trim(bo.getChannelCode()));
         update.setPlatformType(normalizePlatformType(bo.getPlatformType()));
+        update.setMode(normalizeMode(bo.getMode()));
         update.setApiBase(StringUtils.trim(bo.getApiBase()));
         update.setPlatformAgentId(StringUtils.trim(bo.getPlatformAgentId()));
         update.setAppId(StringUtils.trim(bo.getAppId()));
@@ -170,6 +177,7 @@ public class AiChannelServiceImpl implements IAiChannelService {
         runtime.setId(channel.getId());
         runtime.setChannelCode(channel.getChannelCode());
         runtime.setPlatformType(channel.getPlatformType());
+        runtime.setMode(channel.getMode());
         runtime.setAgentId(channel.getAgentId());
         runtime.setAppId(channel.getAppId());
         runtime.setAppSecret(secretManager.decrypt(channel.getAppSecret()));
@@ -184,15 +192,63 @@ public class AiChannelServiceImpl implements IAiChannelService {
     }
 
     @Override
-    public List<String> listEnabledChannelCodes(String platformType) {
-        if (StringUtils.isBlank(platformType)) {
-            return List.of();
-        }
+    public List<String> listEnabledLongConnectionChannelCodes() {
         LambdaQueryWrapper<AiChannel> lqw = Wrappers.lambdaQuery();
         lqw.select(AiChannel::getChannelCode);
-        lqw.eq(AiChannel::getPlatformType, platformType);
         lqw.eq(AiChannel::getStatus, AiChannel.STATUS_ENABLED);
+        // 钉钉恒为长连接；飞书仅 mode=ws 时长连接（其余为 Webhook，由外部平台回调驱动）
+        lqw.and(w -> w.eq(AiChannel::getPlatformType, AiChannel.PLATFORM_DINGTALK)
+            .or(f -> f.eq(AiChannel::getPlatformType, AiChannel.PLATFORM_FEISHU)
+                .eq(AiChannel::getMode, AiChannel.MODE_WS)));
         return baseMapper.selectList(lqw).stream().map(AiChannel::getChannelCode).toList();
+    }
+
+    @Override
+    public ChannelUserLookupVo lookupExternalUserId(Long channelId, String mobile) {
+        AiChannel channel = requireChannel(channelId);
+        String platformType = channel.getPlatformType();
+        if (!userLookupClient.supports(platformType)) {
+            throw new ServiceException("该平台暂不支持按手机号查找外部用户标识（仅钉钉 / 飞书支持）");
+        }
+        String normalizedMobile = StringUtils.trim(mobile);
+        String appId = StringUtils.trim(channel.getAppId());
+        requireText(appId, "该渠道未配置应用标识，无法查询");
+        String appSecret = secretManager.decrypt(channel.getAppSecret());
+        requireText(appSecret, "该渠道未配置应用密钥，无法查询");
+
+        ChannelUserLookupVo vo = new ChannelUserLookupVo();
+        vo.setPlatformType(platformType);
+        Optional<AiChannelUserLookupClient.LookupResult> result;
+        try {
+            result = userLookupClient.lookup(platformType, channel.getApiBase(), appId, appSecret, normalizedMobile);
+        } catch (ServiceException e) {
+            log.warn("渠道外部用户标识查询失败：channelCode={}, platform={}, mobile={}, 原因={}",
+                channel.getChannelCode(), platformType, maskMobile(normalizedMobile), e.getMessage());
+            throw e;
+        }
+        if (result.isEmpty()) {
+            vo.setFound(false);
+            return vo;
+        }
+        vo.setFound(true);
+        vo.setExternalUserId(result.get().externalUserId());
+        vo.setDisplayName(result.get().displayName());
+        log.info("渠道外部用户标识查询命中：channelCode={}, platform={}, mobile={}",
+            channel.getChannelCode(), platformType, maskMobile(normalizedMobile));
+        return vo;
+    }
+
+    /**
+     * 手机号脱敏（仅打日志用，避免手机号明文落日志）。
+     *
+     * @param mobile 手机号
+     * @return 脱敏后的手机号
+     */
+    private static String maskMobile(String mobile) {
+        if (StringUtils.isBlank(mobile) || mobile.length() < 7) {
+            return mobile;
+        }
+        return mobile.substring(0, 3) + "****" + mobile.substring(mobile.length() - 4);
     }
 
     // -----------------------------------------------------------------
@@ -329,6 +385,23 @@ public class AiChannelServiceImpl implements IAiChannelService {
             throw new ServiceException("平台类型仅支持 feishu / wecom / github / dingtalk");
         }
         return type;
+    }
+
+    /**
+     * 归一化接入形态：留空默认 Webhook；仅接受 webhook / ws。
+     *
+     * @param mode 接入形态
+     * @return 归一化后的接入形态
+     */
+    private String normalizeMode(String mode) {
+        String value = StringUtils.trim(mode);
+        if (StringUtils.isBlank(value)) {
+            return AiChannel.MODE_WEBHOOK;
+        }
+        if (!AiChannel.MODE_WEBHOOK.equals(value) && !AiChannel.MODE_WS.equals(value)) {
+            throw new ServiceException("接入形态仅支持 webhook / ws");
+        }
+        return value;
     }
 
     /**
@@ -511,8 +584,11 @@ public class AiChannelServiceImpl implements IAiChannelService {
             vo.setVerificationTokenSet(raw != null && StringUtils.isNotBlank(raw.getVerificationToken()));
             vo.setWebhookSecretSet(raw != null && StringUtils.isNotBlank(raw.getWebhookSecret()));
             vo.setApiTokenSet(raw != null && StringUtils.isNotBlank(raw.getApiToken()));
-            // 长连接平台（钉钉）额外回显「是否已拉起」（Webhook 平台无此列）
-            if (raw != null && AiChannel.PLATFORM_DINGTALK.equals(raw.getPlatformType())) {
+            // 长连接渠道（钉钉 / 飞书 mode=ws）额外回显「是否已拉起」（Webhook 平台无此列）
+            if (raw != null
+                && (AiChannel.PLATFORM_DINGTALK.equals(raw.getPlatformType())
+                    || (AiChannel.PLATFORM_FEISHU.equals(raw.getPlatformType())
+                        && AiChannel.MODE_WS.equals(raw.getMode())))) {
                 AiChannelStreamStatus.Snapshot snapshot = streamStatus.get(raw.getChannelCode());
                 vo.setStreamStatus(snapshot == null ? AiChannelStreamStatus.STOPPED : snapshot.status());
                 vo.setStreamStatusDetail(snapshot == null ? null : snapshot.detail());

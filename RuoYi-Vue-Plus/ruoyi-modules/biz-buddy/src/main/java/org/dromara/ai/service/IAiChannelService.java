@@ -7,6 +7,7 @@ import org.dromara.ai.domain.bo.AiChannelIdentityBo;
 import org.dromara.ai.domain.vo.AiChannelIdentityVo;
 import org.dromara.ai.domain.vo.AiChannelThreadVo;
 import org.dromara.ai.domain.vo.AiChannelVo;
+import org.dromara.ai.domain.vo.ChannelUserLookupVo;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.mybatis.core.page.PageQuery;
 
@@ -76,12 +77,25 @@ public interface IAiChannelService {
     AiChannel loadRuntimeConfig(String channelCode);
 
     /**
-     * 查询启用中的渠道编码清单（供长连接平台在应用启动时按需拉起连接）。
+     * 查询启用中的**长连接**渠道编码清单（供应用启动时按需拉起连接）。
      *
-     * @param platformType 平台类型（如 {@code dingtalk}）
+     * <p>钉钉恒为长连接；飞书按 {@code mode=ws} 判定；其余平台为 Webhook（由外部平台回调驱动），不在此列。</p>
+     *
      * @return 渠道编码清单
      */
-    List<String> listEnabledChannelCodes(String platformType);
+    List<String> listEnabledLongConnectionChannelCodes();
+
+    /**
+     * 按手机号查询外部平台的用户标识（钉钉 userid / 飞书 open_id）。
+     *
+     * <p>仅**钉钉与飞书**支持（用渠道已存的应用凭据调平台通讯录接口）；其余平台抛业务异常。
+     * 平台侧未查到该手机号时以返回值的 {@code found=false} 表达，不作为异常。</p>
+     *
+     * @param channelId 渠道主键
+     * @param mobile    11 位手机号
+     * @return 查询结果
+     */
+    ChannelUserLookupVo lookupExternalUserId(Long channelId, String mobile);
 
     // -----------------------------------------------------------------
     //  外部身份映射

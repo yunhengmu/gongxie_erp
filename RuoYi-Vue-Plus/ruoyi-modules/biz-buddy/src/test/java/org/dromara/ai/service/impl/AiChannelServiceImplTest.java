@@ -8,6 +8,7 @@ import io.github.linpeilie.Converter;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.dromara.ai.config.AiSecretManager;
 import org.dromara.ai.core.channel.AiChannelStreamStatus;
+import org.dromara.ai.core.channel.AiChannelUserLookupClient;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiChannel;
 import org.dromara.ai.domain.AiChannelIdentity;
@@ -18,6 +19,7 @@ import org.dromara.ai.domain.bo.AiChannelIdentityBo;
 import org.dromara.ai.domain.vo.AiChannelIdentityVo;
 import org.dromara.ai.domain.vo.AiChannelThreadVo;
 import org.dromara.ai.domain.vo.AiChannelVo;
+import org.dromara.ai.domain.vo.ChannelUserLookupVo;
 import org.dromara.ai.mapper.AiChannelIdentityMapper;
 import org.dromara.ai.mapper.AiChannelMapper;
 import org.dromara.ai.mapper.AiChannelThreadMapper;
@@ -44,8 +46,10 @@ import org.springframework.context.support.StaticApplicationContext;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -81,6 +85,8 @@ class AiChannelServiceImplTest {
     private AiSecretManager secretManager;
     @Mock
     private UserService userService;
+    @Mock
+    private AiChannelUserLookupClient userLookupClient;
     @Spy
     private AiChannelStreamStatus streamStatus = new AiChannelStreamStatus();
 
@@ -284,14 +290,90 @@ class AiChannelServiceImplTest {
     }
 
     @Test
-    @DisplayName("启用渠道编码：空类型返回空列表")
-    void shouldListEnabledChannelCodes() {
-        assertTrue(service.listEnabledChannelCodes(" ").isEmpty());
-
+    @DisplayName("启用长连接渠道编码：返回可拉起的渠道（钉钉恒为长连接、飞书仅 mode=ws）")
+    void shouldListEnabledLongConnectionChannelCodes() {
         AiChannel c1 = new AiChannel();
         c1.setChannelCode("c1");
         when(baseMapper.selectList(any())).thenReturn(List.of(c1));
-        assertEquals(List.of("c1"), service.listEnabledChannelCodes("feishu"));
+        assertEquals(List.of("c1"), service.listEnabledLongConnectionChannelCodes());
+    }
+
+    @Test
+    @DisplayName("按手机号查外部用户标识：命中返回标识与用户名（手机号首尾空格被忽略）")
+    void shouldLookupExternalUserId() {
+        AiChannel channel = lookupChannel(AiChannel.PLATFORM_DINGTALK);
+        when(baseMapper.selectById(1L)).thenReturn(channel);
+        when(secretManager.decrypt("cipher")).thenReturn("plain");
+        when(userLookupClient.supports(AiChannel.PLATFORM_DINGTALK)).thenReturn(true);
+        when(userLookupClient.lookup(eq(AiChannel.PLATFORM_DINGTALK), any(), eq("appkey"), eq("plain"), eq("13800000000")))
+            .thenReturn(Optional.of(new AiChannelUserLookupClient.LookupResult("staff-1", "张三")));
+
+        ChannelUserLookupVo vo = service.lookupExternalUserId(1L, " 13800000000 ");
+
+        assertNotNull(vo);
+        assertTrue(vo.isFound());
+        assertEquals("staff-1", vo.getExternalUserId());
+        assertEquals("张三", vo.getDisplayName());
+        assertEquals(AiChannel.PLATFORM_DINGTALK, vo.getPlatformType());
+    }
+
+    @Test
+    @DisplayName("按手机号查外部用户标识：平台未查到时为 found=false 而非异常")
+    void shouldReportNotFoundExternalUserId() {
+        AiChannel channel = lookupChannel(AiChannel.PLATFORM_FEISHU);
+        when(baseMapper.selectById(1L)).thenReturn(channel);
+        when(secretManager.decrypt("cipher")).thenReturn("plain");
+        when(userLookupClient.supports(AiChannel.PLATFORM_FEISHU)).thenReturn(true);
+        when(userLookupClient.lookup(eq(AiChannel.PLATFORM_FEISHU), any(), any(), any(), any()))
+            .thenReturn(Optional.empty());
+
+        ChannelUserLookupVo vo = service.lookupExternalUserId(1L, "13800000000");
+
+        assertFalse(vo.isFound());
+        assertNull(vo.getExternalUserId());
+    }
+
+    @Test
+    @DisplayName("按手机号查外部用户标识：平台不支持时抛业务异常")
+    void shouldRejectUnsupportedPlatformForLookup() {
+        AiChannel channel = lookupChannel(AiChannel.PLATFORM_GITHUB);
+        when(baseMapper.selectById(1L)).thenReturn(channel);
+        when(userLookupClient.supports(AiChannel.PLATFORM_GITHUB)).thenReturn(false);
+
+        assertThrows(ServiceException.class, () -> service.lookupExternalUserId(1L, "13800000000"));
+    }
+
+    @Test
+    @DisplayName("按手机号查外部用户标识：渠道不存在时抛业务异常")
+    void shouldRejectMissingChannelForLookup() {
+        when(baseMapper.selectById(9L)).thenReturn(null);
+
+        assertThrows(ServiceException.class, () -> service.lookupExternalUserId(9L, "13800000000"));
+    }
+
+    @Test
+    @DisplayName("按手机号查外部用户标识：渠道未配置应用标识时抛业务异常且不调平台")
+    void shouldRejectLookupWhenAppIdMissing() {
+        AiChannel channel = lookupChannel(AiChannel.PLATFORM_DINGTALK);
+        channel.setAppId(null);
+        when(baseMapper.selectById(1L)).thenReturn(channel);
+        when(userLookupClient.supports(AiChannel.PLATFORM_DINGTALK)).thenReturn(true);
+
+        assertThrows(ServiceException.class, () -> service.lookupExternalUserId(1L, "13800000000"));
+        verify(userLookupClient, times(0)).lookup(any(), any(), any(), any(), any());
+    }
+
+    /**
+     * 构造一个用于「查外部用户标识」用例的渠道（已配应用标识与密文密钥）。
+     */
+    private AiChannel lookupChannel(String platformType) {
+        AiChannel channel = new AiChannel();
+        channel.setId(1L);
+        channel.setChannelCode("c1");
+        channel.setPlatformType(platformType);
+        channel.setAppId("appkey");
+        channel.setAppSecret("cipher");
+        return channel;
     }
 
     @Test

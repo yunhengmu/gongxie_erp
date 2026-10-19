@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -209,7 +208,7 @@ class AiChannelRuntimeRegistryTest {
     @Test
     @DisplayName("应用就绪后拉起启用中的长连接渠道")
     void shouldStartLongConnectionChannels() {
-        when(channelService.listEnabledChannelCodes(AiChannel.PLATFORM_DINGTALK))
+        when(channelService.listEnabledLongConnectionChannelCodes())
             .thenReturn(List.of("ch-1"));
         AiChannel channel = channel(1L, LocalDateTime.of(2026, 1, 1, 0, 0));
         channel.setPlatformType(AiChannel.PLATFORM_DINGTALK);
@@ -226,7 +225,7 @@ class AiChannelRuntimeRegistryTest {
     @Test
     @DisplayName("无启用渠道时启动钩子不装配")
     void shouldNotStartWhenNoChannels() {
-        when(channelService.listEnabledChannelCodes(anyString())).thenReturn(List.of());
+        when(channelService.listEnabledLongConnectionChannelCodes()).thenReturn(List.of());
 
         registry.startLongConnectionChannels();
 
@@ -298,6 +297,8 @@ class AiChannelRuntimeRegistryTest {
         when(runtime.getFingerprint()).thenReturn(fingerprint);
         when(runtime.getPlatformType()).thenReturn(platformType);
         when(runtime.getChannelCode()).thenReturn("ch-1");
+        // 长连接渠道（钉钉恒为长连接；飞书按 mode=ws）才会登记运行状态
+        when(runtime.isLongConnection()).thenReturn(AiChannel.PLATFORM_DINGTALK.equals(platformType));
         return runtime;
     }
 

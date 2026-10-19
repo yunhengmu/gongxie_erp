@@ -51,6 +51,10 @@
         <!-- victools JSON Schema：AgentScope core 2.0.4 依赖 4.38.0（其工具参数 schema 生成走该版本 API）。
              已移除 spring-ai，不再有与 5.x 的版本冲突；此处显式钉版以固定行为、避免后续被其它依赖抬版。 -->
         <victools.version>4.38.0</victools.version>
+        <!-- 飞书官方 Java SDK：飞书「长连接（WebSocket）接收事件」是 SDK 独有能力（AgentScope 渠道扩展未提供），
+             故 REQ-AI-24 的飞书渠道在「无公网 IP」场景需要它；SDK 自带 shaded protobuf / okhttp，
+             与项目既有 protobuf-java 4.35.1 隔离，不产生版本冲突。 -->
+        <larksuite-oapi.version>2.8.7</larksuite-oapi.version>
 
         <!-- 通用工具、编译增强与代码生成相关依赖版本 -->
         <hutool.version>5.8.47</hutool.version>
@@ -360,6 +364,13 @@
                 <groupId>io.agentscope</groupId>
                 <artifactId>agentscope-extensions-channel-dingtalk</artifactId>
                 <version>${agentscope.version}</version>
+            </dependency>
+            <!-- 飞书官方 Java SDK（REQ-AI-24）：仅用于飞书渠道的「长连接」形态
+                 （WebSocket 主动外连、免公网 IP）；webhook 形态不经它。 -->
+            <dependency>
+                <groupId>com.larksuite.oapi</groupId>
+                <artifactId>oapi-sdk</artifactId>
+                <version>${larksuite-oapi.version}</version>
             </dependency>
             <!-- victools JSON Schema 统一版本（钉 4.38.0 以适配 AgentScope，见版本属性处注释） -->
             <dependency>

@@ -68,6 +68,15 @@ comment on column ai_knowledge_base.rerank_enabled is '检索重排开关（1启
 comment on column ai_knowledge_base.rerank_model_id is '检索重排模型（ai_model_config.id，model_type=rerank）';
 ```
 
+### 升级须知（2026-10-19 渠道长连接）
+
+渠道接入新增**飞书长连接**形态：`ai_channel` 新增 `mode` 列（`webhook` / `ws`，默认 `webhook`；仅飞书区分，须与飞书后台「事件订阅方式」一致）。建表脚本已含该列与列注释，但同样**只在空卷首次初始化时执行**——**存量库需手工迁移**（建表脚本内已有幂等过程，亦可直接复用）：
+
+```sql
+alter table ai_channel add column if not exists mode varchar(16) not null default 'webhook';
+comment on column ai_channel.mode is '接入形态：webhook Webhook 回调（默认，需平台公网可达） / ws 长连接（应用主动外连、免公网 IP；仅飞书区分）';
+```
+
 ## 4. 实测结论（2026-10-09，WSL2 + Docker 29.3 / Compose v5.1.1）
 
 `docker compose up -d --build` 后：

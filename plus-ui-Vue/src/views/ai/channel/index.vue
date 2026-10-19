@@ -48,7 +48,8 @@
               <div class="table-heading">
                 <h3>渠道接入</h3>
                 <p>
-                  接入飞书 / 企业微信 / GitHub / 钉钉：前三个为 Webhook（平台回调），钉钉为长连接（应用主动建连、无需回调地址）。
+                  接入飞书 / 企业微信 / GitHub / 钉钉：企业微信 / GitHub 为 Webhook（平台回调），
+                  飞书可选 Webhook 或长连接，钉钉为长连接（应用主动建连、无需公网 IP 与回调地址）。
                   外部身份需在「外部身份映射」中绑定平台账号，消息线程按「会话映射」续接同一条会话。
                   执行走无人值守通道（写工具一律拒绝），产出落在会话管理页并标记来源为「渠道接入」。
                 </p>
@@ -99,13 +100,13 @@
             </el-table-column>
             <el-table-column label="接入地址 / 方式" align="left" :show-overflow-tooltip="true">
               <template #default="scope">
-                <span v-if="scope.row.platformType === 'dingtalk'" class="text-muted">长连接订阅（无需回调地址）</span>
+                <span v-if="isLongConnection(scope.row)" class="text-muted">长连接订阅（无需回调地址）</span>
                 <code v-else class="callback-path">{{ callbackPath(scope.row) }}</code>
               </template>
             </el-table-column>
             <el-table-column label="连接状态" align="center" width="120">
               <template #default="scope">
-                <template v-if="scope.row.platformType === 'dingtalk'">
+                <template v-if="isLongConnection(scope.row)">
                   <el-tooltip
                     :disabled="scope.row.streamStatus !== 'failed' || !scope.row.streamStatusDetail"
                     :content="scope.row.streamStatusDetail || ''"
@@ -126,7 +127,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" align="center" width="130" class-name="small-padding fixed-width">
+            <el-table-column label="操作" align="center" width="170" class-name="small-padding fixed-width">
               <template #default="scope">
                 <el-tooltip content="修改" placement="top">
                   <el-button
@@ -144,6 +145,15 @@
                     type="primary"
                     icon="Delete"
                     @click="handleDelete(scope.row)"
+                  ></el-button>
+                </el-tooltip>
+                <el-tooltip v-if="supportsUserLookup(scope.row)" content="按手机号查平台标识" placement="top">
+                  <el-button
+                    v-hasPermi="['ai:channel:query']"
+                    link
+                    type="primary"
+                    icon="Cellphone"
+                    @click="handleLookup(scope.row)"
                   ></el-button>
                 </el-tooltip>
               </template>
@@ -367,8 +377,11 @@
               <el-tooltip placement="top">
                 <template #content>
                   <div class="tip-content">
-                    仅字母 / 数字 / 下划线 / 短横线；回调地址为
-                    <code>{{ callbackPath(form) }}</code>
+                    <template v-if="formIsLongConnection">仅字母 / 数字 / 下划线 / 短横线；该渠道为长连接，无需回调地址。</template>
+                    <template v-else>
+                      仅字母 / 数字 / 下划线 / 短横线；回调地址为
+                      <code>{{ callbackPath(form) }}</code>
+                    </template>
                   </div>
                 </template>
                 <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
@@ -403,45 +416,70 @@
         </el-form-item>
 
         <template v-if="form.platformType === 'feishu'">
+          <el-form-item label="接入形态" prop="mode">
+            <template #label>
+              <span class="label-tip">
+                接入形态
+                <el-tooltip placement="top">
+                  <template #content>
+                    <div class="tip-content">须与飞书后台「事件订阅方式」保持一致；选「长连接」则无需公网 IP 与回调地址。</div>
+                  </template>
+                  <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+                </el-tooltip>
+              </span>
+            </template>
+            <el-radio-group v-model="form.mode">
+              <el-radio value="webhook">Webhook 回调</el-radio>
+              <el-radio value="ws">长连接</el-radio>
+            </el-radio-group>
+          </el-form-item>
           <el-form-item label="App ID" prop="appId">
             <el-input v-model="form.appId" placeholder="飞书自建应用 appId（cli_xxx）" />
           </el-form-item>
           <el-form-item label="App Secret" prop="appSecret">
             <el-input v-model="form.appSecret" type="password" show-password :placeholder="secretPlaceholder(form.appSecretSet)" />
           </el-form-item>
-          <el-form-item label="Encrypt Key" prop="encryptKey">
-            <template #label>
-              <span class="label-tip">
-                Encrypt Key
-                <el-tooltip placement="top">
-                  <template #content>
-                    <div class="tip-content">选填；配置后回调报文体为 AES 密文，且校验 X-Lark-Signature。</div>
-                  </template>
-                  <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
-                </el-tooltip>
-              </span>
-            </template>
-            <el-input v-model="form.encryptKey" type="password" show-password :placeholder="secretPlaceholder(form.encryptKeySet)" />
-          </el-form-item>
-          <el-form-item label="Verification Token" prop="verificationToken">
-            <template #label>
-              <span class="label-tip">
-                Verification Token
-                <el-tooltip placement="top">
-                  <template #content>
-                    <div class="tip-content">选填；配置后 URL 校验握手会比对报文中的 token。</div>
-                  </template>
-                  <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
-                </el-tooltip>
-              </span>
-            </template>
-            <el-input
-              v-model="form.verificationToken"
-              type="password"
-              show-password
-              :placeholder="secretPlaceholder(form.verificationTokenSet)"
-            />
-          </el-form-item>
+          <template v-if="formIsLongConnection">
+            <div class="form-tip form-tip-block">
+              飞书为长连接：应用主动外连，<b>无需公网 IP 与回调地址</b>；请在飞书后台把事件订阅方式选为「长连接」
+              并开通接收消息事件 im.message.receive_v1。建连时即完成鉴权，故不需要 Encrypt Key / Verification Token。
+            </div>
+          </template>
+          <template v-else>
+            <el-form-item label="Encrypt Key" prop="encryptKey">
+              <template #label>
+                <span class="label-tip">
+                  Encrypt Key
+                  <el-tooltip placement="top">
+                    <template #content>
+                      <div class="tip-content">选填；配置后回调报文体为 AES 密文，且校验 X-Lark-Signature。</div>
+                    </template>
+                    <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
+              <el-input v-model="form.encryptKey" type="password" show-password :placeholder="secretPlaceholder(form.encryptKeySet)" />
+            </el-form-item>
+            <el-form-item label="Verification Token" prop="verificationToken">
+              <template #label>
+                <span class="label-tip">
+                  Verification Token
+                  <el-tooltip placement="top">
+                    <template #content>
+                      <div class="tip-content">选填；配置后 URL 校验握手会比对报文中的 token。</div>
+                    </template>
+                    <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
+              <el-input
+                v-model="form.verificationToken"
+                type="password"
+                show-password
+                :placeholder="secretPlaceholder(form.verificationTokenSet)"
+              />
+            </el-form-item>
+          </template>
         </template>
 
         <template v-else-if="form.platformType === 'wecom'">
@@ -613,6 +651,60 @@
       </template>
     </el-dialog>
 
+    <!-- 按手机号查外部用户标识 -->
+    <el-dialog v-model="lookupDialog.visible" title="按手机号查找外部用户标识" width="520px" append-to-body>
+      <el-form ref="lookupFormRef" :model="lookupForm" :rules="lookupRules" label-width="110px">
+        <el-form-item label="渠道">
+          <el-input :model-value="lookupDialog.channelName" readonly />
+        </el-form-item>
+        <el-form-item label="手机号" prop="mobile">
+          <el-input
+            v-model="lookupForm.mobile"
+            placeholder="成员在该平台登记的 11 位手机号"
+            clearable
+            @keyup.enter="submitLookup"
+          />
+        </el-form-item>
+      </el-form>
+      <div class="form-tip form-tip-inline">
+        用该渠道已配置的应用凭据向平台查询；号码须已登记在企业通讯录，且应用已开通通讯录读取权限。
+      </div>
+      <el-alert
+        v-if="lookupDialog.searched && !lookupDialog.found"
+        class="lookup-alert"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="未查到该手机号对应的用户"
+        description="请确认号码已登记在企业通讯录、或该应用已获通讯录读取权限。"
+      />
+      <el-descriptions v-if="lookupDialog.found" class="lookup-result" :column="1" size="small" border>
+        <el-descriptions-item label="外部用户标识">
+          <span class="lookup-value">{{ lookupDialog.externalUserId }}</span>
+          <el-button
+            v-copyText="lookupDialog.externalUserId"
+            v-copyText:callback="lookupCopySuccess"
+            link
+            type="primary"
+            icon="CopyDocument"
+            class="lookup-copy"
+          ></el-button>
+        </el-descriptions-item>
+        <el-descriptions-item v-if="lookupDialog.displayName" label="平台用户名">
+          {{ lookupDialog.displayName }}
+        </el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button :loading="lookupDialog.loading" type="primary" @click="submitLookup">查 询</el-button>
+          <el-button v-if="lookupDialog.found" type="success" plain @click="prefillIdentityFromLookup">
+            预填到外部身份映射
+          </el-button>
+          <el-button @click="lookupDialog.visible = false">关 闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <UserSelect ref="userSelectRef" :multiple="false" @confirm-call-back="handlePlatformUserSelected"></UserSelect>
   </div>
 </template>
@@ -634,6 +726,7 @@ import {
   delChannel,
   delIdentity,
   delThread,
+  findExternalUserId,
   getChannel,
   listChannel,
   listIdentity,
@@ -676,6 +769,7 @@ const initFormData: ChannelForm = {
   channelName: undefined,
   channelCode: undefined,
   platformType: 'feishu',
+  mode: 'webhook',
   agentId: undefined,
   appId: undefined,
   appSecret: undefined,
@@ -760,14 +854,25 @@ const platformLabel = (type?: string) => {
   return type || '-';
 };
 
-/** API 基地址输入提示（钉钉为 OpenAPI + 长连接注册地址前缀） */
-const apiBasePlaceholder = computed(() =>
-  form.value.platformType === 'dingtalk'
-    ? '留空使用 https://api.dingtalk.com'
-    : '留空使用各平台默认地址（企业内网 / 私有部署时填写）'
-);
+/** 是否长连接渠道（钉钉恒为长连接；飞书按 mode=ws） */
+const isLongConnection = (row: Partial<ChannelVO>) =>
+  row.platformType === 'dingtalk' || (row.platformType === 'feishu' && row.mode === 'ws');
 
-/** 长连接状态展示名（仅钉钉渠道有值） */
+/** 当前表单是否为「长连接」形态（仅飞书有此开关，钉钉走独立分支） */
+const formIsLongConnection = computed(() => form.value.platformType === 'feishu' && form.value.mode === 'ws');
+
+/** API 基地址输入提示（钉钉为 OpenAPI + 长连接注册地址前缀；飞书长连接为 domain） */
+const apiBasePlaceholder = computed(() => {
+  if (form.value.platformType === 'dingtalk') {
+    return '留空使用 https://api.dingtalk.com';
+  }
+  if (formIsLongConnection.value) {
+    return '长连接 domain，留空使用 https://open.feishu.cn';
+  }
+  return '留空使用各平台默认地址（企业内网 / 私有部署时填写）';
+});
+
+/** 长连接状态展示名（长连接渠道有值） */
 const streamLabel = (status?: string) => {
   if (status === 'running') return '运行中';
   if (status === 'failed') return '启动失败';
@@ -859,6 +964,7 @@ const handleUpdate = async (row?: Partial<ChannelVO>) => {
     channelName: detail.channelName,
     channelCode: detail.channelCode,
     platformType: detail.platformType,
+    mode: detail.mode ?? 'webhook',
     agentId: detail.agentId,
     appId: detail.appId,
     appSecret: undefined,
@@ -920,6 +1026,91 @@ const handleDelete = async (row?: Partial<ChannelVO>) => {
   modal.msgSuccess('删除成功');
   await getList();
   await getChannelOptions();
+};
+
+// ------------------------------------------------------------------
+//  按手机号查外部用户标识
+// ------------------------------------------------------------------
+
+/** 支持按手机号查外部用户标识的平台（企微需独立通讯录 secret、GitHub 无手机号，均不支持） */
+const LOOKUP_PLATFORMS = ['dingtalk', 'feishu'];
+
+/** 该渠道是否展示「查外部用户标识」入口 */
+const supportsUserLookup = (row: Partial<ChannelVO>) => LOOKUP_PLATFORMS.includes(row.platformType || '');
+
+const lookupFormRef = ref<ElFormInstance>();
+const lookupForm = ref<{ mobile?: string }>({ mobile: undefined });
+const lookupDialog = reactive({
+  visible: false,
+  loading: false,
+  searched: false,
+  found: false,
+  channelId: undefined as string | number | undefined,
+  channelName: undefined as string | undefined,
+  externalUserId: undefined as string | undefined,
+  displayName: undefined as string | undefined
+});
+
+const lookupRules: ElFormRules = {
+  mobile: [
+    { required: true, message: '手机号不能为空', trigger: 'blur' },
+    { pattern: /^1\d{10}$/, message: '手机号格式不正确', trigger: 'blur' }
+  ]
+};
+
+/** 打开「按手机号查外部用户标识」弹窗 */
+const handleLookup = (row: Partial<ChannelVO>) => {
+  lookupForm.value = { mobile: undefined };
+  lookupDialog.visible = true;
+  lookupDialog.loading = false;
+  lookupDialog.searched = false;
+  lookupDialog.found = false;
+  lookupDialog.channelId = row.id;
+  lookupDialog.channelName = row.channelName;
+  lookupDialog.externalUserId = undefined;
+  lookupDialog.displayName = undefined;
+  lookupFormRef.value?.clearValidate();
+};
+
+/** 执行查询 */
+const submitLookup = () => {
+  lookupFormRef.value?.validate(async (valid: boolean) => {
+    const channelId = lookupDialog.channelId;
+    const mobile = lookupForm.value.mobile;
+    if (!valid || channelId == null || !mobile) {
+      return;
+    }
+    lookupDialog.loading = true;
+    try {
+      const res = await findExternalUserId(channelId, mobile);
+      const data = res.data;
+      lookupDialog.searched = true;
+      lookupDialog.found = data?.found === true;
+      lookupDialog.externalUserId = data?.externalUserId ?? undefined;
+      lookupDialog.displayName = data?.displayName ?? undefined;
+    } finally {
+      lookupDialog.loading = false;
+    }
+  });
+};
+
+/** 复制成功提示 */
+const lookupCopySuccess = () => {
+  modal.msgSuccess('已复制到剪贴板');
+};
+
+/** 把查询结果预填到「外部身份映射」新增表单 */
+const prefillIdentityFromLookup = () => {
+  const channelId = lookupDialog.channelId;
+  const externalUserId = lookupDialog.externalUserId;
+  if (channelId == null || !externalUserId) {
+    return;
+  }
+  lookupDialog.visible = false;
+  activeTab.value = 'identity';
+  handleIdentityAdd();
+  identityForm.value.channelId = channelId;
+  identityForm.value.externalUserId = externalUserId;
 };
 
 // ------------------------------------------------------------------
@@ -1177,5 +1368,22 @@ getThreadList();
 .callback-path {
   color: var(--el-color-primary);
   font-size: 12px;
+}
+
+.form-tip-inline {
+  margin: -8px 0 12px 110px;
+}
+
+.lookup-alert {
+  margin-bottom: 12px;
+}
+
+.lookup-value {
+  font-family: var(--font-mono, monospace);
+  word-break: break-all;
+}
+
+.lookup-copy {
+  margin-left: 4px;
 }
 </style>

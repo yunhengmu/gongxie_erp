@@ -102,6 +102,14 @@ alter table ai_knowledge_base add column rerank_enabled char(1) not null default
 alter table ai_knowledge_base add column rerank_model_id bigint(20);
 ```
 
+### 升级须知（2026-10-19 渠道长连接）
+
+渠道接入新增**飞书长连接**形态：`ai_channel` 新增 `mode` 列（`webhook` / `ws`，默认 `webhook`；仅飞书区分，须与飞书后台「事件订阅方式」一致）。建表脚本已含该列，但同样**只在空卷首次初始化时执行**——**存量库需手工迁移**（脚本内 `add_ai_channel_mode_column` 过程为幂等版；手工执行下列语句重复跑会报 `Duplicate column name 'mode'`，可忽略）：
+
+```sql
+alter table ai_channel add column mode varchar(16) not null default 'webhook' comment '接入形态：webhook Webhook 回调（默认，需平台公网可达） / ws 长连接（应用主动外连、免公网 IP；仅飞书区分）';
+```
+
 ## 6. 已知坑（与 PostgreSQL 版相同，附 MySQL 增量项）
 
 **① 用 Docker Hub 拉 `bellsoft/liberica-openjdk-rocky` 反复失败**

@@ -55,6 +55,7 @@
 --   drop table if exists ai_agent_task;
 --   drop table if exists ai_channel_thread;
 --   drop table if exists ai_channel_identity;
+--   alter table ai_channel drop column mode;  -- 存量库仅回退增量列（全新库直接删表即可）
 --   drop table if exists ai_channel;
 --   drop table if exists ai_agent_subagent;
 --   drop table if exists ai_subagent;
@@ -1023,6 +1024,7 @@ create table if not exists ai_channel (
     channel_name       varchar(100) not null,
     channel_code       varchar(64)  not null,
     platform_type      varchar(20)  not null,
+    mode               varchar(16)  not null default 'webhook',
     agent_id           bigint       not null,
     app_id             varchar(200),
     app_secret         varchar(500),
@@ -1046,6 +1048,7 @@ comment on table ai_channel is 'AI 渠道接入配置（REQ-AI-24）';
 comment on column ai_channel.channel_name is '渠道名称';
 comment on column ai_channel.channel_code is '渠道编码（唯一，回调地址中的路径标识）';
 comment on column ai_channel.platform_type is '平台类型：feishu 飞书 / wecom 企业微信 / github GitHub / dingtalk 钉钉（长连接）';
+comment on column ai_channel.mode is '接入形态：webhook Webhook 回调（默认，需平台公网可达） / ws 长连接（应用主动外连、免公网 IP；仅飞书区分）';
 comment on column ai_channel.agent_id is '默认智能体（ai_agent.id）';
 comment on column ai_channel.app_id is '应用标识（飞书 appId / 企微 corpId / 钉钉 AppKey；GitHub 为空）';
 comment on column ai_channel.app_secret is '应用密钥（AES 密文；飞书 appSecret / 企微 secret / 钉钉 AppSecret）';
@@ -1057,6 +1060,9 @@ comment on column ai_channel.api_token is '平台访问令牌（AES 密文；Git
 comment on column ai_channel.api_base is '平台 API 基地址（飞书 / 企微 / GitHub / 钉钉 OpenAPI；留空用各平台默认值）';
 comment on column ai_channel.status is '状态（0启用 1停用）';
 create unique index if not exists uk_ai_channel_code on ai_channel (channel_code) WHERE (del_flag = '0'::bpchar);
+
+-- 存量库增量（幂等）：为已存在的 ai_channel 补充接入形态列；全新库由上方建表语句已含该列，可重复执行。
+alter table ai_channel add column if not exists mode varchar(16) not null default 'webhook';
 
 create table if not exists ai_channel_identity (
     id               bigint       not null,

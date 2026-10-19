@@ -232,6 +232,17 @@
             <artifactId>agentscope-extensions-channel-dingtalk</artifactId>
         </dependency>
         <!--
+          飞书官方 Java SDK：**本项目唯一破例新增的第三方依赖**。
+          原因：飞书「长连接（WebSocket）接收事件」只能由官方 SDK 建立（其帧为私有 protobuf 协议），
+          AgentScope 的渠道扩展未提供该形态；钉钉能用零依赖实现是因为它的帧是 JSON。
+          仅飞书渠道 `mode=ws` 时使用；SDK 自带的 protobuf / okhttp 已 shaded（relocated），
+          与项目既有 protobuf-java 4.35.1 隔离。
+        -->
+        <dependency>
+            <groupId>com.larksuite.oapi</groupId>
+            <artifactId>oapi-sdk</artifactId>
+        </dependency>
+        <!--
           spring-webflux：仅用于提供官方 channel 出站客户端依赖的 WebClient。
           本项目为 Servlet 应用，不引入 spring-boot-starter-webflux；连接器由框架自动回退到
           JDK HttpClient（spring-web 的 JdkClientHttpConnector），无额外网络栈依赖。
