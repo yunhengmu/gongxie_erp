@@ -173,6 +173,8 @@ export interface ChatStreamEvent {
     | 'route_fallback'
     | 'answer_reset'
     | 'references'
+    /** 对话期实时进度（思考 / 工具 / 专家 / 汇总…） */
+    | 'phase'
     | 'done'
     | 'error'
     /** 本轮被用户停止/服务器中止（收尾事件，等价于结束） */
@@ -227,6 +229,14 @@ export interface ChatStreamEvent {
   items?: ChatSourceItem[];
   /** 参考来源（done 事件，与 references 事件同结构） */
   references?: ChatSourceItem[];
+  /** 进度阶段（phase：routing 判断选人 / thinking 思考 / tool 工具 / expert 专家 / resuming 续跑 / integrating 汇总 / finalizing 收尾） */
+  phase?: 'routing' | 'thinking' | 'tool' | 'expert' | 'resuming' | 'integrating' | 'finalizing';
+  /** 进度文案（phase，后端已拼好中文，前端只渲染） */
+  text?: string;
+  /** 进度说话人（phase：entry 小Z / expert 领域专家） */
+  speaker?: 'entry' | 'expert';
+  /** 说话专家名（phase，speaker=expert 时非空） */
+  expertName?: string;
 }
 
 /** 待确认的工具调用 */

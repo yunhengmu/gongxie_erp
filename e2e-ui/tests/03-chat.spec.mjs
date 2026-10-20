@@ -46,6 +46,11 @@ test.describe('会话主路径', () => {
     // 用**裸 Enter** 发送：顺带覆盖「Enter 发送、Shift+Enter 换行」的快捷键绑定（修复 #8）
     await sendMessageByEnter(page, PROMPT);
 
+    // 对话期进度：提问后应立刻看到「小Z 正在…」状态条（首字之前），缓解长等待的焦虑
+    const phaseBar = page.locator('.msg-row--assistant').last().locator('.phase-bar');
+    await expect(phaseBar).toBeVisible({ timeout: 30_000 });
+    await expect(phaseBar.locator('.phase-bar__text')).not.toBeEmpty();
+
     // 先等「助手气泡」或「错误提示」二者之一：前者=链路通，后者=前置问题
     await expect(page.locator('.msg-row--assistant, .msg-error').first()).toBeVisible({ timeout: 60_000 });
     if (await page.locator('.msg-error').first().isVisible().catch(() => false)) {
@@ -55,9 +60,10 @@ test.describe('会话主路径', () => {
 
     const assistant = page.locator('.msg-row--assistant').last();
 
-    // 流式结束判据：结束元信息出现（`由 AI 生成` + 复制按钮）且游标消失
+    // 流式结束判据：结束元信息出现（`由 AI 生成` + 复制按钮）且游标与状态条都消失
     await expect(assistant.locator('.msg-meta')).toBeVisible({ timeout: 90_000 });
     await expect(page.locator('.typing-cursor')).toHaveCount(0, { timeout: 90_000 });
+    await expect(page.locator('.phase-bar')).toHaveCount(0, { timeout: 90_000 });
 
     // 正文非空（只断言结构，不看内容）
     const body = (await assistant.locator('.ai-markdown').last().innerText()).trim();

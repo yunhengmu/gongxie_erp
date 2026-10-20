@@ -2,6 +2,7 @@ package org.dromara.ai.core.agent;
 
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.ModelCallEndEvent;
+import io.agentscope.core.event.ModelCallStartEvent;
 import io.agentscope.core.event.RequireUserConfirmEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
 import io.agentscope.core.event.ToolCallDeltaEvent;
@@ -68,6 +69,11 @@ public class AiStreamEventBridge {
      * 检索来源注册表：知识库检索工具命中时暂存的结构化来源，按 toolCallId 取用
      */
     private final AiRetrievalSourceRegistry retrievalSourceRegistry;
+
+    /**
+     * 工具中文名解析：进度文案里「正在调用「X」工具…」的 X 取此（带 TTL 缓存，未登记回退编码）
+     */
+    private final ToolLabelResolver toolLabelResolver;
 
     /**
      * SSE 事件：清空本轮已展示正文（安全拦截时丢弃已流出片段）
@@ -137,6 +143,10 @@ public class AiStreamEventBridge {
             onToolCallDelta(emitter, state, deltaEvent, forwardToolEvents);
             return;
         }
+        if (event instanceof ModelCallStartEvent) {
+            onModelCallStart(emitter, state);
+            return;
+        }
         if (event instanceof ModelCallEndEvent modelCallEnd) {
             state.accumulateUsage(modelCallEnd.getUsage());
             return;
@@ -168,6 +178,20 @@ public class AiStreamEventBridge {
                     block.getId(), block.getName(), block.getInput(), block.getContent()));
             }
         }
+    }
+
+    /**
+     * 模型调用开始：下发「正在思考…」进度（对话期进度）。
+     *
+     * <p>一次 ReAct 循环会有多次模型调用，靠 {@link AiPhaseSupport#emit} 的同文案去重只保留首条，
+     * 且在工具执行之后再次进入思考时会重新播报（文案键已变化）。</p>
+     *
+     * @param emitter SSE 发射器
+     * @param state   流式累积状态
+     */
+    private void onModelCallStart(SseEmitter emitter, AiStreamState state) {
+        AiPhaseSupport.emit(emitter, state, AiPhaseSupport.PHASE_THINKING,
+            AiPhaseSupport.who(state) + "正在思考…", state.speakerExpertName);
     }
 
     /**
@@ -373,6 +397,7 @@ public class AiStreamEventBridge {
         traceService.appendTransition(state.traceId, "tool_call", StringUtils.isBlank(start.getSource())
             ? start.getToolCallName() : start.getToolCallName() + "@" + start.getSource());
         captureReplyId(state, start.getReplyId());
+        emitToolPhase(emitter, state, start.getToolCallName());
         if (!forwardToolEvents) {
             return;
         }
@@ -382,6 +407,28 @@ public class AiStreamEventBridge {
         payload.put("toolName", start.getToolCallName());
         putSource(payload, start.getSource());
         AiSseSupport.send(emitter, payload);
+    }
+
+    /**
+     * 下发「正在调用「X」工具…」进度。
+     *
+     * <p>刻意**放在 {@code forwardToolEvents} 判断之前**：专家直答链路不下发工具卡片，但用户仍需知道
+     * 专家在忙什么；此处只透出工具中文名，入参与结果仍不下发（零泄漏）。</p>
+     *
+     * <p>编排协议工具 {@code route_decision} 的「调用」语义由专用文案表达，不显示为普通工具名。</p>
+     *
+     * @param emitter  SSE 发射器
+     * @param state    流式累积状态
+     * @param toolName 工具编码
+     */
+    private void emitToolPhase(SseEmitter emitter, AiStreamState state, String toolName) {
+        if (RouteDecisionTool.TOOL_NAME.equals(toolName)) {
+            AiPhaseSupport.emit(emitter, state, AiPhaseSupport.PHASE_ROUTING, "小Z 正在判断该由谁回答…", null);
+            return;
+        }
+        AiPhaseSupport.emit(emitter, state, AiPhaseSupport.PHASE_TOOL,
+            AiPhaseSupport.who(state) + "正在调用「" + toolLabelResolver.labelOf(toolName) + "」工具…",
+            state.speakerExpertName);
     }
 
     /**

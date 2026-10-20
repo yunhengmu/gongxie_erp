@@ -193,6 +193,9 @@ public class AiExpertResumeDriver {
 
         long startNanos = System.nanoTime();
         AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
+        // 对话期进度：续跑请求到首个事件之间有一整段空窗（装配 + 专家续跑），先播报「在继续执行」
+        AiPhaseSupport.emit(emitter, state, AiPhaseSupport.PHASE_RESUMING,
+            "小Z 正在继续执行你已确认的操作…", null);
         // 专家续跑是阻塞式编排调用：登记「dispose 该 Mono」为取消句柄（中断 boundedElastic 线程）
         AtomicReference<Disposable> holder = new AtomicReference<>();
         AiRunRegistry.Cancelable cancelable = () -> {

@@ -212,7 +212,15 @@
                 </div>
               </template>
 
-              <span v-if="msg.streaming" class="typing-cursor"></span>
+              <span v-if="msg.streaming && !msg.phaseText" class="typing-cursor"></span>
+
+              <!-- 对话期实时进度：长等待（模型思考 / 工具执行 / 专家调用）时播报「小Z 在干什么」，
+                   正文一开始流动就让位给内容（见 handleStreamEvent 的 text_delta 分支） -->
+              <div v-if="msg.phaseText" class="phase-bar">
+                <span class="phase-bar__dot"></span>
+                <span class="phase-bar__text">{{ msg.phaseText }}</span>
+                <span v-if="msg.phaseElapsed" class="phase-bar__elapsed">已等待 {{ msg.phaseElapsed }}s</span>
+              </div>
 
               <!-- 参考来源：回答用到知识库时展示（默认收起，点击标题展开 / 收起） -->
               <div v-if="msg.sources && msg.sources.length" class="msg-sources">
@@ -527,6 +535,12 @@ interface LocalMessage {
     /** 本轮随消息发送的附件主键 */
     attachmentIds: Array<string | number>;
   };
+  /** 对话期实时进度文案（后端 phase 事件下发；正文开始流动即清空） */
+  phaseText?: string;
+  /** 本轮进度起始时间戳（毫秒）：算「已等待 N 秒」用，前端本地计时 */
+  phaseStartedAt?: number;
+  /** 已等待秒数（由秒表每秒刷新） */
+  phaseElapsed?: number;
 }
 
 /** 资源标签（REQ-AI-32）：+ 后面显示的选中项，悬停左侧出叉号可移除 */
@@ -675,6 +689,7 @@ onActivated(() => {
 onBeforeUnmount(() => {
   workbenchTimers.forEach((timer) => window.clearTimeout(timer));
   workbenchTimers = [];
+  stopPhaseTicker();
   window.removeEventListener('resize', syncWorkbenchHeight);
   workbenchResizeObserver?.disconnect();
   workbenchResizeObserver = undefined;
@@ -936,7 +951,44 @@ const finishStream = () => {
   streaming.value = false;
   currentAssistantKey.value = undefined;
   sseData.value = null;
+  stopPhaseTicker();
   closeStream();
+};
+
+/** 进度秒表句柄（每秒刷新「已等待 N 秒」） */
+let phaseTicker: number | undefined;
+
+/** 启动进度秒表（重复调用无副作用） */
+const startPhaseTicker = () => {
+  if (phaseTicker !== undefined) {
+    return;
+  }
+  phaseTicker = window.setInterval(() => {
+    const msg = currentAssistant();
+    // 正文已开流（状态条让位）或本轮已结束：不刷新，等待收尾统一清理
+    if (!msg || !msg.phaseText || !msg.phaseStartedAt) {
+      return;
+    }
+    msg.phaseElapsed = Math.max(1, Math.round((Date.now() - msg.phaseStartedAt) / 1000));
+  }, 1000);
+};
+
+/** 停止进度秒表 */
+const stopPhaseTicker = () => {
+  if (phaseTicker !== undefined) {
+    window.clearInterval(phaseTicker);
+    phaseTicker = undefined;
+  }
+};
+
+/** 清掉某条消息的进度状态（收尾 / 失败 / 中止 / 待确认时调用） */
+const clearPhase = (msg?: LocalMessage) => {
+  if (!msg) {
+    return;
+  }
+  msg.phaseText = undefined;
+  msg.phaseStartedAt = undefined;
+  msg.phaseElapsed = undefined;
 };
 
 /** 工具调用状态 → 卡片状态（历史数据无 running，SUCCESS 视为成功，其余视为失败/未知） */
@@ -1605,6 +1657,7 @@ const handleStop = () => {
   const msg = currentAssistant();
   if (msg) {
     msg.streaming = false;
+    clearPhase(msg);
     // 前端随即关闭 SSE，很可能收不到后端随后的 aborted 事件，故本地即时标记「已中止」
     msg.status = '3';
   }
@@ -1688,8 +1741,17 @@ const handleStreamEvent = (raw: string) => {
   switch (event.type) {
     case 'start':
       break;
+    case 'phase': {
+      // 对话期实时进度：长等待时播报后端在干什么（文案由后端拼好，前端只渲染）
+      msg.phaseText = event.text ?? '';
+      msg.phaseStartedAt ??= Date.now();
+      startPhaseTicker();
+      break;
+    }
     case 'text_delta': {
       const delta = event.delta ?? '';
+      // 正文开始流动即让状态条让位：只在「无可见输出」的静默期展示进度
+      msg.phaseText = undefined;
       const last = msg.parts[msg.parts.length - 1];
       if (last && last.kind === 'text') {
         last.text = (last.text ?? '') + delta;
@@ -1740,6 +1802,7 @@ const handleStreamEvent = (raw: string) => {
       // 工具被配置为「需人工确认」：本轮暂停，等待用户处置后再恢复
       msg.id = event.messageId ?? msg.id;
       msg.streaming = false;
+      clearPhase(msg);
       // 后端待确认按 messageId 唯一暂存：同一助手消息内第二次暂停会覆盖旧槽位，
       // 若旧卡片仍留在前端且 messageId 与新卡片相同，用户点旧卡片时后端处理的却是新一批
       // 工具调用（点 A 却执行了 B）。故先把同消息内已有的 pending 卡片统一置为 expired。
@@ -1821,6 +1884,7 @@ const handleStreamEvent = (raw: string) => {
     case 'done': {
       msg.id = event.messageId ?? msg.id;
       msg.streaming = false;
+      clearPhase(msg);
       msg.durationMs = event.durationMs;
       msg.toolCallCount = event.toolCallCount;
       msg.totalTokens = event.totalTokens;
@@ -1836,6 +1900,7 @@ const handleStreamEvent = (raw: string) => {
       // 中止也按收尾处理：给用户明确的「已中止」反馈（兜底服务端主动中止等场景）
       msg.id = event.messageId ?? msg.id;
       msg.streaming = false;
+      clearPhase(msg);
       msg.durationMs = event.durationMs ?? msg.durationMs;
       msg.status = '3';
       finishStream();
@@ -1843,6 +1908,7 @@ const handleStreamEvent = (raw: string) => {
     }
     case 'error': {
       msg.streaming = false;
+      clearPhase(msg);
       msg.status = '1';
       msg.errorMsg = event.message || '对话失败';
       modal.msgError(msg.errorMsg);
@@ -2073,6 +2139,7 @@ watch(sseError, (err) => {
   const msg = currentAssistant();
   if (msg) {
     msg.streaming = false;
+    clearPhase(msg);
     msg.status = '1';
     msg.errorMsg = '连接中断，请重试';
   }
@@ -2398,6 +2465,54 @@ onMounted(() => {
 @keyframes blink {
   to {
     visibility: hidden;
+  }
+}
+
+/* 对话期实时进度条：与光标二选一展示（正文开流即让位），故不复用光标位置 */
+.phase-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+  animation: phase-fade-in 120ms ease-out;
+}
+
+.phase-bar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--app-accent-strong);
+  animation: phase-pulse 1.2s ease-in-out infinite;
+}
+
+.phase-bar__text {
+  word-break: break-word;
+}
+
+/* 秒数用等宽数字，避免每秒刷新时宽度抖动 */
+.phase-bar__elapsed {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+@keyframes phase-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes phase-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
   }
 }
 

@@ -1,6 +1,7 @@
 package org.dromara.ai.core.agent;
 
 import io.agentscope.core.event.ModelCallEndEvent;
+import io.agentscope.core.event.ModelCallStartEvent;
 import io.agentscope.core.event.RequireUserConfirmEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
 import io.agentscope.core.event.ToolCallDeltaEvent;
@@ -55,9 +56,11 @@ class AiStreamEventBridgeTest {
     private final AiSafetyGuard safetyGuard = mock(AiSafetyGuard.class);
     private final IAiSafetyEventService safetyEventService = mock(IAiSafetyEventService.class);
     private final AiRetrievalSourceRegistry retrievalSourceRegistry = new AiRetrievalSourceRegistry();
+    /** 工具中文名解析：默认回退工具编码，既有断言（不含中文名的进度文案）不受影响 */
+    private final ToolLabelResolver toolLabelResolver = mock(ToolLabelResolver.class);
     private final AiStreamEventBridge bridge =
         new AiStreamEventBridge(traceService, new AiProperties(), safetyGuard, safetyEventService,
-            retrievalSourceRegistry);
+            retrievalSourceRegistry, toolLabelResolver);
     private final SseEmitter emitter = mock(SseEmitter.class);
 
     @BeforeAll
@@ -70,6 +73,9 @@ class AiStreamEventBridgeTest {
         // 工具结果守卫默认「原样放行」，既有断言不受影响
         lenient().when(safetyGuard.guard(any(), any()))
             .thenAnswer(invocation -> SafetyDecision.pass(invocation.getArgument(0)));
+        // 进度文案里的工具名默认回退编码（未 mock 时 Mockito 返回 null，会让文案出现 "null"）
+        lenient().when(toolLabelResolver.labelOf(any()))
+            .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private static AiStreamState state(Long traceId) {
@@ -190,14 +196,67 @@ class AiStreamEventBridgeTest {
     }
 
     @Test
-    @DisplayName("专家直答链路不下发工具事件但仍累积")
+    @DisplayName("专家直答链路不下发工具卡片，但仍播报工具进度")
     void shouldAccumulateWithoutForwarding() throws Exception {
         AiStreamState state = state(100L);
         bridge.handle(emitter, state, new ToolCallStartEvent("reply-1", "c1", "search"), false);
         bridge.handle(emitter, state, new ToolCallDeltaEvent("reply-1", "c1", "search", "{}"), false);
         assertEquals("search", state.tools.get("c1").toolName);
         assertEquals("{}", state.tools.get("c1").input.toString());
-        verify(emitter, never()).send(org.mockito.ArgumentMatchers.any(SseEmitter.SseEventBuilder.class));
+        // 卡片不下发（入参/结果不外泄），但进度要播报——用户得知道专家在忙什么
+        assertNull(jsonOfType(emitter, "tool_call_start"), "专家链路不得下发工具卡片事件");
+        assertTrue(jsonOfType(emitter, "phase").contains("\"phase\":\"tool\""), "应播报工具进度");
+    }
+
+    @Test
+    @DisplayName("模型调用开始播报「小Z 正在思考…」，重复调用只播报一次")
+    void shouldEmitThinkingPhaseOnce() throws Exception {
+        AiStreamState state = state(100L);
+        bridge.handle(emitter, state, new ModelCallStartEvent("reply-1"));
+        bridge.handle(emitter, state, new ModelCallStartEvent("reply-2"));
+
+        String json = jsonOfType(emitter, "phase");
+        assertTrue(json.contains("\"phase\":\"thinking\""), json);
+        assertTrue(json.contains("小Z 正在思考…"), json);
+        assertTrue(json.contains("\"speaker\":\"entry\""), json);
+        // 同一文案去重：两次模型调用只下发一条
+        verify(emitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
+    @DisplayName("专家身份的进度文案带专家名，工具名取中文名")
+    void shouldEmitExpertSpeakerPhase() throws Exception {
+        AiStreamState state = state(100L);
+        state.speakerExpertName = "制度问答";
+        when(toolLabelResolver.labelOf("search")).thenReturn("查询制度");
+
+        bridge.handle(emitter, state, new ToolCallStartEvent("reply-1", "c1", "search"), false);
+
+        String json = jsonOfType(emitter, "phase");
+        assertTrue(json.contains("专家「制度问答」正在调用「查询制度」工具…"), json);
+        assertTrue(json.contains("\"speaker\":\"expert\""), json);
+        assertTrue(json.contains("\"expertName\":\"制度问答\""), json);
+    }
+
+    @Test
+    @DisplayName("编排协议工具的调用播报为「判断该由谁回答」")
+    void shouldEmitRoutingPhaseForRouteDecisionTool() throws Exception {
+        AiStreamState state = state(100L);
+        bridge.handle(emitter, state, new ToolCallStartEvent("reply-1", "c1", RouteDecisionTool.TOOL_NAME));
+
+        String json = jsonOfType(emitter, "phase");
+        assertTrue(json.contains("\"phase\":\"routing\""), json);
+        assertTrue(json.contains("小Z 正在判断该由谁回答…"), json);
+    }
+
+    @Test
+    @DisplayName("无人值守链路（无发射器）播报进度不抛异常")
+    void shouldNotEmitPhaseWithoutEmitter() {
+        AiStreamState state = state(100L);
+        assertDoesNotThrow(() -> {
+            bridge.handle(null, state, new ModelCallStartEvent("reply-1"));
+            bridge.handle(null, state, new ToolCallStartEvent("reply-1", "c1", "search"));
+        });
     }
 
     @Test

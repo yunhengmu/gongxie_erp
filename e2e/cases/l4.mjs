@@ -41,9 +41,11 @@ export const run = async (ctx) => {
 
   const done = lastOfType(events, 'done');
   const error = lastOfType(events, 'error');
+  const phases = eventsOfType(events, 'phase');
   const evidence = {
     sessionId: session.id,
     eventTypes: events.map((event) => event.type),
+    phases: phases.map((item) => `${item.phase}:${item.text}`),
     stopReason,
     done: done ? { messageId: done.messageId, replyId: done.replyId, durationMs: done.durationMs, totalTokens: done.totalTokens, toolCallCount: done.toolCallCount } : null,
     error: error ? error.message : null
@@ -60,6 +62,17 @@ export const run = async (ctx) => {
   }
   if (!done || !done.replyId) {
     return { status: 'FAIL', detail: `未以 done 收尾（停止原因：${stopReason}）`, evidence };
+  }
+  // 对话期进度：提问后、正文/工具结果之前必须已有 phase（否则前端整段静默，只有光标在闪）
+  const firstPhaseIndex = events.findIndex((event) => event.type === 'phase');
+  const firstOutputIndex = events.findIndex(
+    (event) => event.type === 'text_delta' || event.type === 'tool_result'
+  );
+  if (firstPhaseIndex < 0) {
+    return { status: 'FAIL', detail: '本轮未下发任何 phase 进度事件（前端全程只有闪烁光标）', evidence };
+  }
+  if (firstOutputIndex >= 0 && firstPhaseIndex > firstOutputIndex) {
+    return { status: 'FAIL', detail: '首个 phase 晚于首个正文/工具结果，进度播报失去意义', evidence };
   }
 
   // 编排轨迹的 action/status 是在收尾时**补写**的（行先以 null 插入，随后 UPDATE 填充），

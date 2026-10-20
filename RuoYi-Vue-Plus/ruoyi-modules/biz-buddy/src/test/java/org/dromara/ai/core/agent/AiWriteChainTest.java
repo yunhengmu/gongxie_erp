@@ -52,6 +52,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -127,7 +128,7 @@ class AiWriteChainTest {
         // 装配真实编排器与真实路由工具（事件桥亦为真实实现）
         AiRouteOrchestrator orchestrator = new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
             new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService,
-                new org.dromara.ai.core.AiRetrievalSourceRegistry()), traceService,
+                new org.dromara.ai.core.AiRetrievalSourceRegistry(), mock(ToolLabelResolver.class)), traceService,
             aiProperties, runtimeConfigStore, skillService, agentService, new AiRunRegistry());
         RouteDecisionTool routeTool = new RouteDecisionTool(orchestrator);
 
@@ -168,8 +169,13 @@ class AiWriteChainTest {
         // 暂停时写工具**尚未执行**：明细已登记但无结果态
         assertTrue(firstRoute.expertToolLogs.stream()
             .anyMatch(log -> "create_notice".equals(log.getToolName()) && log.getState() == null));
-        // 首段下发：route_decision + expert_start + answer_reset（暂停刻意不发 expert_result）
-        verify(emitter, times(3)).send(any(SseEmitter.SseEventBuilder.class));
+        // 首段下发：route_decision + expert_start + answer_reset（暂停刻意不发 expert_result），
+        // 另加对话期进度 phase（专家启动、专家调用写工具各一条）
+        assertEquals(1, countEvents("route_decision"));
+        assertEquals(1, countEvents("expert_start"));
+        assertEquals(1, countEvents("answer_reset"));
+        assertEquals(0, countEvents("expert_result"), "暂停时不得下发专家结论");
+        assertEquals(2, countEvents("phase"), "专家启动与工具调用各播报一次进度");
 
         // ④ 确认 → ⑤ 续跑：用 ConfirmResult 驱动**同一专家会话**续跑，写工具此时才真正执行
         // 恢复段与门面一致：重建编排上下文（复用同一次编排主键），候选清单按提问用户现算
@@ -206,11 +212,42 @@ class AiWriteChainTest {
                 .anyMatch(log -> "create_notice".equals(log.getToolName())
                     && ToolResultState.SUCCESS.name().equals(log.getState())),
             "确认后写工具应真正执行并留下成功明细");
-        // 恢复段累计下发 6 条（首段 3 + 恢复段 3：answer_reset + text_delta + expert_result）
-        verify(emitter, times(6)).send(any(SseEmitter.SseEventBuilder.class));
+        // 累计下发（首段 + 恢复段逐类型统计）：answer_reset 首段与恢复段各一次；
+        // text_delta 仅续跑后的专家正文；expert_result 仅续跑成功那一次；续跑刻意不发 expert_start
+        assertEquals(2, countEvents("answer_reset"), "首段与恢复段各清一次正文");
+        assertEquals(1, countEvents("text_delta"), "专家续跑后的正文直传用户");
+        assertEquals(1, countEvents("expert_result"), "续跑成功应下发专家结论");
+        assertEquals(1, countEvents("expert_start"), "续跑不得重复下发 expert_start（避免孤儿卡片）");
+        assertEquals(3, countEvents("phase"), "进度：专家启动、首次工具调用、续跑工具调用");
+        assertEquals(1, countEvents("route_decision"), "路由决策只在首段发生");
     }
 
     // ==================== fixtures ====================
+
+    /**
+     * 统计**截至当前**已下发的事件条数（按事件信封的 {@code type} 判别）。
+     *
+     * <p>替代原先的「下发总条数」断言：对话期进度 {@code phase} 会随编排阶段增减，
+     * 逐类型断言更稳定，失败时也更容易定位是哪一类事件变化。</p>
+     *
+     * @param type 事件类型
+     * @return 条数
+     * @throws Exception {@code SseEventBuilder#build} 反射异常
+     */
+    private int countEvents(String type) throws Exception {
+        ArgumentCaptor<SseEmitter.SseEventBuilder> cap = ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(emitter, atLeastOnce()).send(cap.capture());
+        int count = 0;
+        for (SseEmitter.SseEventBuilder builder : cap.getAllValues()) {
+            for (org.springframework.web.servlet.mvc.method.annotation.ResponseBodyEmitter.DataWithMediaType data
+                : builder.build()) {
+                if (String.valueOf(data.getData()).contains("\"type\":\"" + type + "\"")) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
 
     /**
      * 公告管理专家定义：开启写工具开关（否则「需确认」档会被改写为拒绝，HITL 无从触发）。
