@@ -58,9 +58,19 @@ public class AiChatPendingVo implements Serializable {
         private String toolCallId;
 
         /**
-         * 工具名称
+         * 工具名称（工具编码）
          */
         private String toolName;
+
+        /**
+         * 工具中文显示名；未在 ai_tool 登记（如 MCP 别名 mcp_<hash>）时等于 {@link #toolName}
+         */
+        private String toolLabel;
+
+        /**
+         * 工具注册说明；未登记时为空串
+         */
+        private String toolDesc;
 
         /**
          * 工具入参

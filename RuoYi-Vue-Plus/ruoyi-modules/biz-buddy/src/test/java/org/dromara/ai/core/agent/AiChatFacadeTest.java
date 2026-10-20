@@ -126,6 +126,8 @@ class AiChatFacadeTest {
     @Mock
     private IAiTraceService traceService;
     @Mock
+    private ToolLabelResolver toolLabelResolver;
+    @Mock
     private IAiChatAttachmentService attachmentService;
 
     @Mock
@@ -156,7 +158,7 @@ class AiChatFacadeTest {
         AiTrustApplier trustApplier = new AiTrustApplier(agentRegistry, agentService);
         AiTurnFinisher turnFinisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
             traceService, memoryService, aiProperties, routeRecorder, pendingStore,
-            streamBridge, safetyGuard, safetyEventService);
+            toolLabelResolver, streamBridge, safetyGuard, safetyEventService);
         integrationDriver = spy(new AiIntegrationDriver(sessionService, pendingStore, traceService,
             routeOrchestrator, streamBridge, runRegistry, turnFinisher));
         AiExpertResumeDriver expertResumeDriver = new AiExpertResumeDriver(sessionService, agentService, agentRegistry,
@@ -166,10 +168,13 @@ class AiChatFacadeTest {
             pendingStore, permissionModeStore, decisionService, usageStatService, quotaService,
             safetyGuard, safetyEventService,
             sessionResourceService, expertDirectory, routeRecorder, routeOrchestrator, routeJudgeService, assembler, routeSupport, trustApplier,
-            slotStore, streamBridge, traceService, runRegistry, turnFinisher, integrationDriver, expertResumeDriver);
+            slotStore, streamBridge, traceService, toolLabelResolver, runRegistry, turnFinisher, integrationDriver, expertResumeDriver);
         // 安全守卫默认「原样放行」，既有断言不受影响
         lenient().when(safetyGuard.guard(any(), any()))
             .thenAnswer(invocation -> org.dromara.ai.core.safety.SafetyDecision.pass(invocation.getArgument(0)));
+        // 工具名解析按「未登记」回退口径打桩（中文名＝编码、说明为空），与生产回退一致
+        lenient().when(toolLabelResolver.labelOf(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(toolLabelResolver.descriptionOf(any())).thenReturn("");
     }
 
     @BeforeAll
