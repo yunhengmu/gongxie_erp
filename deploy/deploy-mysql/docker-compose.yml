@@ -1,7 +1,7 @@
 # ==========================================================================================
 # BizBuddy 全栈一键部署（MySQL 8.0 版）
 #
-# 组件：MySQL 8.0 + Redis + Milvus（standalone：etcd / minio / milvus）
+# 组件：MySQL 8.0 + Redis + Milvus（standalone：etcd + 复用平台 MinIO 作对象存储）
 #       + ruoyi-admin（后端） + ruoyi-snailjob-server（调度服务端） + nginx（前端 + 反向代理）
 #
 # 与 `deploy-pg/`（PostgreSQL 版）的关系：
@@ -142,7 +142,8 @@ services:
       retries: 12
 
   # 平台自用的对象存储（OSS）：RuoYi 的文件上传与知识库文档都存这里（配置在 sys_oss_config 表）。
-  # 注意与下面的 milvus-minio 区分：那个是 Milvus 的内部对象存储，两者互不共用。
+  # Milvus 复用同一实例（独立桶 milvus-bucket），不再单独起 milvus-minio 容器——
+  # 两者本就用同一镜像，合并省一个容器与一份数据卷；代价是故障域合并（见 README 重启/运维说明）。
   minio:
     image: ${MINIO_IMAGE:-minio/minio:RELEASE.2024-12-18T13-15-44Z}
     container_name: bizbuddy-mysql-minio
@@ -156,6 +157,12 @@ services:
     volumes:
       - minio-data:/data
     command: minio server /data --console-address ":9001"
+    # Milvus 的 depends_on 要求本实例 healthy（原先这条只在独立的 milvus-minio 上有）
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
 
   # 一次性初始化：建桶（保持私有，对应 sys_oss_config.access_policy=0）。
   # 私有桶下匿名直访一律 403，文件访问改由后端按需下发预签名 URL（见 SysOssServiceImpl）。
@@ -176,6 +183,9 @@ services:
         mc mb -p local/${OSS_BUCKET:-ruoyi} || true
         # 私有桶：显式清除匿名读权限。新桶本就是私有；存量卷若曾被设为可公开读，这里会纠正。
         mc anonymous set none local/${OSS_BUCKET:-ruoyi} || true
+        # Milvus 的向量数据桶：与平台文件分桶存放，便于各自备份 / 清理而互不影响
+        mc mb -p local/milvus-bucket || true
+        mc anonymous set none local/milvus-bucket || true
         # 把演示文档送进桶：对应建库脚本里 ai_document「BizBuddy简介.txt」的 oss_id（key=demo/bizbuddy_intro.txt），
         # 使「重新解析」可按对象键读取；重复 up 覆盖同名对象，天然幂等。
         mc cp /seed/bizbuddy_intro.txt local/${OSS_BUCKET:-ruoyi}/demo/bizbuddy_intro.txt || true
@@ -184,9 +194,9 @@ services:
       - ../../docs/BizBuddy简介.txt:/seed/bizbuddy_intro.txt:ro
     restart: "no"
 
-  # Milvus standalone 依赖 etcd（元数据）与 minio（对象存储），三者构成一个整体。
-  # 取自 Milvus 官方 standalone 编排；仅对外暴露 19530（gRPC），etcd / minio 不发布端口，
-  # 避免与宿主机上可能已有的 MinIO / etcd 冲突。
+  # Milvus standalone 依赖 etcd（元数据）与对象存储，三者构成一个整体。
+  # 对象存储**复用平台的 minio**（独立桶 milvus-bucket），不再单独起容器；仅对外暴露 19530（gRPC），
+  # etcd 不发布端口，避免与宿主机上可能已有的 etcd 冲突。
   milvus-etcd:
     image: quay.io/coreos/etcd:v3.5.25
     container_name: bizbuddy-mysql-milvus-etcd
@@ -205,25 +215,6 @@ services:
       timeout: 20s
       retries: 5
 
-  milvus-minio:
-    # Milvus standalone 的对象存储。注意：MinIO 官方已停止通过 Docker Hub 发布镜像，
-    # Milvus 官方 standalone 编排里钉的旧 tag 在 docker.io 上**已不存在**（拉取会报 not found）。
-    # 这里默认改用一个仍可拉取的 release；若你的网络/镜像源不同，用 MINIO_IMAGE 覆盖即可。
-    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2024-12-18T13-15-44Z}
-    container_name: bizbuddy-mysql-milvus-minio
-    restart: unless-stopped
-    environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-    volumes:
-      - milvus-minio-data:/minio_data
-    command: minio server /minio_data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 5
-
   milvus:
     # 项目文档标注 Milvus v2.6.13；若该镜像在你的网络下拉取不到，可退回 v2.6.12
     image: milvusdb/milvus:v2.6.13
@@ -235,7 +226,12 @@ services:
     environment:
       MINIO_REGION: us-east-1
       ETCD_ENDPOINTS: milvus-etcd:2379
-      MINIO_ADDRESS: milvus-minio:9000
+      # 对象存储复用平台 minio：地址与凭据必须与平台侧一致（原先是独立的 milvus-minio / minioadmin）
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY_ID: ${OSS_ACCESS_KEY:-ruoyi}
+      MINIO_SECRET_ACCESS_KEY: ${OSS_SECRET_KEY:-ruoyi123}
+      # 独立桶：与平台文件桶分开，便于各自备份 / 清理
+      MINIO_BUCKET_NAME: milvus-bucket
       # 与后端配置一致：默认超级用户 root / Milvus
       COMMON_SECURITY_AUTHORIZATIONENABLED: "true"
       COMMON_SECURITY_DEFAULTROOTPASSWORD: ${MILVUS_PASSWORD:-Milvus}
@@ -247,7 +243,7 @@ services:
     depends_on:
       milvus-etcd:
         condition: service_healthy
-      milvus-minio:
+      minio:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
@@ -343,7 +339,6 @@ volumes:
   redis-data:
   minio-data:
   milvus-etcd-data:
-  milvus-minio-data:
   milvus-data:
   snailjob-logs:
   admin-logs:
