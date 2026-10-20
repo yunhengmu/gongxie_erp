@@ -20,7 +20,7 @@ snail-job:
   # 需要在 SnailJob 后台组管理创建对应名称的组,然后创建任务的时候选择对应的组,才能正确分派任务
   group: "ruoyi_group"
   # SnailJob 接入验证令牌 详见 script/sql/ry_job.sql `sj_group_config`表
-  # 生产必须替换（prod 启动自检会拒绝出厂默认值，见 ProductionConfigGuard）
+  # 生产必须替换（启动自检会拒绝出厂默认值，对所有 profile 生效，见 ProductionConfigGuard）
   token: "${SNAILJOB_TOKEN:SJ_cKqBTPzCsWA3VyuCfFoccmuIEGXjr5KT}"
   server:
     host: 127.0.0.1

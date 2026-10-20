@@ -14,9 +14,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link ProductionConfigGuard} 单元测试：prod 下拒绝出厂示例值，非 prod 不干预，替换后放行。
+ * {@link ProductionConfigGuard} 单元测试：默认（含非 {@code prod}）命中出厂示例值即拒绝启动；
+ * 非 {@code prod} 可用 {@code warn} 开关显式降级；{@code prod} 下开关被忽略；替换后放行。
  */
-@DisplayName("生产配置收口自检")
+@DisplayName("配置收口自检")
 class ProductionConfigGuardTest {
 
     /**
@@ -28,6 +29,21 @@ class ProductionConfigGuardTest {
         MockEnvironment environment = new MockEnvironment();
         for (SampleSecret secret : ProductionConfigGuard.SAMPLE_SECRETS) {
             environment.setProperty(secret.key(), secret.sampleValue());
+        }
+        return environment;
+    }
+
+    /**
+     * 构造一个把全部出厂示例值替换为自有值的环境。
+     *
+     * @param profile 激活的 profile
+     * @return 已收口环境
+     */
+    private static MockEnvironment replacedEnv(String profile) {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles(profile);
+        for (SampleSecret secret : ProductionConfigGuard.SAMPLE_SECRETS) {
+            environment.setProperty(secret.key(), "changed-" + secret.key());
         }
         return environment;
     }
@@ -48,28 +64,59 @@ class ProductionConfigGuardTest {
     }
 
     @Test
-    @DisplayName("prod：全部替换为自有值则放行")
-    void shouldPassWhenAllSecretsReplaced() {
-        MockEnvironment environment = new MockEnvironment();
-        environment.setActiveProfiles("prod");
-        for (SampleSecret secret : ProductionConfigGuard.SAMPLE_SECRETS) {
-            environment.setProperty(secret.key(), "changed-" + secret.key());
-        }
+    @DisplayName("非 prod（dev / 无 profile）：默认同样拒绝启动——堵住「默认部署落在护栏盲区」")
+    void shouldRejectOutsideProdByDefault() {
+        MockEnvironment devEnv = sampleEnv();
+        devEnv.setActiveProfiles("dev");
+        IllegalStateException devEx = assertThrows(IllegalStateException.class,
+            () -> new ProductionConfigGuard(devEnv).afterPropertiesSet());
+        // 非 prod 的失败提示须给出逃生开关，否则使用者无从下手
+        assertTrue(devEx.getMessage().contains(ProductionConfigGuard.MODE_KEY));
 
-        new ProductionConfigGuard(environment).afterPropertiesSet();
-
-        assertTrue(ProductionConfigGuard.detect(environment::getProperty).isEmpty());
+        MockEnvironment noProfileEnv = sampleEnv();
+        assertThrows(IllegalStateException.class,
+            () -> new ProductionConfigGuard(noProfileEnv).afterPropertiesSet());
     }
 
     @Test
-    @DisplayName("非 prod（dev / 无 profile）：即便是示例值也不干预")
-    void shouldSkipOutsideProd() {
-        MockEnvironment devEnv = sampleEnv();
-        devEnv.setActiveProfiles("dev");
-        new ProductionConfigGuard(devEnv).afterPropertiesSet();
+    @DisplayName("非 prod：显式 warn 开关仅告警不阻断（本地开发逃生口）")
+    void shouldOnlyWarnWhenExplicitlyDowngraded() {
+        MockEnvironment environment = sampleEnv();
+        environment.setActiveProfiles("dev");
+        environment.setProperty(ProductionConfigGuard.MODE_KEY, "warn");
 
-        MockEnvironment noProfileEnv = sampleEnv();
-        new ProductionConfigGuard(noProfileEnv).afterPropertiesSet();
+        new ProductionConfigGuard(environment).afterPropertiesSet();
+    }
+
+    @Test
+    @DisplayName("prod：warn 开关被忽略，仍拒绝启动")
+    void shouldIgnoreWarnSwitchInProd() {
+        MockEnvironment environment = sampleEnv();
+        environment.setActiveProfiles("prod");
+        environment.setProperty(ProductionConfigGuard.MODE_KEY, "warn");
+
+        assertThrows(IllegalStateException.class,
+            () -> new ProductionConfigGuard(environment).afterPropertiesSet());
+    }
+
+    @Test
+    @DisplayName("非 prod：开关取值无法识别时按 enforce 处理（fail-safe）")
+    void shouldFallBackToEnforceOnUnknownMode() {
+        MockEnvironment environment = sampleEnv();
+        environment.setActiveProfiles("dev");
+        environment.setProperty(ProductionConfigGuard.MODE_KEY, "whatever");
+
+        assertThrows(IllegalStateException.class,
+            () -> new ProductionConfigGuard(environment).afterPropertiesSet());
+    }
+
+    @Test
+    @DisplayName("prod / dev：全部替换为自有值则放行（无需任何开关）")
+    void shouldPassWhenAllSecretsReplaced() {
+        new ProductionConfigGuard(replacedEnv("prod")).afterPropertiesSet();
+        new ProductionConfigGuard(replacedEnv("dev")).afterPropertiesSet();
+
+        assertTrue(ProductionConfigGuard.detect(replacedEnv("prod")::getProperty).isEmpty());
     }
 
     @Test

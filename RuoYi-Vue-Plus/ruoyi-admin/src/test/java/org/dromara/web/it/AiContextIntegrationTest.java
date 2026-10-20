@@ -44,7 +44,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfEnvironmentVariable(named = "BIZBUDDY_IT", matches = "(?i)true")
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "snail-job.enabled=false")
+    // 本测试刻意以 dev + 出厂配置装配真 Redis / 真库，故把配置收口自检显式降级为「仅告警」
+    properties = {
+        "snail-job.enabled=false",
+        "bizbuddy.security.guard.mode=warn"
+    })
 @DisplayName("集成测试：上下文装配 + AI 配置（真 Redis）与明细统计（真库）")
 class AiContextIntegrationTest {
 
