@@ -265,8 +265,10 @@ services:
       context: ../../RuoYi-Vue-Plus/ruoyi-extend/ruoyi-snailjob-server
       dockerfile: Dockerfile
     container_name: bizbuddy-mysql-snailjob-server
-    # 同 ruoyi-admin：配置不合格时 fail-fast，重试无用，限 3 次后停下
-    restart: on-failure:3
+    # 本容器不加载配置收口护栏（pom 不含 ruoyi-admin，扫描包仅 org.dromara.snailjob），
+    # 不存在「配置不合格即 fail-fast」的前提，故保留 unless-stopped 以自愈依赖抖动；
+    # 只有 ruoyi-admin 用 on-failure:3。
+    restart: unless-stopped
     environment:
       <<: *java-env
       # 标准（非动态数据源）配置，环境变量即可覆盖 jar 内的 application-dev.yml。
@@ -292,7 +294,7 @@ services:
       dockerfile: Dockerfile
     container_name: bizbuddy-mysql-admin
     # 应用容器的启动会因配置不合格而 fail-fast（如配置收口护栏命中出厂值），这类失败重试无用；
-    # on-failure:3 让它重试 3 次后停下，避免无限崩溃重启刷日志（基础设施仍用 unless-stopped 自愈）。
+    # on-failure:3 让它重试 3 次后停下，避免无限崩溃重启刷日志（基础设施与 snailjob-server 仍用 unless-stopped 自愈）。
     restart: on-failure:3
     environment:
       <<: *java-env
