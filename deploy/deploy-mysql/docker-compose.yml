@@ -47,6 +47,7 @@
 #        想重建数据库：docker compose down -v && docker compose up -d --build
 #
 # 可覆盖的变量见 `.env.example`（复制为 `.env` 即可生效；不配则用文件内默认值）。
+# 例外：密钥 / 口令类若沿用出厂默认值，启动自检会拒绝启动（见 x-java-env 的 BIZBUDDY_SECURITY_GUARD_MODE）。
 # ==========================================================================================
 
 name: bizbuddy-mysql
@@ -57,6 +58,10 @@ x-java-env: &java-env
   SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
   # 建库脚本会创建 dev / prod 两个 SnailJob 命名空间，此处须与其中之一一致
   SNAIL_JOB_NAMESPACE: ${SPRING_PROFILES_ACTIVE:-dev}
+  # 出厂默认值收口自检（ProductionConfigGuard）：默认 enforce，命中出厂示例口令 / 密钥即拒绝启动
+  # （对全部 profile 生效——默认部署走 dev，若只认 prod 就恰好落在盲区）。
+  # 本地开发要沿用出厂值，就在 .env 里把下面这项设为 warn（仅非 prod 生效；prod 下恒为 enforce）。
+  BIZBUDDY_SECURITY_GUARD_MODE: ${BIZBUDDY_SECURITY_GUARD_MODE:-enforce}
   MYSQL_HOST: mysql
   MYSQL_PORT_INNER: "3306"
   MYSQL_DATABASE: ${MYSQL_DATABASE:-biz_buddy}
@@ -260,7 +265,8 @@ services:
       context: ../../RuoYi-Vue-Plus/ruoyi-extend/ruoyi-snailjob-server
       dockerfile: Dockerfile
     container_name: bizbuddy-mysql-snailjob-server
-    restart: unless-stopped
+    # 同 ruoyi-admin：配置不合格时 fail-fast，重试无用，限 3 次后停下
+    restart: on-failure:3
     environment:
       <<: *java-env
       # 标准（非动态数据源）配置，环境变量即可覆盖 jar 内的 application-dev.yml。
@@ -285,7 +291,9 @@ services:
       context: ../../RuoYi-Vue-Plus/ruoyi-admin
       dockerfile: Dockerfile
     container_name: bizbuddy-mysql-admin
-    restart: unless-stopped
+    # 应用容器的启动会因配置不合格而 fail-fast（如配置收口护栏命中出厂值），这类失败重试无用；
+    # on-failure:3 让它重试 3 次后停下，避免无限崩溃重启刷日志（基础设施仍用 unless-stopped 自愈）。
+    restart: on-failure:3
     environment:
       <<: *java-env
       SERVER_PORT: "8080"

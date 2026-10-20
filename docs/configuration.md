@@ -153,7 +153,7 @@
 | `application.yml` | `security.excludes` | 免鉴权路径；渠道入站回调 `/ai/channel/callback/**` 在此放开（安全靠验签/口令） |
 | `application.yml` | `api-decrypt` | 接口加解密开关与 RSA 密钥对；**生产必须替换**（环境变量 `API_DECRYPT_PUBLIC_KEY` / `API_DECRYPT_PRIVATE_KEY`），需与前端 `.env.*` 的 `VITE_APP_RSA_*` 成对更换 |
 | `application.yml` | `sa-token` | 认证：token 名、并发登录、JWT 秘钥（环境变量 `SA_TOKEN_JWT_SECRET_KEY`，**生产必须替换**） |
-| `application.yml` / `application-prod.yml` | `ProductionConfigGuard`（启动自检） | **`prod` profile 启动时**逐项比对出厂示例值（JWT 秘钥 / 接口加密密钥对 / `bizbuddy.ai.crypto-key` / 数据库·Redis·Milvus 口令 / SnailJob 令牌），仍是示例值即**拒绝启动**并列出命中项。非 `prod`（本地与容器默认 `dev`）不干预 |
+| `application.yml` / `application-prod.yml` | `ProductionConfigGuard`（启动自检） | **所有 profile 启动时**逐项比对出厂示例值（JWT 秘钥 / 接口加密密钥对 / `bizbuddy.ai.crypto-key` / 数据库·Redis·Milvus 口令 / SnailJob 令牌），命中即**拒绝启动**并列出命中项。原实现只认 `prod`，而两套编排默认 profile 是 `dev`，于是「按默认方式部署」恰好绕过护栏；现默认对所有 profile 生效，非 `prod` 可用 `bizbuddy.security.guard.mode=warn`（环境变量 `BIZBUDDY_SECURITY_GUARD_MODE`）显式降级为仅告警（本地开发逃生口），`prod` 下该开关无效 |
 | `application-dev.yml` | `spring.datasource.dynamic.datasource.master.*` | 主数据源连接（dynamic-datasource）：PostgreSQL 14 或 MySQL 8.0，仅 JDBC URL 不同（驱动由 Hikari 按 URL 自动匹配，不在配置中声明） |
 | `application-dev.yml` | `spring.data.redis.*` / `redisson.*` | Redis 连接与 Redisson 连接池；dev 配置**要求必须设置 Redis 密码** |
 | `application-dev.yml` | `snail-job.*` | 调度客户端：`enabled`、`group`、`token`、`namespace`、服务端地址 |
@@ -162,7 +162,7 @@
 
 ## 4. 生产环境必改清单
 
-> **启动自检**：以 `SPRING_PROFILES_ACTIVE=prod` 启动时，[`ProductionConfigGuard`](../RuoYi-Vue-Plus/ruoyi-admin/src/main/java/org/dromara/web/config/ProductionConfigGuard.java) 会逐项比对下表 1~5 及 7 的**出厂示例值**，仍为示例值则**直接拒绝启动**并列出命中项与对应环境变量——即这些项已不是「靠自觉」，漏改会立刻失败。
+> **启动自检**：**任何 profile** 启动时，[`ProductionConfigGuard`](../RuoYi-Vue-Plus/ruoyi-admin/src/main/java/org/dromara/web/config/ProductionConfigGuard.java) 都会逐项比对下表 1~5 及 7 的**出厂示例值**，命中即**直接拒绝启动**并列出命中项与对应环境变量——即这些项已不是「靠自觉」，漏改会立刻失败。原实现只对 `prod` 生效，导致默认（`dev` profile）部署可带出厂口令跑起来；现默认对所有 profile 生效，非 `prod` 可用 `BIZBUDDY_SECURITY_GUARD_MODE=warn` 显式降级为「仅告警」，`prod` 下该开关被忽略。
 
 | # | 配置项 | 环境变量 | 原因 |
 |---|---|---|---|
@@ -175,7 +175,7 @@
 | 7 | `snail-job.token` | `SNAILJOB_TOKEN` | 接入令牌默认随源码公开；须与 `sj_group_config` 表一致 |
 | 8 | 数据库表 `sys_oss_config.domain_url` | —（数据库配置） | 必须是**浏览器可达**地址；容器部署默认给 `localhost`，从其它机器 / 公网访问需改成实际域名或 IP（各栈端口见部署文档） |
 
-> 环境变量名与部署侧的登记见 `deploy/deploy-pg/.env.example` / `deploy/deploy-mysql/.env.example` 的「生产部署密钥」段。
+> 环境变量名与部署侧的登记见 `deploy/deploy-pg/.env.example` / `deploy/deploy-mysql/.env.example` 的「出厂默认值收口自检」段。
 
 ## 5. 相关文档
 
