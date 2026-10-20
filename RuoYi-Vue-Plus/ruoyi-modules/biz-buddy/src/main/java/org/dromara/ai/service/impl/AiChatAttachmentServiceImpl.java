@@ -183,6 +183,15 @@ public class AiChatAttachmentServiceImpl implements IAiChatAttachmentService {
     }
 
     @Override
+    public AiChatAttachmentVo refreshUrl(Long sessionId, Long attachmentId) {
+        AiMessageAttachment attachment = attachmentId == null ? null : baseMapper.selectById(attachmentId);
+        if (attachment == null || !Objects.equals(sessionId, attachment.getSessionId())) {
+            throw new ServiceException("附件不存在或不属于该会话");
+        }
+        return toVo(attachment, resolveUrlQuietly(attachment.getOssId()));
+    }
+
+    @Override
     public void deletePending(Long sessionId, Long attachmentId) {
         AiMessageAttachment attachment = attachmentId == null ? null : baseMapper.selectById(attachmentId);
         if (attachment == null) {

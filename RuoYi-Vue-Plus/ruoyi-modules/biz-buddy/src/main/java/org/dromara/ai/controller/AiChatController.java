@@ -253,6 +253,24 @@ public class AiChatController extends BaseController {
     }
 
     /**
+     * 重新签发附件访问地址（打开原图 / 下载文档前调用）。
+     *
+     * <p>历史回显的附件地址是**预签名 URL**（默认 120 秒有效）：页面停留超时后再打开会 403
+     * （MinIO `Request has expired`），故前端在点击时先换一个新签地址再打开。</p>
+     *
+     * @param sessionId    会话主键
+     * @param attachmentId 附件主键
+     */
+    @GetMapping("/session/{sessionId}/attachment/{attachmentId}/url")
+    public R<AiChatAttachmentVo> refreshAttachmentUrl(@NotNull(message = "会话不能为空")
+                                                      @PathVariable("sessionId") Long sessionId,
+                                                      @NotNull(message = "附件不能为空")
+                                                      @PathVariable("attachmentId") Long attachmentId) {
+        aiSessionService.getOwnedSession(sessionId);
+        return R.ok(aiChatAttachmentService.refreshUrl(sessionId, attachmentId));
+    }
+
+    /**
      * 删除尚未发送的暂存附件（用户移除 chip 时调用）
      *
      * @param sessionId    会话主键

@@ -1,6 +1,6 @@
 # 一键部署（PostgreSQL 版）
 
-用 Docker Compose 拉起 BizBuddy 全栈：**PostgreSQL 14 + Redis + Milvus standalone（etcd / minio / milvus）+ 后端 + 调度服务端 + Nginx（前端）**。
+用 Docker Compose 拉起 BizBuddy 全栈：**PostgreSQL 14 + Redis + Milvus standalone（etcd + 复用平台 MinIO）+ 后端 + 调度服务端 + Nginx（前端）**。
 
 > 与 `RuoYi-Vue-Plus/script/docker/docker-compose.yml` 的区别：那个是上游 RuoYi 模板（MySQL、无 Milvus、直接用成品镜像）；本目录针对本项目的**真实技术栈**，并把建库脚本按依赖顺序挂进 PostgreSQL 的初始化目录，`up` 完即是「有表、有数据、可登录」的环境。
 
@@ -87,8 +87,8 @@ comment on column ai_channel.mode is '接入形态：webhook Webhook 回调（�
 
 | 容器 | 状态 |
 |---|---|
-| bizbuddy-postgres / redis / milvus / milvus-etcd / milvus-minio | Up (healthy) |
-| bizbuddy-minio（平台 OSS） | Up（`minio-init` 一次性建桶 / 上传演示文档后退出） |
+| bizbuddy-postgres / redis / milvus / milvus-etcd | Up (healthy) |
+| bizbuddy-minio（平台 OSS，Milvus 复用其 `milvus-bucket` 桶） | Up (healthy)；`minio-init` 一次性建桶 / 上传演示文档后退出 |
 | bizbuddy-admin | Up，日志 `RuoYi-Vue-Plus启动成功`，无 ERROR |
 | bizbuddy-snailjob-server | Up，无 ERROR |
 | bizbuddy-web | Up |
@@ -129,8 +129,8 @@ docker tag  docker.m.daocloud.io/bellsoft/liberica-openjdk-rocky:21.0.12-cds \
 ```
 
 **② MinIO 镜像 tag 已消失**
-现象：`minio/minio:RELEASE.2024-05-28T17-19-04Z: not found`。MinIO 官方已停止通过 Docker Hub 发布，Milvus 官方编排里钉的旧 tag 拉不到。
-处置：本目录已改用仍可拉取的 release，并支持覆盖（`.env`）：`MINIO_IMAGE=…`，必要时用社区 fork `pgsty/minio:…`。
+现象：`minio/minio:RELEASE.2024-05-28T17-19-04Z: not found`。MinIO 官方已停止通过 Docker Hub 发布，旧 tag 拉不到。
+处置：本目录默认用仍可拉取的 release（平台 MinIO，Milvus 复用同一实例），并支持覆盖（`.env`）：`MINIO_IMAGE=…`，必要时用社区 fork `pgsty/minio:…`。
 
 **③ 构建上下文必须是模块目录**
 现象：`failed to calculate checksum … "/target/ruoyi-admin.jar": not found`。
@@ -153,7 +153,7 @@ docker logs bizbuddy-postgres 2>&1 | grep -E 'docker-entrypoint-initdb.d|ERROR'
 **⑥ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
 现象：上传文档失败，后端日志 `S3StorageException: Unable to execute HTTP request: Connection refused: /127.0.0.1:9000`。
 原因：**平台文件存储（OSS）的坐标不在 yaml 里，而在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。容器里 `127.0.0.1` 是容器自身，自然连不上。
-处置：本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9000/9001；注意与 Milvus 自用的 `milvus-minio` 是两套，互不共用）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`；对应 `sys_oss_config.access_policy=0`，且**框架不会自动建桶**）。文件访问由后端**读取时现算预签名 URL**（有效期 `oss.presign-expire-seconds`，默认 120s）。建桶复用 `minio` 镜像**自带的 `mc`**——`minio/mc` 独立镜像在部分镜像源上拉不到（403）。
+处置：本目录已备好两件事——① 平台 MinIO 服务 `minio`（9000/9001；**Milvus 复用同一实例**，向量数据放独立桶 `milvus-bucket`，与平台文件桶 `ruoyi` 分开）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`；对应 `sys_oss_config.access_policy=0`，且**框架不会自动建桶**）。文件访问由后端**读取时现算预签名 URL**（有效期 `oss.presign-expire-seconds`，默认 120s）。建桶复用 `minio` 镜像**自带的 `mc`**——`minio/mc` 独立镜像在部分镜像源上拉不到（403）。
 另外 `deploy/deploy-pg/sql/50-oss-endpoint.sql` 会在首次建库时把 `sys_oss_config` 的端点改成 `minio:9000`；**已初始化过的数据卷不会重跑**，需手动补一次：
 
 ```bash

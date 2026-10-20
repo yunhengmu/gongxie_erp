@@ -128,6 +128,36 @@ class AiChatAttachmentServiceImplTest {
     }
 
     @Test
+    @DisplayName("重新签发附件地址：本人会话返回新签 URL")
+    void shouldRefreshUrlForOwnedAttachment() {
+        AiMessageAttachment attachment = new AiMessageAttachment();
+        attachment.setId(9L);
+        attachment.setSessionId(1L);
+        attachment.setOssId(OSS_ID);
+        attachment.setFileType(AiMessageAttachment.TYPE_IMAGE);
+        attachment.setFileName("a.png");
+        when(baseMapper.selectById(9L)).thenReturn(attachment);
+        when(ossService.selectUrlByIds(String.valueOf(OSS_ID))).thenReturn("http://oss/a.png?X-Amz-Expires=120");
+
+        AiChatAttachmentVo vo = service().refreshUrl(1L, 9L);
+
+        assertEquals("http://oss/a.png?X-Amz-Expires=120", vo.getUrl());
+        assertEquals("a.png", vo.getFileName());
+    }
+
+    @Test
+    @DisplayName("重新签发附件地址：跨会话附件被拒绝")
+    void shouldRejectRefreshForForeignAttachment() {
+        AiMessageAttachment foreign = new AiMessageAttachment();
+        foreign.setId(9L);
+        foreign.setSessionId(2L);
+        when(baseMapper.selectById(9L)).thenReturn(foreign);
+
+        ServiceException ex = assertThrows(ServiceException.class, () -> service().refreshUrl(1L, 9L));
+        assertEquals("附件不存在或不属于该会话", ex.getMessage());
+    }
+
+    @Test
     @DisplayName("仅图片登记触发视觉能力校验，文档不触发")
     void shouldCheckVisionOnlyForImage() {
         when(ossService.selectByIds(String.valueOf(OSS_ID))).thenReturn(List.of(oss("txt")));

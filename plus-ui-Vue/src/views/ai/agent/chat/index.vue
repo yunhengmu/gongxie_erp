@@ -46,14 +46,17 @@
             <div class="msg-block msg-block--user">
               <div v-if="msg.attachments?.length" class="msg-attachments">
                 <template v-for="att in msg.attachments" :key="String(att.id)">
-                  <el-image
+                  <div
                     v-if="att.fileType === 'image' && att.url"
-                    class="msg-attachment-image"
-                    :src="att.url"
-                    :preview-src-list="[att.url]"
-                    preview-teleported
-                    fit="cover"
-                  />
+                    class="msg-attachment-image-wrap"
+                    role="button"
+                    tabindex="0"
+                    title="查看原图"
+                    @click="handlePreviewAttachment(att)"
+                    @keydown.enter.prevent="handlePreviewAttachment(att)"
+                  >
+                    <el-image class="msg-attachment-image" :src="att.url" fit="cover" />
+                  </div>
                   <a
                     v-else-if="att.url"
                     class="msg-attachment-file"
@@ -61,6 +64,7 @@
                     target="_blank"
                     rel="noopener"
                     :title="att.fileName"
+                    @click.prevent="handleOpenAttachment(att)"
                   >
                     <el-icon><Document /></el-icon>
                     <span class="msg-attachment-file__name">{{ att.fileName }}</span>
@@ -219,7 +223,6 @@
               <div v-if="msg.phaseText" class="phase-bar">
                 <span class="phase-bar__dot"></span>
                 <span class="phase-bar__text">{{ msg.phaseText }}</span>
-                <span v-if="msg.phaseElapsed" class="phase-bar__elapsed">已等待 {{ msg.phaseElapsed }}s</span>
               </div>
 
               <!-- 参考来源：回答用到知识库时展示（默认收起，点击标题展开 / 收起） -->
@@ -408,6 +411,14 @@
         </div>
       </div>
     </section>
+
+    <!-- 原图预览：点击附件时先换一个新签地址再打开，避免预签名 URL 过期后 403 -->
+    <el-image-viewer
+      v-if="previewVisible"
+      :url-list="[previewUrl]"
+      teleported
+      @close="previewVisible = false"
+    />
   </div>
 </template>
 
@@ -433,6 +444,7 @@ import {
   pinChatSessionExpert,
   removeChatResources,
   renameChatSession,
+  refreshChatAttachmentUrl,
   sendChatMessage,
   stopChat,
   topChatSession
@@ -537,10 +549,6 @@ interface LocalMessage {
   };
   /** 对话期实时进度文案（后端 phase 事件下发；正文开始流动即清空） */
   phaseText?: string;
-  /** 本轮进度起始时间戳（毫秒）：算「已等待 N 秒」用，前端本地计时 */
-  phaseStartedAt?: number;
-  /** 已等待秒数（由秒表每秒刷新） */
-  phaseElapsed?: number;
 }
 
 /** 资源标签（REQ-AI-32）：+ 后面显示的选中项，悬停左侧出叉号可移除 */
@@ -689,7 +697,6 @@ onActivated(() => {
 onBeforeUnmount(() => {
   workbenchTimers.forEach((timer) => window.clearTimeout(timer));
   workbenchTimers = [];
-  stopPhaseTicker();
   window.removeEventListener('resize', syncWorkbenchHeight);
   workbenchResizeObserver?.disconnect();
   workbenchResizeObserver = undefined;
@@ -951,34 +958,7 @@ const finishStream = () => {
   streaming.value = false;
   currentAssistantKey.value = undefined;
   sseData.value = null;
-  stopPhaseTicker();
   closeStream();
-};
-
-/** 进度秒表句柄（每秒刷新「已等待 N 秒」） */
-let phaseTicker: number | undefined;
-
-/** 启动进度秒表（重复调用无副作用） */
-const startPhaseTicker = () => {
-  if (phaseTicker !== undefined) {
-    return;
-  }
-  phaseTicker = window.setInterval(() => {
-    const msg = currentAssistant();
-    // 正文已开流（状态条让位）或本轮已结束：不刷新，等待收尾统一清理
-    if (!msg || !msg.phaseText || !msg.phaseStartedAt) {
-      return;
-    }
-    msg.phaseElapsed = Math.max(1, Math.round((Date.now() - msg.phaseStartedAt) / 1000));
-  }, 1000);
-};
-
-/** 停止进度秒表 */
-const stopPhaseTicker = () => {
-  if (phaseTicker !== undefined) {
-    window.clearInterval(phaseTicker);
-    phaseTicker = undefined;
-  }
 };
 
 /** 清掉某条消息的进度状态（收尾 / 失败 / 中止 / 待确认时调用） */
@@ -987,8 +967,6 @@ const clearPhase = (msg?: LocalMessage) => {
     return;
   }
   msg.phaseText = undefined;
-  msg.phaseStartedAt = undefined;
-  msg.phaseElapsed = undefined;
 };
 
 /** 工具调用状态 → 卡片状态（历史数据无 running，SUCCESS 视为成功，其余视为失败/未知） */
@@ -1744,8 +1722,6 @@ const handleStreamEvent = (raw: string) => {
     case 'phase': {
       // 对话期实时进度：长等待时播报后端在干什么（文案由后端拼好，前端只渲染）
       msg.phaseText = event.text ?? '';
-      msg.phaseStartedAt ??= Date.now();
-      startPhaseTicker();
       break;
     }
     case 'text_delta': {
@@ -2011,6 +1987,48 @@ const handleRemoveAttachment = async (item: ChatAttachmentVO) => {
     } catch {
       // 暂存件删除失败可忽略，不影响发送
     }
+  }
+};
+
+/**
+ * 取附件的新签访问地址。
+ *
+ * <p>历史回显的地址是**预签名 URL**（默认 120 秒有效）：页面停留超时后再打开会 403
+ * （MinIO `Request has expired`），表现为缩略图还在、点开原图空白。故打开前先换一个新签地址；
+ * 换签失败时回退到原地址（至少还有机会命中浏览器缓存）。</p>
+ */
+const resolveFreshAttachmentUrl = async (item: ChatAttachmentVO): Promise<string | undefined> => {
+  const sessionId = currentSessionId.value;
+  if (!sessionId || item.id === undefined || item.id === null) {
+    return item.url;
+  }
+  try {
+    const res = await refreshChatAttachmentUrl(sessionId, item.id);
+    return res.data?.url || item.url;
+  } catch {
+    return item.url;
+  }
+};
+
+/** 图片原图预览开关与地址 */
+const previewVisible = ref(false);
+const previewUrl = ref('');
+
+/** 点击图片附件：换新签地址后打开原图预览 */
+const handlePreviewAttachment = async (item: ChatAttachmentVO) => {
+  const url = await resolveFreshAttachmentUrl(item);
+  if (!url) {
+    return;
+  }
+  previewUrl.value = url;
+  previewVisible.value = true;
+};
+
+/** 点击文档附件：换新签地址后新窗口打开（同样避免预签名过期） */
+const handleOpenAttachment = async (item: ChatAttachmentVO) => {
+  const url = await resolveFreshAttachmentUrl(item);
+  if (url) {
+    window.open(url, '_blank', 'noopener');
   }
 };
 
@@ -2341,6 +2359,18 @@ onMounted(() => {
   margin-bottom: 6px;
 }
 
+.msg-attachment-image-wrap {
+  display: inline-block;
+  line-height: 0;
+  border-radius: 10px;
+  cursor: zoom-in;
+}
+
+.msg-attachment-image-wrap:focus-visible {
+  outline: 2px solid var(--app-accent-strong);
+  outline-offset: 2px;
+}
+
 .msg-attachment-image {
   width: 120px;
   height: 120px;
@@ -2489,12 +2519,6 @@ onMounted(() => {
 
 .phase-bar__text {
   word-break: break-word;
-}
-
-/* 秒数用等宽数字，避免每秒刷新时宽度抖动 */
-.phase-bar__elapsed {
-  font-variant-numeric: tabular-nums;
-  opacity: 0.7;
 }
 
 @keyframes phase-fade-in {

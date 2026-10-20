@@ -1,6 +1,6 @@
 # 一键部署（MySQL 8.0 版）
 
-用 Docker Compose 拉起 BizBuddy 全栈：**MySQL 8.0 + Redis + Milvus standalone（etcd / minio / milvus）+ 后端 + 调度服务端 + Nginx（前端）**。
+用 Docker Compose 拉起 BizBuddy 全栈：**MySQL 8.0 + Redis + Milvus standalone（etcd + 复用平台 MinIO）+ 后端 + 调度服务端 + Nginx（前端）**。
 
 > 与 [`deploy-pg/`](../deploy-pg)（PostgreSQL 版）是**并列的两套编排**，技术栈差异只在数据库（及随之为其准备的 JDBC 驱动 / 技能仓库实现），其余组件一致。
 > 本项目已同时支持 PostgreSQL 与 MySQL 8.0：**技能仓库按数据源类型自动装配**（`AgentScopeConfig#aiSkillRepository`，PostgreSQL 版 `PostgresSkillRepository` / MySQL 版 `MysqlSkillRepository`），无需改代码。
@@ -61,7 +61,8 @@ docker compose up -d --build
 
 | 容器 | 状态 |
 |---|---|
-| bizbuddy-mysql / redis / milvus / milvus-etcd / milvus-minio | Up (healthy) |
+| bizbuddy-mysql / redis / milvus / milvus-etcd | Up (healthy) |
+| bizbuddy-mysql-minio（平台 OSS，Milvus 复用其 `milvus-bucket` 桶） | Up (healthy)；`minio-init` 一次性建桶 / 上传演示文档后退出 |
 | bizbuddy-mysql-admin | Up，日志 `MysqlSkillRepository initialized with database: biz_buddy, skills table: ai_skill, resources table: ai_skill_resource`、`Started DromaraApplication in ~26s`，无 ERROR |
 | bizbuddy-mysql-snailjob-server | Up，Tomcat 8800、上下文 `/snail-job`，无 ERROR |
 | bizbuddy-mysql-web | Up |
@@ -125,7 +126,7 @@ docker tag  docker.m.daocloud.io/bellsoft/liberica-openjdk-rocky:21.0.12-cds \
             bellsoft/liberica-openjdk-rocky:21.0.12-cds
 ```
 
-**② MinIO 镜像 tag 已消失**：`minio/minio:RELEASE.2024-05-28T17-19-04Z: not found`。本目录已改用仍可拉取的 release，并支持 `.env` 覆盖 `MINIO_IMAGE`。
+**② MinIO 镜像 tag 已消失**：`minio/minio:RELEASE.2024-05-28T17-19-04Z: not found`。本目录默认用仍可拉取的 release（平台 MinIO，Milvus 复用同一实例），并支持 `.env` 覆盖 `MINIO_IMAGE`。
 
 **③ 构建上下文必须是模块目录**：Dockerfile 里是 `ADD ./target/xxx.jar`，`context` 必须是**该模块目录**，否则报 `not found`。
 
@@ -143,7 +144,7 @@ docker logs bizbuddy-mysql 2>&1 | grep -iE 'docker-entrypoint|ERROR'
 原因：Spring 松散绑定下 `SNAILJOB_HOST` 落到 **`snail-job.host`（客户端自己的 IP）**。本目录已改用 `SNAILJOB_SERVER_HOST`。
 
 **⑥ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
-原因：**平台文件存储（OSS）坐标存在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。本目录已备好两件事——① 平台**专用** MinIO 服务 `minio`（9002/9003）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`）。`deploy/deploy-mysql/sql/50-oss-endpoint.sql` 会在首次建库时把端点改成 `minio:9000`、`domain_url` 写成宿主机可达地址、`access_policy` 置 `0`（私有，文件访问走后端下发的预签名 URL）；**已初始化过的数据卷不会重跑**，需手动补一次：
+原因：**平台文件存储（OSS）坐标存在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。本目录已备好两件事——① 平台 MinIO 服务 `minio`（9002/9003；**Milvus 复用同一实例**，向量数据放独立桶 `milvus-bucket`，与平台文件桶 `ruoyi` 分开）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`）。`deploy/deploy-mysql/sql/50-oss-endpoint.sql` 会在首次建库时把端点改成 `minio:9000`、`domain_url` 写成宿主机可达地址、`access_policy` 置 `0`（私有，文件访问走后端下发的预签名 URL）；**已初始化过的数据卷不会重跑**，需手动补一次：
 
 ```bash
 docker exec -i bizbuddy-mysql mysql -uroot -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" < deploy/deploy-mysql/sql/50-oss-endpoint.sql
