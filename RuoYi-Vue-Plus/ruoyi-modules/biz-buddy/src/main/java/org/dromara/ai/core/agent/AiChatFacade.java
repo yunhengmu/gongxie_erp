@@ -404,6 +404,9 @@ public class AiChatFacade {
             // 选项合法即采信并**短路到专家直答**（不再跑入口轮）。pinned 已指定专家，按口径跳过判定；
             // 关闭 / 非 gate 档 / 未采信时 takeOver=false，照常跑入口轮，行为与现状逐项等价。
             if (route != null && route.pinnedExpertId == null) {
+                // 结构化决策判定期间产物只有一次外呼、可能持续数秒，先播报「在判断」避免静默
+                AiPhaseSupport.emit(emitter, state, AiPhaseSupport.PHASE_ROUTING,
+                    "小Z 正在判断该由谁回答…", null);
                 RouteJudgeService.JudgeGateOutcome gate =
                     routeJudgeService.judgeGate(route, userContent, userId, deptId, userMessageId);
                 if (gate.takeOver()) {
@@ -882,6 +885,9 @@ public class AiChatFacade {
         AtomicBoolean finished = new AtomicBoolean(false);
         try {
             AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_START));
+            // 对话期进度：恢复请求到首个事件之间有一整段空窗（装配 + 专家续跑），先播报「在继续执行」
+            AiPhaseSupport.emit(emitter, state, AiPhaseSupport.PHASE_RESUMING,
+                "小Z 正在继续执行你已确认的操作…", null);
             // SSE 断连 / 超时：取消该会话**当前全部**后端执行（与对话页「停止」同一路径）。
             // 恢复段是**另一条 SSE 请求**，故此处同样要登记（与 streamChat 同款；SseEmitter 回调单槽覆盖）
             emitter.onCompletion(() -> runRegistry.cancel(sessionId));

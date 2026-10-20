@@ -212,7 +212,8 @@ class AiRouteOrchestratorTest {
      */
     private AiRouteOrchestrator newOrchestratorWithRealBridge(AiRetrievalSourceRegistry registry) {
         return new AiRouteOrchestrator(agentRegistry, expertDirectory, recorder,
-            new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService, registry),
+            new AiStreamEventBridge(traceService, aiProperties, safetyGuard, safetyEventService, registry,
+                mock(ToolLabelResolver.class)),
             traceService, aiProperties, runtimeConfigStore, skillService, agentService, runRegistry);
     }
 

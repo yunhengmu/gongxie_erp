@@ -546,6 +546,9 @@ public class AiRouteOrchestrator {
                 "expertName", candidate.agentName(),
                 "attemptNo", attempt,
                 "callKind", kind));
+            // 对话期进度：专家执行可能长达数十秒，先播报「在咨询谁」，其内部动作由专家状态的 phase 接续
+            AiPhaseSupport.emit(route.emitter, route.entryState, AiPhaseSupport.PHASE_EXPERT,
+                "正在咨询领域专家「" + candidate.agentName() + "」…", null);
         }
         // 专家直答（REQ-AI-30 直答修订，2026-10-03）：先清掉小Z 已流出的正文并进入接管态，
         // 随后专家的正文以 text_delta 直传用户（内部工具卡片不下发，只累积留证）
@@ -558,6 +561,8 @@ public class AiRouteOrchestrator {
         state.agentId = candidate.agentId();
         state.modelId = definition.getModelId();
         state.traceId = childTraceId;
+        // 对话期进度：专家的思考 / 工具动作按专家身份播报（「专家「X」正在调用…」）
+        state.speakerExpertName = candidate.agentName();
         // 专家继承会话资源集（REQ-AI-32）：与小Z 同源的工具 / 技能 / MCP 工具可见面（专家侧仅只读 + 会话选中的只读工具）
         HarnessAgent expert = agentRegistry.getExpert(definition, route.resources);
         RuntimeContext context = buildExpertContext(route, candidate, expertSessionId);

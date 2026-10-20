@@ -198,6 +198,8 @@ public class AiTurnFinisher {
      */
     AiMessage finish(SseEmitter emitter, Long sessionId, AiStreamState state, long durationMs,
                      Long resumeMessageId, AiRouteContext route) {
+        // 对话期进度：收尾要做安全复检与落库，先播报「在整理」；正文尾部冲刷会随后清掉该状态行
+        AiPhaseSupport.emit(emitter, state, AiPhaseSupport.PHASE_FINALIZING, "小Z 正在整理回答…", null);
         // 安全合规：先冲刷尾部缓冲（与 SSE 同源），再对最终正文做一次完整守卫（含专家直答正文）
         streamBridge.flushSafety(emitter, state);
         List<AiToolCallLog> logs = buildToolLogs(state, route);

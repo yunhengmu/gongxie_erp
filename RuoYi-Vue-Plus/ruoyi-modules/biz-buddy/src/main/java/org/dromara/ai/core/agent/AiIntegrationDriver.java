@@ -120,6 +120,8 @@ public class AiIntegrationDriver {
         // 兜底轮（专家失败/超时）：专家可能已流出部分正文，先清掉再让小Z 自答，避免两者拼接
         AiSseSupport.send(emitter, AiSseSupport.envelope(EVENT_ANSWER_RESET));
         state.answer.setLength(0);
+        // 对话期进度：整合轮是一次完整的模型调用（可能数秒），播报「在汇总」避免正文重开前的静默
+        AiPhaseSupport.emit(emitter, state, AiPhaseSupport.PHASE_INTEGRATING, "小Z 正在汇总专家结论…", null);
         String userMessage = intro + report;
         AtomicBoolean finished = new AtomicBoolean(false);
         AgentRun<AgentEvent> run = agent.prepareRun(List.of(new UserMessage(userMessage)), ctx);

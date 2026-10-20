@@ -79,6 +79,20 @@ final class AiStreamState {
     /** 对话模型主键 */
     Long modelId;
 
+    /**
+     * 当前进度事件的说话人专家名（对话期进度，{@code phase} 事件）。
+     *
+     * <p>{@code null} 表示入口智能体（小Z）自己的进度；非空表示本轮事件来自被调用的领域专家——
+     * 由 {@code AiRouteOrchestrator#runExpert} 在调用专家前写入，使「小Z 正在思考…」在专家侧
+     * 变为「专家「X」正在思考…」。专家每次调用都新建独立状态，故无需复位。</p>
+     */
+    volatile String speakerExpertName;
+
+    /**
+     * 上一次已下发的进度键（{@code phase|text}）：同一文案不重复下发，避免逐轮模型调用刷屏。
+     */
+    String lastPhaseKey;
+
     /** 是否因等待人工确认而暂停 */
     volatile boolean pendingConfirm;
 
