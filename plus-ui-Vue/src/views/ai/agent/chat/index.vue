@@ -46,14 +46,17 @@
             <div class="msg-block msg-block--user">
               <div v-if="msg.attachments?.length" class="msg-attachments">
                 <template v-for="att in msg.attachments" :key="String(att.id)">
-                  <el-image
+                  <div
                     v-if="att.fileType === 'image' && att.url"
-                    class="msg-attachment-image"
-                    :src="att.url"
-                    :preview-src-list="[att.url]"
-                    preview-teleported
-                    fit="cover"
-                  />
+                    class="msg-attachment-image-wrap"
+                    role="button"
+                    tabindex="0"
+                    title="查看原图"
+                    @click="handlePreviewAttachment(att)"
+                    @keydown.enter.prevent="handlePreviewAttachment(att)"
+                  >
+                    <el-image class="msg-attachment-image" :src="att.url" fit="cover" />
+                  </div>
                   <a
                     v-else-if="att.url"
                     class="msg-attachment-file"
@@ -61,6 +64,7 @@
                     target="_blank"
                     rel="noopener"
                     :title="att.fileName"
+                    @click.prevent="handleOpenAttachment(att)"
                   >
                     <el-icon><Document /></el-icon>
                     <span class="msg-attachment-file__name">{{ att.fileName }}</span>
@@ -407,6 +411,14 @@
         </div>
       </div>
     </section>
+
+    <!-- 原图预览：点击附件时先换一个新签地址再打开，避免预签名 URL 过期后 403 -->
+    <el-image-viewer
+      v-if="previewVisible"
+      :url-list="[previewUrl]"
+      teleported
+      @close="previewVisible = false"
+    />
   </div>
 </template>
 
@@ -432,6 +444,7 @@ import {
   pinChatSessionExpert,
   removeChatResources,
   renameChatSession,
+  refreshChatAttachmentUrl,
   sendChatMessage,
   stopChat,
   topChatSession
@@ -1978,6 +1991,48 @@ const handleRemoveAttachment = async (item: ChatAttachmentVO) => {
 };
 
 /**
+ * 取附件的新签访问地址。
+ *
+ * <p>历史回显的地址是**预签名 URL**（默认 120 秒有效）：页面停留超时后再打开会 403
+ * （MinIO `Request has expired`），表现为缩略图还在、点开原图空白。故打开前先换一个新签地址；
+ * 换签失败时回退到原地址（至少还有机会命中浏览器缓存）。</p>
+ */
+const resolveFreshAttachmentUrl = async (item: ChatAttachmentVO): Promise<string | undefined> => {
+  const sessionId = currentSessionId.value;
+  if (!sessionId || item.id === undefined || item.id === null) {
+    return item.url;
+  }
+  try {
+    const res = await refreshChatAttachmentUrl(sessionId, item.id);
+    return res.data?.url || item.url;
+  } catch {
+    return item.url;
+  }
+};
+
+/** 图片原图预览开关与地址 */
+const previewVisible = ref(false);
+const previewUrl = ref('');
+
+/** 点击图片附件：换新签地址后打开原图预览 */
+const handlePreviewAttachment = async (item: ChatAttachmentVO) => {
+  const url = await resolveFreshAttachmentUrl(item);
+  if (!url) {
+    return;
+  }
+  previewUrl.value = url;
+  previewVisible.value = true;
+};
+
+/** 点击文档附件：换新签地址后新窗口打开（同样避免预签名过期） */
+const handleOpenAttachment = async (item: ChatAttachmentVO) => {
+  const url = await resolveFreshAttachmentUrl(item);
+  if (url) {
+    window.open(url, '_blank', 'noopener');
+  }
+};
+
+/**
  * 输入框快捷键：Enter / Ctrl+Enter 发送，Shift+Enter 换行。
  *
  * 必须挡掉输入法组合态：中文候选框里按 Enter 是「选词」，不加这个判断会把选词误当发送。
@@ -2302,6 +2357,18 @@ onMounted(() => {
   gap: 6px;
   max-width: 100%;
   margin-bottom: 6px;
+}
+
+.msg-attachment-image-wrap {
+  display: inline-block;
+  line-height: 0;
+  border-radius: 10px;
+  cursor: zoom-in;
+}
+
+.msg-attachment-image-wrap:focus-visible {
+  outline: 2px solid var(--app-accent-strong);
+  outline-offset: 2px;
 }
 
 .msg-attachment-image {

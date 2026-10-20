@@ -59,6 +59,18 @@ public interface IAiChatAttachmentService {
     byte[] downloadBytes(Long ossId);
 
     /**
+     * 重新签发附件访问地址。
+     *
+     * <p>附件历史回显用的是**预签名 URL**（有效期默认 120 秒），页面停留超过有效期后再打开预览 / 下载
+     * 会拿到 403（MinIO `Request has expired`）。故点开原图 / 打开文档前先调本方法换一个**新签**地址。</p>
+     *
+     * @param sessionId    会话主键（校验归属）
+     * @param attachmentId 附件主键
+     * @return 附件视图（`url` 为新签地址）
+     */
+    AiChatAttachmentVo refreshUrl(Long sessionId, Long attachmentId);
+
+    /**
      * 删除一个尚未发送的暂存附件（用户移除 chip 时调用）。
      *
      * @param sessionId    会话主键

@@ -198,9 +198,26 @@ export const deleteChatAttachment = (sessionId: string | number, attachmentId: s
 };
 
 /**
+ * 重新签发附件访问地址（打开原图 / 下载文档前调用）
+ *
+ * <p>历史回显的地址是预签名 URL（默认 120 秒有效），页面停留超时后再打开会 403，故点击时先换新签地址。</p>
+ * @param sessionId 会话主键
+ * @param attachmentId 附件主键
+ */
+export const refreshChatAttachmentUrl = (
+  sessionId: string | number,
+  attachmentId: string | number
+): AxiosPromise<ChatAttachmentVO> => {
+  return request({
+    url: `/ai/chat/session/${sessionId}/attachment/${attachmentId}/url`,
+    method: 'get'
+  });
+};
+
+/**
  * 删除一问一答（整轮）：该用户消息及其助手回复
  * @param sessionId 会话主键
- * @param messageId 用户消息主键
+ * @param messageId 消息主键
  */
 export const deleteChatMessage = (sessionId: string | number, messageId: string | number): AxiosPromise<void> => {
   return request({
