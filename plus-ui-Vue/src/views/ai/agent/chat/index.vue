@@ -185,8 +185,14 @@
                     </el-tag>
                   </div>
                   <div v-for="call in part.toolCalls ?? []" :key="call.toolCallId" class="confirm-card__item">
-                    <div class="confirm-card__tool">{{ call.toolName }}</div>
-                    <pre class="tool-code">{{ formatToolInput(call.input) }}</pre>
+                    <!-- 展示中文名（后端下发 toolLabel，查不到回退工具编码）：
+                         用户要据此决定放行与否，工具编码（如 create_notice）看不懂 -->
+                    <div class="confirm-card__tool">{{ call.toolLabel || call.toolName }}</div>
+                    <!-- 一句话说明该工具做什么，降低「看不懂就盲点允许」的风险 -->
+                    <div v-if="call.toolDesc" class="confirm-card__desc">{{ call.toolDesc }}</div>
+                    <!-- 原始入参仅在待确认时展示：已处置卡片只需保留结论（状态/拒绝原因），
+                         避免历史消息里堆积大段 JSON、淹没结论 -->
+                    <pre v-if="part.confirmState === 'pending'" class="tool-code">{{ formatToolInput(call.input) }}</pre>
                   </div>
                   <div v-if="part.confirmState === 'pending'" class="confirm-card__actions">
                     <el-button type="primary" size="small" @click="handleConfirmTool(part, true, false)">
@@ -201,7 +207,7 @@
                     已拒绝{{ part.confirmReason ? `：${part.confirmReason}` : '' }}。
                   </div>
                   <div v-else-if="part.confirmState === 'expired'" class="confirm-card__tip">
-                    确认已过期，请重新提问。
+                    确认已失效（已过期或被新的确认请求替代），请重新提问。
                   </div>
                 </div>
               </template>
@@ -244,6 +250,16 @@
               <div v-if="msg.status === '1'" class="msg-error">
                 <el-icon><WarningFilled /></el-icon>
                 <span>{{ msg.errorMsg || '回复失败' }}</span>
+                <!-- 仅当该轮记录了可重发的正文/附件时才给重试入口（系统级错误无可重发内容） -->
+                <el-button
+                  v-if="msg.retryPayload"
+                  type="primary"
+                  link
+                  size="small"
+                  @click="handleRetryMessage(msg)"
+                >
+                  重新发送
+                </el-button>
               </div>
               <div
                 v-else-if="!msg.streaming && (msg.durationMs !== undefined || msg.status === '3')"
@@ -287,7 +303,7 @@
           type="textarea"
           :autosize="{ minRows: 4.5, maxRows: 10 }"
           resize="none"
-          :disabled="streaming"
+          :disabled="streaming || sending"
           placeholder="今天帮您干点什么？"
           @keydown="handleComposerKeydown"
         />
@@ -431,6 +447,7 @@ import { visibleSkillOptions } from '@/api/ai/skill';
 import type { SkillOptionVO } from '@/api/ai/skill/types';
 import type { ToolCallLogVO } from '@/api/ai/session/types';
 import { uploadOss } from '@/api/system/oss';
+import cache from '@/plugins/cache';
 import modal from '@/plugins/modal';
 import logo from '@/assets/logo/logo.png';
 import AiMarkdown from '@/views/ai/components/AiMarkdown.vue';
@@ -501,6 +518,15 @@ interface LocalMessage {
   attachments?: ChatAttachmentVO[];
   /** 回答参考来源（知识库命中；流式与历史消息均可见） */
   sources?: ChatSourceItem[];
+  /** 失败轮次的重试载荷：记录本轮正文与附件，供「重新发送」原样重发 */
+  retryPayload?: {
+    /** 本轮用户正文 */
+    content: string;
+    /** 本轮用户消息主键（重试时先删除，避免历史里出现重复用户气泡） */
+    userMessageId?: string | number;
+    /** 本轮随消息发送的附件主键 */
+    attachmentIds: Array<string | number>;
+  };
 }
 
 /** 资源标签（REQ-AI-32）：+ 后面显示的选中项，悬停左侧出叉号可移除 */
@@ -572,6 +598,12 @@ const pendingAttachments = ref<ChatAttachmentVO[]>([]);
 const uploadingAttachment = ref(false);
 /** 隐藏的文件选择框 */
 const attachmentInputRef = ref<HTMLInputElement>();
+
+/**
+ * 「尚未落库的指定专家」本地缓存键：会话未创建时专家选择只在前端暂存，刷新即丢，
+ * 故用会话级存储兜住这一窗口（见 savePendingExpertCache）。
+ */
+const PENDING_EXPERT_CACHE_KEY = 'ai-chat-pending-expert';
 
 /** 单条消息可携带的附件数量上限（与后端 bizbuddy.ai.chat.max-attachments-per-message 保持一致） */
 const MAX_ATTACHMENTS = 5;
@@ -1192,6 +1224,36 @@ const handleResourceSelect = async (index: string) => {
   }
 };
 
+/** 读取「尚未落库的指定专家」本地缓存（缺失或字段不完整时返回 undefined） */
+const readPendingExpertCache = (): { id: string | number; name: string } | undefined => {
+  const cached = cache.session.getJSON(PENDING_EXPERT_CACHE_KEY);
+  if (!cached || cached.id === undefined || cached.id === null || !cached.name) {
+    return undefined;
+  }
+  return { id: cached.id, name: cached.name };
+};
+
+/** 缓存「尚未落库的指定专家」：无会话时选择只在内存里，刷新即丢，故写本地兜住这一窗口 */
+const savePendingExpertCache = (expert: { id: string | number; name: string }) => {
+  cache.session.setJSON(PENDING_EXPERT_CACHE_KEY, expert);
+};
+
+/** 清除「尚未落库的指定专家」缓存：选择已随会话落库或用户取消后，避免脏数据长期留存 */
+const clearPendingExpertCache = () => {
+  cache.session.remove(PENDING_EXPERT_CACHE_KEY);
+};
+
+/** 刷新后恢复「尚未落库的指定专家」：仅当前无会话时生效，有会话时以服务端真值为准 */
+const restorePendingExpertCache = () => {
+  if (currentSessionId.value) {
+    return;
+  }
+  const cached = readPendingExpertCache();
+  if (cached) {
+    pinnedExpert.value = cached;
+  }
+};
+
 /** 指定 / 取消指定专家：已有会话即时提交，未创建会话暂存本地 */
 const toggleExpertResource = async (agentId: string) => {
   if (isExpertSelected(agentId)) {
@@ -1200,6 +1262,7 @@ const toggleExpertResource = async (agentId: string) => {
   }
   const option = expertOptions.value.find((item) => String(item.agentId) === String(agentId));
   const name = option?.agentName || String(agentId);
+  const label = option ? expertLabel(option) : name;
   if (currentSessionId.value) {
     await pinChatSessionExpert(currentSessionId.value, agentId);
     const session = sessions.value.find((item) => String(item.id) === String(currentSessionId.value));
@@ -1207,8 +1270,13 @@ const toggleExpertResource = async (agentId: string) => {
       session.pinnedExpertId = agentId;
       session.pinnedExpertName = name;
     }
+    // 已随会话落库，本地兜底记录不再需要
+    clearPendingExpertCache();
+  } else {
+    // 会话尚未创建：选择只在前端暂存，刷新会丢，持久化到本地兜住这个窗口
+    savePendingExpertCache({ id: agentId, name: label });
   }
-  pinnedExpert.value = { id: agentId, name: option ? expertLabel(option) : name };
+  pinnedExpert.value = { id: agentId, name: label };
 };
 
 /** 取消指定专家：清空 pinned_expert_id，回到自动路由；同一会话上下文不丢 */
@@ -1221,6 +1289,8 @@ const clearExpert = async () => {
       session.pinnedExpertName = undefined;
     }
   }
+  // 用户主动取消：一并清掉本地兜底记录（无论有无会话）
+  clearPendingExpertCache();
   pinnedExpert.value = undefined;
 };
 
@@ -1335,6 +1405,8 @@ const handleRemoveChip = async (chip: ResourceChip) => {
 
 /** 载入某个会话的资源集与指定专家（服务端真值） */
 const loadSessionResourceSet = async (session: ChatSessionVO) => {
+  // 载入已有会话即以其服务端真值为准，本地兜底的未落库选择作废
+  clearPendingExpertCache();
   pinnedExpert.value = session.pinnedExpertId
     ? { id: session.pinnedExpertId, name: session.pinnedExpertName || String(session.pinnedExpertId) }
     : undefined;
@@ -1361,6 +1433,8 @@ const handleNewSession = () => {
   inputText.value = '';
   // 资源选择（REQ-AI-32）：新建会话时清空，需重新选择；选项列表保留
   sessionResources.value = [];
+  // 一并清掉本地兜底的专家选择：避免刷新后又把已被清空的旧选择恢复出来
+  clearPendingExpertCache();
   pinnedExpert.value = undefined;
 };
 
@@ -1539,6 +1613,11 @@ const handleStop = () => {
 
 /** 处置待确认的工具调用：写入结果后建立恢复流继续生成 */
 const handleConfirmTool = async (part: MessagePart, confirmed: boolean, remember: boolean, rejectReason?: string) => {
+  // 只有待确认卡片可处置：挡住连点与竞态（已被置为 expired 的旧卡片不再重复提交）
+  if (part.confirmState !== 'pending') {
+    modal.msgWarning('该确认已失效，请重新提问');
+    return;
+  }
   const sessionId = currentSessionId.value;
   const messageId = part.messageId;
   if (!sessionId || messageId === undefined || messageId === null || streaming.value) {
@@ -1567,6 +1646,11 @@ const handleConfirmTool = async (part: MessagePart, confirmed: boolean, remember
 
 /** 拒绝待确认的工具调用：可填写拒绝原因（可选），交后端回传模型并留痕 */
 const handleRejectTool = async (part: MessagePart) => {
+  // 同样先校验状态：避免对已失效卡片弹出拒绝原因输入框
+  if (part.confirmState !== 'pending') {
+    modal.msgWarning('该确认已失效，请重新提问');
+    return;
+  }
   const result = await ElMessageBox.prompt('可填写拒绝原因（可选），将回传给模型并记入审计', '拒绝执行', {
     confirmButtonText: '确认拒绝',
     cancelButtonText: '取消',
@@ -1656,6 +1740,14 @@ const handleStreamEvent = (raw: string) => {
       // 工具被配置为「需人工确认」：本轮暂停，等待用户处置后再恢复
       msg.id = event.messageId ?? msg.id;
       msg.streaming = false;
+      // 后端待确认按 messageId 唯一暂存：同一助手消息内第二次暂停会覆盖旧槽位，
+      // 若旧卡片仍留在前端且 messageId 与新卡片相同，用户点旧卡片时后端处理的却是新一批
+      // 工具调用（点 A 却执行了 B）。故先把同消息内已有的 pending 卡片统一置为 expired。
+      msg.parts.forEach((part) => {
+        if (part.kind === 'confirm' && part.confirmState === 'pending') {
+          part.confirmState = 'expired';
+        }
+      });
       msg.parts.push({
         kind: 'confirm',
         messageId: event.messageId,
@@ -1779,6 +1871,8 @@ const ensureSession = async (): Promise<string | number | undefined> => {
     return undefined;
   }
   currentSessionId.value = session.id;
+  // 指定专家已随 pinnedExpertId 落库，本地兜底记录可清除
+  clearPendingExpertCache();
   // 首次建会话时把本地暂存的资源选择一并提交（REQ-AI-32）
   if (sessionResources.value.length) {
     await addChatResources(
@@ -1870,25 +1964,41 @@ const handleComposerKeydown = (event: KeyboardEvent) => {
   void handleSend();
 };
 
-/** 发送消息：先落库拿 messageId，再建立 SSE 流 */
-const handleSend = async () => {
-  const content = inputText.value.trim();
-  const attachmentIds = pendingAttachments.value.map((att) => att.id);
-  if ((!content && !attachmentIds.length) || streaming.value || sending.value) {
-    return;
+/**
+ * 发送一轮对话：落库用户消息 → 追加助手占位 → 建立 SSE 流。
+ * handleSend 与「失败重试」共用同一路径，保证重试与正常发送行为完全一致。
+ * 返回是否成功启动本轮，供调用方决定是否清空输入区。
+ */
+const startChatRound = async (
+  content: string,
+  attachmentIds: Array<string | number>,
+  retrySource?: LocalMessage
+): Promise<boolean> => {
+  if (streaming.value || sending.value) {
+    return false;
   }
   sending.value = true;
   try {
     const sessionId = await ensureSession();
     if (sessionId === undefined) {
-      return;
+      return false;
     }
 
     const res = await sendChatMessage(sessionId, content, attachmentIds);
     const userMessageId = res.data?.id;
     if (userMessageId === undefined || userMessageId === null) {
       modal.msgError('消息发送失败');
-      return;
+      return false;
+    }
+
+    // 重试：先摘掉上一轮失败的错误气泡与其用户气泡，避免历史里出现重复消息
+    if (retrySource) {
+      const failedUserId = retrySource.retryPayload?.userMessageId;
+      messages.value = messages.value.filter(
+        (item) =>
+          item !== retrySource &&
+          (failedUserId === undefined || failedUserId === null || String(item.id) !== String(failedUserId))
+      );
     }
 
     messages.value.push({
@@ -1902,18 +2012,52 @@ const handleSend = async () => {
       attachments: res.data?.attachments ?? []
     });
     const tempId = `pending-${Date.now()}`;
-    messages.value.push({ id: tempId, role: 'assistant', content: '', parts: [], streaming: true, status: '0' });
+    const assistant: LocalMessage = {
+      id: tempId,
+      role: 'assistant',
+      content: '',
+      parts: [],
+      streaming: true,
+      status: '0',
+      // 记录本轮正文/附件/用户消息主键：失败时据此原样重发（见 handleRetryMessage）
+      retryPayload: { content, userMessageId, attachmentIds }
+    };
+    messages.value.push(assistant);
     currentAssistantKey.value = tempId;
-    inputText.value = '';
-    pendingAttachments.value = [];
     scrollToBottomSoon();
 
     streaming.value = true;
     streamUrl.value = buildChatStreamUrl(sessionId, userMessageId);
     openStream();
+    return true;
   } finally {
     sending.value = false;
   }
+};
+
+/** 发送消息：先落库拿 messageId，再建立 SSE 流 */
+const handleSend = async () => {
+  const content = inputText.value.trim();
+  const attachmentIds = pendingAttachments.value.map((att) => att.id);
+  if ((!content && !attachmentIds.length) || streaming.value || sending.value) {
+    return;
+  }
+  const started = await startChatRound(content, attachmentIds);
+  if (!started) {
+    return;
+  }
+  // 发送成功后才清空输入区与待发附件（失败时保留文案，便于用户直接重发）
+  inputText.value = '';
+  pendingAttachments.value = [];
+};
+
+/** 失败重试：用该轮记录的正文与附件重发（不经过输入框，避免覆盖用户当前草稿） */
+const handleRetryMessage = async (msg: LocalMessage) => {
+  const payload = msg.retryPayload;
+  if (!payload) {
+    return;
+  }
+  await startChatRound(payload.content, payload.attachmentIds, msg);
 };
 
 watch(sseData, (raw) => {
@@ -1937,6 +2081,8 @@ watch(sseError, (err) => {
 });
 
 onMounted(() => {
+  // 刷新后恢复「尚未落库的指定专家」（仅当前无会话时生效），兜住选择随刷新丢失的窗口
+  restorePendingExpertCache();
   loadAgents();
   loadResourceOptions();
   getSessions();
@@ -2558,6 +2704,14 @@ onMounted(() => {
   color: var(--app-text-title);
   font-size: 12px;
   font-weight: 600;
+}
+
+/* 工具说明：次要色小号字，克制呈现，不喧宾夺主 */
+.confirm-card__desc {
+  margin-bottom: 6px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .confirm-card__actions {

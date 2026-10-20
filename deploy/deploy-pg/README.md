@@ -29,9 +29,13 @@ pnpm install && pnpm build:prod
 
 ```bash
 cd deploy/deploy-pg
-cp .env.example .env        # 可选：不复制则用文件内默认值
+cp .env.example .env        # 可选；本地开发请把其中的 BIZBUDDY_SECURITY_GUARD_MODE 改为 warn
 docker compose up -d --build
 ```
+
+> **不复制 `.env` 会起不来**：密钥 / 口令类沿用出厂示例值时，启动自检（`ProductionConfigGuard`）
+> 会拒绝启动并列出命中项。本地开发在 `.env` 里设 `BIZBUDDY_SECURITY_GUARD_MODE=warn` 即可照旧沿用出厂值；
+> `prod` 下该开关无效，恒为拒绝启动。
 
 | 访问 | 地址 |
 |---|---|
@@ -191,6 +195,8 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 ```
 
 > 建库脚本**只在数据卷为空时执行**。改了口令/库名等变量要生效，需 `down -v` 重建。
+
+> **重启策略**：只有 `ruoyi-admin` 为 `restart: on-failure:3`——配置不合格时应用会 fail-fast 退出，重试 3 次后容器停在 `exited`，日志里最后一次启动报错即根因（**这是设计如此，不是容器故障**）；`ruoyi-snailjob-server`、基础设施与 nginx 为 `unless-stopped`，依赖抖动可自愈（snailjob-server 不依赖 ruoyi-admin、不加载配置收口护栏，没有 fail-fast 前提）。
 
 > 启动/恢复请用**不带服务名**的 `docker compose up -d`：只 `up` 某一个服务不会补齐其它缺失的容器，容易留下「前端能打开、上传却失败」这类半残状态（典型如平台 MinIO 容器缺失 → 上传报 `UnknownHostException: minio`）。用 `docker compose ps` 对照 compose 文件核对服务是否齐全。
 

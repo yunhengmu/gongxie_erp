@@ -96,6 +96,11 @@ public class AiTurnFinisher {
     private final AiConfirmPendingStore pendingStore;
 
     /**
+     * 工具中文名与说明解析（HITL 确认卡片展示，带 TTL 缓存）
+     */
+    private final ToolLabelResolver toolLabelResolver;
+
+    /**
      * 事件桥：收尾前冲刷安全尾部缓冲，保证「落库内容 == 前端所见」
      */
     private final AiStreamEventBridge streamBridge;
@@ -374,9 +379,35 @@ public class AiTurnFinisher {
         payload.put("messageId", assistant.getId());
         payload.put("replyId", state.pendingReplyId);
         payload.put("expiresInSec", aiProperties.getChat().getPendingConfirmTtlMinutes() * 60);
-        payload.put("toolCalls", state.pendingToolCalls);
+        payload.put("toolCalls", buildToolCallPayloads(state.pendingToolCalls));
         AiSseSupport.send(emitter, payload);
         emitter.complete();
+    }
+
+    /**
+     * 构造 tool_confirm 事件里每个工具项的载荷。
+     *
+     * <p>字段与 {@code AiChatPendingVo.ToolCall} 保持一致：保留待确认工具调用的原有字段
+     * （{@code toolCallId} / {@code toolName} / {@code input} / {@code content}），
+     * 并在 {@code toolName}（编码）之外补 {@code toolLabel}（中文名）/ {@code toolDesc}（说明），
+     * 未在 {@code ai_tool} 登记的工具回退为编码本身与空串。</p>
+     *
+     * @param toolCalls 待确认的工具调用
+     * @return 工具项载荷列表（按原顺序）
+     */
+    private List<Map<String, Object>> buildToolCallPayloads(List<AiConfirmPendingStore.PendingToolCall> toolCalls) {
+        List<Map<String, Object>> items = new ArrayList<>(toolCalls.size());
+        for (AiConfirmPendingStore.PendingToolCall call : toolCalls) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("toolCallId", call.toolCallId());
+            item.put("toolName", call.toolName());
+            item.put("toolLabel", toolLabelResolver.labelOf(call.toolName()));
+            item.put("toolDesc", toolLabelResolver.descriptionOf(call.toolName()));
+            item.put("input", call.input());
+            item.put("content", call.content());
+            items.add(item);
+        }
+        return items;
     }
 
     /**

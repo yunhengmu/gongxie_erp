@@ -92,7 +92,7 @@ sa-token:
   is-concurrent: true
   # 在多人登录同一账号时，是否共用一个token (为true时所有登录共用一个token, 为false时每次登录新建一个token)
   is-share: false
-  # jwt秘钥（生产必须替换；prod 启动自检会拒绝出厂默认值，见 ProductionConfigGuard）
+  # jwt秘钥（生产必须替换；启动自检会拒绝出厂默认值——对所有 profile 生效，见 ProductionConfigGuard）
   jwt-secret-key: ${SA_TOKEN_JWT_SECRET_KEY:abcdefghijklmnopqrstuvwxyz}
 
 # security配置
@@ -373,7 +373,7 @@ mcp:
 bizbuddy:
   ai:
     # 模型密钥加密用的 AES 秘钥（长度必须为 16/24/32 位，生产环境必须替换）
-    # 生产必须替换；prod 启动自检会拒绝出厂默认值（见 ProductionConfigGuard）
+    # 生产必须替换；启动自检会拒绝出厂默认值（对所有 profile 生效，见 ProductionConfigGuard）
     crypto-key: ${BIZBUDDY_AI_CRYPTO_KEY:bizbuddy-ai-2026}
     # 模型连通性测试的默认超时时间（秒）
     test-timeout-seconds: 30

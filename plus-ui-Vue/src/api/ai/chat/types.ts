@@ -233,8 +233,12 @@ export interface ChatStreamEvent {
 export interface ChatPendingToolCall {
   /** AgentScope 工具调用 ID */
   toolCallId: string;
-  /** 工具名称 */
+  /** 工具名称（后端下发的是工具编码，如 create_notice，普通用户看不懂） */
   toolName: string;
+  /** 工具中文名（后端随工具项下发；查不到时等于工具编码），供确认卡片展示 */
+  toolLabel?: string;
+  /** 工具注册说明（后端随工具项下发，一句话描述该工具做什么），供确认卡片展示 */
+  toolDesc?: string;
   /** 工具入参 */
   input?: Record<string, any>;
 }

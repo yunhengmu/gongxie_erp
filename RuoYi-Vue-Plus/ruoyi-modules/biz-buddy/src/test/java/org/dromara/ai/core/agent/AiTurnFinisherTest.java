@@ -77,6 +77,8 @@ class AiTurnFinisherTest {
     @Mock
     private AiConfirmPendingStore pendingStore;
     @Mock
+    private ToolLabelResolver toolLabelResolver;
+    @Mock
     private AiStreamEventBridge streamBridge;
     @Mock
     private AiSafetyGuard safetyGuard;
@@ -96,10 +98,13 @@ class AiTurnFinisherTest {
     void setUp() {
         finisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
             traceService, memoryService, aiProperties, routeRecorder, pendingStore,
-            streamBridge, safetyGuard, safetyEventService);
+            toolLabelResolver, streamBridge, safetyGuard, safetyEventService);
         // 安全守卫默认「原样放行」（pass 回填原文），既有断言不受影响
         lenient().when(safetyGuard.guard(any(), any()))
             .thenAnswer(invocation -> SafetyDecision.pass(invocation.getArgument(0)));
+        // 工具名解析按「未登记」回退口径打桩（中文名＝编码、说明为空），与生产回退一致
+        lenient().when(toolLabelResolver.labelOf(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(toolLabelResolver.descriptionOf(any())).thenReturn("");
     }
 
     // ---------------- finish ----------------

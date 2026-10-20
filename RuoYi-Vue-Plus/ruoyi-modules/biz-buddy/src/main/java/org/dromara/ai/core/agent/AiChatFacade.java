@@ -240,6 +240,11 @@ public class AiChatFacade {
     private final IAiTraceService traceService;
 
     /**
+     * 工具中文名与说明解析（HITL 确认卡片展示，带 TTL 缓存）
+     */
+    private final ToolLabelResolver toolLabelResolver;
+
+    /**
      * 单次执行取消注册表：对话页「停止」与 SSE 断连据此取消后端执行（AgentScope 2.0.4）
      */
     private final AiRunRegistry runRegistry;
@@ -1012,6 +1017,9 @@ public class AiChatFacade {
                     AiChatPendingVo.ToolCall item = new AiChatPendingVo.ToolCall();
                     item.setToolCallId(call.toolCallId());
                     item.setToolName(call.toolName());
+                    // 工具中文名与说明：卡片直接展示编码用户看不懂，下发前按 ai_tool 解析（未登记则回退编码）
+                    item.setToolLabel(toolLabelResolver.labelOf(call.toolName()));
+                    item.setToolDesc(toolLabelResolver.descriptionOf(call.toolName()));
                     item.setInput(call.input());
                     calls.add(item);
                 }

@@ -40,9 +40,13 @@ pnpm install && pnpm build:prod
 
 ```bash
 cd deploy/deploy-mysql
-cp .env.example .env        # 可选：不复制则用文件内默认值
+cp .env.example .env        # 可选；本地开发请把其中的 BIZBUDDY_SECURITY_GUARD_MODE 改为 warn
 docker compose up -d --build
 ```
+
+> **不复制 `.env` 会起不来**：密钥 / 口令类沿用出厂示例值时，启动自检（`ProductionConfigGuard`）
+> 会拒绝启动并列出命中项。本地开发在 `.env` 里设 `BIZBUDDY_SECURITY_GUARD_MODE=warn` 即可照旧沿用出厂值；
+> `prod` 下该开关无效，恒为拒绝启动。
 
 | 访问 | 地址 |
 |---|---|
@@ -172,6 +176,8 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 ```
 
 > 建库脚本**只在数据卷为空时执行**。改了口令/库名等变量要生效，需 `down -v` 重建。
+
+> **重启策略**：只有 `ruoyi-admin` 为 `restart: on-failure:3`——配置不合格时应用会 fail-fast 退出，重试 3 次后容器停在 `exited`，日志里最后一次启动报错即根因（**这是设计如此，不是容器故障**）；`ruoyi-snailjob-server`、基础设施与 nginx 为 `unless-stopped`，依赖抖动可自愈（snailjob-server 不依赖 ruoyi-admin、不加载配置收口护栏，没有 fail-fast 前提）。
 
 > 人工排查时用 `docker exec ... mysql` 查中文，请带 `--default-character-set=utf8mb4`：MySQL 官方镜像不带 locale，客户端会退回 latin1，中文会显示成 `?`（**读到的乱码不代表库里是乱码**，用 `hex()` 可验证）。建库脚本各自自带 `SET NAMES utf8mb4`，初始化不受此影响。
 >

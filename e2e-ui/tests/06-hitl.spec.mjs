@@ -23,7 +23,7 @@ import { CONFIG, stackSkipReason } from '../lib/config.mjs';
 /** 种子中绑定了「需确认」写工具的专家（ry_ai.sql:1696-1701） */
 const EXPERT_NAME = '公告管理专家';
 
-/** 该专家的写工具（decision='1'）：卡片里的工具名是**工具编码**，不是中文名 */
+/** 该专家的写工具（decision='1'）：卡片优先展示中文名（后端下发 toolLabel），查不到才回退工具编码 */
 const WRITE_TOOLS = ['create_notice', 'update_notice', 'delete_notice'];
 
 /**
@@ -99,13 +99,14 @@ test.describe('写操作人工确认（HITL）', () => {
       );
     }
 
-    // 卡片内容：待确认 + 标题 + 工具编码
+    // 卡片内容：待确认 + 标题 + 工具行（展示中文名，查不到才回退工具编码，故不硬套编码）
     await expect(card).toHaveClass(/confirm-card--pending/);
     await expect(card.locator('.confirm-card__title')).toHaveText('该操作需要你确认后才会执行');
-    await expect(card.locator('.confirm-card__tool').first()).toHaveText(
-      new RegExp(WRITE_TOOLS.join('|')),
-      { timeout: 10_000 }
-    );
+    await expect(card.locator('.confirm-card__tool').first()).not.toBeEmpty({ timeout: 10_000 });
+
+    // 卡片必须给出人话（工具中文名 + 注册说明），而不是只显示工具编码——
+    // 用户要据此决定「允许/拒绝」，看不懂就有安全风险（修复依据见 docs/ai 说明）
+    await expect(page.locator('.confirm-card__desc')).toBeVisible({ timeout: 10_000 });
 
     // 允许本次
     const [confirmResponse] = await Promise.all([
