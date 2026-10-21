@@ -2,6 +2,7 @@ package org.dromara.ai.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.dromara.ai.core.AiVectorStore;
 import org.dromara.ai.domain.AiKnowledgeBase;
 import org.dromara.ai.domain.AiModelConfig;
 import org.dromara.ai.domain.bo.AiKnowledgeBaseBo;
@@ -56,6 +57,9 @@ class AiKnowledgeBaseServiceImplTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private AiVectorStore vectorStore;
 
     @InjectMocks
     private AiKnowledgeBaseServiceImpl knowledgeBaseService;
@@ -563,6 +567,41 @@ class AiKnowledgeBaseServiceImplTest {
         when(baseMapper.deleteByIds(any())).thenReturn(1);
         assertTrue(knowledgeBaseService.deleteWithValidByIds(List.of(1L), false));
         verify(documentMapper, never()).selectCount(any());
+    }
+
+    /**
+     * 验证删除知识库时同步 drop 对应的 Milvus 集合（否则向量数据永久残留）。
+     */
+    @Test
+    @DisplayName("删除知识库同步删除向量集合")
+    void shouldDropCollectionOnDelete() {
+        AiKnowledgeBase kb = new AiKnowledgeBase();
+        kb.setId(7L);
+        kb.setCollectionName("kb_demo");
+        kb.setDimension(1024);
+        when(baseMapper.selectByIds(any())).thenReturn(List.of(kb));
+        when(baseMapper.deleteByIds(any())).thenReturn(1);
+
+        assertTrue(knowledgeBaseService.deleteWithValidByIds(List.of(7L), false));
+
+        verify(vectorStore).dropCollection("kb_demo", 1024);
+    }
+
+    /**
+     * 验证集合清理失败不阻断知识库删除（向量库不可用不应阻塞业务）。
+     */
+    @Test
+    @DisplayName("集合清理失败仍完成删除")
+    void shouldDeleteWhenDropCollectionFails() {
+        AiKnowledgeBase kb = new AiKnowledgeBase();
+        kb.setId(7L);
+        kb.setCollectionName("kb_demo");
+        kb.setDimension(1024);
+        when(baseMapper.selectByIds(any())).thenReturn(List.of(kb));
+        when(baseMapper.deleteByIds(any())).thenReturn(1);
+        when(vectorStore.dropCollection(any(), anyInt())).thenThrow(new RuntimeException("milvus down"));
+
+        assertTrue(knowledgeBaseService.deleteWithValidByIds(List.of(7L), false));
     }
 
     /**

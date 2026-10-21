@@ -6,6 +6,7 @@ import io.agentscope.core.rag.model.DocumentMetadata;
 import io.agentscope.core.rag.store.MilvusStore;
 import io.agentscope.core.rag.store.dto.SearchDocumentDto;
 import io.milvus.v2.common.IndexParam;
+import io.milvus.v2.service.collection.request.DropCollectionReq;
 import io.milvus.v2.service.utility.request.FlushReq;
 import io.milvus.v2.service.vector.request.DeleteReq;
 import io.milvus.v2.service.vector.request.QueryReq;
@@ -258,6 +259,48 @@ public class AiVectorStore {
             return 0;
         }
         return delete(collection, dimension, ids);
+    }
+
+    /**
+     * 删除整个集合（知识库删除时调用）。
+     *
+     * <p>不 drop 集合会让知识库删除后向量数据永久残留：业务行已删、再无入口能定位到它，
+     * 集合会随知识库增删无限累积。这里无论 drop 是否成功都清理本地缓存，避免进程内继续
+     * 持有已失效句柄。</p>
+     *
+     * @param collection 集合名
+     * @param dimension  向量维度（仅用于建句柄；集合不存在时会先被创建再删除）
+     * @return 是否真正删除成功
+     */
+    public boolean dropCollection(String collection, int dimension) {
+        if (StringUtils.isBlank(collection)) {
+            return false;
+        }
+        MilvusStore handle;
+        try {
+            handle = store(collection, dimension);
+        } catch (Exception e) {
+            log.warn("删除集合前建连失败，collection={}, cause={}", collection, e.getMessage());
+            return false;
+        }
+        boolean dropped = false;
+        try {
+            handle.getClient().dropCollection(DropCollectionReq.builder()
+                .collectionName(collection)
+                .build());
+            dropped = true;
+        } catch (Exception e) {
+            log.warn("删除 Milvus 集合失败，collection={}, cause={}", collection, e.getMessage());
+        } finally {
+            stores.remove(collection, handle);
+            dimensions.remove(collection);
+            try {
+                handle.close();
+            } catch (Exception e) {
+                log.warn("关闭 Milvus 句柄失败，collection={}, cause={}", collection, e.getMessage());
+            }
+        }
+        return dropped;
     }
 
     /**

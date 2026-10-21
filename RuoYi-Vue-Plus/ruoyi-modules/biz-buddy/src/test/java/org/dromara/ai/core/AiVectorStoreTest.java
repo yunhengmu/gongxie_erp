@@ -6,6 +6,7 @@ import io.agentscope.core.rag.model.DocumentMetadata;
 import io.agentscope.core.rag.store.MilvusStore;
 import io.agentscope.core.rag.store.dto.SearchDocumentDto;
 import io.milvus.v2.client.MilvusClientV2;
+import io.milvus.v2.service.collection.request.DropCollectionReq;
 import io.milvus.v2.service.vector.request.DeleteReq;
 import io.milvus.v2.service.vector.request.QueryReq;
 import io.milvus.v2.service.vector.response.DeleteResp;
@@ -241,6 +242,44 @@ class AiVectorStoreTest {
             ArgumentCaptor<DeleteReq> deleteCaptor = ArgumentCaptor.forClass(DeleteReq.class);
             verify(client).delete(deleteCaptor.capture());
             assertEquals("id in [\"v1\",\"v2\"]", deleteCaptor.getValue().getFilter());
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
+    @DisplayName("删除集合：调用 drop 并清理本地缓存与句柄")
+    void shouldDropCollectionAndEvictCache() {
+        try (MockedConstruction<MilvusStore> construction = mockConstruction(MilvusStore.class,
+            (mock, context) -> {
+                MilvusClientV2 client = mock(MilvusClientV2.class);
+                when(mock.getClient()).thenReturn(client);
+            })) {
+            AiVectorStore store = new AiVectorStore(props());
+            assertTrue(store.dropCollection("kb", 2));
+
+            MilvusStore handle = construction.constructed().get(0);
+            verify(handle.getClient()).dropCollection(any(DropCollectionReq.class));
+            verify(handle).close();
+            assertFalse(store.isReady("kb"));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
+    @DisplayName("删除集合失败：返回 false，但仍清理本地缓存")
+    void shouldEvictCacheEvenWhenDropFails() {
+        try (MockedConstruction<MilvusStore> construction = mockConstruction(MilvusStore.class,
+            (mock, context) -> {
+                MilvusClientV2 client = mock(MilvusClientV2.class);
+                when(mock.getClient()).thenReturn(client);
+                org.mockito.Mockito.doThrow(new RuntimeException("drop-boom"))
+                    .when(client).dropCollection(any(DropCollectionReq.class));
+            })) {
+            AiVectorStore store = new AiVectorStore(props());
+            assertFalse(store.dropCollection("kb", 2));
+            assertFalse(store.isReady("kb"));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
