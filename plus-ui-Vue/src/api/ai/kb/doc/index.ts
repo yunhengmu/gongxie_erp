@@ -1,4 +1,4 @@
-import type { ChunkVO, DocumentForm, DocumentQuery, DocumentVO } from '@/api/ai/kb/doc/types';
+import type { ChunkContextVO, ChunkVO, DocumentForm, DocumentQuery, DocumentVO } from '@/api/ai/kb/doc/types';
 import type { PageResult } from '@/api/types';
 import type { AxiosPromise } from '@/utils/api-types';
 import request from '@/utils/request';
@@ -36,6 +36,24 @@ export const listDocumentChunk = (id: string | number, query?: PageQuery): Axios
     url: '/ai/kb/doc/' + id + '/chunks',
     method: 'get',
     params: query
+  });
+};
+
+/**
+ * 按切片序号定位切片（回答「参考来源」点击用）
+ * @param id 文档主键
+ * @param chunkIndex 切片序号（从 0 开始）
+ * @param radius 前后各取多少条相邻切片（后端默认 1，上限 3）
+ */
+export const getDocumentChunkContext = (
+  id: string | number,
+  chunkIndex: number,
+  radius?: number
+): AxiosPromise<ChunkContextVO> => {
+  return request({
+    url: '/ai/kb/doc/' + id + '/chunks/' + chunkIndex,
+    method: 'get',
+    params: radius === undefined ? undefined : { radius }
   });
 };
 

@@ -242,7 +242,17 @@
                   <span class="msg-sources__title">参考来源</span>
                 </div>
                 <div v-show="isSourcesExpanded(msg)" class="msg-sources__body">
-                  <div v-for="(source, index) in msg.sources" :key="index" class="msg-sources__item">
+                  <div
+                    v-for="(source, index) in msg.sources"
+                    :key="index"
+                    class="msg-sources__item"
+                    :class="{ 'is-clickable': hasSourceDoc(source) }"
+                    :role="hasSourceDoc(source) ? 'button' : undefined"
+                    :tabindex="hasSourceDoc(source) ? 0 : undefined"
+                    :title="hasSourceDoc(source) ? '查看命中原文' : undefined"
+                    @click="handleOpenSource(source)"
+                    @keydown.enter.prevent="handleOpenSource(source)"
+                  >
                     <el-tag :type="sourceScoreType(source.score)" size="small" effect="plain">
                       {{ formatSourceScore(source.score) }}
                     </el-tag>
@@ -419,6 +429,72 @@
       teleported
       @close="previewVisible = false"
     />
+
+    <!-- 参考来源定位：点击来源后按「文档 + 切片序号」现查原文，避免把整篇文档塞进消息记录 -->
+    <el-drawer
+      v-model="sourceDrawer.visible"
+      :title="sourceDrawer.docName || '参考来源'"
+      size="560px"
+      append-to-body
+      destroy-on-close
+      class="source-drawer"
+    >
+      <div v-loading="sourceDrawer.loading" class="source-detail">
+        <div v-if="sourceDrawer.meta" class="source-detail__meta">{{ sourceDrawer.meta }}</div>
+
+        <!-- 全文模式：历史来源未记录切片序号、或用户想通读该文档时使用 -->
+        <template v-if="sourceDrawer.showFullText">
+          <div class="source-detail__toolbar">
+            <el-button link type="primary" size="small" @click="sourceDrawer.showFullText = false">
+              返回命中片段
+            </el-button>
+          </div>
+          <div class="source-detail__fulltext">{{ sourceDrawer.fullText }}</div>
+        </template>
+
+        <template v-else-if="sourceDrawer.context">
+          <div
+            v-for="chunk in sourceDrawer.context.before"
+            :key="'b-' + chunk.chunkIndex"
+            class="source-detail__chunk source-detail__chunk--neighbor"
+          >
+            <div class="source-detail__label">第 {{ chunk.chunkIndex + 1 }} 段</div>
+            <div class="source-detail__text">{{ chunk.content }}</div>
+          </div>
+
+          <div v-if="sourceDrawer.context.target" class="source-detail__chunk source-detail__chunk--target">
+            <div class="source-detail__label">
+              命中片段 · 第 {{ sourceDrawer.context.target.chunkIndex + 1 }} 段
+            </div>
+            <div class="source-detail__text">{{ sourceDrawer.context.target.content }}</div>
+          </div>
+          <el-empty
+            v-else
+            description="来源文档已变更（可能已重新解析），当前序号无法定位"
+            :image-size="60"
+          />
+
+          <div
+            v-for="chunk in sourceDrawer.context.after"
+            :key="'a-' + chunk.chunkIndex"
+            class="source-detail__chunk source-detail__chunk--neighbor"
+          >
+            <div class="source-detail__label">第 {{ chunk.chunkIndex + 1 }} 段</div>
+            <div class="source-detail__text">{{ chunk.content }}</div>
+          </div>
+
+          <div class="source-detail__toolbar">
+            <el-button link type="primary" size="small" @click="handleShowFullText">查看文档全文</el-button>
+          </div>
+        </template>
+
+        <el-empty
+          v-else-if="!sourceDrawer.loading"
+          :description="sourceDrawer.error || '暂无内容'"
+          :image-size="60"
+        />
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -461,6 +537,8 @@ import type {
   ChatSourceItem,
   ChatStreamEvent
 } from '@/api/ai/chat/types';
+import { getDocumentChunkContext, getDocumentContent } from '@/api/ai/kb/doc';
+import type { ChunkContextVO } from '@/api/ai/kb/doc/types';
 import { scenarioPackMcpOptions, scenarioPackOptions } from '@/api/ai/pack';
 import type { ScenarioPackMcpOptionVO, ScenarioPackOptionVO } from '@/api/ai/pack/types';
 import { visibleSkillOptions } from '@/api/ai/skill';
@@ -903,6 +981,100 @@ const sourceScoreType = (score?: number): ElTagType => {
 
 /** 参考来源相似度格式化 */
 const formatSourceScore = (score?: number) => (score === undefined || score === null ? '-' : score.toFixed(2));
+
+/**
+ * 参考来源抽屉状态。
+ *
+ * 来源只带「文档 + 切片序号」，点开时现查原文，避免把所有引用正文塞进消息记录。
+ */
+const sourceDrawer = reactive({
+  visible: false,
+  loading: false,
+  docId: null as string | number | null,
+  docName: '',
+  meta: '',
+  error: '',
+  context: null as ChunkContextVO | null,
+  fullText: '',
+  showFullText: false
+});
+
+/** 来源是否可定位：历史来源可能缺少 docId */
+const hasSourceDoc = (source: ChatSourceItem) => source.docId !== undefined && source.docId !== null;
+
+/** 抽屉头部说明：章节路径 · 页码 · 相似度 */
+const buildSourceMeta = (source: ChatSourceItem) => {
+  const parts: string[] = [];
+  if (source.headingPath) {
+    parts.push('§ ' + source.headingPath);
+  }
+  if (source.pageNo !== undefined && source.pageNo !== null) {
+    parts.push('第 ' + source.pageNo + ' 页');
+  }
+  if (source.score !== undefined && source.score !== null) {
+    parts.push('相似度 ' + formatSourceScore(source.score));
+  }
+  return parts.join(' · ');
+};
+
+/** 加载并展示文档全文（历史来源缺切片序号、或用户想通读时兜底） */
+const loadSourceFullText = async (docId: string | number) => {
+  try {
+    const res = await getDocumentContent(docId);
+    sourceDrawer.fullText = res.data ?? '';
+    sourceDrawer.showFullText = true;
+    if (!sourceDrawer.fullText) {
+      sourceDrawer.error = '文档尚未解析，暂无原文';
+    }
+  } catch {
+    sourceDrawer.error = '无法读取文档全文（可能已删除或无权访问）';
+  } finally {
+    sourceDrawer.loading = false;
+  }
+};
+
+/** 点击来源：按文档 + 切片序号现查命中原文；失败只降级提示，不打断对话 */
+const handleOpenSource = async (source: ChatSourceItem) => {
+  if (!hasSourceDoc(source)) {
+    return;
+  }
+  const docId = source.docId as string | number;
+  Object.assign(sourceDrawer, {
+    visible: true,
+    loading: true,
+    docId,
+    docName: source.docName || '参考来源',
+    meta: buildSourceMeta(source),
+    error: '',
+    context: null,
+    fullText: '',
+    showFullText: false
+  });
+  if (source.chunkIndex === undefined || source.chunkIndex === null) {
+    await loadSourceFullText(docId);
+    return;
+  }
+  try {
+    const res = await getDocumentChunkContext(docId, source.chunkIndex);
+    sourceDrawer.context = res.data ?? null;
+    if (!sourceDrawer.context?.target) {
+      sourceDrawer.error = '来源文档已变更（可能已重新解析），当前序号无法定位';
+    }
+  } catch {
+    sourceDrawer.error = '无法读取来源原文（文档可能已删除或无权访问）';
+  } finally {
+    sourceDrawer.loading = false;
+  }
+};
+
+/** 从命中片段视图切到文档全文 */
+const handleShowFullText = () => {
+  if (sourceDrawer.docId === null) {
+    return;
+  }
+  sourceDrawer.loading = true;
+  loadSourceFullText(sourceDrawer.docId);
+};
 
 /**
  * 累积参考来源：按 docId + chunkIndex 去重（保留最高 score），与后端口径一致。
@@ -2640,6 +2812,69 @@ onMounted(() => {
   padding: 2px 0;
   font-size: 12px;
   color: var(--app-text-muted);
+}
+
+/* 可点击来源：给出明确的悬停与键盘焦点反馈（点击后打开命中原文抽屉） */
+.msg-sources__item.is-clickable {
+  padding: 3px 6px;
+  margin: 0 -6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.msg-sources__item.is-clickable:hover,
+.msg-sources__item.is-clickable:focus-visible {
+  background: var(--el-fill-color-light);
+  outline: none;
+}
+
+/* 参考来源抽屉：命中片段强调整块，前后邻居弱化，便于一眼看出引用位置 */
+.source-detail {
+  min-height: 120px;
+  padding-bottom: 8px;
+}
+
+.source-detail__meta {
+  margin-bottom: 12px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.source-detail__chunk {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  background: var(--el-fill-color-lighter);
+}
+
+.source-detail__chunk--neighbor {
+  opacity: 0.72;
+}
+
+.source-detail__chunk--target {
+  border: 1px solid var(--app-accent-strong);
+  background: var(--el-color-primary-light-9);
+}
+
+.source-detail__label {
+  margin-bottom: 6px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.source-detail__text,
+.source-detail__fulltext {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.source-detail__toolbar {
+  margin-top: 4px;
+  text-align: right;
 }
 
 .msg-sources__text {

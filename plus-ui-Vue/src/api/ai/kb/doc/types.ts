@@ -91,3 +91,13 @@ export interface ChunkVO {
   /** 创建时间 */
   createTime?: string;
 }
+
+/** 切片定位结果（点击回答「参考来源」时按文档 + 序号现查） */
+export interface ChunkContextVO {
+  /** 命中切片；文档已重新解析导致序号不存在时为 null */
+  target?: ChunkVO | null;
+  /** 命中切片之前的相邻切片（按序号升序） */
+  before: ChunkVO[];
+  /** 命中切片之后的相邻切片（按序号升序） */
+  after: ChunkVO[];
+}
