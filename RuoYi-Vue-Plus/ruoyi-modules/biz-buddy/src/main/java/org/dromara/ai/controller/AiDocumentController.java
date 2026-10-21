@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.dromara.ai.domain.bo.AiDocumentBo;
+import org.dromara.ai.domain.vo.AiChunkContextVo;
 import org.dromara.ai.domain.vo.AiChunkVo;
 import org.dromara.ai.domain.vo.AiDocumentVo;
 import org.dromara.ai.service.IAiDocumentService;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
@@ -88,6 +90,22 @@ public class AiDocumentController extends BaseController {
     public R<PageResult<AiChunkVo>> chunks(@NotNull(message = "主键不能为空")
                                            @PathVariable("id") Long id, PageQuery pageQuery) {
         return R.ok(aiDocumentService.queryChunkPage(id, pageQuery));
+    }
+
+    /**
+     * 按切片序号定位切片（回答「参考来源」点击用）
+     *
+     * @param id         文档主键
+     * @param chunkIndex 切片序号（从 0 开始）
+     * @param radius     前后各取多少条相邻切片（默认 1，上限 3）
+     */
+    @SaCheckPermission("ai:kb:doc")
+    @GetMapping("/{id}/chunks/{chunkIndex}")
+    public R<AiChunkContextVo> chunkContext(@NotNull(message = "主键不能为空")
+                                            @PathVariable("id") Long id,
+                                            @PathVariable("chunkIndex") Integer chunkIndex,
+                                            @RequestParam(value = "radius", required = false) Integer radius) {
+        return R.ok(aiDocumentService.queryChunkContext(id, chunkIndex, radius));
     }
 
     /**

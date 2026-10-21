@@ -1,6 +1,7 @@
 package org.dromara.ai.service;
 
 import org.dromara.ai.domain.bo.AiDocumentBo;
+import org.dromara.ai.domain.vo.AiChunkContextVo;
 import org.dromara.ai.domain.vo.AiChunkVo;
 import org.dromara.ai.domain.vo.AiDocumentVo;
 import org.dromara.common.core.domain.PageResult;
@@ -73,5 +74,17 @@ public interface IAiDocumentService {
      * @return 纯文本内容
      */
     String queryContent(Long docId);
+
+    /**
+     * 按切片序号定位切片，并带出前后相邻切片（回答「参考来源」点击用）。
+     *
+     * <p>访问前校验该文档所属知识库对当前用户可见，避免仅凭 docId 越权读取正文。</p>
+     *
+     * @param docId      文档主键
+     * @param chunkIndex 切片序号（从 0 开始）
+     * @param radius     前后各取多少条相邻切片（null 或越界时按 1 处理，上限 3）
+     * @return 命中切片及其上下文；序号不存在时 {@code target} 为 null
+     */
+    AiChunkContextVo queryChunkContext(Long docId, Integer chunkIndex, Integer radius);
 
 }

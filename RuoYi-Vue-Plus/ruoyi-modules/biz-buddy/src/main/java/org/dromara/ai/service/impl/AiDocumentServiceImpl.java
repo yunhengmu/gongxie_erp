@@ -10,6 +10,7 @@ import org.dromara.ai.domain.AiChunk;
 import org.dromara.ai.domain.AiDocument;
 import org.dromara.ai.domain.AiKnowledgeBase;
 import org.dromara.ai.domain.bo.AiDocumentBo;
+import org.dromara.ai.domain.vo.AiChunkContextVo;
 import org.dromara.ai.domain.vo.AiChunkVo;
 import org.dromara.ai.domain.vo.AiDocumentVo;
 import org.dromara.ai.mapper.AiChunkMapper;
@@ -23,6 +24,7 @@ import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
+import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.api.OssService;
 import org.springframework.stereotype.Service;
 
@@ -70,6 +72,16 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
      * 预览文本返回上限（字符）
      */
     private static final int PREVIEW_MAX_LENGTH = 200_000;
+
+    /**
+     * 切片定位默认前后邻居数
+     */
+    private static final int DEFAULT_CONTEXT_RADIUS = 1;
+
+    /**
+     * 切片定位前后邻居数上限：避免一次请求把整篇文档拉回前端
+     */
+    private static final int MAX_CONTEXT_RADIUS = 3;
 
     /**
      * 默认切片长度
@@ -248,6 +260,61 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
             return content.substring(0, PREVIEW_MAX_LENGTH) + "\n\n…（内容过长，仅展示前 " + PREVIEW_MAX_LENGTH + " 个字符）";
         }
         return content;
+    }
+
+    @Override
+    public AiChunkContextVo queryChunkContext(Long docId, Integer chunkIndex, Integer radius) {
+        if (docId == null || chunkIndex == null || chunkIndex < 0) {
+            throw new ServiceException("文档与切片序号不能为空");
+        }
+        AiDocument document = baseMapper.selectById(docId);
+        if (document == null) {
+            throw new ServiceException("文档不存在或已被删除");
+        }
+        // 越权防护：来源条目只带 docId，若不校验可见范围，任何有 ai:kb:doc 权限的用户
+        // 都能凭 docId 读到无权访问的知识库正文
+        if (knowledgeBaseService.filterVisibleKbIds(List.of(document.getKbId()), LoginHelper.getUserId()).isEmpty()) {
+            throw new ServiceException("无权访问该知识库文档");
+        }
+        int span = normalizeContextRadius(radius);
+        LambdaQueryWrapper<AiChunk> lqw = Wrappers.lambdaQuery();
+        lqw.eq(AiChunk::getDocId, docId);
+        // 一次取回「命中切片 + 前后若干条」，按下标切分，避免逐条查询
+        lqw.between(AiChunk::getChunkIndex, Math.max(0, chunkIndex - span), chunkIndex + span);
+        lqw.orderByAsc(AiChunk::getChunkIndex);
+        List<AiChunkVo> chunks = chunkMapper.selectVoList(lqw);
+        AiChunkContextVo context = new AiChunkContextVo();
+        List<AiChunkVo> before = new ArrayList<>();
+        List<AiChunkVo> after = new ArrayList<>();
+        for (AiChunkVo chunk : chunks) {
+            Integer index = chunk.getChunkIndex();
+            if (index == null) {
+                continue;
+            }
+            if (index < chunkIndex) {
+                before.add(chunk);
+            } else if (index > chunkIndex) {
+                after.add(chunk);
+            } else {
+                context.setTarget(chunk);
+            }
+        }
+        context.setBefore(before);
+        context.setAfter(after);
+        return context;
+    }
+
+    /**
+     * 归一化上下文半径：缺省取 1，负数按缺省处理，过大钳制到上限。
+     *
+     * @param radius 入参半径
+     * @return 实际使用的半径
+     */
+    private int normalizeContextRadius(Integer radius) {
+        if (radius == null || radius < 0) {
+            return DEFAULT_CONTEXT_RADIUS;
+        }
+        return Math.min(radius, MAX_CONTEXT_RADIUS);
     }
 
     /**
