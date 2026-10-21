@@ -51,8 +51,8 @@ import org.xml.sax.InputSource;
  *       {@code comment.id} 幂等 + 机器人账号自环判定。</li>
  * </ul>
  *
- * <p>通过校验的文本消息交由 {@link AiChannelInboundService} 异步处理并**立即 200**，
- * 避免平台因超时重推。</p>
+ * <p>通过校验的入站消息（文本 / 图片 / 文件 / 语音）交由 {@link AiChannelInboundService} 异步处理并**立即 200**，
+ * 避免平台因超时重推；媒体内容由后续装配链路下载并转为内容块，不在回调层丢弃。</p>
  *
  * @author BizBuddy
  */
@@ -138,7 +138,8 @@ public class AiChannelCallbackController {
             log.debug("飞书回调重复事件被丢弃：channelCode={}, eventId={}", channelCode, eventId.get());
             return ResponseEntity.ok("{}");
         }
-        // 5. 归一化：非文本 / 结构异常一律静默应答
+        // 5. 归一化：结构异常 / 不支持的消息类型静默应答；
+        //    图片、文件、语音会被归一化为「标记文本 + 媒体元数据」，由 AiChannelMediaAssembler 后续装配，不在此丢弃
         Optional<InboundMessage> inbound = runtime.getFeishuMapper().map(envelope);
         if (inbound.isEmpty()) {
             return ResponseEntity.ok("{}");

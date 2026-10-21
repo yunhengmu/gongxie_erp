@@ -408,7 +408,9 @@ public final class AiChannelRuntime {
     /**
      * 钉钉长连接入站报文处理：幂等（msgId）→ 归一化 → 防自环 → 交上层处理。
      *
-     * <p>与三个 Webhook 平台同口径：非文本 / 结构异常静默丢弃，不落库、不执行。</p>
+     * <p>与三个 Webhook 平台同口径：结构异常 / 不支持的消息类型静默丢弃，不落库、不执行；
+     * 图片、文件、语音会被归一化为「标记文本 + 媒体元数据」并照常转交上层，由
+     * {@link AiChannelMediaAssembler} 装配为内容块，不在此处丢弃。</p>
      *
      * @param payload 钉钉 Stream 下发的机器人消息报文
      */
@@ -437,7 +439,9 @@ public final class AiChannelRuntime {
     /**
      * 飞书长连接入站报文处理：幂等（event_id）→ 归一化 → 防自环 → 交上层处理。
      *
-     * <p>与钉钉长连接及三个 Webhook 平台同口径：非文本 / 结构异常静默丢弃，不落库、不执行。
+     * <p>与钉钉长连接及三个 Webhook 平台同口径：结构异常 / 不支持的消息类型静默丢弃，不落库、不执行；
+     * 图片、文件、语音会被归一化为「标记文本 + 媒体元数据」并照常转交上层，由
+     * {@link AiChannelMediaAssembler} 装配为内容块，不在此处丢弃。
      * 报文为 schema 2.0 信封明文，直接交给 {@link FeishuInboundMapper}（与飞书 Webhook 形态同一份解析）。</p>
      *
      * @param payload 飞书长连接下发的事件报文（schema 2.0 信封）
