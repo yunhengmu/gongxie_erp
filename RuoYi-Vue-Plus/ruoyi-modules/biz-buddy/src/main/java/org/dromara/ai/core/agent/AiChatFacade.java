@@ -293,6 +293,20 @@ public class AiChatFacade {
      * @param emitter       SSE 发射器
      */
     public void streamChat(Long sessionId, Long userMessageId, SseEmitter emitter) {
+        streamChat(sessionId, userMessageId, emitter, List.of());
+    }
+
+    /**
+     * 发起一轮流式对话（支持重新生成时替换旧回答）。
+     *
+     * @param sessionId         会话主键（即 AgentScope 的 sessionId）
+     * @param userMessageId     已落库的用户消息主键
+     * @param emitter           SSE 发射器
+     * @param replaceAnswerIds  重新生成时要替换的旧回答主键（新回答落库 / 落为待确认后才删除；
+     *                          普通提问传空列表）
+     */
+    public void streamChat(Long sessionId, Long userMessageId, SseEmitter emitter,
+                           List<Long> replaceAnswerIds) {
         long startNanos = System.nanoTime();
         AiSession session = sessionService.getOwnedSession(sessionId);
         if (!SESSION_ACTIVE.equals(session.getStatus())) {
@@ -392,6 +406,10 @@ public class AiChatFacade {
         state.modelId = definition.getModelId();
         // 链路追踪（REQ-AI-28）：复用上面已建的链路（编排运行与它是同一条父链路）
         state.traceId = traceId;
+        // 重新生成：旧回答待新回答落库后再删（失败时保留，避免「报错 + 丢答案」）
+        if (replaceAnswerIds != null && !replaceAnswerIds.isEmpty()) {
+            state.replaceAnswerIds.addAll(replaceAnswerIds);
+        }
         if (route != null) {
             // 编排链路的 HITL 贯通（REQ-AI-30 Phase 2）：专家命中「需确认」时，
             // 编排器需要把专家侧的待确认信息**上浮**写入入口轮状态，故此处回挂引用
@@ -513,9 +531,10 @@ public class AiChatFacade {
     /**
      * 重新生成最后一轮回答。
      *
-     * <p>处理顺序：二次预检 → 回退模型上下文 → 逻辑删除旧回答 → 复用 {@link #streamChat}
-     * 的完整编排链路重新生成。任一步失败都通过 SSE {@code error} 事件返回原因码，
-     * 不进入模型调用，避免带污染上下文或重复写操作。</p>
+     * <p>处理顺序：二次预检 → 回退模型上下文 → 复用 {@link #streamChat} 的完整编排链路重新生成。
+     * 预检已解析出旧回答主键，**不在此处删除**：等新回答落库（或落为待确认）再删，
+     * 否则模型调用失败时用户会同时看到报错与旧回答消失。预检 / 回退阶段失败通过 SSE
+     * {@code error}（带原因码）返回，不进入模型调用。</p>
      *
      * @param sessionId     会话主键
      * @param userMessageId 本轮用户消息主键
@@ -539,15 +558,15 @@ public class AiChatFacade {
                     "无法回退该轮的对话上下文，请新建会话后重试"));
                 return;
             }
-            // 旧回答逻辑删除（保留行用于审计），随后由本轮生成落新的助手消息
-            sessionService.deleteRoundAnswers(sessionId, userMessageId);
         } catch (Exception e) {
             log.error("重新生成准备失败，sessionId={}, messageId={}", sessionId, userMessageId, e);
             rejectRegenerate(emitter, regenerateFailure(AiRegenerateCheckVo.CODE_CONTEXT_RESTORE_FAILED,
                 "重新生成准备失败：" + AiSseSupport.rootCauseMessage(e)));
             return;
         }
-        streamChat(sessionId, userMessageId, emitter);
+        // 旧回答主键取自预检结果（生成前解析），由收尾阶段在新回答落库后删除
+        streamChat(sessionId, userMessageId, emitter,
+            check.getAssistantMessageIds() == null ? List.of() : check.getAssistantMessageIds());
     }
 
     /**

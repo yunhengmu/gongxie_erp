@@ -394,17 +394,24 @@ public class AiSessionServiceImpl implements IAiSessionService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void deleteRoundAnswers(Long sessionId, Long userMessageId) {
-        AiSession session = getOwnedSession(sessionId);
-        AiMessage target = requireRoundTarget(sessionId, userMessageId);
-        List<Long> answerIds = resolveRound(session, target).answers().stream()
-            .map(AiMessage::getId)
-            .toList();
-        if (answerIds.isEmpty()) {
+    public void deleteAnswerMessages(Long sessionId, Long userId, Collection<Long> answerIds) {
+        if (answerIds == null || answerIds.isEmpty()) {
             return;
         }
-        messageMapper.deleteByIds(answerIds);
-        decrementMessageCount(sessionId, answerIds.size());
+        List<Long> ids = answerIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        // 收尾在 Reactor 线程执行、没有 Sa-Token 上下文，故按调用方传入的归属用户校验，
+        // 避免凭消息主键删到别人的会话
+        AiSession session = sessionId == null ? null : baseMapper.selectById(sessionId);
+        if (session == null || !Objects.equals(session.getUserId(), userId)) {
+            throw new ServiceException("会话不存在或无权访问");
+        }
+        int deleted = messageMapper.deleteByIds(ids);
+        if (deleted > 0) {
+            decrementMessageCount(sessionId, deleted);
+        }
     }
 
     /**

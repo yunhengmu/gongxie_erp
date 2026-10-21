@@ -498,7 +498,13 @@
           </div>
 
           <div class="source-detail__toolbar">
-            <el-button link type="primary" size="small" @click="handleShowFullText">查看文档全文</el-button>
+            <el-button
+              v-hasPermi="['ai:kb:doc:preview']"
+              link
+              type="primary"
+              size="small"
+              @click="handleShowFullText"
+            >查看文档全文</el-button>
           </div>
         </template>
 

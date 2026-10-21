@@ -132,12 +132,16 @@ public interface IAiSessionService {
     AiRegenerateCheckVo checkRegenerable(Long sessionId, Long userMessageId);
 
     /**
-     * 逻辑删除某轮的全部助手消息（重新生成前清掉旧回答，保留行用于审计）。
+     * 逻辑删除指定的助手消息（重新生成成功、或暂停落卡片后清掉旧回答）。
      *
-     * @param sessionId     会话主键
-     * @param userMessageId 本轮用户消息主键
+     * <p>按**消息主键**删除而非按轮次重算：新回答落库后按轮次解析会把新回答一并删掉，
+     * 故调用方应使用生成前解析好的旧回答主键。</p>
+     *
+     * @param sessionId  会话主键
+     * @param userId     会话归属用户（收尾线程无 Sa-Token 上下文，须由调用方显式传入）
+     * @param answerIds  待删除的助手消息主键
      */
-    void deleteRoundAnswers(Long sessionId, Long userMessageId);
+    void deleteAnswerMessages(Long sessionId, Long userId, Collection<Long> answerIds);
 
     /**
      * 落库用户消息，并刷新会话活跃时间与消息条数（标题仍为默认时按首问改写）。

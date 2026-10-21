@@ -24,6 +24,7 @@ import org.dromara.ai.mapper.AiToolMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiScenarioPackService;
+import org.dromara.ai.test.AiTestSupport;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.mybatis.core.page.PageQuery;
@@ -31,6 +32,7 @@ import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.api.DeptService;
 import org.dromara.system.api.UserService;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -75,6 +77,12 @@ class AiSessionServiceImplTest {
         expertDirectory, aiChatAttachmentService);
 
     private MockedStatic<LoginHelper> loginHelper;
+
+    @BeforeAll
+    static void initMybatis() {
+        // LambdaQueryWrapper 需要实体 TableInfo（纯单测不起容器，手工注册一次）
+        AiTestSupport.initialize();
+    }
 
     @BeforeEach
     void setUp() {
@@ -441,7 +449,7 @@ class AiSessionServiceImplTest {
     }
 
     @Test
-    @DisplayName("删除本轮问答：写操作轮次拒绝，只读轮次只删助手消息")
+    @DisplayName("删除本轮问答：写操作轮次拒绝，被替换的旧回答按主键删除")
     void shouldGuardDeleteByWriteToolsAndDeleteOnlyAnswers() {
         when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
         AiMessage user = message(1L, 1L, AiMessage.ROLE_USER, "0");
@@ -453,7 +461,7 @@ class AiSessionServiceImplTest {
         when(toolMapper.selectList(any())).thenReturn(List.of(tool("create_notice", "发布通知", "1")));
         assertThrows(ServiceException.class, () -> service.deleteChatRound(1L, 1L));
 
-        service.deleteRoundAnswers(1L, 1L);
+        service.deleteAnswerMessages(1L, 9L, List.of(2L));
         ArgumentCaptor<Collection<?>> captor = ArgumentCaptor.forClass(Collection.class);
         verify(messageMapper).deleteByIds(captor.capture());
         assertFalse(captor.getValue().contains(1L));

@@ -97,6 +97,14 @@ final class AiStreamState {
     volatile boolean pendingConfirm;
 
     /**
+     * 重新生成时要替换掉的旧回答主键。
+     *
+     * <p>旧回答**不提前删除**：等到新回答落库（{@code finish}）或落为待确认（{@code finishPending}）
+     * 之后再删，避免模型调用失败时用户既看到报错、又丢掉原回答。</p>
+     */
+    final List<Long> replaceAnswerIds = new ArrayList<>();
+
+    /**
      * 发起待确认工具调用的智能体主键（REQ-AI-30 Phase 2）。
      *
      * <p>{@code null} 表示这是**入口智能体自己**的暂停；非空表示暂停源自**专家调用**
