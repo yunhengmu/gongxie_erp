@@ -3,6 +3,7 @@ package org.dromara.ai.core.channel;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.message.Msg;
+import io.agentscope.core.message.MsgRole;
 import io.agentscope.extensions.channel.common.ChannelMediaMetadata;
 import io.agentscope.extensions.channel.common.InboundEventDeduplicator;
 import io.agentscope.extensions.channel.dingtalk.DingTalkAccessTokenProvider;
@@ -23,6 +24,8 @@ import io.agentscope.extensions.channel.wecom.WeComInboundMapper;
 import io.agentscope.extensions.channel.wecom.WeComOutboundClient;
 import io.agentscope.harness.agent.gateway.channel.InboundMessage;
 import io.agentscope.harness.agent.gateway.channel.OutboundAddress;
+import io.agentscope.harness.agent.gateway.channel.Peer;
+import io.agentscope.harness.agent.gateway.channel.PeerKind;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
@@ -33,7 +36,10 @@ import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -133,6 +139,11 @@ public final class AiChannelRuntime {
      * 钉钉机器人编码（媒体下载用；非钉钉渠道为 null）
      */
     private final String dingTalkRobotCode;
+
+    /**
+     * 钉钉应用 AppKey（入站消息 accountId，与框架 mapper 同口径；非钉钉渠道为 null）
+     */
+    private final String dingTalkAccountId;
 
     /**
      * 平台 OpenAPI WebClient（媒体下载用；构造期不发请求）
@@ -247,6 +258,7 @@ public final class AiChannelRuntime {
         DingTalkStreamClient dingTalkStreamLocal = null;
         DingTalkAccessTokenProvider dingTalkTokenProviderLocal = null;
         String dingTalkRobotCodeLocal = null;
+        String dingTalkAccountIdLocal = null;
         FeishuStreamClient feishuStreamLocal = null;
         String resolvedBase = null;
 
@@ -308,6 +320,7 @@ public final class AiChannelRuntime {
                 dingTalkStreamLocal = new DingTalkStreamClient(props, this::onDingTalkPayload);
                 resolvedBase = props.apiBase();
                 dingTalkRobotCodeLocal = props.robotCode();
+                dingTalkAccountIdLocal = props.appKey();
             }
             default -> throw new IllegalArgumentException(
                 "不支持的平台类型：" + channel.getPlatformType());
@@ -332,6 +345,7 @@ public final class AiChannelRuntime {
         this.weComTokenProvider = weComTokenProviderLocal;
         this.dingTalkTokenProvider = dingTalkTokenProviderLocal;
         this.dingTalkRobotCode = dingTalkRobotCodeLocal;
+        this.dingTalkAccountId = dingTalkAccountIdLocal;
         this.apiBase = resolvedBase;
         this.apiClient = resolvedBase == null ? null : WebClient.builder().baseUrl(resolvedBase).build();
         this.inboundHandler = inboundHandler;
@@ -421,7 +435,20 @@ public final class AiChannelRuntime {
             return;
         }
         Optional<InboundMessage> inbound = dingTalkMapper.map(payload);
+        // 群聊里发图片时钉钉下发的是 richText（框架 mapper 不支持），此处补一份归一化
+        if (inbound.isEmpty() && "richText".equalsIgnoreCase(payload.path("msgtype").asText(""))) {
+            inbound = mapDingTalkRichText(payload);
+        }
         if (inbound.isEmpty()) {
+            // 不支持的报文此前静默丢弃，线上无法区分「平台没推」与「推了但字段不符」，
+            // 这里留下类型与字段形状（不落正文与下载码值），便于排查图片 / 富文本消息
+            JsonNode content = payload.path("content");
+            log.warn("钉钉入站报文未识别（按不支持类型丢弃）：channelCode={}, msgtype={}, msgId={}, "
+                    + "顶层下载码={}, content类型={}, content字段={}, content缺下载码={}, richText={}",
+                channelCode, payload.path("msgtype").asText(null), msgId.orElse(null),
+                payload.hasNonNull("downloadCode"), content.getNodeType(), fieldNamesOf(content),
+                content.path("downloadCode").isMissingNode(),
+                payload.path("content").path("richText").isArray());
             return;
         }
         InboundMessage message = inbound.get();
@@ -434,6 +461,120 @@ public final class AiChannelRuntime {
             return;
         }
         inboundHandler.accept(message);
+    }
+
+    /**
+     * 钉钉 {@code richText} 报文的归一化（框架 mapper 明确不支持该类型）。
+     *
+     * <p>群聊发图片时钉钉下发的不是 {@code picture}，而是 {@code richText}：文本项为
+     * {@code {"text":"…"}}，图片项带 {@code downloadCode}（可能还带 {@code pictureDownloadCode}）。
+     * 这里按同一份归一化契约装配为「文本 + 图片标记」多条消息，后续由
+     * {@link AiChannelMediaAssembler} 下载并转成内容块；没有可识别内容时返回空。</p>
+     *
+     * @param payload 钉钉长连接下发的机器人消息报文
+     * @return 归一化入站消息；无可识别内容时为空
+     */
+    private Optional<InboundMessage> mapDingTalkRichText(JsonNode payload) {
+        JsonNode items = payload.path("content").path("richText");
+        if (!items.isArray() || items.isEmpty()) {
+            return Optional.empty();
+        }
+        String senderStaffId = textOf(payload, "senderStaffId");
+        String conversationId = textOf(payload, "conversationId");
+        Peer peer;
+        String senderId;
+        if ("2".equals(textOf(payload, "conversationType")) && conversationId != null) {
+            peer = new Peer(PeerKind.GROUP, conversationId);
+            senderId = senderStaffId != null ? senderStaffId : conversationId;
+        } else {
+            String peerId = senderStaffId != null ? senderStaffId : conversationId;
+            if (StringUtils.isBlank(peerId)) {
+                return Optional.empty();
+            }
+            peer = new Peer(PeerKind.DIRECT, peerId);
+            senderId = peerId;
+        }
+
+        String channelMessageId = DingTalkInboundMapper.extractMsgId(payload).orElse("");
+        StringBuilder text = new StringBuilder();
+        List<String> downloadCodes = new ArrayList<>();
+        List<String> pictureCodes = new ArrayList<>();
+        for (JsonNode item : items) {
+            String itemText = textOf(item, "text");
+            if (StringUtils.isNotBlank(itemText)) {
+                if (text.length() > 0) {
+                    text.append('\n');
+                }
+                text.append(itemText.strip());
+            }
+            // 图片项：downloadCode 可能直接挂在项上，也可能放在内层 content 对象里
+            String downloadCode = textOf(item, "downloadCode");
+            if (StringUtils.isBlank(downloadCode)) {
+                downloadCode = textOf(item.path("content"), "downloadCode");
+            }
+            if (StringUtils.isNotBlank(downloadCode)) {
+                downloadCodes.add(downloadCode);
+                pictureCodes.add(textOf(item, "pictureDownloadCode"));
+            }
+        }
+        if (text.length() == 0 && downloadCodes.isEmpty()) {
+            return Optional.empty();
+        }
+
+        List<Msg> messages = new ArrayList<>();
+        if (text.length() > 0) {
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("channelMessageId", channelMessageId);
+            messages.add(Msg.builder().role(MsgRole.USER).name(senderId)
+                .textContent(text.toString()).metadata(meta).build());
+        }
+        for (int i = 0; i < downloadCodes.size(); i++) {
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put(ChannelMediaMetadata.KIND, ChannelMediaMetadata.KIND_IMAGE);
+            meta.put(ChannelMediaMetadata.PROVIDER_TYPE, "richText");
+            meta.put(ChannelMediaMetadata.ID, downloadCodes.get(i));
+            ChannelMediaMetadata.putIfPresent(meta, ChannelMediaMetadata.SECONDARY_ID, pictureCodes.get(i));
+            meta.put("channelMessageId", channelMessageId);
+            messages.add(Msg.builder().role(MsgRole.USER).name(senderId)
+                .textContent(ChannelMediaMetadata.markerText(ChannelMediaMetadata.KIND_IMAGE, null))
+                .metadata(meta).build());
+        }
+        return Optional.of(InboundMessage.builder(channelCode, peer, messages)
+            .accountId(dingTalkAccountId)
+            .senderId(senderId)
+            .build());
+    }
+
+    /**
+     * 取 JSON 字段的文本值（缺失 / 非文本返回 null）。
+     */
+    private static String textOf(JsonNode node, String field) {
+        if (node == null) {
+            return null;
+        }
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        String text = value.asText();
+        return StringUtils.isBlank(text) ? null : text;
+    }
+
+    /**
+     * 取 JSON 对象的字段名（非对象返回占位符，仅用于日志）。
+     */
+    private static String fieldNamesOf(JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return "-";
+        }
+        StringBuilder names = new StringBuilder();
+        node.fieldNames().forEachRemaining(name -> {
+            if (names.length() > 0) {
+                names.append(',');
+            }
+            names.append(name);
+        });
+        return names.toString();
     }
 
     /**
@@ -595,7 +736,8 @@ public final class AiChannelRuntime {
         if (StringUtils.isBlank(downloadUrl)) {
             return null;
         }
-        return WebClient.builder().build().get().uri(downloadUrl)
+        // 必须用 URI 原样传入：uri(String) 会按模板再编码一次，把签名里的 %2F 变成 %252F 导致 OSS 403
+        return WebClient.builder().build().get().uri(URI.create(downloadUrl))
             .retrieve().bodyToMono(byte[].class).block(Duration.ofSeconds(20));
     }
 
