@@ -91,3 +91,44 @@ export interface ChunkVO {
   /** 创建时间 */
   createTime?: string;
 }
+
+/** 切片定位结果（点击回答「参考来源」时按文档 + 序号现查） */
+export interface ChunkContextVO {
+  /** 命中切片；文档已重新解析导致序号不存在时为 null */
+  target?: ChunkVO | null;
+  /** 命中切片之前的相邻切片（按序号升序） */
+  before: ChunkVO[];
+  /** 命中切片之后的相邻切片（按序号升序） */
+  after: ChunkVO[];
+}
+
+/** 批量提交回执（异步受理结果） */
+export interface DocumentBatchVO {
+  /** 已受理（已入队）的文档主键 */
+  accepted: Array<string | number>;
+  /** 被跳过的文档及原因 */
+  skipped: Array<{
+    /** 文档主键 */
+    id: string | number;
+    /** 文档名称 */
+    docName?: string;
+    /** 跳过原因 */
+    reason: string;
+  }>;
+}
+
+/** 批量处理进度（轮询回执） */
+export interface DocumentBatchStatusVO {
+  /** 文档主键 */
+  id: string | number;
+  /** 文档名称 */
+  docName?: string;
+  /** 解析状态 */
+  parseStatus?: string;
+  /** 解析失败原因 */
+  errorMsg?: string;
+  /** 向量化状态 */
+  vectorStatus?: string;
+  /** 向量化失败原因 */
+  vectorErrorMsg?: string;
+}

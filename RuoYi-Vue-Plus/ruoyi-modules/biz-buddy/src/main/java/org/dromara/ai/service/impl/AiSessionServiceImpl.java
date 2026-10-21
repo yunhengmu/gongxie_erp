@@ -14,12 +14,14 @@ import org.dromara.ai.domain.AiExpertAgent;
 import org.dromara.ai.domain.AiMessage;
 import org.dromara.ai.domain.AiScenarioPack;
 import org.dromara.ai.domain.AiSession;
+import org.dromara.ai.domain.AiTool;
 import org.dromara.ai.domain.AiToolCallLog;
 import org.dromara.ai.domain.bo.AiSessionBo;
 import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiAgentVo;
 import org.dromara.ai.domain.vo.AiChatAttachmentVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
+import org.dromara.ai.domain.vo.AiRegenerateCheckVo;
 import org.dromara.ai.domain.vo.AiSessionExportVo;
 import org.dromara.ai.domain.vo.AiSessionVo;
 import org.dromara.ai.domain.vo.AiSourceVo;
@@ -28,6 +30,7 @@ import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.mapper.AiScenarioPackMapper;
 import org.dromara.ai.mapper.AiSessionMapper;
 import org.dromara.ai.mapper.AiToolCallLogMapper;
+import org.dromara.ai.mapper.AiToolMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiScenarioPackService;
@@ -49,10 +52,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * AI 会话 Service 业务层处理
@@ -63,6 +68,18 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Service
 public class AiSessionServiceImpl implements IAiSessionService {
+
+    /**
+     * 平台内置只读工具白名单。
+     *
+     * <p>这些工具由框架 / 平台代码注册，不落 {@code ai_tool} 表，但本身不产生业务副作用：
+     * 技能读取、编排协议、子智能体编排（子智能体内部的写工具会单独落明细并照常拦截）。
+     * 未在此白名单且未登记的工具仍按 fail-closed 视为写操作。</p>
+     */
+    private static final Set<String> BUILTIN_READ_ONLY_TOOLS = Set.of(
+        "route_decision", "submit_expert_result",
+        "load_skill_through_path", "read_skill",
+        "agent_spawn", "agent_send", "agent_list", "todo_write");
 
     /**
      * 默认会话标题模板
@@ -129,6 +146,11 @@ public class AiSessionServiceImpl implements IAiSessionService {
     private final AiMessageMapper messageMapper;
 
     private final AiToolCallLogMapper toolCallLogMapper;
+
+    /**
+     * 工具注册表：重新生成预检按 {@code tool_code} 取 {@code tool_type} 判定写操作
+     */
+    private final AiToolMapper toolMapper;
 
     private final AiScenarioPackMapper scenarioPackMapper;
 
@@ -300,21 +322,149 @@ public class AiSessionServiceImpl implements IAiSessionService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Boolean deleteChatRound(Long sessionId, Long messageId) {
-        getOwnedSession(sessionId);
+        AiSession session = getOwnedSession(sessionId);
+        AiMessage target = requireRoundTarget(sessionId, messageId);
+        ChatRound round = resolveRound(session, target);
+        // 写操作轮次禁止删除：删掉后审计链路（工具明细、编排轨迹）就难以从会话页回溯
+        List<AiRegenerateCheckVo.WriteTool> writeTools = detectWriteTools(round.answers());
+        if (!writeTools.isEmpty()) {
+            throw new ServiceException(writeToolReason(writeTools));
+        }
+        if (round.pendingConfirm()) {
+            throw new ServiceException("该轮存在待确认的工具调用，请先处置后再删除");
+        }
+        List<Long> doomed = new ArrayList<>();
+        doomed.add(messageId);
+        for (AiMessage answer : round.answers()) {
+            if (STREAMING_DONE.equals(answer.getStreaming())) {
+                doomed.add(answer.getId());
+                continue;
+            }
+            throw new ServiceException("该轮回答仍在生成中，请先停止后再删除");
+        }
+        boolean flag = messageMapper.deleteByIds(doomed) > 0;
+        if (flag) {
+            decrementMessageCount(sessionId, doomed.size());
+        }
+        return flag;
+    }
+
+    @Override
+    public AiRegenerateCheckVo checkRegenerable(Long sessionId, Long userMessageId) {
+        AiSession session = getOwnedSession(sessionId);
+        if (!SESSION_ACTIVE.equals(session.getStatus())) {
+            return rejectRegenerate(null, AiRegenerateCheckVo.CODE_SESSION_CLOSED, "会话已结束，不能重新生成");
+        }
+        AiMessage target = userMessageId == null ? null : messageMapper.selectById(userMessageId);
+        if (target == null || !sessionId.equals(target.getSessionId())
+            || !AiMessage.ROLE_USER.equals(target.getRole())) {
+            return rejectRegenerate(null, AiRegenerateCheckVo.CODE_ROUND_NOT_FOUND, "消息不存在或不属于该会话");
+        }
+        ChatRound round = resolveRound(session, target);
+        List<Long> answerIds = round.answers().stream().map(AiMessage::getId).toList();
+        if (!round.lastRound()) {
+            return rejectRegenerate(answerIds, AiRegenerateCheckVo.CODE_ROUND_NOT_LAST,
+                "只支持重新生成最后一轮回答");
+        }
+        if (round.streaming()) {
+            return rejectRegenerate(answerIds, AiRegenerateCheckVo.CODE_ROUND_STREAMING,
+                "该轮回答仍在生成中，请先停止后再重新生成");
+        }
+        if (round.pendingConfirm()) {
+            return rejectRegenerate(answerIds, AiRegenerateCheckVo.CODE_ROUND_PENDING_CONFIRM,
+                "该轮存在待确认的工具调用，请先处置后再重新生成");
+        }
+        List<AiRegenerateCheckVo.WriteTool> writeTools = detectWriteTools(round.answers());
+        if (!writeTools.isEmpty()) {
+            boolean onlyUnknown = writeTools.stream().allMatch(AiRegenerateCheckVo.WriteTool::isUnknown);
+            AiRegenerateCheckVo vo = rejectRegenerate(answerIds,
+                onlyUnknown ? AiRegenerateCheckVo.CODE_UNKNOWN_TOOL_USED : AiRegenerateCheckVo.CODE_WRITE_TOOL_USED,
+                writeToolReason(writeTools));
+            vo.setWriteTools(writeTools);
+            return vo;
+        }
+        AiRegenerateCheckVo vo = new AiRegenerateCheckVo();
+        vo.setAllowed(true);
+        vo.setReasonCode(AiRegenerateCheckVo.CODE_OK);
+        vo.setReason("可以重新生成");
+        vo.setAssistantMessageIds(answerIds);
+        vo.setWriteTools(List.of());
+        return vo;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteAnswerMessages(Long sessionId, Long userId, Collection<Long> answerIds) {
+        if (answerIds == null || answerIds.isEmpty()) {
+            return;
+        }
+        List<Long> ids = answerIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        // 收尾在 Reactor 线程执行、没有 Sa-Token 上下文，故按调用方传入的归属用户校验，
+        // 避免凭消息主键删到别人的会话
+        AiSession session = sessionId == null ? null : baseMapper.selectById(sessionId);
+        if (session == null || !Objects.equals(session.getUserId(), userId)) {
+            throw new ServiceException("会话不存在或无权访问");
+        }
+        int deleted = messageMapper.deleteByIds(ids);
+        if (deleted > 0) {
+            decrementMessageCount(sessionId, deleted);
+        }
+    }
+
+    /**
+     * 构造「不允许重新生成」的预检结果。
+     *
+     * @param answerIds  本轮助手消息主键（可空）
+     * @param reasonCode 原因码
+     * @param reason     面向用户的原因
+     * @return 预检结果
+     */
+    private AiRegenerateCheckVo rejectRegenerate(List<Long> answerIds, String reasonCode, String reason) {
+        AiRegenerateCheckVo vo = new AiRegenerateCheckVo();
+        vo.setAllowed(false);
+        vo.setReasonCode(reasonCode);
+        vo.setReason(reason);
+        vo.setAssistantMessageIds(answerIds == null ? List.of() : answerIds);
+        vo.setWriteTools(List.of());
+        return vo;
+    }
+
+    /**
+     * 校验「本轮用户消息」的存在性与归属。
+     *
+     * @param sessionId 会话主键
+     * @param messageId 消息主键
+     * @return 用户消息实体
+     */
+    private AiMessage requireRoundTarget(Long sessionId, Long messageId) {
         AiMessage target = messageId == null ? null : messageMapper.selectById(messageId);
         if (target == null || !sessionId.equals(target.getSessionId())) {
             throw new ServiceException("消息不存在或不属于该会话");
         }
         if (!AiMessage.ROLE_USER.equals(target.getRole())) {
-            throw new ServiceException("只能删除用户提问");
+            throw new ServiceException("只能操作本轮用户提问");
         }
+        return target;
+    }
+
+    /**
+     * 解析一问一答：该用户消息之后、下一条用户消息之前的全部助手消息。
+     *
+     * @param session 会话实体
+     * @param target  本轮用户消息
+     * @return 轮次视图
+     */
+    private ChatRound resolveRound(AiSession session, AiMessage target) {
         LambdaQueryWrapper<AiMessage> lqw = Wrappers.lambdaQuery();
-        lqw.eq(AiMessage::getSessionId, sessionId);
+        lqw.eq(AiMessage::getSessionId, session.getId());
         lqw.orderByAsc(AiMessage::getId);
         List<AiMessage> all = messageMapper.selectList(lqw);
         int start = -1;
         for (int i = 0; i < all.size(); i++) {
-            if (all.get(i).getId().equals(messageId)) {
+            if (all.get(i).getId().equals(target.getId())) {
                 start = i;
                 break;
             }
@@ -322,32 +472,128 @@ public class AiSessionServiceImpl implements IAiSessionService {
         if (start < 0) {
             throw new ServiceException("消息不存在或已被删除");
         }
-        // 该轮＝本条用户消息 + 紧随其后的助手消息（含 HITL 暂停后复用同一行的补充），到下一条用户消息为止
-        List<Long> doomed = new ArrayList<>();
-        doomed.add(messageId);
+        List<AiMessage> answers = new ArrayList<>();
+        boolean lastRound = true;
         for (int i = start + 1; i < all.size(); i++) {
             AiMessage next = all.get(i);
             if (AiMessage.ROLE_USER.equals(next.getRole())) {
+                lastRound = false;
                 break;
             }
-            if (STREAMING_DONE.equals(next.getStreaming())) {
-                doomed.add(next.getId());
+            answers.add(next);
+        }
+        boolean streaming = answers.stream().anyMatch(item -> !STREAMING_DONE.equals(item.getStreaming()));
+        boolean pendingConfirm = answers.stream()
+            .anyMatch(item -> AiMessage.STATUS_PENDING_CONFIRM.equals(item.getStatus()));
+        return new ChatRound(answers, lastRound, streaming, pendingConfirm);
+    }
+
+    /**
+     * 判定某轮是否发起过写操作。
+     *
+     * <p>口径（fail-closed）：</p>
+     * <ul>
+     *   <li>已登记且 {@code tool_type='1'}：{@code SUCCESS / ERROR / INTERRUPTED} 均视为写操作
+     *       （错误与中断也可能已在外部系统生效）；{@code DENIED} 视为用户已拒绝、无副作用，放行。</li>
+     *   <li>未在 {@code ai_tool} 登记：无法证明只读，一律视为写操作。</li>
+     * </ul>
+     *
+     * @param answers 本轮助手消息
+     * @return 命中的写操作工具（按工具编码 + 状态去重）
+     */
+    private List<AiRegenerateCheckVo.WriteTool> detectWriteTools(List<AiMessage> answers) {
+        List<Long> messageIds = answers.stream().map(AiMessage::getId).filter(Objects::nonNull).toList();
+        if (messageIds.isEmpty()) {
+            return List.of();
+        }
+        LambdaQueryWrapper<AiToolCallLog> logQuery = Wrappers.lambdaQuery();
+        logQuery.in(AiToolCallLog::getMessageId, messageIds);
+        logQuery.orderByAsc(AiToolCallLog::getId);
+        List<AiToolCallLog> logs = toolCallLogMapper.selectList(logQuery);
+        if (logs.isEmpty()) {
+            return List.of();
+        }
+        Set<String> toolCodes = logs.stream()
+            .map(AiToolCallLog::getToolName)
+            .filter(StringUtils::isNotBlank)
+            .collect(Collectors.toSet());
+        Map<String, AiTool> tools = new HashMap<>();
+        if (!toolCodes.isEmpty()) {
+            LambdaQueryWrapper<AiTool> toolQuery = Wrappers.lambdaQuery();
+            toolQuery.in(AiTool::getToolCode, toolCodes);
+            for (AiTool tool : toolMapper.selectList(toolQuery)) {
+                tools.put(tool.getToolCode(), tool);
+            }
+        }
+        Map<String, AiRegenerateCheckVo.WriteTool> hits = new LinkedHashMap<>();
+        for (AiToolCallLog log : logs) {
+            // 用户已拒绝的调用没有真正执行，不构成重复副作用风险
+            if ("DENIED".equalsIgnoreCase(log.getState())) {
                 continue;
             }
-            throw new ServiceException("该轮回答仍在生成中，请先停止后再删除");
+            AiTool tool = tools.get(log.getToolName());
+            boolean unknown = tool == null;
+            // 平台内置只读工具不在 ai_tool 登记，但可证明无副作用
+            if (unknown && BUILTIN_READ_ONLY_TOOLS.contains(log.getToolName())) {
+                continue;
+            }
+            boolean write = unknown || !AiTool.TYPE_READ_ONLY.equals(tool.getToolType());
+            if (!write) {
+                continue;
+            }
+            AiRegenerateCheckVo.WriteTool item = new AiRegenerateCheckVo.WriteTool();
+            item.setToolCode(log.getToolName());
+            item.setToolName(unknown ? log.getToolName() : tool.getToolName());
+            item.setState(log.getState());
+            item.setUnknown(unknown);
+            hits.putIfAbsent(log.getToolName() + "|" + log.getState(), item);
         }
-        boolean flag = messageMapper.deleteByIds(doomed) > 0;
-        if (flag) {
-            // 消息条数为存储计数器，删除后需同步回退（避免「任务管理」页条数与实际不符）
-            AiSession session = baseMapper.selectById(sessionId);
-            int remaining = Math.max(0, (session == null || session.getMessageCount() == null
-                ? 0 : session.getMessageCount()) - doomed.size());
-            AiSession update = new AiSession();
-            update.setId(sessionId);
-            update.setMessageCount(remaining);
-            baseMapper.updateById(update);
-        }
-        return flag;
+        return new ArrayList<>(hits.values());
+    }
+
+    /**
+     * 组装写操作拦截的用户提示。
+     *
+     * @param writeTools 命中的写操作工具
+     * @return 面向用户的原因
+     */
+    private String writeToolReason(List<AiRegenerateCheckVo.WriteTool> writeTools) {
+        String names = writeTools.stream()
+            .map(AiRegenerateCheckVo.WriteTool::getToolName)
+            .distinct()
+            .collect(Collectors.joining("、"));
+        boolean onlyUnknown = writeTools.stream().allMatch(AiRegenerateCheckVo.WriteTool::isUnknown);
+        return onlyUnknown
+            ? "该轮调用了未登记的工具（" + names + "），无法确认是否只读，不能重新生成"
+            : "该轮执行过写操作（" + names + "），不能重新生成";
+    }
+
+    /**
+     * 回退会话的消息计数（消息条数为存储计数器，删除后需同步递减）。
+     *
+     * @param sessionId 会话主键
+     * @param removed   删除的消息条数
+     */
+    private void decrementMessageCount(Long sessionId, int removed) {
+        AiSession session = baseMapper.selectById(sessionId);
+        int remaining = Math.max(0, (session == null || session.getMessageCount() == null
+            ? 0 : session.getMessageCount()) - removed);
+        AiSession update = new AiSession();
+        update.setId(sessionId);
+        update.setMessageCount(remaining);
+        baseMapper.updateById(update);
+    }
+
+    /**
+     * 一问一答的解析结果。
+     *
+     * @param answers       本轮助手消息
+     * @param lastRound     是否为会话最后一轮
+     * @param streaming     是否有助手消息仍在生成
+     * @param pendingConfirm 是否有待人工确认的助手消息
+     */
+    private record ChatRound(List<AiMessage> answers, boolean lastRound, boolean streaming,
+                             boolean pendingConfirm) {
     }
 
     @Override

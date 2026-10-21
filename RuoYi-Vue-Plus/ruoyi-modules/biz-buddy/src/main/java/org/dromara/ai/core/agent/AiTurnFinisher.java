@@ -236,6 +236,8 @@ public class AiTurnFinisher {
             AiSseSupport.complete(emitter);
             return null;
         }
+        // 重新生成：新回答已落库，此时才删除被替换的旧回答（中途失败时保留，避免「报错 + 丢答案」）
+        deleteReplacedAnswers(sessionId, state);
         recordAllowDecisions(state, assistant.getId(), resumeMessageId);
         // 专家调用的工具同样补「实际执行」的决策留痕（REQ-AI-30 Phase 2）：按专家维度记账，
         // 被拒绝（DENIED，多为「需确认」档）的不记，避免出现与实际结果相反的「允许」行
@@ -277,6 +279,26 @@ public class AiTurnFinisher {
     }
 
     /**
+     * 删除重新生成时要替换掉的旧回答。
+     *
+     * <p>调用时机固定在**新回答落库成功之后**：模型调用失败、落库失败或用户中止时旧回答保持原样，
+     * 用户至少还留有原来的答案。删除失败只告警，不影响本轮收尾。</p>
+     *
+     * @param sessionId 会话主键
+     * @param state     流式累积状态（读取待替换的旧回答主键）
+     */
+    private void deleteReplacedAnswers(Long sessionId, AiStreamState state) {
+        if (state.replaceAnswerIds.isEmpty()) {
+            return;
+        }
+        try {
+            sessionService.deleteAnswerMessages(sessionId, state.userId, state.replaceAnswerIds);
+        } catch (Exception e) {
+            log.warn("删除被替换的旧回答失败，sessionId={}, answerIds={}", sessionId, state.replaceAnswerIds, e);
+        }
+    }
+
+    /**
      * 因等待人工确认而暂停：落库待确认消息、写决策日志、暂存 Redis 待确认状态并下发确认事件。
      *
      * @param emitter    SSE 发射器
@@ -303,6 +325,8 @@ public class AiTurnFinisher {
             sendPendingSaveError(emitter, e);
             return null;
         }
+        // 重新生成落入待确认态：卡片已挂到新消息上，旧回答同样在此刻删除
+        deleteReplacedAnswers(sessionId, state);
         afterPendingPersisted(emitter, state, durationMs, assistant, 1, expertResume);
         return assistant.getId();
     }

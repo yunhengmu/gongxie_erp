@@ -139,6 +139,9 @@ class AiChatFacadeTest {
     @Mock
     private AiRunRegistry runRegistry;
 
+    @Mock
+    private AiRegenerateContextRestorer contextRestorer;
+
     /**
      * 整合轮驱动（真实实例的 spy）：仅用于断言「短路 + 专家未接管 → 走整合轮」这一协作调用，
      * 其内部收尾行为由 {@code AiIntegrationDriverTest} 单独覆盖，此处桩为空操作以避免重复执行。
@@ -167,7 +170,7 @@ class AiChatFacadeTest {
         facade = new AiChatFacade(sessionService, agentService, messageMapper, agentRegistry, aiProperties,
             pendingStore, permissionModeStore, decisionService, usageStatService, quotaService,
             safetyGuard, safetyEventService,
-            sessionResourceService, expertDirectory, routeRecorder, routeOrchestrator, routeJudgeService, assembler, routeSupport, trustApplier,
+            sessionResourceService, contextRestorer, expertDirectory, routeRecorder, routeOrchestrator, routeJudgeService, assembler, routeSupport, trustApplier,
             slotStore, streamBridge, traceService, toolLabelResolver, runRegistry, turnFinisher, integrationDriver, expertResumeDriver);
         // 安全守卫默认「原样放行」，既有断言不受影响
         lenient().when(safetyGuard.guard(any(), any()))

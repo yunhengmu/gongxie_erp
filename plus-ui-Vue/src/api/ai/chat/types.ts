@@ -203,6 +203,8 @@ export interface ChatStreamEvent {
   durationMs?: number;
   /** 错误信息（error） */
   message?: string;
+  /** 错误原因码（error：WRITE_TOOL_USED / CONTEXT_RESTORE_FAILED 等，重新生成预检拒绝时非空） */
+  reasonCode?: string;
   /** 待确认的工具调用（tool_confirm） */
   toolCalls?: ChatPendingToolCall[];
   /** 确认有效期（秒，tool_confirm） */
@@ -251,6 +253,32 @@ export interface ChatPendingToolCall {
   toolDesc?: string;
   /** 工具入参 */
   input?: Record<string, any>;
+}
+
+/** 重新生成预检结果 */
+export interface ChatRegenerateCheckVO {
+  /** 是否允许重新生成 */
+  allowed: boolean;
+  /** 原因码（OK / WRITE_TOOL_USED / UNKNOWN_TOOL_USED / ROUND_NOT_LAST 等） */
+  reasonCode?: string;
+  /** 面向用户的原因说明 */
+  reason?: string;
+  /** 本轮的助手消息主键 */
+  assistantMessageIds?: Array<string | number>;
+  /** 命中的写操作工具（允许时为空） */
+  writeTools?: ChatRegenerateWriteTool[];
+}
+
+/** 重新生成预检命中的写操作工具 */
+export interface ChatRegenerateWriteTool {
+  /** 工具编码 */
+  toolCode?: string;
+  /** 工具中文名（未登记时回退为编码） */
+  toolName?: string;
+  /** 调用结果状态（SUCCESS / ERROR / INTERRUPTED / DENIED） */
+  state?: string;
+  /** 是否未在工具注册表登记 */
+  unknown?: boolean;
 }
 
 /** 未决的工具确认（刷新页面后恢复确认卡片） */

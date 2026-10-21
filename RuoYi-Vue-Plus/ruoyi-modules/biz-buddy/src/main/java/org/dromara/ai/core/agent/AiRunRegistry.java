@@ -52,6 +52,20 @@ public class AiRunRegistry {
     }
 
     /**
+     * 判断该会话当前是否有进行中的执行。
+     *
+     * <p>句柄是单实例内存态，多副本部署时只能反映本实例；重新生成等「先检查再执行」的
+     * 场景用它做同实例互斥，跨副本并发仍由会话内消息状态兜底。</p>
+     *
+     * @param sessionId 会话主键
+     * @return 是否存在活跃执行
+     */
+    public boolean isActive(Long sessionId) {
+        Set<Cancelable> handles = active.get(sessionId);
+        return handles != null && !handles.isEmpty();
+    }
+
+    /**
      * 取消该会话当前登记的全部执行。
      *
      * @param sessionId 会话主键

@@ -4,9 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
+import io.agentscope.extensions.channel.common.ChannelMediaMetadata;
 import io.agentscope.extensions.channel.dingtalk.DingTalkStreamClient;
 import io.agentscope.extensions.channel.github.GitHubOutboundClient;
+import io.agentscope.harness.agent.gateway.channel.InboundMessage;
 import io.agentscope.harness.agent.gateway.channel.OutboundAddress;
+import io.agentscope.harness.agent.gateway.channel.PeerKind;
 import org.dromara.ai.domain.AiChannel;
 import org.dromara.ai.test.AiTestSupport;
 import org.junit.jupiter.api.BeforeAll;
@@ -15,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -290,6 +294,37 @@ class AiChannelRuntimeTest {
 
             consumer.accept(mapper.readTree("{\"msgtype\":\"text\",\"text\":{\"content\":\"无发送者\"}}"));
             assertEquals(1, handled.get());
+        }
+    }
+
+    @Test
+    @DisplayName("钉钉入站：群聊 richText 图片归一化为图片内容块")
+    @SuppressWarnings("unchecked")
+    void shouldMapDingTalkRichTextPicture() throws Exception {
+        List<Object[]> captured = new ArrayList<>();
+        try (MockedConstruction<DingTalkStreamClient> construction =
+                 mockConstruction(DingTalkStreamClient.class,
+                     (mock, context) -> captured.add(context.arguments().toArray()))) {
+            List<InboundMessage> received = new ArrayList<>();
+            AiChannelRuntime.build(dingTalkChannel(), received::add,
+                new io.agentscope.extensions.channel.common.IdempotencyStore(), allowAllLimiter());
+            Consumer<JsonNode> consumer = (Consumer<JsonNode>) captured.get(0)[1];
+            JsonNode payload = new ObjectMapper().readTree("{\"msgtype\":\"richText\",\"msgId\":\"m-rt\","
+                + "\"conversationType\":\"2\",\"conversationId\":\"cid-9\",\"senderStaffId\":\"u9\","
+                + "\"content\":{\"richText\":[{\"text\":\"看看这张图\"},"
+                + "{\"type\":\"picture\",\"downloadCode\":\"dl-9\",\"pictureDownloadCode\":\"pic-9\"}]}}");
+
+            consumer.accept(payload);
+
+            assertEquals(1, received.size());
+            InboundMessage inbound = received.get(0);
+            assertEquals(PeerKind.GROUP, inbound.peer().kind());
+            assertEquals(2, inbound.messages().size());
+            assertEquals("看看这张图", inbound.messages().get(0).getTextContent());
+            Msg image = inbound.messages().get(1);
+            assertEquals(ChannelMediaMetadata.KIND_IMAGE, image.getMetadata().get(ChannelMediaMetadata.KIND));
+            assertEquals("dl-9", image.getMetadata().get(ChannelMediaMetadata.ID));
+            assertEquals("pic-9", image.getMetadata().get(ChannelMediaMetadata.SECONDARY_ID));
         }
     }
 

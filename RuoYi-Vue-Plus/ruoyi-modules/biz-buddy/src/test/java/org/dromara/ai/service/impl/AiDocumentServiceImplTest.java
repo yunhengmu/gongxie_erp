@@ -5,7 +5,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.dromara.ai.domain.AiChunk;
 import org.dromara.ai.domain.AiDocument;
 import org.dromara.ai.domain.AiKnowledgeBase;
+import org.dromara.ai.core.document.AiDocumentBatchRunner;
 import org.dromara.ai.domain.bo.AiDocumentBo;
+import org.dromara.ai.domain.vo.AiChunkContextVo;
+import org.dromara.ai.domain.vo.AiDocumentBatchStatusVo;
+import org.dromara.ai.domain.vo.AiDocumentBatchVo;
 import org.dromara.ai.domain.vo.AiChunkVo;
 import org.dromara.ai.domain.vo.AiDocumentVo;
 import org.dromara.ai.mapper.AiChunkMapper;
@@ -17,6 +21,7 @@ import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.MapstructUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
+import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.api.OssService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +40,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -60,6 +66,9 @@ class AiDocumentServiceImplTest {
 
     @Mock
     private OssService ossService;
+
+    @Mock
+    private AiDocumentBatchRunner batchRunner;
 
     @InjectMocks
     private AiDocumentServiceImpl service;
@@ -479,6 +488,214 @@ class AiDocumentServiceImplTest {
                 "切片终点落在单词内部：" + piece);
             searchFrom = pos;
         }
+    }
+
+    // ==================== 参考来源定位（按切片序号） ====================
+
+    @Test
+    @DisplayName("切片定位：返回命中切片与前后邻居")
+    void shouldReturnChunkContextWithNeighbors() {
+        when(baseMapper.selectById(1L)).thenReturn(document(1L, 2L, "txt", 5L, "2"));
+        when(knowledgeBaseService.filterVisibleKbIds(anyCollection(), eq(9L))).thenReturn(List.of(2L));
+        when(chunkMapper.selectVoList(any())).thenReturn(List.of(chunkVo(1), chunkVo(2), chunkVo(3)));
+
+        try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
+            login.when(LoginHelper::getUserId).thenReturn(9L);
+
+            AiChunkContextVo context = service.queryChunkContext(1L, 2, 1);
+
+            assertEquals(2, context.getTarget().getChunkIndex());
+            assertEquals(1, context.getBefore().size());
+            assertEquals(1, context.getAfter().size());
+        }
+    }
+
+    @Test
+    @DisplayName("切片定位：序号越界时目标为空而不报错（文档重新解析后来源可能失效）")
+    void shouldReturnEmptyTargetWhenChunkIndexMissing() {
+        when(baseMapper.selectById(1L)).thenReturn(document(1L, 2L, "txt", 5L, "2"));
+        when(knowledgeBaseService.filterVisibleKbIds(anyCollection(), eq(9L))).thenReturn(List.of(2L));
+        when(chunkMapper.selectVoList(any())).thenReturn(List.of(chunkVo(1)));
+
+        try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
+            login.when(LoginHelper::getUserId).thenReturn(9L);
+
+            AiChunkContextVo context = service.queryChunkContext(1L, 9, 1);
+
+            assertNull(context.getTarget());
+            assertEquals(1, context.getBefore().size());
+            assertTrue(context.getAfter().isEmpty());
+        }
+    }
+
+    @Test
+    @DisplayName("切片定位：知识库不在可见范围时拒绝（防凭 docId 越权读正文）")
+    void shouldRejectInvisibleKnowledgeBaseForChunkContext() {
+        when(baseMapper.selectById(1L)).thenReturn(document(1L, 2L, "txt", 5L, "2"));
+        when(knowledgeBaseService.filterVisibleKbIds(anyCollection(), eq(9L))).thenReturn(List.of());
+
+        try (MockedStatic<LoginHelper> login = mockStatic(LoginHelper.class)) {
+            login.when(LoginHelper::getUserId).thenReturn(9L);
+
+            ServiceException ex = assertThrows(ServiceException.class,
+                () -> service.queryChunkContext(1L, 1, 1));
+            assertEquals("无权访问该知识库文档", ex.getMessage());
+        }
+    }
+
+    @Test
+    @DisplayName("切片定位：文档不存在时拒绝")
+    void shouldRejectMissingDocumentForChunkContext() {
+        when(baseMapper.selectById(1L)).thenReturn(null);
+
+        ServiceException ex = assertThrows(ServiceException.class,
+            () -> service.queryChunkContext(1L, 1, 1));
+        assertEquals("文档不存在或已被删除", ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("切片定位：序号为负时拒绝")
+    void shouldRejectNegativeChunkIndex() {
+        ServiceException ex = assertThrows(ServiceException.class,
+            () -> service.queryChunkContext(1L, -1, 1));
+        assertEquals("文档与切片序号不能为空", ex.getMessage());
+    }
+
+    // ==================== 批量解析 / 向量化 / 一键入库 ====================
+
+    @Test
+    @DisplayName("批量解析：受理待解析文档，正在解析与不存在的文档归入跳过")
+    void shouldSubmitParseBatchAndSkipBusyOrMissing() {
+        when(baseMapper.selectById(1L)).thenReturn(document(1L, 2L, "txt", 5L, "0"));
+        when(baseMapper.selectById(2L)).thenReturn(document(2L, 2L, "txt", 5L, "1"));
+        when(baseMapper.selectById(3L)).thenReturn(null);
+        when(baseMapper.update(any(AiDocument.class), any())).thenReturn(1);
+
+        AiDocumentBatchVo result = service.submitParseBatch(List.of(1L, 2L, 3L));
+
+        assertEquals(List.of(1L), result.getAccepted());
+        assertEquals(2, result.getSkipped().size());
+        assertEquals("正在解析中，已跳过", result.getSkipped().get(0).getReason());
+        assertEquals("文档不存在或已被删除", result.getSkipped().get(1).getReason());
+        verify(batchRunner, times(1)).submit(any());
+    }
+
+    @Test
+    @DisplayName("批量解析：状态占位失败（并发抢不到）时归入跳过且不入队")
+    void shouldSkipParseWhenClaimFails() {
+        when(baseMapper.selectById(1L)).thenReturn(document(1L, 2L, "txt", 5L, "0"));
+        when(baseMapper.update(any(AiDocument.class), any())).thenReturn(0);
+
+        AiDocumentBatchVo result = service.submitParseBatch(List.of(1L));
+
+        assertTrue(result.getAccepted().isEmpty());
+        assertEquals("正在解析中，已跳过", result.getSkipped().get(0).getReason());
+        verify(batchRunner, never()).submit(any());
+    }
+
+    @Test
+    @DisplayName("批量向量化：未解析与正在向量化的文档跳过，已解析的文档入队")
+    void shouldSubmitVectorizeBatchWithGuards() {
+        when(baseMapper.selectById(1L)).thenReturn(document(1L, 2L, "txt", 5L, "0"));
+        AiDocument running = document(2L, 2L, "txt", 5L, "2");
+        running.setVectorStatus("1");
+        when(baseMapper.selectById(2L)).thenReturn(running);
+        AiDocument ready = document(3L, 2L, "txt", 5L, "2");
+        ready.setVectorStatus("0");
+        when(baseMapper.selectById(3L)).thenReturn(ready);
+        when(baseMapper.update(any(AiDocument.class), any())).thenReturn(1);
+
+        AiDocumentBatchVo result = service.submitVectorizeBatch(List.of(1L, 2L, 3L));
+
+        assertEquals(List.of(3L), result.getAccepted());
+        assertEquals("尚未解析完成，请先解析", result.getSkipped().get(0).getReason());
+        assertEquals("正在向量化中，已跳过", result.getSkipped().get(1).getReason());
+        verify(batchRunner, times(1)).submit(any());
+    }
+
+    @Test
+    @DisplayName("批量一键入库：解析中/向量化中的文档跳过，其余受理并占位解析状态")
+    void shouldSubmitIngestBatchAndSkipBusyDocuments() {
+        AiDocument parsing = document(1L, 2L, "txt", 5L, "1");
+        when(baseMapper.selectById(1L)).thenReturn(parsing);
+        AiDocument vectorizing = document(2L, 2L, "txt", 5L, "2");
+        vectorizing.setVectorStatus("1");
+        when(baseMapper.selectById(2L)).thenReturn(vectorizing);
+        AiDocument ready = document(3L, 2L, "txt", 5L, "2");
+        ready.setVectorStatus("0");
+        when(baseMapper.selectById(3L)).thenReturn(ready);
+        when(baseMapper.update(any(AiDocument.class), any())).thenReturn(1);
+
+        AiDocumentBatchVo result = service.submitIngestBatch(List.of(1L, 2L, 3L));
+
+        assertEquals(List.of(3L), result.getAccepted());
+        assertEquals("正在解析中，已跳过", result.getSkipped().get(0).getReason());
+        assertEquals("正在向量化中，已跳过", result.getSkipped().get(1).getReason());
+        verify(batchRunner, times(1)).submit(any());
+    }
+
+    @Test
+    @DisplayName("批量提交：去重后超上限被拒，且重复主键只查询一次")
+    void shouldDedupeAndRejectOversizedBatch() {
+        when(baseMapper.selectById(any())).thenReturn(document(1L, 2L, "txt", 5L, "0"));
+        when(baseMapper.update(any(AiDocument.class), any())).thenReturn(1);
+
+        AiDocumentBatchVo result = service.submitParseBatch(List.of(1L, 1L));
+
+        assertEquals(List.of(1L), result.getAccepted());
+        verify(baseMapper, times(1)).selectById(any());
+
+        List<Long> tooMany = new ArrayList<>();
+        for (long i = 1; i <= 51; i++) {
+            tooMany.add(i);
+        }
+        assertThrows(ServiceException.class, () -> service.submitParseBatch(tooMany));
+    }
+
+    @Test
+    @DisplayName("批量进度：按入参顺序返回状态，已删除的文档忽略")
+    void shouldQueryBatchStatusInRequestOrder() {
+        AiDocument first = document(2L, 2L, "txt", 5L, "2");
+        first.setVectorStatus("1");
+        AiDocument second = document(1L, 2L, "txt", 5L, "3");
+        second.setErrorMsg("下载失败");
+        when(baseMapper.selectByIds(any())).thenReturn(List.of(first, second));
+
+        List<AiDocumentBatchStatusVo> status = service.queryBatchStatus(List.of(1L, 2L, 3L));
+
+        assertEquals(2, status.size());
+        assertEquals(1L, status.get(0).getId());
+        assertEquals("下载失败", status.get(0).getErrorMsg());
+        assertEquals("1", status.get(1).getVectorStatus());
+    }
+
+    @Test
+    @DisplayName("批量解析入口：已占位为「解析中」的文档跳过「解析中」守卫")
+    void shouldParseClaimedDocumentWithoutParsingGuard() {
+        AiDocument doc = document(1L, 2L, "txt", 5L, "1");
+        when(baseMapper.selectById(1L)).thenReturn(doc);
+        when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb(2L, 10, 0));
+        when(chunkMapper.selectList(any())).thenReturn(List.of());
+        when(ossService.selectInternalUrlByIds("5")).thenReturn("http://minio/a");
+        when(baseMapper.selectVoById(1L)).thenReturn(new AiDocumentVo());
+        try (MockedStatic<HttpUtil> hs = mockStatic(HttpUtil.class);
+             MockedStatic<AiDocumentParser> ps = mockStatic(AiDocumentParser.class)) {
+            hs.when(() -> HttpUtil.downloadBytes("http://minio/a")).thenReturn(new byte[]{1});
+            ps.when(() -> AiDocumentParser.parse(any(byte[].class), eq("txt")))
+                .thenReturn(List.of(new AiDocumentParser.ParsedBlock("hello", 0, null, null)));
+
+            assertNotNull(service.parseClaimed(1L));
+        }
+    }
+
+    /** 构造一条切片视图（仅保留定位相关字段） */
+    private AiChunkVo chunkVo(int index) {
+        AiChunkVo vo = new AiChunkVo();
+        vo.setDocId(1L);
+        vo.setKbId(2L);
+        vo.setChunkIndex(index);
+        vo.setContent("第 " + index + " 段");
+        return vo;
     }
 
     private static boolean isAsciiWordChar(char c) {

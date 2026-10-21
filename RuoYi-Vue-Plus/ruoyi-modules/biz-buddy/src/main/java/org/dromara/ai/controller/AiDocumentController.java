@@ -1,11 +1,16 @@
 package org.dromara.ai.controller;
 
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import cn.dev33.satoken.annotation.SaMode;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.dromara.ai.domain.bo.AiDocumentBatchBo;
 import org.dromara.ai.domain.bo.AiDocumentBo;
+import org.dromara.ai.domain.vo.AiChunkContextVo;
 import org.dromara.ai.domain.vo.AiChunkVo;
+import org.dromara.ai.domain.vo.AiDocumentBatchStatusVo;
+import org.dromara.ai.domain.vo.AiDocumentBatchVo;
 import org.dromara.ai.domain.vo.AiDocumentVo;
 import org.dromara.ai.service.IAiDocumentService;
 import org.dromara.ai.service.IAiVectorService;
@@ -25,9 +30,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * AI 知识库文档 Controller
@@ -91,14 +98,32 @@ public class AiDocumentController extends BaseController {
     }
 
     /**
+     * 按切片序号定位切片（回答「参考来源」点击用）
+     *
+     * @param id         文档主键
+     * @param chunkIndex 切片序号（从 0 开始）
+     * @param radius     前后各取多少条相邻切片（默认 1，上限 3）
+     */
+    @SaCheckPermission("ai:kb:doc")
+    @GetMapping("/{id}/chunks/{chunkIndex}")
+    public R<AiChunkContextVo> chunkContext(@NotNull(message = "主键不能为空")
+                                            @PathVariable("id") Long id,
+                                            @PathVariable("chunkIndex") Integer chunkIndex,
+                                            @RequestParam(value = "radius", required = false) Integer radius) {
+        return R.ok(aiDocumentService.queryChunkContext(id, chunkIndex, radius));
+    }
+
+    /**
      * 登记文档（文件已上传至对象存储）
      */
     @SaCheckPermission("ai:kb:doc:upload")
     @Log(title = "AI知识库文档", businessType = BusinessType.INSERT)
     @RepeatSubmit
     @PostMapping()
-    public R<Void> add(@Validated(AddGroup.class) @RequestBody AiDocumentBo bo) {
-        return toAjax(aiDocumentService.insertByBo(bo));
+    public R<Long> add(@Validated(AddGroup.class) @RequestBody AiDocumentBo bo) {
+        aiDocumentService.insertByBo(bo);
+        // 返回新文档主键：前端「上传后自动解析并向量化」需要立即拿到 id 提交批量入库
+        return R.ok(bo.getId());
     }
 
     /**
@@ -129,6 +154,47 @@ public class AiDocumentController extends BaseController {
     public R<AiDocumentVo> vectorize(@NotNull(message = "主键不能为空")
                                      @PathVariable("id") Long id) {
         return R.ok(aiVectorService.vectorizeDocument(id));
+    }
+
+    /**
+     * 批量解析（异步）：立即返回受理与跳过明细，页面轮询 {@link #batchStatus} 获取进度。
+     */
+    @SaCheckPermission("ai:kb:doc:parse")
+    @Log(title = "AI知识库文档批量解析", businessType = BusinessType.UPDATE)
+    @PostMapping("/batch/parse")
+    public R<AiDocumentBatchVo> batchParse(@Validated @RequestBody AiDocumentBatchBo bo) {
+        return R.ok(aiDocumentService.submitParseBatch(bo.getIds()));
+    }
+
+    /**
+     * 批量向量化（异步）：仅受理已解析完成的文档。
+     */
+    @SaCheckPermission("ai:kb:doc:vector")
+    @Log(title = "AI知识库文档批量向量化", businessType = BusinessType.UPDATE)
+    @PostMapping("/batch/vectorize")
+    public R<AiDocumentBatchVo> batchVectorize(@Validated @RequestBody AiDocumentBatchBo bo) {
+        return R.ok(aiDocumentService.submitVectorizeBatch(bo.getIds()));
+    }
+
+    /**
+     * 批量一键入库（异步）：逐文档先解析、成功后串接向量化。
+     */
+    @SaCheckPermission(value = {"ai:kb:doc:parse", "ai:kb:doc:vector"}, mode = SaMode.AND)
+    @Log(title = "AI知识库文档批量入库", businessType = BusinessType.UPDATE)
+    @PostMapping("/batch/ingest")
+    public R<AiDocumentBatchVo> batchIngest(@Validated @RequestBody AiDocumentBatchBo bo) {
+        return R.ok(aiDocumentService.submitIngestBatch(bo.getIds()));
+    }
+
+    /**
+     * 查询批量处理进度（轻量回执，供页面轮询）
+     *
+     * @param ids 文档主键串（逗号分隔）
+     */
+    @SaCheckPermission("ai:kb:doc")
+    @GetMapping("/batch/status")
+    public R<List<AiDocumentBatchStatusVo>> batchStatus(@RequestParam("ids") List<Long> ids) {
+        return R.ok(aiDocumentService.queryBatchStatus(ids));
     }
 
     /**

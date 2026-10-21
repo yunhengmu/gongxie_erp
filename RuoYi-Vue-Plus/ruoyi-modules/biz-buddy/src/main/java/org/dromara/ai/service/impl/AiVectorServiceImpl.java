@@ -106,6 +106,34 @@ public class AiVectorServiceImpl implements IAiVectorService {
 
     @Override
     public AiDocumentVo vectorizeDocument(Long docId) {
+        AiDocument document = requireVectorizable(docId);
+        if (STATUS_RUNNING.equals(document.getVectorStatus())) {
+            throw new ServiceException("该文档正在向量化中，请稍后再试");
+        }
+        return doVectorize(document);
+    }
+
+    @Override
+    public AiDocumentVo vectorizeClaimed(Long docId) {
+        try {
+            return doVectorize(requireVectorizable(docId));
+        } catch (Exception e) {
+            // 状态已由调用方占位：任何前置校验失败都必须落为「失败」，否则会一直显示「向量化中」
+            markStatus(docId, STATUS_FAILED, abbreviate(e.getMessage()));
+            if (e instanceof ServiceException serviceException) {
+                throw serviceException;
+            }
+            throw new ServiceException("文档向量化失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 校验文档可向量化（存在且已解析完成）。
+     *
+     * @param docId 文档主键
+     * @return 文档实体
+     */
+    private AiDocument requireVectorizable(Long docId) {
         AiDocument document = documentMapper.selectById(docId);
         if (document == null) {
             throw new ServiceException("文档不存在或已被删除");
@@ -113,9 +141,17 @@ public class AiVectorServiceImpl implements IAiVectorService {
         if (!PARSE_DONE.equals(document.getParseStatus())) {
             throw new ServiceException("文档尚未解析完成，请先执行「解析」");
         }
-        if (STATUS_RUNNING.equals(document.getVectorStatus())) {
-            throw new ServiceException("该文档正在向量化中，请稍后再试");
-        }
+        return document;
+    }
+
+    /**
+     * 执行向量化（调用方已完成守卫与状态占位）。
+     *
+     * @param document 文档实体
+     * @return 向量化后的文档视图对象
+     */
+    private AiDocumentVo doVectorize(AiDocument document) {
+        Long docId = document.getId();
         AiKnowledgeBase knowledgeBase = knowledgeBaseService.getEnabledKnowledgeBase(document.getKbId());
         AiModelConfig model = resolveEmbeddingModel(knowledgeBase.getEmbeddingModelId());
         String apiKey = modelConfigService.decryptApiKey(model.getId());
@@ -129,8 +165,8 @@ public class AiVectorServiceImpl implements IAiVectorService {
 
         markStatus(docId, STATUS_RUNNING, "");
         try {
-            // 重建语义：先清理该文档在本知识库中的旧向量，避免残留脏数据
-            removeVectors(knowledgeBase.getId(), collectVectorIds(chunks));
+            // 重建语义：按文档清理**全部**历史向量（含切片已重建、业务记录不再指向的孤儿）
+            vectorStore.deleteByDocId(knowledgeBase.getCollectionName(), knowledgeBase.getDimension(), docId);
 
             int pageCount = (chunks.size() + WRITE_PAGE_SIZE - 1) / WRITE_PAGE_SIZE;
             for (int page = 0; page < pageCount; page++) {
@@ -464,22 +500,6 @@ public class AiVectorServiceImpl implements IAiVectorService {
         lqw.eq(AiChunk::getDocId, docId);
         lqw.orderByAsc(AiChunk::getChunkIndex);
         return chunkMapper.selectList(lqw);
-    }
-
-    /**
-     * 收集切片上已记录的向量主键。
-     *
-     * @param chunks 切片列表
-     * @return 向量主键集合
-     */
-    private List<String> collectVectorIds(List<AiChunk> chunks) {
-        List<String> ids = new ArrayList<>();
-        for (AiChunk chunk : chunks) {
-            if (StringUtils.isNotBlank(chunk.getVectorId())) {
-                ids.add(chunk.getVectorId());
-            }
-        }
-        return ids;
     }
 
     /**

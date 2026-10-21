@@ -27,6 +27,7 @@ import org.dromara.ai.domain.dto.AiTaskExecution;
 import org.dromara.ai.domain.bo.AiChatConfirmBo;
 import org.dromara.ai.domain.vo.AiChatPendingVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
+import org.dromara.ai.domain.vo.AiRegenerateCheckVo;
 import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
@@ -190,6 +191,11 @@ public class AiChatFacade {
     private final IAiSessionResourceService sessionResourceService;
 
     /**
+     * 重新生成前的模型上下文回退（尾部截断 + 兜底重放）
+     */
+    private final AiRegenerateContextRestorer contextRestorer;
+
+    /**
      * 领域专家名录（REQ-AI-30）：入口智能体每轮现算候选专家清单
      */
     private final AiExpertDirectory expertDirectory;
@@ -287,6 +293,20 @@ public class AiChatFacade {
      * @param emitter       SSE 发射器
      */
     public void streamChat(Long sessionId, Long userMessageId, SseEmitter emitter) {
+        streamChat(sessionId, userMessageId, emitter, List.of());
+    }
+
+    /**
+     * 发起一轮流式对话（支持重新生成时替换旧回答）。
+     *
+     * @param sessionId         会话主键（即 AgentScope 的 sessionId）
+     * @param userMessageId     已落库的用户消息主键
+     * @param emitter           SSE 发射器
+     * @param replaceAnswerIds  重新生成时要替换的旧回答主键（新回答落库 / 落为待确认后才删除；
+     *                          普通提问传空列表）
+     */
+    public void streamChat(Long sessionId, Long userMessageId, SseEmitter emitter,
+                           List<Long> replaceAnswerIds) {
         long startNanos = System.nanoTime();
         AiSession session = sessionService.getOwnedSession(sessionId);
         if (!SESSION_ACTIVE.equals(session.getStatus())) {
@@ -386,6 +406,10 @@ public class AiChatFacade {
         state.modelId = definition.getModelId();
         // 链路追踪（REQ-AI-28）：复用上面已建的链路（编排运行与它是同一条父链路）
         state.traceId = traceId;
+        // 重新生成：旧回答待新回答落库后再删（失败时保留，避免「报错 + 丢答案」）
+        if (replaceAnswerIds != null && !replaceAnswerIds.isEmpty()) {
+            state.replaceAnswerIds.addAll(replaceAnswerIds);
+        }
         if (route != null) {
             // 编排链路的 HITL 贯通（REQ-AI-30 Phase 2）：专家命中「需确认」时，
             // 编排器需要把专家侧的待确认信息**上浮**写入入口轮状态，故此处回挂引用
@@ -485,6 +509,93 @@ public class AiChatFacade {
             throw e instanceof ServiceException serviceException
                 ? serviceException : new ServiceException("对话启动失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 重新生成预检（含同实例执行互斥）。
+     *
+     * @param sessionId     会话主键
+     * @param userMessageId 本轮用户消息主键
+     * @return 预检结果
+     */
+    public AiRegenerateCheckVo checkRegenerable(Long sessionId, Long userMessageId) {
+        AiRegenerateCheckVo check = sessionService.checkRegenerable(sessionId, userMessageId);
+        if (check.isAllowed() && runRegistry.isActive(sessionId)) {
+            check.setAllowed(false);
+            check.setReasonCode(AiRegenerateCheckVo.CODE_CONVERSATION_BUSY);
+            check.setReason("会话正在生成回答，请先停止后再重新生成");
+        }
+        return check;
+    }
+
+    /**
+     * 重新生成最后一轮回答。
+     *
+     * <p>处理顺序：二次预检 → 回退模型上下文 → 复用 {@link #streamChat} 的完整编排链路重新生成。
+     * 预检已解析出旧回答主键，**不在此处删除**：等新回答落库（或落为待确认）再删，
+     * 否则模型调用失败时用户会同时看到报错与旧回答消失。预检 / 回退阶段失败通过 SSE
+     * {@code error}（带原因码）返回，不进入模型调用。</p>
+     *
+     * @param sessionId     会话主键
+     * @param userMessageId 本轮用户消息主键
+     * @param emitter       SSE 发射器
+     */
+    public void regenerate(Long sessionId, Long userMessageId, SseEmitter emitter) {
+        AiRegenerateCheckVo check = checkRegenerable(sessionId, userMessageId);
+        if (!check.isAllowed()) {
+            rejectRegenerate(emitter, check);
+            return;
+        }
+        try {
+            AiSession session = sessionService.getOwnedSession(sessionId);
+            AiAgent definition = agentService.getEnabledAgent(session.getAgentId());
+            AiSessionResourceSet resources = sessionResourceService.resolveForSession(session);
+            Long userId = LoginHelper.getUserId();
+            // 必须与后续生成共用同一实例：状态按 (userId, sessionId) 存放，换实例会读回旧上下文
+            HarnessAgent agent = agentRegistry.get(definition, resources);
+            if (!contextRestorer.restore(agent, userId, sessionId, userMessageId)) {
+                rejectRegenerate(emitter, regenerateFailure(AiRegenerateCheckVo.CODE_CONTEXT_RESTORE_FAILED,
+                    "无法回退该轮的对话上下文，请新建会话后重试"));
+                return;
+            }
+        } catch (Exception e) {
+            log.error("重新生成准备失败，sessionId={}, messageId={}", sessionId, userMessageId, e);
+            rejectRegenerate(emitter, regenerateFailure(AiRegenerateCheckVo.CODE_CONTEXT_RESTORE_FAILED,
+                "重新生成准备失败：" + AiSseSupport.rootCauseMessage(e)));
+            return;
+        }
+        // 旧回答主键取自预检结果（生成前解析），由收尾阶段在新回答落库后删除
+        streamChat(sessionId, userMessageId, emitter,
+            check.getAssistantMessageIds() == null ? List.of() : check.getAssistantMessageIds());
+    }
+
+    /**
+     * 构造重新生成失败时的预检结果（仅用于 SSE 错误事件）。
+     *
+     * @param reasonCode 原因码
+     * @param reason     面向用户的原因
+     * @return 预检结果
+     */
+    private AiRegenerateCheckVo regenerateFailure(String reasonCode, String reason) {
+        AiRegenerateCheckVo vo = new AiRegenerateCheckVo();
+        vo.setAllowed(false);
+        vo.setReasonCode(reasonCode);
+        vo.setReason(reason);
+        return vo;
+    }
+
+    /**
+     * 通过 SSE 错误事件返回重新生成被拒的原因。
+     *
+     * @param emitter SSE 发射器
+     * @param check   预检结果
+     */
+    private void rejectRegenerate(SseEmitter emitter, AiRegenerateCheckVo check) {
+        Map<String, Object> payload = AiSseSupport.envelope(EVENT_ERROR);
+        payload.put("message", check.getReason());
+        payload.put("reasonCode", check.getReasonCode());
+        AiSseSupport.send(emitter, payload);
+        AiSseSupport.complete(emitter);
     }
 
     /**

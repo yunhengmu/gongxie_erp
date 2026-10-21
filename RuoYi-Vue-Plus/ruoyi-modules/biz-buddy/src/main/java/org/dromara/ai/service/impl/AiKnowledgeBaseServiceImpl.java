@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.dromara.ai.core.AiVectorStore;
 import org.dromara.ai.domain.AiChunk;
 import org.dromara.ai.domain.AiDocument;
 import org.dromara.ai.domain.AiKnowledgeBase;
@@ -39,6 +41,7 @@ import java.util.Set;
  *
  * @author BizBuddy
  */
+@Slf4j
 @RequiredArgsConstructor
 @Service
 public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
@@ -102,6 +105,11 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
     private final AiChunkMapper chunkMapper;
 
     private final UserService userService;
+
+    /**
+     * 向量库门面（删除知识库时 drop 对应集合）
+     */
+    private final AiVectorStore vectorStore;
 
     @Override
     public AiKnowledgeBaseVo queryById(Long id) {
@@ -296,9 +304,9 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
 
     @Override
     public Boolean deleteWithValidByIds(Collection<Long> ids, Boolean isValid) {
+        List<AiKnowledgeBase> targets = baseMapper.selectByIds(ids);
         if (isValid) {
-            List<AiKnowledgeBase> list = baseMapper.selectByIds(ids);
-            if (list.size() != ids.size()) {
+            if (targets.size() != ids.size()) {
                 throw new ServiceException("您没有删除权限!");
             }
             for (Long id : ids) {
@@ -309,7 +317,38 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
                 }
             }
         }
+        // 先清向量库再删业务行：集合名与维度只在业务行上，删完就再也定位不到该集合
+        for (AiKnowledgeBase knowledgeBase : targets) {
+            dropCollectionQuietly(knowledgeBase);
+        }
         return baseMapper.deleteByIds(ids) > 0;
+    }
+
+    /**
+     * 删除知识库对应的 Milvus 集合（失败只告警：集合残留不应阻断业务删除）。
+     *
+     * @param knowledgeBase 知识库
+     */
+    private void dropCollectionQuietly(AiKnowledgeBase knowledgeBase) {
+        if (knowledgeBase == null || StringUtils.isBlank(knowledgeBase.getCollectionName())) {
+            return;
+        }
+        try {
+            vectorStore.dropCollection(knowledgeBase.getCollectionName(), resolveDimension(knowledgeBase));
+        } catch (Exception e) {
+            log.warn("删除知识库向量集合异常，kbId={}, collection={}, cause={}",
+                knowledgeBase.getId(), knowledgeBase.getCollectionName(), e.getMessage());
+        }
+    }
+
+    /**
+     * 取建连用的向量维度（知识库未配置时按 0 占位，仅用于建句柄）。
+     *
+     * @param knowledgeBase 知识库
+     * @return 维度
+     */
+    private int resolveDimension(AiKnowledgeBase knowledgeBase) {
+        return knowledgeBase.getDimension() == null ? 0 : knowledgeBase.getDimension();
     }
 
     @Override

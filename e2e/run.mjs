@@ -2,7 +2,7 @@
 /**
  * BizBuddy 端到端集成测试脚本（外部驱动）。
  *
- * 对**已运行**的容器栈发真实 HTTP 请求做断言，覆盖 L1~L12；不参与 `mvn test`、不引 Testcontainers。
+ * 对**已运行**的容器栈发真实 HTTP 请求做断言，覆盖 L1~L15；不参与 `mvn test`、不引 Testcontainers。
  * 详细设计见 `.trae/documents/端到端集成测试脚本方案.md`。</p>
  *
  * <p>用法：
@@ -34,8 +34,10 @@ import * as l10 from './cases/l10.mjs';
 import * as l11 from './cases/l11.mjs';
 import * as l12 from './cases/l12.mjs';
 import * as l13 from './cases/l13.mjs';
+import * as l14 from './cases/l14.mjs';
+import * as l15 from './cases/l15.mjs';
 
-const CASES = [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13];
+const CASES = [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13, l14, l15];
 const EXIT = { OK: 0, FAIL: 1, PREFLIGHT: 2, USAGE: 3 };
 
 /** 参数错误 */
@@ -129,6 +131,7 @@ const usage = () => `BizBuddy 端到端集成测试（e2e）
      L1~L6 需模型密钥，L7~L11 不需要（走拒答 / 失败路径或只读协议调用，不触发模型调用）。
      L10/L11 为 MCP 层：出口未挂系统信息工具（运行 jar 陈旧）或口令未配时 SKIP。
      L12 为结构化决策闸门（桩服务四分支）：桩不可达 / 配置接口不可读 / 无对话密钥时 SKIP。
+     L14 为知识库文档批量链路（批量解析 / 状态轮询 / 批量向量化）：缺演示文档或向量密钥时 SKIP。
 
 环境变量：见 e2e/.env.example（机密仅 BIZBUDDY_LLM_API_KEY）
 

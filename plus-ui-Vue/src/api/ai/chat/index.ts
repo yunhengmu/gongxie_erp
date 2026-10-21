@@ -5,6 +5,7 @@ import type {
   ChatConfirmBody,
   ChatMessageVO,
   ChatPendingVO,
+  ChatRegenerateCheckVO,
   ChatResourceItem,
   ChatResourceVO,
   ChatSessionQuery,
@@ -227,6 +228,21 @@ export const deleteChatMessage = (sessionId: string | number, messageId: string 
 };
 
 /**
+ * 重新生成预检：校验是否允许重跑，以及该轮是否发生过写操作
+ * @param sessionId 会话主键
+ * @param messageId 本轮用户消息主键
+ */
+export const checkChatRegenerate = (
+  sessionId: string | number,
+  messageId: string | number
+): AxiosPromise<ChatRegenerateCheckVO> => {
+  return request({
+    url: `/ai/chat/session/${sessionId}/message/${messageId}/regenerate/check`,
+    method: 'get'
+  });
+};
+
+/**
  * 终止会话
  * @param sessionId 会话主键
  */
@@ -314,4 +330,13 @@ export const buildChatStreamUrl = (sessionId: string | number, messageId: string
  */
 export const buildChatResumeUrl = (sessionId: string | number, messageId: string | number) => {
   return `${import.meta.env.VITE_APP_BASE_API}/ai/chat/resume?sessionId=${sessionId}&messageId=${messageId}&Authorization=Bearer ${getToken()}&clientid=${import.meta.env.VITE_APP_CLIENT_ID}`;
+};
+
+/**
+ * 拼接「重新生成」SSE 流地址（messageId 为本轮用户消息主键）
+ * @param sessionId 会话主键
+ * @param messageId 本轮用户消息主键
+ */
+export const buildChatRegenerateUrl = (sessionId: string | number, messageId: string | number) => {
+  return `${import.meta.env.VITE_APP_BASE_API}/ai/chat/session/${sessionId}/message/${messageId}/regenerate?Authorization=Bearer ${getToken()}&clientid=${import.meta.env.VITE_APP_CLIENT_ID}`;
 };

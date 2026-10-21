@@ -6,6 +6,12 @@ import io.agentscope.core.rag.model.DocumentMetadata;
 import io.agentscope.core.rag.store.MilvusStore;
 import io.agentscope.core.rag.store.dto.SearchDocumentDto;
 import io.milvus.v2.common.IndexParam;
+import io.milvus.v2.service.collection.request.DropCollectionReq;
+import io.milvus.v2.service.utility.request.FlushReq;
+import io.milvus.v2.service.vector.request.DeleteReq;
+import io.milvus.v2.service.vector.request.QueryReq;
+import io.milvus.v2.service.vector.response.DeleteResp;
+import io.milvus.v2.service.vector.response.QueryResp;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Milvus 向量库门面。
@@ -38,6 +45,11 @@ public class AiVectorStore {
      * 向量字段名（MilvusStore 约定的默认值）
      */
     private static final String VECTOR_FIELD = "vector";
+
+    /**
+     * 单次删除的主键条数上限（过滤表达式过长会被服务端拒绝）
+     */
+    private static final int DELETE_BATCH_SIZE = 200;
 
     private final AiProperties aiProperties;
 
@@ -83,11 +95,34 @@ public class AiVectorStore {
             ids.add(document.getId());
         }
         try {
-            store(collection, dimension).add(documents).block();
+            MilvusStore store = store(collection, dimension);
+            store.add(documents).block();
+            flushQuietly(store, collection);
         } catch (Exception e) {
             throw new ServiceException("写入向量库失败：" + rootMessage(e, collection));
         }
         return ids;
+    }
+
+    /**
+     * 尽力刷盘，让刚写入的向量**立即可检索**。
+     *
+     * <p>Milvus 在 Bounded 一致性窗口内可能读不到「刚写入但尚未落段」的数据，
+     * 表现为「向量化完成」后立刻去「检索测试」返回空结果。flush 同步等待落盘；
+     * 失败只告警——数据最终仍会可见，不应让向量化整体失败。</p>
+     *
+     * @param store      向量库句柄
+     * @param collection 集合名
+     */
+    private void flushQuietly(MilvusStore store, String collection) {
+        try {
+            store.getClient().flush(FlushReq.builder()
+                .collectionNames(List.of(collection))
+                .waitFlushedTimeoutMs(10_000L)
+                .build());
+        } catch (Exception e) {
+            log.warn("Milvus flush 失败（不影响最终可见性），collection={}, cause={}", collection, e.getMessage());
+        }
     }
 
     /**
@@ -135,6 +170,12 @@ public class AiVectorStore {
     /**
      * 按向量主键批量删除。
      *
+     * <p><b>为什么不用 AgentScope 的 {@code MilvusStore.delete(id)}</b>：它生成的过滤条件是
+     * {@code doc_id in ["<id>"]}——按**业务文档字段**而不是向量主键删除。本平台落库的是
+     * 内容派生的 UUID 主键、{@code doc_id} 存的是业务文档主键，两者永不相等，调用它删除恒返回 0，
+     * 表现为「重新解析 / 重建索引后旧向量残留」：残留向量的切片已随重建失效、被命中结果丢弃，
+     * 却持续占满 topK，检索会逐步退化为「无命中」。这里改为在主键 {@code id} 上条件删除。</p>
+     *
      * @param collection 集合名
      * @param dimension  向量维度
      * @param ids        向量主键集合
@@ -144,23 +185,122 @@ public class AiVectorStore {
         if (ids == null || ids.isEmpty()) {
             return 0;
         }
+        List<String> valid = ids.stream().filter(StringUtils::isNotBlank).distinct().toList();
+        if (valid.isEmpty()) {
+            return 0;
+        }
         MilvusStore store = store(collection, dimension);
         int count = 0;
-        for (String id : ids) {
-            if (StringUtils.isBlank(id)) {
-                continue;
-            }
+        // 分批：过滤表达式过长会被服务端拒绝
+        for (int start = 0; start < valid.size(); start += DELETE_BATCH_SIZE) {
+            int end = Math.min(start + DELETE_BATCH_SIZE, valid.size());
+            List<String> batch = valid.subList(start, end);
             try {
-                Boolean deleted = store.delete(id).block();
-                if (Boolean.TRUE.equals(deleted)) {
-                    count++;
-                }
+                DeleteResp response = store.getClient().delete(DeleteReq.builder()
+                    .collectionName(collection)
+                    .filter(buildIdFilter(batch))
+                    .build());
+                count += response == null ? 0 : (int) response.getDeleteCnt();
             } catch (Exception e) {
                 // 删除失败不阻断业务，记录后由「重建索引」兜底
-                log.warn("删除向量失败，collection={}, id={}, cause={}", collection, id, e.getMessage());
+                log.warn("删除向量失败，collection={}, count={}, cause={}", collection, batch.size(), e.getMessage());
             }
         }
         return count;
+    }
+
+    /**
+     * 构造「按主键删除」的过滤表达式。
+     *
+     * @param ids 向量主键（本平台为内容派生的 UUID，正常不含引号）
+     * @return 形如 {@code id in ["a","b"]} 的表达式
+     */
+    private String buildIdFilter(List<String> ids) {
+        String joined = ids.stream()
+            .map(id -> "\"" + id.replace("\\", "\\\\").replace("\"", "\\\"") + "\"")
+            .collect(Collectors.joining(","));
+        return "id in [" + joined + "]";
+    }
+
+    /**
+     * 删除指定文档在集合中的**全部**向量（含历史孤儿）。
+     *
+     * <p>重建索引时不能只按「当前切片记录的 vectorId」清理：历史残留（切片已重建、向量仍在）
+     * 没有被任何业务记录指向，只删当前 ID 会永久留下孤儿。这里按 {@code doc_id} 反查全部主键再删。</p>
+     *
+     * @param collection 集合名
+     * @param dimension  向量维度
+     * @param docId      业务文档主键
+     * @return 实际删除条数
+     */
+    public int deleteByDocId(String collection, int dimension, Long docId) {
+        if (docId == null) {
+            return 0;
+        }
+        MilvusStore store = store(collection, dimension);
+        // Milvus 单次 query 上限 16384；单文档切片数远低于该值
+        int limit = 16384;
+        List<String> ids = new ArrayList<>();
+        try {
+            QueryResp response = store.getClient().query(QueryReq.builder()
+                .collectionName(collection)
+                .filter("doc_id == \"" + docId + "\"")
+                .outputFields(List.of("id"))
+                .limit(limit)
+                .build());
+            for (QueryResp.QueryResult row : response.getQueryResults()) {
+                Object id = row.getEntity().get("id");
+                if (id != null) {
+                    ids.add(String.valueOf(id));
+                }
+            }
+        } catch (Exception e) {
+            log.warn("按文档查询向量主键失败，collection={}, docId={}, cause={}", collection, docId, e.getMessage());
+            return 0;
+        }
+        return delete(collection, dimension, ids);
+    }
+
+    /**
+     * 删除整个集合（知识库删除时调用）。
+     *
+     * <p>不 drop 集合会让知识库删除后向量数据永久残留：业务行已删、再无入口能定位到它，
+     * 集合会随知识库增删无限累积。这里无论 drop 是否成功都清理本地缓存，避免进程内继续
+     * 持有已失效句柄。</p>
+     *
+     * @param collection 集合名
+     * @param dimension  向量维度（仅用于建句柄；集合不存在时会先被创建再删除）
+     * @return 是否真正删除成功
+     */
+    public boolean dropCollection(String collection, int dimension) {
+        if (StringUtils.isBlank(collection)) {
+            return false;
+        }
+        MilvusStore handle;
+        try {
+            handle = store(collection, dimension);
+        } catch (Exception e) {
+            log.warn("删除集合前建连失败，collection={}, cause={}", collection, e.getMessage());
+            return false;
+        }
+        boolean dropped = false;
+        try {
+            handle.getClient().dropCollection(DropCollectionReq.builder()
+                .collectionName(collection)
+                .build());
+            dropped = true;
+        } catch (Exception e) {
+            log.warn("删除 Milvus 集合失败，collection={}, cause={}", collection, e.getMessage());
+        } finally {
+            stores.remove(collection, handle);
+            dimensions.remove(collection);
+            try {
+                handle.close();
+            } catch (Exception e) {
+                log.warn("关闭 Milvus 句柄失败，collection={}, cause={}", collection, e.getMessage());
+            }
+        }
+        return dropped;
     }
 
     /**

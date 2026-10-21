@@ -5,12 +5,19 @@ import io.agentscope.core.rag.model.Document;
 import io.agentscope.core.rag.model.DocumentMetadata;
 import io.agentscope.core.rag.store.MilvusStore;
 import io.agentscope.core.rag.store.dto.SearchDocumentDto;
+import io.milvus.v2.client.MilvusClientV2;
+import io.milvus.v2.service.collection.request.DropCollectionReq;
+import io.milvus.v2.service.vector.request.DeleteReq;
+import io.milvus.v2.service.vector.request.QueryReq;
+import io.milvus.v2.service.vector.response.DeleteResp;
+import io.milvus.v2.service.vector.response.QueryResp;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.test.AiTestSupport;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedConstruction;
 import reactor.core.publisher.Mono;
 
@@ -23,9 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.verify;
@@ -167,14 +173,21 @@ class AiVectorStoreTest {
     }
 
     @Test
-    @DisplayName("删除：空集合返回 0，正常统计真实删除数并跳过空主键")
+    @DisplayName("删除：空集合返回 0，按主键过滤删除并统计真实条数")
     void shouldDeleteAndCount() {
         try (MockedConstruction<MilvusStore> construction = mockConstruction(MilvusStore.class,
-            (mock, context) -> when(mock.delete(anyString())).thenReturn(Mono.just(true)))) {
+            (mock, context) -> stubDelete(mock, 2L))) {
             AiVectorStore store = new AiVectorStore(props());
             assertEquals(0, store.delete("kb", 2, null));
             assertEquals(0, store.delete("kb", 2, List.of()));
             assertEquals(2, store.delete("kb", 2, List.of("id1", " ", "id2")));
+
+            ArgumentCaptor<DeleteReq> captor = ArgumentCaptor.forClass(DeleteReq.class);
+            MilvusClientV2 client = construction.constructed().get(0).getClient();
+            verify(client).delete(captor.capture());
+            assertEquals("id in [\"id1\",\"id2\"]", captor.getValue().getFilter());
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
     }
 
@@ -182,21 +195,116 @@ class AiVectorStoreTest {
     @DisplayName("删除失败被吞掉不影响其它主键")
     void shouldTolerateDeleteFailure() {
         try (MockedConstruction<MilvusStore> construction = mockConstruction(MilvusStore.class,
-            (mock, context) -> when(mock.delete(anyString()))
-                .thenReturn(Mono.error(new RuntimeException("del-boom"))))) {
+            (mock, context) -> {
+                MilvusClientV2 client = mock(MilvusClientV2.class);
+                when(mock.getClient()).thenReturn(client);
+                when(client.delete(any(DeleteReq.class))).thenThrow(new RuntimeException("del-boom"));
+            })) {
             AiVectorStore store = new AiVectorStore(props());
             assertEquals(0, store.delete("kb", 2, List.of("id1", "id2")));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
     }
 
     @Test
-    @DisplayName("删除返回 false 时不计入删除数")
-    void shouldNotCountFalseDelete() {
+    @DisplayName("删除条数为 0 时不计入删除数")
+    void shouldNotCountZeroDelete() {
         try (MockedConstruction<MilvusStore> construction = mockConstruction(MilvusStore.class,
-            (mock, context) -> when(mock.delete(anyString())).thenReturn(Mono.just(false)))) {
+            (mock, context) -> stubDelete(mock, 0L))) {
             AiVectorStore store = new AiVectorStore(props());
             assertEquals(0, store.delete("kb", 2, List.of("id1")));
         }
+    }
+
+    @Test
+    @DisplayName("按文档删除：先按 doc_id 反查全部主键，再按主键清理（覆盖历史孤儿）")
+    void shouldDeleteByDocIdIncludingOrphans() {
+        try (MockedConstruction<MilvusStore> construction = mockConstruction(MilvusStore.class,
+            (mock, context) -> {
+                MilvusClientV2 client = mock(MilvusClientV2.class);
+                when(mock.getClient()).thenReturn(client);
+                QueryResp.QueryResult first = queryRow("v1");
+                QueryResp.QueryResult second = queryRow("v2");
+                QueryResp queryResp = mock(QueryResp.class);
+                when(queryResp.getQueryResults()).thenReturn(List.of(first, second));
+                when(client.query(any(QueryReq.class))).thenReturn(queryResp);
+                DeleteResp response = deleteResp(2L);
+                when(client.delete(any(DeleteReq.class))).thenReturn(response);
+            })) {
+            AiVectorStore store = new AiVectorStore(props());
+            assertEquals(2, store.deleteByDocId("kb", 2, 9L));
+
+            MilvusClientV2 client = construction.constructed().get(0).getClient();
+            ArgumentCaptor<QueryReq> queryCaptor = ArgumentCaptor.forClass(QueryReq.class);
+            verify(client).query(queryCaptor.capture());
+            assertEquals("doc_id == \"9\"", queryCaptor.getValue().getFilter());
+            ArgumentCaptor<DeleteReq> deleteCaptor = ArgumentCaptor.forClass(DeleteReq.class);
+            verify(client).delete(deleteCaptor.capture());
+            assertEquals("id in [\"v1\",\"v2\"]", deleteCaptor.getValue().getFilter());
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
+    @DisplayName("删除集合：调用 drop 并清理本地缓存与句柄")
+    void shouldDropCollectionAndEvictCache() {
+        try (MockedConstruction<MilvusStore> construction = mockConstruction(MilvusStore.class,
+            (mock, context) -> {
+                MilvusClientV2 client = mock(MilvusClientV2.class);
+                when(mock.getClient()).thenReturn(client);
+            })) {
+            AiVectorStore store = new AiVectorStore(props());
+            assertTrue(store.dropCollection("kb", 2));
+
+            MilvusStore handle = construction.constructed().get(0);
+            verify(handle.getClient()).dropCollection(any(DropCollectionReq.class));
+            verify(handle).close();
+            assertFalse(store.isReady("kb"));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Test
+    @DisplayName("删除集合失败：返回 false，但仍清理本地缓存")
+    void shouldEvictCacheEvenWhenDropFails() {
+        try (MockedConstruction<MilvusStore> construction = mockConstruction(MilvusStore.class,
+            (mock, context) -> {
+                MilvusClientV2 client = mock(MilvusClientV2.class);
+                when(mock.getClient()).thenReturn(client);
+                org.mockito.Mockito.doThrow(new RuntimeException("drop-boom"))
+                    .when(client).dropCollection(any(DropCollectionReq.class));
+            })) {
+            AiVectorStore store = new AiVectorStore(props());
+            assertFalse(store.dropCollection("kb", 2));
+            assertFalse(store.isReady("kb"));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * 打桩「删除返回指定条数」。
+     */
+    private void stubDelete(MilvusStore store, long count) throws Exception {
+        MilvusClientV2 client = mock(MilvusClientV2.class);
+        when(store.getClient()).thenReturn(client);
+        DeleteResp response = deleteResp(count);
+        when(client.delete(any(DeleteReq.class))).thenReturn(response);
+    }
+
+    private DeleteResp deleteResp(long count) {
+        DeleteResp response = mock(DeleteResp.class);
+        when(response.getDeleteCnt()).thenReturn(count);
+        return response;
+    }
+
+    private QueryResp.QueryResult queryRow(String id) {
+        QueryResp.QueryResult row = mock(QueryResp.QueryResult.class);
+        when(row.getEntity()).thenReturn(Map.of("id", id));
+        return row;
     }
 
     @Test
