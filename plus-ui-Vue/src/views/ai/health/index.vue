@@ -12,6 +12,9 @@
             </p>
           </div>
           <div class="toolbar-actions">
+            <el-button v-hasPermi="['ai:health:query']" icon="List" @click="openOnboarding">
+              首登清单
+            </el-button>
             <el-button v-hasPermi="['ai:health:query']" icon="Refresh" :loading="loading" @click="loadReport">
               重新自检
             </el-button>
@@ -59,12 +62,50 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <!-- 首登清单：与任务工作台的卡片同源（GET /ai/onboarding/checklist），不受「已完成」隐藏限制 -->
+    <el-drawer v-model="onboardingVisible" title="首登清单" size="420px">
+      <div v-loading="onboardingLoading" class="onboarding-drawer">
+        <div v-if="onboarding" class="onboarding-drawer__summary">
+          <el-progress :percentage="onboardingPercent" :stroke-width="8" :show-text="false" />
+          <span>已完成 {{ onboarding.doneCount }}/{{ onboarding.requiredCount }} 项</span>
+        </div>
+        <div v-if="onboarding" class="onboarding-drawer__list">
+          <div
+            v-for="item in onboarding.items"
+            :key="item.key"
+            class="onboarding-row"
+            :class="{ 'is-done': item.done }"
+            role="button"
+            tabindex="0"
+            @click="handleOnboardingItem(item)"
+            @keydown.enter.prevent="handleOnboardingItem(item)"
+          >
+            <el-icon class="onboarding-row__status">
+              <CircleCheckFilled v-if="item.done" />
+              <CircleCheck v-else />
+            </el-icon>
+            <div class="onboarding-row__body">
+              <div class="onboarding-row__title">{{ item.title }}</div>
+              <div class="onboarding-row__desc">{{ item.description }}</div>
+            </div>
+            <el-icon v-if="!item.done" class="onboarding-row__arrow"><ArrowRight /></el-icon>
+          </div>
+        </div>
+        <el-empty v-else-if="!onboardingLoading" description="清单加载失败" :image-size="70" />
+      </div>
+      <template #footer>
+        <el-button @click="onboardingVisible = false">关闭</el-button>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
 <script setup name="AiHealth" lang="ts">
 import { getHealthReport, probeHealthItem } from '@/api/ai/health';
 import type { HealthCheckItem, HealthReport, HealthStatus } from '@/api/ai/health/types';
+import { getOnboardingChecklist } from '@/api/ai/onboarding';
+import type { OnboardingItem, OnboardingReport } from '@/api/ai/onboarding/types';
 import modal from '@/plugins/modal';
 
 type TagType = 'success' | 'warning' | 'danger' | 'info';
@@ -74,6 +115,53 @@ type AlertType = 'success' | 'warning' | 'error' | 'info';
 const loading = ref(true);
 /** 正在探测的行 key（行级 loading） */
 const probingKey = ref('');
+/** 首登清单抽屉 */
+const onboardingVisible = ref(false);
+const onboardingLoading = ref(false);
+const onboarding = ref<OnboardingReport | null>(null);
+const router = useRouter();
+
+/** 首登清单完成百分比 */
+const onboardingPercent = computed(() => {
+  const data = onboarding.value;
+  if (!data || !data.requiredCount) {
+    return 0;
+  }
+  return Math.round((data.doneCount / data.requiredCount) * 100);
+});
+
+/** 打开首登清单并实时刷新 */
+const openOnboarding = async () => {
+  onboardingVisible.value = true;
+  onboardingLoading.value = true;
+  try {
+    const res = await getOnboardingChecklist();
+    onboarding.value = res.data ?? null;
+  } catch {
+    onboarding.value = null;
+  } finally {
+    onboardingLoading.value = false;
+  }
+};
+
+/** 点击未完成项：跳到对应页面（首轮对话跳任务工作台） */
+const handleOnboardingItem = (item: OnboardingItem) => {
+  if (item.done) {
+    return;
+  }
+  const targets: Record<string, string> = {
+    'chat-model': '/bizbuddy/model/config',
+    'embedding-model': '/bizbuddy/model/config',
+    document: '/bizbuddy/kb/doc',
+    'first-chat': '/bizbuddy/agent/chat'
+  };
+  const target = targets[item.key];
+  if (!target) {
+    return;
+  }
+  onboardingVisible.value = false;
+  void router.push(target);
+};
 
 /** 报告（首屏占位，加载后以服务端结果为准） */
 const report = ref<HealthReport>({
@@ -202,5 +290,84 @@ onMounted(loadReport);
 
 .health-empty {
   color: var(--app-text-muted);
+}
+
+/* 首登清单抽屉 */
+.onboarding-drawer__summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: var(--app-text-muted);
+  font-size: 12px;
+
+  .el-progress {
+    flex: 1;
+  }
+}
+
+.onboarding-drawer__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.onboarding-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: var(--el-fill-color-light, #f5f7fa);
+  }
+
+  &.is-done {
+    cursor: default;
+
+    &:hover {
+      background: transparent;
+    }
+  }
+
+  &__status {
+    flex: 0 0 auto;
+    font-size: 17px;
+    color: var(--el-color-warning, #e6a23c);
+  }
+
+  &__body {
+    min-width: 0;
+    flex: 1;
+  }
+
+  &__title {
+    font-size: 13px;
+    color: var(--el-text-color-primary, #303133);
+  }
+
+  &__desc {
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary, #909399);
+  }
+
+  &__arrow {
+    flex: 0 0 auto;
+    color: var(--el-text-color-placeholder, #c0c4cc);
+  }
+}
+
+.onboarding-row.is-done .onboarding-row__status {
+  color: var(--el-color-success, #67c23a);
+}
+
+.onboarding-row.is-done .onboarding-row__title {
+  color: var(--el-text-color-secondary, #909399);
 }
 </style>

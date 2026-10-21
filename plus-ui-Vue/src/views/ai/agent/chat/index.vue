@@ -331,6 +331,50 @@
 
       <!-- 底栏：输入区（对话前垂直居中，发出第一条消息后回到底部） -->
       <div class="composer" :class="{ 'composer--center': !messages.length }">
+        <!-- 首登检查清单：仅管理员、当前会话无消息且尚未全部完成时展示（完成状态由服务端推导） -->
+        <div v-if="showOnboarding" class="onboarding-card">
+          <div class="onboarding-card__head">
+            <div class="onboarding-card__heading">
+              <span class="onboarding-card__title">开始使用 BizBuddy</span>
+              <span class="onboarding-card__progress">
+                已完成 {{ onboarding?.doneCount }}/{{ onboarding?.requiredCount }} 项
+              </span>
+            </div>
+            <el-icon class="onboarding-card__close" title="暂时隐藏" @click="dismissOnboarding">
+              <Close />
+            </el-icon>
+          </div>
+          <div class="onboarding-card__list">
+            <div
+              v-for="item in onboarding?.items"
+              :key="item.key"
+              class="onboarding-item"
+              :class="{ 'is-done': item.done }"
+              role="button"
+              tabindex="0"
+              @click="handleOnboardingItem(item)"
+              @keydown.enter.prevent="handleOnboardingItem(item)"
+            >
+              <el-icon class="onboarding-item__status">
+                <CircleCheckFilled v-if="item.done" />
+                <CircleCheck v-else />
+              </el-icon>
+              <div class="onboarding-item__body">
+                <div class="onboarding-item__title">{{ item.title }}</div>
+                <div class="onboarding-item__desc">{{ item.description }}</div>
+              </div>
+              <el-icon v-if="!item.done" class="onboarding-item__arrow"><ArrowRight /></el-icon>
+            </div>
+          </div>
+          <div class="onboarding-card__links">
+            <el-button link type="primary" size="small" @click="openOnboardingPage('/bizbuddy/audit/health')">
+              运行平台健康自检
+            </el-button>
+            <el-button link type="primary" size="small" @click="openOnboardingPage('/bizbuddy/integration/channel')">
+              配置渠道接入
+            </el-button>
+          </div>
+        </div>
         <!-- 对话前标题：输入框上方约两行文字高度处，水平居中；发出第一条消息后移除 -->
         <div v-if="!messages.length" class="composer__title">BizBuddy, 我帮您</div>
         <el-input
@@ -562,12 +606,16 @@ import type {
 } from '@/api/ai/chat/types';
 import { getDocumentChunkContext, getDocumentContent } from '@/api/ai/kb/doc';
 import type { ChunkContextVO } from '@/api/ai/kb/doc/types';
+import { getOnboardingChecklist } from '@/api/ai/onboarding';
+import type { OnboardingItem, OnboardingReport } from '@/api/ai/onboarding/types';
 import { scenarioPackMcpOptions, scenarioPackOptions } from '@/api/ai/pack';
 import type { ScenarioPackMcpOptionVO, ScenarioPackOptionVO } from '@/api/ai/pack/types';
 import { visibleSkillOptions } from '@/api/ai/skill';
 import type { SkillOptionVO } from '@/api/ai/skill/types';
 import type { ToolCallLogVO } from '@/api/ai/session/types';
 import { uploadOss } from '@/api/system/oss';
+import { useUserStore } from '@/store/modules/user';
+import { checkPermi } from '@/utils/permission';
 import cache from '@/plugins/cache';
 import modal from '@/plugins/modal';
 import logo from '@/assets/logo/logo.png';
@@ -713,6 +761,63 @@ const currentAssistantKey = ref<string | number | undefined>(undefined);
 const inputText = ref('');
 const streaming = ref(false);
 const sending = ref(false);
+/** 首登检查清单：仅具备健康自检权限的管理员可见（完成状态全部由服务端推导） */
+const onboarding = ref<OnboardingReport | null>(null);
+const onboardingDismissed = ref(false);
+const userStore = useUserStore();
+const router = useRouter();
+/** 首登卡片展示条件：管理员 + 当前会话无消息 + 未全部完成 + 未被手动隐藏 */
+const showOnboarding = computed(
+  () =>
+    checkPermi(['ai:health:query']) &&
+    !onboardingDismissed.value &&
+    !!onboarding.value &&
+    !onboarding.value.allDone &&
+    !messages.value.length
+);
+const onboardingDismissKey = () => `bizbuddy:onboarding:dismissed:${userStore.userId || 'anonymous'}`;
+const loadOnboarding = async () => {
+  if (!checkPermi(['ai:health:query'])) {
+    return;
+  }
+  onboardingDismissed.value = cache.local.get(onboardingDismissKey()) === '1';
+  try {
+    const res = await getOnboardingChecklist();
+    onboarding.value = res.data ?? null;
+  } catch {
+    // 权限不足 / 接口异常时静默隐藏，不影响对话主路径
+    onboarding.value = null;
+  }
+};
+const dismissOnboarding = () => {
+  onboardingDismissed.value = true;
+  cache.local.set(onboardingDismissKey(), '1');
+};
+const openOnboardingPage = (path: string) => {
+  void router.push(path);
+};
+const focusComposer = () => {
+  const textarea = workbenchRef.value?.querySelector('.composer textarea') as HTMLTextAreaElement | null;
+  textarea?.focus();
+};
+const handleOnboardingItem = (item: OnboardingItem) => {
+  if (item.done) {
+    return;
+  }
+  if (item.key === 'first-chat') {
+    focusComposer();
+    return;
+  }
+  const targets: Record<string, string> = {
+    'chat-model': '/bizbuddy/model/config',
+    'embedding-model': '/bizbuddy/model/config',
+    document: '/bizbuddy/kb/doc'
+  };
+  const target = targets[item.key];
+  if (target) {
+    void router.push(target);
+  }
+};
 /** 最后一轮重新生成预检结果（null 表示尚未检查或检查失败） */
 const regenerateCheck = ref<ChatRegenerateCheckVO | null>(null);
 /** 预检结果对应的用户消息主键，避免切换会话后误用旧结果 */
@@ -799,6 +904,8 @@ onMounted(() => {
 
 onActivated(() => {
   syncWorkbenchHeight();
+  // 从「模型配置 / 文档与切片」等页面返回时刷新首登状态
+  void loadOnboarding();
 });
 
 onBeforeUnmount(() => {
@@ -2224,6 +2331,8 @@ const handleStreamEvent = (raw: string) => {
       regenerateBackup = null;
       void refreshRegenerateCheck();
       getSessions();
+      // 首登清单：首轮完成后刷新，下一次打开空会话时即可反映最新状态
+      void loadOnboarding();
       // 编排轨迹回填：异步补齐专家原始结论，不阻塞本轮收尾
       void syncExpertConclusions(msg);
       break;
@@ -2537,6 +2646,7 @@ onMounted(() => {
   loadAgents();
   loadResourceOptions();
   getSessions();
+  void loadOnboarding();
 });
 </script>
 
@@ -2688,6 +2798,125 @@ onMounted(() => {
   font-weight: 600;
   letter-spacing: 0.5px;
   text-align: center;
+}
+
+/* 首登检查清单：对话前的可关闭卡片 */
+.onboarding-card {
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--app-surface-border);
+  border-radius: var(--app-radius-base, 12px);
+  background: var(--app-surface-bg);
+  box-shadow: var(--app-shadow-sm);
+  text-align: left;
+}
+
+.onboarding-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.onboarding-card__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.onboarding-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--el-text-color-primary, #303133);
+}
+
+.onboarding-card__progress {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.onboarding-card__close {
+  cursor: pointer;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.onboarding-card__close:hover {
+  color: var(--el-text-color-primary, #303133);
+}
+
+.onboarding-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.onboarding-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.15s ease;
+}
+
+.onboarding-item:hover,
+.onboarding-item:focus-visible {
+  background: var(--el-fill-color-light, #f5f7fa);
+}
+
+.onboarding-item.is-done {
+  cursor: default;
+}
+
+.onboarding-item.is-done:hover {
+  background: transparent;
+}
+
+.onboarding-item__status {
+  flex: 0 0 auto;
+  font-size: 17px;
+  color: var(--el-color-warning, #e6a23c);
+}
+
+.onboarding-item.is-done .onboarding-item__status {
+  color: var(--el-color-success, #67c23a);
+}
+
+.onboarding-item__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.onboarding-item__title {
+  font-size: 13px;
+  color: var(--el-text-color-primary, #303133);
+}
+
+.onboarding-item.is-done .onboarding-item__title {
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.onboarding-item__desc {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.onboarding-item__arrow {
+  flex: 0 0 auto;
+  color: var(--el-text-color-placeholder, #c0c4cc);
+}
+
+.onboarding-card__links {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 6px;
 }
 
 .msg-row {
