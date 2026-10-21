@@ -63,6 +63,11 @@ public class AiDocumentBo implements Serializable {
     private String parseStatus;
 
     /**
+     * 向量化状态（0待向量化 1向量化中 2已向量化 3向量化失败）
+     */
+    private String vectorStatus;
+
+    /**
      * 备注
      */
     private String remark;

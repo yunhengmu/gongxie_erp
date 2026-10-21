@@ -106,6 +106,34 @@ public class AiVectorServiceImpl implements IAiVectorService {
 
     @Override
     public AiDocumentVo vectorizeDocument(Long docId) {
+        AiDocument document = requireVectorizable(docId);
+        if (STATUS_RUNNING.equals(document.getVectorStatus())) {
+            throw new ServiceException("该文档正在向量化中，请稍后再试");
+        }
+        return doVectorize(document);
+    }
+
+    @Override
+    public AiDocumentVo vectorizeClaimed(Long docId) {
+        try {
+            return doVectorize(requireVectorizable(docId));
+        } catch (Exception e) {
+            // 状态已由调用方占位：任何前置校验失败都必须落为「失败」，否则会一直显示「向量化中」
+            markStatus(docId, STATUS_FAILED, abbreviate(e.getMessage()));
+            if (e instanceof ServiceException serviceException) {
+                throw serviceException;
+            }
+            throw new ServiceException("文档向量化失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 校验文档可向量化（存在且已解析完成）。
+     *
+     * @param docId 文档主键
+     * @return 文档实体
+     */
+    private AiDocument requireVectorizable(Long docId) {
         AiDocument document = documentMapper.selectById(docId);
         if (document == null) {
             throw new ServiceException("文档不存在或已被删除");
@@ -113,9 +141,17 @@ public class AiVectorServiceImpl implements IAiVectorService {
         if (!PARSE_DONE.equals(document.getParseStatus())) {
             throw new ServiceException("文档尚未解析完成，请先执行「解析」");
         }
-        if (STATUS_RUNNING.equals(document.getVectorStatus())) {
-            throw new ServiceException("该文档正在向量化中，请稍后再试");
-        }
+        return document;
+    }
+
+    /**
+     * 执行向量化（调用方已完成守卫与状态占位）。
+     *
+     * @param document 文档实体
+     * @return 向量化后的文档视图对象
+     */
+    private AiDocumentVo doVectorize(AiDocument document) {
+        Long docId = document.getId();
         AiKnowledgeBase knowledgeBase = knowledgeBaseService.getEnabledKnowledgeBase(document.getKbId());
         AiModelConfig model = resolveEmbeddingModel(knowledgeBase.getEmbeddingModelId());
         String apiKey = modelConfigService.decryptApiKey(model.getId());

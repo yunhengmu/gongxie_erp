@@ -2,16 +2,20 @@ package org.dromara.ai.service.impl;
 
 import cn.hutool.http.HttpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.ai.core.document.AiDocumentBatchRunner;
 import org.dromara.ai.domain.AiChunk;
 import org.dromara.ai.domain.AiDocument;
 import org.dromara.ai.domain.AiKnowledgeBase;
 import org.dromara.ai.domain.bo.AiDocumentBo;
 import org.dromara.ai.domain.vo.AiChunkContextVo;
 import org.dromara.ai.domain.vo.AiChunkVo;
+import org.dromara.ai.domain.vo.AiDocumentBatchStatusVo;
+import org.dromara.ai.domain.vo.AiDocumentBatchVo;
 import org.dromara.ai.domain.vo.AiDocumentVo;
 import org.dromara.ai.mapper.AiChunkMapper;
 import org.dromara.ai.mapper.AiDocumentMapper;
@@ -26,12 +30,18 @@ import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.satoken.utils.LoginHelper;
 import org.dromara.system.api.OssService;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * AI 知识库文档 Service 业务层处理
@@ -69,6 +79,11 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
     private static final String STATUS_VECTOR_PENDING = "0";
 
     /**
+     * 向量化状态：向量化中
+     */
+    private static final String STATUS_VECTOR_RUNNING = "1";
+
+    /**
      * 预览文本返回上限（字符）
      */
     private static final int PREVIEW_MAX_LENGTH = 200_000;
@@ -82,6 +97,11 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
      * 切片定位前后邻居数上限：避免一次请求把整篇文档拉回前端
      */
     private static final int MAX_CONTEXT_RADIUS = 3;
+
+    /**
+     * 单次批量提交的文档数上限：与线程池队列容量一起兜住异常放大
+     */
+    private static final int MAX_BATCH_SIZE = 50;
 
     /**
      * 默认切片长度
@@ -124,12 +144,18 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
 
     private final OssService ossService;
 
+    /**
+     * 批量处理线程池（解析 / 向量化 / 一键入库共用）
+     */
+    private final AiDocumentBatchRunner batchRunner;
+
     @Override
     public PageResult<AiDocumentVo> queryPageList(AiDocumentBo bo, PageQuery pageQuery) {
         LambdaQueryWrapper<AiDocument> lqw = Wrappers.lambdaQuery();
         lqw.eq(bo.getKbId() != null, AiDocument::getKbId, bo.getKbId());
         lqw.like(StringUtils.isNotBlank(bo.getDocName()), AiDocument::getDocName, bo.getDocName());
         lqw.eq(StringUtils.isNotBlank(bo.getParseStatus()), AiDocument::getParseStatus, bo.getParseStatus());
+        lqw.eq(StringUtils.isNotBlank(bo.getVectorStatus()), AiDocument::getVectorStatus, bo.getVectorStatus());
         lqw.orderByDesc(AiDocument::getCreateTime);
         Page<AiDocumentVo> result = baseMapper.selectVoPage(pageQuery.build(), lqw);
         result.getRecords().forEach(this::fillFileUrl);
@@ -173,13 +199,26 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
 
     @Override
     public AiDocumentVo parse(Long id) {
-        AiDocument document = baseMapper.selectById(id);
-        if (document == null) {
-            throw new ServiceException("文档不存在或已被删除");
-        }
+        AiDocument document = requireDocument(id);
         if (STATUS_PARSING.equals(document.getParseStatus())) {
             throw new ServiceException("文档正在解析中，请稍后再试");
         }
+        return doParse(document);
+    }
+
+    @Override
+    public AiDocumentVo parseClaimed(Long id) {
+        return doParse(requireDocument(id));
+    }
+
+    /**
+     * 执行解析（调用方已完成存在性与「解析中」守卫）。
+     *
+     * @param document 文档
+     * @return 解析后的文档视图对象
+     */
+    private AiDocumentVo doParse(AiDocument document) {
+        Long id = document.getId();
         AiKnowledgeBase knowledgeBase = knowledgeBaseService.getEnabledKnowledgeBase(document.getKbId());
         // 切片会随解析重建，需要同步清理旧向量与向量化状态
         List<AiChunk> oldChunks = listChunks(id);
@@ -235,6 +274,271 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
         }
         chunkMapper.delete(chunkLqw);
         return baseMapper.deleteByIds(ids) > 0;
+    }
+
+    @Override
+    public AiDocumentBatchVo submitParseBatch(Collection<Long> ids) {
+        return submitBatch(ids, BatchAction.PARSE);
+    }
+
+    @Override
+    public AiDocumentBatchVo submitVectorizeBatch(Collection<Long> ids) {
+        return submitBatch(ids, BatchAction.VECTORIZE);
+    }
+
+    @Override
+    public AiDocumentBatchVo submitIngestBatch(Collection<Long> ids) {
+        return submitBatch(ids, BatchAction.INGEST);
+    }
+
+    @Override
+    public List<AiDocumentBatchStatusVo> queryBatchStatus(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<Long> uniqueIds = dedupe(ids);
+        Map<Long, AiDocument> byId = new HashMap<>();
+        for (AiDocument document : baseMapper.selectByIds(uniqueIds)) {
+            byId.put(document.getId(), document);
+        }
+        List<AiDocumentBatchStatusVo> result = new ArrayList<>(byId.size());
+        for (Long id : uniqueIds) {
+            AiDocument document = byId.get(id);
+            if (document == null) {
+                continue;
+            }
+            AiDocumentBatchStatusVo vo = new AiDocumentBatchStatusVo();
+            vo.setId(document.getId());
+            vo.setDocName(document.getDocName());
+            vo.setParseStatus(document.getParseStatus());
+            vo.setErrorMsg(document.getErrorMsg());
+            vo.setVectorStatus(document.getVectorStatus());
+            vo.setVectorErrorMsg(document.getVectorErrorMsg());
+            result.add(vo);
+        }
+        return result;
+    }
+
+    /**
+     * 批量提交：逐条做前置校验与状态占位，然后入队异步执行。
+     *
+     * <p>「占位」是并发控制的关键：解析前先用条件更新把 {@code parse_status} 置为「解析中」，
+     * 重复提交 / 多个管理员同时点击时只有一次能抢到，其余归入跳过明细。</p>
+     *
+     * @param ids    文档主键集合
+     * @param action 批量动作
+     * @return 提交回执
+     */
+    private AiDocumentBatchVo submitBatch(Collection<Long> ids, BatchAction action) {
+        List<Long> uniqueIds = dedupe(ids);
+        if (uniqueIds.isEmpty()) {
+            throw new ServiceException("请选择至少一个文档");
+        }
+        if (uniqueIds.size() > MAX_BATCH_SIZE) {
+            throw new ServiceException("一次最多处理 " + MAX_BATCH_SIZE + " 个文档");
+        }
+        AiDocumentBatchVo result = new AiDocumentBatchVo();
+        for (Long id : uniqueIds) {
+            AiDocument document = baseMapper.selectById(id);
+            String skipReason = resolveSkipReason(document, action);
+            if (skipReason != null) {
+                result.addSkipped(id, document == null ? null : document.getDocName(), skipReason);
+                continue;
+            }
+            boolean needsParseClaim = action == BatchAction.PARSE || action == BatchAction.INGEST;
+            if (needsParseClaim && !claimParse(id)) {
+                result.addSkipped(id, document.getDocName(), "正在解析中，已跳过");
+                continue;
+            }
+            if (action == BatchAction.VECTORIZE && !claimVector(id)) {
+                result.addSkipped(id, document.getDocName(), "正在向量化中，已跳过");
+                continue;
+            }
+            if (enqueue(id, action)) {
+                result.getAccepted().add(id);
+                continue;
+            }
+            // 入队失败时把已占位的状态落为失败，避免一直显示「处理中」
+            if (needsParseClaim) {
+                markStatus(id, STATUS_FAILED, "批量处理队列已满，请稍后重试");
+            }
+            if (action == BatchAction.VECTORIZE) {
+                markVectorStatus(id, STATUS_FAILED, "批量处理队列已满，请稍后重试");
+            }
+            result.addSkipped(id, document.getDocName(), "批量处理队列已满，请稍后重试");
+        }
+        return result;
+    }
+
+    /**
+     * 判断文档是否可参与本次批量动作。
+     *
+     * @param document 文档（可为 null）
+     * @param action   批量动作
+     * @return 跳过原因；可执行时返回 null
+     */
+    private String resolveSkipReason(AiDocument document, BatchAction action) {
+        if (document == null) {
+            return "文档不存在或已被删除";
+        }
+        boolean parsing = STATUS_PARSING.equals(document.getParseStatus());
+        boolean vectorizing = STATUS_VECTOR_RUNNING.equals(document.getVectorStatus());
+        return switch (action) {
+            case PARSE -> parsing ? "正在解析中，已跳过" : null;
+            case VECTORIZE -> {
+                if (!STATUS_PARSED.equals(document.getParseStatus())) {
+                    yield "尚未解析完成，请先解析";
+                }
+                yield vectorizing ? "正在向量化中，已跳过" : null;
+            }
+            case INGEST -> parsing ? "正在解析中，已跳过" : (vectorizing ? "正在向量化中，已跳过" : null);
+        };
+    }
+
+    /**
+     * 条件更新抢占解析状态（原子操作，避免并发重复解析）。
+     *
+     * @param id 文档主键
+     * @return 是否抢占成功
+     */
+    private boolean claimParse(Long id) {
+        AiDocument update = new AiDocument();
+        update.setParseStatus(STATUS_PARSING);
+        update.setErrorMsg("");
+        LambdaUpdateWrapper<AiDocument> wrapper = Wrappers.lambdaUpdate();
+        wrapper.eq(AiDocument::getId, id).ne(AiDocument::getParseStatus, STATUS_PARSING);
+        return baseMapper.update(update, wrapper) > 0;
+    }
+
+    /**
+     * 条件更新抢占向量化状态（原子操作，避免并发重复向量化）。
+     *
+     * @param id 文档主键
+     * @return 是否抢占成功
+     */
+    private boolean claimVector(Long id) {
+        AiDocument update = new AiDocument();
+        update.setVectorStatus(STATUS_VECTOR_RUNNING);
+        update.setVectorErrorMsg("");
+        LambdaUpdateWrapper<AiDocument> wrapper = Wrappers.lambdaUpdate();
+        wrapper.eq(AiDocument::getId, id).ne(AiDocument::getVectorStatus, STATUS_VECTOR_RUNNING);
+        return baseMapper.update(update, wrapper) > 0;
+    }
+
+    /**
+     * 更新向量化状态（入队失败等批量链路场景使用）。
+     *
+     * @param id       文档主键
+     * @param status   向量化状态
+     * @param errorMsg 失败原因
+     */
+    private void markVectorStatus(Long id, String status, String errorMsg) {
+        AiDocument update = new AiDocument();
+        update.setId(id);
+        update.setVectorStatus(status);
+        update.setVectorErrorMsg(errorMsg);
+        baseMapper.updateById(update);
+    }
+
+    /**
+     * 提交到批量线程池。
+     *
+     * @param id     文档主键
+     * @param action 批量动作
+     * @return 是否入队成功（队列满时返回 false）
+     */
+    private boolean enqueue(Long id, BatchAction action) {
+        try {
+            switch (action) {
+                case PARSE -> batchRunner.submit(() -> runParse(id));
+                case VECTORIZE -> batchRunner.submit(() -> runVectorize(id));
+                case INGEST -> batchRunner.submit(() -> runIngest(id));
+            }
+            return true;
+        } catch (TaskRejectedException e) {
+            log.warn("知识库批量任务入队失败（队列已满）：docId={}, action={}", id, action);
+            return false;
+        }
+    }
+
+    /**
+     * 批量解析任务：失败已在解析内部落库，这里只记录日志，避免污染线程池。
+     *
+     * @param id 文档主键
+     */
+    private void runParse(Long id) {
+        try {
+            parseClaimed(id);
+        } catch (Exception e) {
+            log.warn("批量解析失败：docId={}, cause={}", id, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 批量向量化任务。
+     *
+     * @param id 文档主键
+     */
+    private void runVectorize(Long id) {
+        try {
+            aiVectorService.vectorizeClaimed(id);
+        } catch (Exception e) {
+            log.warn("批量向量化失败：docId={}, cause={}", id, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 一键入库任务：解析成功后串接向量化；解析失败则不进入向量化。
+     *
+     * @param id 文档主键
+     */
+    private void runIngest(Long id) {
+        try {
+            AiDocumentVo parsed = parseClaimed(id);
+            if (parsed == null || !STATUS_PARSED.equals(parsed.getParseStatus())) {
+                return;
+            }
+            // 解析成功后再占位向量化状态：解析会把向量化状态重置为「待向量化」
+            if (!claimVector(id)) {
+                return;
+            }
+            aiVectorService.vectorizeClaimed(id);
+        } catch (Exception e) {
+            log.warn("批量入库失败：docId={}, cause={}", id, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 去空、去重并保持入参顺序。
+     *
+     * @param ids 主键集合
+     * @return 去重后的主键列表
+     */
+    private List<Long> dedupe(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> unique = new LinkedHashSet<>();
+        ids.stream().filter(Objects::nonNull).forEach(unique::add);
+        return new ArrayList<>(unique);
+    }
+
+    /**
+     * 批量动作类型
+     */
+    private enum BatchAction {
+        /**
+         * 仅解析
+         */
+        PARSE,
+        /**
+         * 仅向量化
+         */
+        VECTORIZE,
+        /**
+         * 解析成功后串接向量化
+         */
+        INGEST
     }
 
     @Override
@@ -315,6 +619,20 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
             return DEFAULT_CONTEXT_RADIUS;
         }
         return Math.min(radius, MAX_CONTEXT_RADIUS);
+    }
+
+    /**
+     * 按主键取文档，不存在时抛出业务异常。
+     *
+     * @param id 文档主键
+     * @return 文档
+     */
+    private AiDocument requireDocument(Long id) {
+        AiDocument document = baseMapper.selectById(id);
+        if (document == null) {
+            throw new ServiceException("文档不存在或已被删除");
+        }
+        return document;
     }
 
     /**

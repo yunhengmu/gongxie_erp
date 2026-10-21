@@ -23,6 +23,17 @@ public interface IAiVectorService {
     AiDocumentVo vectorizeDocument(Long docId);
 
     /**
+     * 向量化文档，**跳过「正在向量化中」守卫**（调用方已在入队前用条件更新占位）。
+     *
+     * <p>仅供批量任务线程使用；页面单条操作请用 {@link #vectorizeDocument(Long)}。
+     * 前置校验失败时会把向量化状态落为「失败」，避免占位后一直停留在「向量化中」。</p>
+     *
+     * @param docId 文档主键
+     * @return 向量化后的文档视图对象
+     */
+    AiDocumentVo vectorizeClaimed(Long docId);
+
+    /**
      * 检索测试：按查询文本召回切片。
      *
      * @param kbId      知识库主键

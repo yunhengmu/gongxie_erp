@@ -45,25 +45,50 @@
         <div class="toolbar-shell">
           <div class="table-heading">
             <h3>文档与切片</h3>
-            <p>支持 PDF / docx / xlsx / pptx 与常见文本格式；上传后先「解析」提取文本并切片，再「向量化」写入向量库。</p>
+            <p>支持 PDF / docx / xlsx / pptx 与常见文本格式；可多选批量「解析 / 向量化」，或上传后由「自动入库」一次走完。</p>
           </div>
           <div class="toolbar-actions">
+            <el-tooltip v-if="canIngest" content="上传后自动执行「解析 + 向量化」，无需再逐条点击" placement="top">
+              <el-switch
+                v-model="autoIngest"
+                class="auto-ingest-switch"
+                active-text="自动入库"
+                :disabled="!queryParams.kbId"
+              />
+            </el-tooltip>
             <el-upload
               ref="uploadRef"
               :action="uploadUrl"
               :headers="uploadHeaders"
-              :limit="1"
+              :multiple="true"
               :accept="acceptExt"
               :show-file-list="false"
               :on-success="handleUploadSuccess"
               :on-error="handleUploadError"
-              :on-exceed="handleUploadExceed"
               :before-upload="handleBeforeUpload"
             >
               <el-button v-hasPermi="['ai:kb:doc:upload']" type="primary" plain icon="Upload" :disabled="!queryParams.kbId">
                 上传文档
               </el-button>
             </el-upload>
+            <el-dropdown
+              v-hasPermi="['ai:kb:doc:parse']"
+              trigger="click"
+              :disabled="!ids.length"
+              @command="handleBatchCommand"
+            >
+              <el-button type="primary" plain icon="Operation" :disabled="!ids.length">
+                批量处理
+                <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="ingest" icon="MagicStick">一键入库（解析 + 向量化）</el-dropdown-item>
+                  <el-dropdown-item command="parse" icon="Document">批量解析</el-dropdown-item>
+                  <el-dropdown-item command="vectorize" icon="Cpu">批量向量化</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <el-button
               v-hasPermi="['ai:kb:doc:remove']"
               type="danger"
@@ -79,8 +104,16 @@
         </div>
       </template>
 
-      <el-table v-loading="loading" border class="data-table" :data="docList" @selection-change="handleSelectionChange">
-        <el-table-column type="selection" width="55" align="center" />
+      <el-table
+        ref="docTableRef"
+        v-loading="loading"
+        border
+        class="data-table"
+        :data="docList"
+        row-key="id"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" align="center" reserve-selection />
         <el-table-column label="文档名称" align="center" prop="docName" :show-overflow-tooltip="true" />
         <el-table-column label="格式" align="center" width="90">
           <template #default="scope">{{ scope.row.fileSuffix || '-' }}</template>
@@ -213,20 +246,56 @@
         @pagination="loadChunks"
       />
     </el-dialog>
+
+    <!-- 批量处理进度（异步任务轮询回执） -->
+    <el-drawer v-model="batchDrawer.visible" title="批量处理进度" size="520px" append-to-body>
+      <div class="batch-summary">
+        <span>{{ batchDrawer.label }}</span>
+        <el-tag :type="batchDrawer.running ? 'warning' : 'success'" size="small">
+          {{ batchDrawer.running ? '处理中' : '已完成' }}
+        </el-tag>
+      </div>
+      <div class="batch-list">
+        <div v-for="item in batchDrawer.items" :key="item.id" class="batch-item">
+          <div class="batch-item__head">
+            <span class="batch-item__name">{{ item.docName || '#' + item.id }}</span>
+            <div class="batch-item__tags">
+              <el-tag :type="statusType(item.parseStatus)" size="small">
+                解析：{{ statusLabel(item.parseStatus) }}
+              </el-tag>
+              <el-tag :type="statusType(item.vectorStatus)" size="small">
+                向量化：{{ vectorStatusLabel(item.vectorStatus) }}
+              </el-tag>
+            </div>
+          </div>
+          <div v-if="item.errorMsg" class="batch-item__error">解析失败：{{ item.errorMsg }}</div>
+          <div v-if="item.vectorErrorMsg" class="batch-item__error">向量化失败：{{ item.vectorErrorMsg }}</div>
+        </div>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="batchDrawer.visible = false">关 闭</el-button>
+        </div>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
 <script setup name="AiKbDoc" lang="ts">
 import {
   addDocument,
+  batchIngestDocument,
+  batchParseDocument,
+  batchVectorizeDocument,
   delDocument,
+  getBatchStatus,
   getDocumentContent,
   listDocument,
   listDocumentChunk,
   parseDocument,
   vectorizeDocument
 } from '@/api/ai/kb/doc';
-import type { ChunkVO, DocumentQuery, DocumentVO } from '@/api/ai/kb/doc/types';
+import type { ChunkVO, DocumentBatchStatusVO, DocumentBatchVO, DocumentQuery, DocumentVO } from '@/api/ai/kb/doc/types';
 import { optionKnowledgeBase } from '@/api/ai/kb/base';
 import type { KnowledgeBaseVO } from '@/api/ai/kb/base/types';
 import { useLoading } from '@/hooks/async/useLoading';
@@ -234,6 +303,7 @@ import { useSearchReset } from '@/hooks/form/useSearchReset';
 import { useSearchToggle } from '@/hooks/form/useSearchToggle';
 import { useTableSelection } from '@/hooks/table/useTableSelection';
 import modal from '@/plugins/modal';
+import { checkPermi } from '@/utils/permission';
 import { globalHeaders } from '@/utils/request';
 
 const route = useRoute();
@@ -254,6 +324,40 @@ const VECTOR_STATUS_OPTIONS = [
 
 const ACCEPT_EXT = '.pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,.json,.xml,.html,.htm,.yml,.yaml,.log,.sql,.properties';
 
+/** 批量进度轮询间隔（毫秒） */
+const BATCH_POLL_INTERVAL = 3000;
+/** 单次批量提交上限（与后端 MAX_BATCH_SIZE 对齐，超出时分片提交） */
+const BATCH_LIMIT = 50;
+
+/**
+ * 批量动作定义：命令 → 展示名 + 接口 + 完成判据。
+ *
+ * 完成判据必须按动作区分：批量解析只看解析状态，批量向量化只看向量化状态，
+ * 一键入库则「解析失败」即终止，否则等向量化进入终态。
+ */
+const BATCH_ACTIONS = {
+  ingest: {
+    label: '一键入库',
+    tip: '将逐文档解析，成功后自动向量化',
+    run: batchIngestDocument,
+    done: (item: DocumentBatchStatusVO) => item.parseStatus === '3' || ['2', '3'].includes(item.vectorStatus ?? '')
+  },
+  parse: {
+    label: '批量解析',
+    tip: '将重新提取文本并重建切片',
+    run: batchParseDocument,
+    done: (item: DocumentBatchStatusVO) => ['2', '3'].includes(item.parseStatus ?? '')
+  },
+  vectorize: {
+    label: '批量向量化',
+    tip: '将切片写入向量库，已向量化过的文档会重建索引',
+    run: batchVectorizeDocument,
+    done: (item: DocumentBatchStatusVO) => ['2', '3'].includes(item.vectorStatus ?? '')
+  }
+} as const;
+
+type BatchCommand = keyof typeof BATCH_ACTIONS;
+
 const statusOptions = STATUS_OPTIONS;
 const vectorStatusOptions = VECTOR_STATUS_OPTIONS;
 const uploadUrl = import.meta.env.VITE_APP_BASE_API + '/resource/oss/upload';
@@ -267,11 +371,13 @@ const { loading, withLoading } = useLoading(true);
 const { showSearch } = useSearchToggle();
 const total = ref(0);
 const queryFormRef = ref<ElFormInstance>();
-/**
- * 上传组件实例。``limit=1`` 时必须在校验失败 / 上传结束（成功或失败）后清空已选文件，
- * 否则 el-upload 会一直认为"已达上限"，后续选择文件被静默忽略（表现为点击后毫无反应、请求不发出）。
- */
+const docTableRef = ref();
+/** 上传组件实例：多文件上传结束后统一清空内部文件列表，避免长期累积 */
 const uploadRef = ref();
+/** 是否具备「一键入库」所需的两项权限（缺少任一项就隐藏自动开关，避免上传后必然 403） */
+const canIngest = computed(() => checkPermi(['ai:kb:doc:parse']) && checkPermi(['ai:kb:doc:vector']));
+/** 上传后是否自动执行「解析 + 向量化」 */
+const autoIngest = ref(canIngest.value);
 
 const data = reactive<PageData<any, DocumentQuery>>({
   form: {},
@@ -307,7 +413,25 @@ const chunkDialog = reactive({
   query: { pageNum: 1, pageSize: 5 }
 });
 
-const { ids, multiple, handleSelectionChange } = useTableSelection<DocumentVO>((item) => item.id);
+/** 批量处理进度面板 */
+const batchDrawer = reactive({
+  visible: false,
+  label: '',
+  running: false,
+  items: [] as DocumentBatchStatusVO[],
+  command: 'ingest' as BatchCommand,
+  targetIds: [] as Array<string | number>
+});
+
+/** 批量进度轮询定时器（单实例，切换批次时先清旧） */
+let batchTimer: ReturnType<typeof setTimeout> | null = null;
+/** 本次上传已登记、待提交自动入库的文档主键 */
+const pendingUploadIds: Array<string | number> = [];
+let uploadTimer: ReturnType<typeof setTimeout> | null = null;
+/** 在途上传数：归零后统一清空 el-upload 内部列表 */
+const uploadPending = ref(0);
+
+const { ids, multiple, handleSelectionChange, clearSelection } = useTableSelection<DocumentVO>((item) => item.id);
 
 const isPdf = computed(() => preview.suffix === 'pdf');
 const isImage = computed(() => ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'].includes(preview.suffix));
@@ -390,52 +514,181 @@ const { resetQuery } = useSearchReset({
   }
 });
 
-/** 上传前校验 */
+/** 上传前校验（多文件时每个文件各触发一次） */
 const handleBeforeUpload = () => {
   if (!queryParams.value.kbId) {
-    uploadRef.value?.clearFiles();
     modal.msgWarning('请先选择知识库');
     return false;
   }
-  modal.loading('正在上传文件，请稍候...');
+  uploadPending.value += 1;
   return true;
 };
 
+/** 上传结束（成功 / 失败都调用）：在途归零后清空 el-upload 内部列表 */
+const finishUpload = () => {
+  uploadPending.value = Math.max(0, uploadPending.value - 1);
+  if (!uploadPending.value) {
+    uploadRef.value?.clearFiles();
+  }
+};
+
 /** 上传失败 */
-const handleUploadError = () => {
-  modal.closeLoading();
-  uploadRef.value?.clearFiles();
-  modal.msgError('文件上传失败');
+const handleUploadError = (error: Error) => {
+  finishUpload();
+  modal.msgError(error?.message ? `文件上传失败：${error.message}` : '文件上传失败');
 };
 
-/** 超出数量上限（limit=1）：清空占位并提示重新选择，避免"静默无响应" */
-const handleUploadExceed = () => {
-  uploadRef.value?.clearFiles();
-  modal.msgWarning('一次只能上传一个文件，已清空上一次选择，请重新选择文件');
-};
-
-/** 上传成功：登记文档并提示解析 */
+/** 上传成功：登记文档；开启「自动入库」时按批提交流水线 */
 const handleUploadSuccess = async (res: any, file: any) => {
-  modal.closeLoading();
-  // 同失败分支：先释放 limit=1 的占位，保证可以连续上传多个文件
-  uploadRef.value?.clearFiles();
-  if (res.code !== 200) {
-    modal.msgError(res.msg || '文件上传失败');
+  try {
+    if (res.code !== 200) {
+      modal.msgError(res.msg || '文件上传失败');
+      return;
+    }
+    const oss = res.data ?? {};
+    const originalName: string = oss.originalName || oss.fileName || file?.name || '未命名文档';
+    const suffix = (oss.fileSuffix || originalName.split('.').pop() || '').toLowerCase();
+    const added = await addDocument({
+      kbId: queryParams.value.kbId,
+      docName: originalName,
+      fileSuffix: suffix,
+      ossId: oss.ossId,
+      fileSize: file?.size
+    });
+    const docId = added?.data;
+    if (docId !== undefined && docId !== null) {
+      queueUploaded(docId);
+    }
+  } catch (e) {
+    // 登记失败（同名文档 / 文件不存在等）由请求层统一提示，这里只保证上传计数归零
+  } finally {
+    finishUpload();
+  }
+};
+
+/**
+ * 上传登记结果入队，并在「最后一次登记后」合并提交。
+ *
+ * 多文件上传是逐个回调的，逐个提交会把一个批次拆成 N 个请求；
+ * 这里用 800ms 防抖把同一个选择批次压成一次「一键入库」。
+ */
+const queueUploaded = (docId: string | number) => {
+  pendingUploadIds.push(docId);
+  if (uploadTimer) {
+    clearTimeout(uploadTimer);
+  }
+  uploadTimer = setTimeout(flushUploaded, 800);
+};
+
+/** 提交本批上传结果 */
+const flushUploaded = async () => {
+  uploadTimer = null;
+  const targetIds = pendingUploadIds.splice(0, pendingUploadIds.length);
+  if (!targetIds.length) {
     return;
   }
-  const oss = res.data;
-  const originalName: string = oss.originalName || oss.fileName || file?.name || '未命名文档';
-  const suffix = (oss.fileSuffix || originalName.split('.').pop() || '').toLowerCase();
-  await addDocument({
-    kbId: queryParams.value.kbId,
-    docName: originalName,
-    fileSuffix: suffix,
-    ossId: oss.ossId,
-    fileSize: file?.size
-  });
-  modal.msgSuccess('上传成功，请点击「解析」提取文本与切片');
+  if (autoIngest.value) {
+    await submitBatch('ingest', targetIds);
+  } else {
+    modal.msgSuccess(`已登记 ${targetIds.length} 个文档，请点击「解析」提取文本与切片`);
+    await getList();
+  }
+};
+
+/** 批量操作入口 */
+const handleBatchCommand = async (command: BatchCommand) => {
+  if (!ids.value.length) {
+    return;
+  }
+  const action = BATCH_ACTIONS[command];
+  try {
+    await modal.confirm(`已选 ${ids.value.length} 个文档，确认执行「${action.label}」？${action.tip}。`);
+  } catch {
+    return;
+  }
+  await submitBatch(command, [...ids.value]);
+};
+
+/**
+ * 提交批量任务并打开进度面板。
+ *
+ * @param command   批量动作
+ * @param targetIds 文档主键
+ */
+const submitBatch = async (command: BatchCommand, targetIds: Array<string | number>) => {
+  const action = BATCH_ACTIONS[command];
+  const accepted: Array<string | number> = [];
+  const skipped: DocumentBatchVO['skipped'] = [];
+  // 后端单次上限 50：超出时分片提交，避免整批被拒
+  for (let offset = 0; offset < targetIds.length; offset += BATCH_LIMIT) {
+    const segment = targetIds.slice(offset, offset + BATCH_LIMIT);
+    const res = await action.run(segment);
+    accepted.push(...(res.data?.accepted ?? []));
+    skipped.push(...(res.data?.skipped ?? []));
+  }
+  if (accepted.length) {
+    openBatchDrawer(command, accepted);
+    modal.msgSuccess(`「${action.label}」已受理 ${accepted.length} 个文档，进度见右侧面板`);
+  }
+  if (skipped.length) {
+    const preview = skipped
+      .slice(0, 3)
+      .map((item) => `${item.docName || '#' + item.id}：${item.reason}`)
+      .join('；');
+    modal.msgWarning(`已跳过 ${skipped.length} 个文档（${preview}${skipped.length > 3 ? ' 等' : ''}）`);
+  }
+  if (!accepted.length && !skipped.length) {
+    modal.msgWarning('没有可处理的文档');
+  }
   await getList();
 };
+
+/** 打开进度面板并开始轮询 */
+const openBatchDrawer = (command: BatchCommand, targetIds: Array<string | number>) => {
+  batchDrawer.command = command;
+  batchDrawer.label = BATCH_ACTIONS[command].label;
+  batchDrawer.targetIds = targetIds;
+  batchDrawer.items = targetIds.map((id) => ({ id }) as DocumentBatchStatusVO);
+  batchDrawer.running = true;
+  batchDrawer.visible = true;
+  scheduleBatchPoll();
+};
+
+/** 轮询批量进度（setTimeout 链，避免请求重叠） */
+const scheduleBatchPoll = async () => {
+  if (batchTimer) {
+    clearTimeout(batchTimer);
+    batchTimer = null;
+  }
+  try {
+    const res = await getBatchStatus(batchDrawer.targetIds);
+    batchDrawer.items = res.data ?? batchDrawer.items;
+  } catch {
+    // 单次轮询失败不打断：保持当前面板，下一轮继续
+  }
+  const action = BATCH_ACTIONS[batchDrawer.command];
+  batchDrawer.running = !batchDrawer.items.every(action.done);
+  if (batchDrawer.running) {
+    batchTimer = setTimeout(scheduleBatchPoll, BATCH_POLL_INTERVAL);
+    return;
+  }
+  // 全部进入终态：刷新列表并清空选择，避免「已完成」的文档仍处于勾选态
+  await getList();
+  docTableRef.value?.clearSelection();
+  clearSelection();
+};
+
+/** 页面卸载时清理定时器（避免离开后仍持续请求） */
+onBeforeUnmount(() => {
+  if (batchTimer) {
+    clearTimeout(batchTimer);
+    batchTimer = null;
+  }
+  if (uploadTimer) {
+    clearTimeout(uploadTimer);
+    uploadTimer = null;
+  }
+});
 
 /** 解析文档 */
 const handleParse = async (row: DocumentVO) => {
@@ -613,6 +866,65 @@ onMounted(async () => {
   font-size: 13px;
   line-height: 1.8;
   white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.auto-ingest-switch {
+  margin-right: 4px;
+}
+
+.batch-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: var(--app-text-muted);
+  font-size: 13px;
+}
+
+.batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 180px);
+  overflow: auto;
+}
+
+.batch-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--app-surface-border);
+  background: var(--app-elevated-soft-bg);
+}
+
+.batch-item__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.batch-item__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.batch-item__tags {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.batch-item__error {
+  margin-top: 6px;
+  color: var(--el-color-danger);
+  font-size: 12px;
+  line-height: 1.6;
   word-break: break-word;
 }
 </style>

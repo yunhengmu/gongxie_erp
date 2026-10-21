@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -185,6 +186,38 @@ class AiVectorServiceImplTest {
         doc.setVectorStatus("1");
         when(documentMapper.selectById(1L)).thenReturn(doc);
         assertThrows(ServiceException.class, () -> service.vectorizeDocument(1L));
+    }
+
+    @Test
+    @DisplayName("向量化入口：已占位的文档跳过「向量化中」守卫并完成写入")
+    void shouldVectorizeClaimedDocument() {
+        AiKnowledgeBase kb = kb(2L, 3, 7L);
+        AiModelConfig model = model(7L);
+        stubVectorizeCommon(kb, model);
+        AiDocument claimed = parsedDocument();
+        claimed.setVectorStatus("1");
+        when(documentMapper.selectById(1L)).thenReturn(claimed);
+        when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(1L, "a")));
+        when(embeddingClient.embed(model, "key", List.of("a"))).thenReturn(List.of(new double[]{1, 2, 3}));
+        when(vectorStore.add(eq("col"), eq(3), any())).thenReturn(List.of("v1"));
+        when(documentMapper.selectVoById(1L)).thenReturn(new AiDocumentVo());
+
+        assertNotNull(service.vectorizeClaimed(1L));
+    }
+
+    @Test
+    @DisplayName("向量化入口：已占位但前置校验失败时落为「失败」，不卡在「向量化中」")
+    void shouldMarkFailedWhenClaimedVectorizeRejected() {
+        AiDocument doc = parsedDocument();
+        doc.setVectorStatus("1");
+        doc.setParseStatus("0");
+        when(documentMapper.selectById(1L)).thenReturn(doc);
+
+        assertThrows(ServiceException.class, () -> service.vectorizeClaimed(1L));
+
+        ArgumentCaptor<AiDocument> captor = ArgumentCaptor.forClass(AiDocument.class);
+        verify(documentMapper).updateById(captor.capture());
+        assertEquals("3", captor.getValue().getVectorStatus());
     }
 
     @Test

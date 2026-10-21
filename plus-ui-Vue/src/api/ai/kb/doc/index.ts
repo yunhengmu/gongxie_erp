@@ -1,4 +1,12 @@
-import type { ChunkContextVO, ChunkVO, DocumentForm, DocumentQuery, DocumentVO } from '@/api/ai/kb/doc/types';
+import type {
+  ChunkContextVO,
+  ChunkVO,
+  DocumentBatchStatusVO,
+  DocumentBatchVO,
+  DocumentForm,
+  DocumentQuery,
+  DocumentVO
+} from '@/api/ai/kb/doc/types';
 import type { PageResult } from '@/api/types';
 import type { AxiosPromise } from '@/utils/api-types';
 import request from '@/utils/request';
@@ -60,8 +68,9 @@ export const getDocumentChunkContext = (
 /**
  * 登记文档（文件已上传至对象存储）
  * @param data 表单数据
+ * @returns 新文档主键（上传后自动入库需要用到）
  */
-export const addDocument = (data: DocumentForm) => {
+export const addDocument = (data: DocumentForm): AxiosPromise<string | number> => {
   return request({
     url: '/ai/kb/doc',
     method: 'post',
@@ -88,6 +97,54 @@ export const vectorizeDocument = (id: string | number): AxiosPromise<DocumentVO>
   return request({
     url: '/ai/kb/doc/' + id + '/vectorize',
     method: 'post'
+  });
+};
+
+/**
+ * 批量解析（异步受理，进度需轮询 getBatchStatus）
+ * @param ids 文档主键数组
+ */
+export const batchParseDocument = (ids: Array<string | number>): AxiosPromise<DocumentBatchVO> => {
+  return request({
+    url: '/ai/kb/doc/batch/parse',
+    method: 'post',
+    data: { ids }
+  });
+};
+
+/**
+ * 批量向量化（异步受理）
+ * @param ids 文档主键数组
+ */
+export const batchVectorizeDocument = (ids: Array<string | number>): AxiosPromise<DocumentBatchVO> => {
+  return request({
+    url: '/ai/kb/doc/batch/vectorize',
+    method: 'post',
+    data: { ids }
+  });
+};
+
+/**
+ * 批量一键入库（异步受理：先解析，成功后串接向量化）
+ * @param ids 文档主键数组
+ */
+export const batchIngestDocument = (ids: Array<string | number>): AxiosPromise<DocumentBatchVO> => {
+  return request({
+    url: '/ai/kb/doc/batch/ingest',
+    method: 'post',
+    data: { ids }
+  });
+};
+
+/**
+ * 查询批量处理进度（轻量回执）
+ * @param ids 文档主键数组
+ */
+export const getBatchStatus = (ids: Array<string | number>): AxiosPromise<DocumentBatchStatusVO[]> => {
+  return request({
+    url: '/ai/kb/doc/batch/status',
+    method: 'get',
+    params: { ids: ids.join(',') }
   });
 };
 
