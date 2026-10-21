@@ -47,7 +47,7 @@ export default defineConfig({
     // ② 关键路径用例：依赖 ① 的登录态
     {
       name: 'chromium',
-      testMatch: /0[1-9]-.*\.spec\.mjs/,
+      testMatch: /\d{2}-.*\.spec\.mjs/,
       dependencies: ['auth'],
       use: {
         ...devices['Desktop Chrome'],

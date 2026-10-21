@@ -7,10 +7,12 @@ import org.dromara.ai.domain.AiExpertAgent;
 import org.dromara.ai.domain.AiMessage;
 import org.dromara.ai.domain.AiScenarioPack;
 import org.dromara.ai.domain.AiSession;
+import org.dromara.ai.domain.AiTool;
 import org.dromara.ai.domain.AiToolCallLog;
 import org.dromara.ai.domain.bo.AiSessionBo;
 import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiMessageVo;
+import org.dromara.ai.domain.vo.AiRegenerateCheckVo;
 import org.dromara.ai.domain.vo.AiSessionExportVo;
 import org.dromara.ai.domain.vo.AiSessionVo;
 import org.dromara.ai.domain.vo.AiToolCallLogVo;
@@ -18,6 +20,7 @@ import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.mapper.AiScenarioPackMapper;
 import org.dromara.ai.mapper.AiSessionMapper;
 import org.dromara.ai.mapper.AiToolCallLogMapper;
+import org.dromara.ai.mapper.AiToolMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiChatAttachmentService;
 import org.dromara.ai.service.IAiScenarioPackService;
@@ -35,9 +38,11 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,6 +61,7 @@ class AiSessionServiceImplTest {
     private final AiSessionMapper baseMapper = mock(AiSessionMapper.class);
     private final AiMessageMapper messageMapper = mock(AiMessageMapper.class);
     private final AiToolCallLogMapper toolCallLogMapper = mock(AiToolCallLogMapper.class);
+    private final AiToolMapper toolMapper = mock(AiToolMapper.class);
     private final AiScenarioPackMapper scenarioPackMapper = mock(AiScenarioPackMapper.class);
     private final IAiAgentService agentService = mock(IAiAgentService.class);
     private final IAiScenarioPackService scenarioPackService = mock(IAiScenarioPackService.class);
@@ -65,8 +71,8 @@ class AiSessionServiceImplTest {
     private final AiExpertDirectory expertDirectory = mock(AiExpertDirectory.class);
     private final IAiChatAttachmentService aiChatAttachmentService = mock(IAiChatAttachmentService.class);
     private final AiSessionServiceImpl service = new AiSessionServiceImpl(baseMapper, messageMapper, toolCallLogMapper,
-        scenarioPackMapper, agentService, scenarioPackService, userService, deptService, aiAgentStateStore, expertDirectory,
-        aiChatAttachmentService);
+        toolMapper, scenarioPackMapper, agentService, scenarioPackService, userService, deptService, aiAgentStateStore,
+        expertDirectory, aiChatAttachmentService);
 
     private MockedStatic<LoginHelper> loginHelper;
 
@@ -326,6 +332,135 @@ class AiSessionServiceImplTest {
     }
 
     @Test
+    @DisplayName("重新生成预检：只读最后一轮允许")
+    void shouldAllowRegenerateOnReadOnlyLastRound() {
+        when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
+        AiMessage user = message(1L, 1L, AiMessage.ROLE_USER, "0");
+        AiMessage assistant = message(2L, 1L, AiMessage.ROLE_ASSISTANT, "0");
+        when(messageMapper.selectById(1L)).thenReturn(user);
+        when(messageMapper.selectList(any())).thenReturn(List.of(user, assistant));
+        AiToolCallLog log = toolLog("query_kb", "SUCCESS");
+        // 平台内置只读工具（未登记）不应被误判为写操作
+        AiToolCallLog builtin = toolLog("load_skill_through_path", "SUCCESS");
+        when(toolCallLogMapper.selectList(any())).thenReturn(List.of(log, builtin));
+        when(toolMapper.selectList(any())).thenReturn(List.of(tool("query_kb", "查知识库", AiTool.TYPE_READ_ONLY)));
+
+        AiRegenerateCheckVo vo = service.checkRegenerable(1L, 1L);
+
+        assertTrue(vo.isAllowed());
+        assertEquals(AiRegenerateCheckVo.CODE_OK, vo.getReasonCode());
+        assertTrue(vo.getWriteTools().isEmpty());
+    }
+
+    @Test
+    @DisplayName("重新生成预检：写工具轮次拦截并回传工具中文名")
+    void shouldRejectRegenerateWhenWriteToolUsed() {
+        when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
+        AiMessage user = message(1L, 1L, AiMessage.ROLE_USER, "0");
+        AiMessage assistant = message(2L, 1L, AiMessage.ROLE_ASSISTANT, "0");
+        when(messageMapper.selectById(1L)).thenReturn(user);
+        when(messageMapper.selectList(any())).thenReturn(List.of(user, assistant));
+        when(toolCallLogMapper.selectList(any())).thenReturn(List.of(toolLog("create_notice", "SUCCESS")));
+        when(toolMapper.selectList(any())).thenReturn(List.of(tool("create_notice", "发布通知", "1")));
+
+        AiRegenerateCheckVo vo = service.checkRegenerable(1L, 1L);
+
+        assertFalse(vo.isAllowed());
+        assertEquals(AiRegenerateCheckVo.CODE_WRITE_TOOL_USED, vo.getReasonCode());
+        assertEquals("发布通知", vo.getWriteTools().get(0).getToolName());
+    }
+
+    @Test
+    @DisplayName("重新生成预检：写工具 ERROR / INTERRUPTED 也拦截，DENIED 放行")
+    void shouldApplyWriteToolStateRules() {
+        when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
+        AiMessage user = message(1L, 1L, AiMessage.ROLE_USER, "0");
+        AiMessage assistant = message(2L, 1L, AiMessage.ROLE_ASSISTANT, "0");
+        when(messageMapper.selectById(1L)).thenReturn(user);
+        when(messageMapper.selectList(any())).thenReturn(List.of(user, assistant));
+        when(toolMapper.selectList(any())).thenReturn(List.of(tool("create_notice", "发布通知", "1")));
+
+        when(toolCallLogMapper.selectList(any())).thenReturn(List.of(toolLog("create_notice", "ERROR")));
+        assertFalse(service.checkRegenerable(1L, 1L).isAllowed());
+
+        when(toolCallLogMapper.selectList(any())).thenReturn(List.of(toolLog("create_notice", "INTERRUPTED")));
+        assertFalse(service.checkRegenerable(1L, 1L).isAllowed());
+
+        when(toolCallLogMapper.selectList(any())).thenReturn(List.of(toolLog("create_notice", "DENIED")));
+        assertTrue(service.checkRegenerable(1L, 1L).isAllowed());
+    }
+
+    @Test
+    @DisplayName("重新生成预检：未登记工具按写操作拦截")
+    void shouldRejectRegenerateWhenToolUnknown() {
+        when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
+        AiMessage user = message(1L, 1L, AiMessage.ROLE_USER, "0");
+        AiMessage assistant = message(2L, 1L, AiMessage.ROLE_ASSISTANT, "0");
+        when(messageMapper.selectById(1L)).thenReturn(user);
+        when(messageMapper.selectList(any())).thenReturn(List.of(user, assistant));
+        when(toolCallLogMapper.selectList(any())).thenReturn(List.of(toolLog("mcp_ab12", "SUCCESS")));
+        when(toolMapper.selectList(any())).thenReturn(List.of());
+
+        AiRegenerateCheckVo vo = service.checkRegenerable(1L, 1L);
+
+        assertFalse(vo.isAllowed());
+        assertEquals(AiRegenerateCheckVo.CODE_UNKNOWN_TOOL_USED, vo.getReasonCode());
+        assertTrue(vo.getWriteTools().get(0).isUnknown());
+    }
+
+    @Test
+    @DisplayName("重新生成预检：非最后一轮拒绝")
+    void shouldRejectRegenerateWhenNotLastRound() {
+        when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
+        AiMessage user = message(1L, 1L, AiMessage.ROLE_USER, "0");
+        AiMessage assistant = message(2L, 1L, AiMessage.ROLE_ASSISTANT, "0");
+        AiMessage nextUser = message(3L, 1L, AiMessage.ROLE_USER, "0");
+        when(messageMapper.selectById(1L)).thenReturn(user);
+        when(messageMapper.selectList(any())).thenReturn(List.of(user, assistant, nextUser));
+
+        AiRegenerateCheckVo vo = service.checkRegenerable(1L, 1L);
+
+        assertFalse(vo.isAllowed());
+        assertEquals(AiRegenerateCheckVo.CODE_ROUND_NOT_LAST, vo.getReasonCode());
+    }
+
+    @Test
+    @DisplayName("重新生成预检：待人工确认轮次拒绝")
+    void shouldRejectRegenerateWhenPendingConfirm() {
+        when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
+        AiMessage user = message(1L, 1L, AiMessage.ROLE_USER, "0");
+        AiMessage assistant = message(2L, 1L, AiMessage.ROLE_ASSISTANT, "0");
+        assistant.setStatus(AiMessage.STATUS_PENDING_CONFIRM);
+        when(messageMapper.selectById(1L)).thenReturn(user);
+        when(messageMapper.selectList(any())).thenReturn(List.of(user, assistant));
+
+        AiRegenerateCheckVo vo = service.checkRegenerable(1L, 1L);
+
+        assertFalse(vo.isAllowed());
+        assertEquals(AiRegenerateCheckVo.CODE_ROUND_PENDING_CONFIRM, vo.getReasonCode());
+    }
+
+    @Test
+    @DisplayName("删除本轮问答：写操作轮次拒绝，只读轮次只删助手消息")
+    void shouldGuardDeleteByWriteToolsAndDeleteOnlyAnswers() {
+        when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
+        AiMessage user = message(1L, 1L, AiMessage.ROLE_USER, "0");
+        AiMessage assistant = message(2L, 1L, AiMessage.ROLE_ASSISTANT, "0");
+        when(messageMapper.selectById(1L)).thenReturn(user);
+        when(messageMapper.selectList(any())).thenReturn(List.of(user, assistant));
+
+        when(toolCallLogMapper.selectList(any())).thenReturn(List.of(toolLog("create_notice", "SUCCESS")));
+        when(toolMapper.selectList(any())).thenReturn(List.of(tool("create_notice", "发布通知", "1")));
+        assertThrows(ServiceException.class, () -> service.deleteChatRound(1L, 1L));
+
+        service.deleteRoundAnswers(1L, 1L);
+        ArgumentCaptor<Collection<?>> captor = ArgumentCaptor.forClass(Collection.class);
+        verify(messageMapper).deleteByIds(captor.capture());
+        assertFalse(captor.getValue().contains(1L));
+        assertTrue(captor.getValue().contains(2L));
+    }
+
+    @Test
     @DisplayName("删除一轮问答：删除用户消息及其后助手消息")
     void shouldDeleteChatRound() {
         when(baseMapper.selectById(1L)).thenReturn(session(1L, 9L, "0"));
@@ -509,6 +644,21 @@ class AiSessionServiceImplTest {
         message.setRole(role);
         message.setStreaming(streaming);
         return message;
+    }
+
+    private static AiToolCallLog toolLog(String toolName, String state) {
+        AiToolCallLog log = new AiToolCallLog();
+        log.setToolName(toolName);
+        log.setState(state);
+        return log;
+    }
+
+    private static AiTool tool(String toolCode, String toolName, String toolType) {
+        AiTool tool = new AiTool();
+        tool.setToolCode(toolCode);
+        tool.setToolName(toolName);
+        tool.setToolType(toolType);
+        return tool;
     }
 
 }

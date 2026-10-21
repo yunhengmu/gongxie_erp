@@ -27,6 +27,7 @@ import org.dromara.ai.domain.dto.AiTaskExecution;
 import org.dromara.ai.domain.bo.AiChatConfirmBo;
 import org.dromara.ai.domain.vo.AiChatPendingVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
+import org.dromara.ai.domain.vo.AiRegenerateCheckVo;
 import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
@@ -188,6 +189,11 @@ public class AiChatFacade {
      * 会话级资源集（REQ-AI-32）：实时对话链路每轮现读，小Z 与专家共用同一份
      */
     private final IAiSessionResourceService sessionResourceService;
+
+    /**
+     * 重新生成前的模型上下文回退（尾部截断 + 兜底重放）
+     */
+    private final AiRegenerateContextRestorer contextRestorer;
 
     /**
      * 领域专家名录（REQ-AI-30）：入口智能体每轮现算候选专家清单
@@ -485,6 +491,92 @@ public class AiChatFacade {
             throw e instanceof ServiceException serviceException
                 ? serviceException : new ServiceException("对话启动失败：" + e.getMessage());
         }
+    }
+
+    /**
+     * 重新生成预检（含同实例执行互斥）。
+     *
+     * @param sessionId     会话主键
+     * @param userMessageId 本轮用户消息主键
+     * @return 预检结果
+     */
+    public AiRegenerateCheckVo checkRegenerable(Long sessionId, Long userMessageId) {
+        AiRegenerateCheckVo check = sessionService.checkRegenerable(sessionId, userMessageId);
+        if (check.isAllowed() && runRegistry.isActive(sessionId)) {
+            check.setAllowed(false);
+            check.setReasonCode(AiRegenerateCheckVo.CODE_CONVERSATION_BUSY);
+            check.setReason("会话正在生成回答，请先停止后再重新生成");
+        }
+        return check;
+    }
+
+    /**
+     * 重新生成最后一轮回答。
+     *
+     * <p>处理顺序：二次预检 → 回退模型上下文 → 逻辑删除旧回答 → 复用 {@link #streamChat}
+     * 的完整编排链路重新生成。任一步失败都通过 SSE {@code error} 事件返回原因码，
+     * 不进入模型调用，避免带污染上下文或重复写操作。</p>
+     *
+     * @param sessionId     会话主键
+     * @param userMessageId 本轮用户消息主键
+     * @param emitter       SSE 发射器
+     */
+    public void regenerate(Long sessionId, Long userMessageId, SseEmitter emitter) {
+        AiRegenerateCheckVo check = checkRegenerable(sessionId, userMessageId);
+        if (!check.isAllowed()) {
+            rejectRegenerate(emitter, check);
+            return;
+        }
+        try {
+            AiSession session = sessionService.getOwnedSession(sessionId);
+            AiAgent definition = agentService.getEnabledAgent(session.getAgentId());
+            AiSessionResourceSet resources = sessionResourceService.resolveForSession(session);
+            Long userId = LoginHelper.getUserId();
+            // 必须与后续生成共用同一实例：状态按 (userId, sessionId) 存放，换实例会读回旧上下文
+            HarnessAgent agent = agentRegistry.get(definition, resources);
+            if (!contextRestorer.restore(agent, userId, sessionId, userMessageId)) {
+                rejectRegenerate(emitter, regenerateFailure(AiRegenerateCheckVo.CODE_CONTEXT_RESTORE_FAILED,
+                    "无法回退该轮的对话上下文，请新建会话后重试"));
+                return;
+            }
+            // 旧回答逻辑删除（保留行用于审计），随后由本轮生成落新的助手消息
+            sessionService.deleteRoundAnswers(sessionId, userMessageId);
+        } catch (Exception e) {
+            log.error("重新生成准备失败，sessionId={}, messageId={}", sessionId, userMessageId, e);
+            rejectRegenerate(emitter, regenerateFailure(AiRegenerateCheckVo.CODE_CONTEXT_RESTORE_FAILED,
+                "重新生成准备失败：" + AiSseSupport.rootCauseMessage(e)));
+            return;
+        }
+        streamChat(sessionId, userMessageId, emitter);
+    }
+
+    /**
+     * 构造重新生成失败时的预检结果（仅用于 SSE 错误事件）。
+     *
+     * @param reasonCode 原因码
+     * @param reason     面向用户的原因
+     * @return 预检结果
+     */
+    private AiRegenerateCheckVo regenerateFailure(String reasonCode, String reason) {
+        AiRegenerateCheckVo vo = new AiRegenerateCheckVo();
+        vo.setAllowed(false);
+        vo.setReasonCode(reasonCode);
+        vo.setReason(reason);
+        return vo;
+    }
+
+    /**
+     * 通过 SSE 错误事件返回重新生成被拒的原因。
+     *
+     * @param emitter SSE 发射器
+     * @param check   预检结果
+     */
+    private void rejectRegenerate(SseEmitter emitter, AiRegenerateCheckVo check) {
+        Map<String, Object> payload = AiSseSupport.envelope(EVENT_ERROR);
+        payload.put("message", check.getReason());
+        payload.put("reasonCode", check.getReasonCode());
+        AiSseSupport.send(emitter, payload);
+        AiSseSupport.complete(emitter);
     }
 
     /**

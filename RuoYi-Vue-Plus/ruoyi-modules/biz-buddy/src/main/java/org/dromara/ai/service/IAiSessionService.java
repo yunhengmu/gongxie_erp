@@ -7,6 +7,7 @@ import org.dromara.ai.domain.bo.AiSessionBo;
 import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiAgentVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
+import org.dromara.ai.domain.vo.AiRegenerateCheckVo;
 import org.dromara.ai.domain.vo.AiSessionExportVo;
 import org.dromara.ai.domain.vo.AiSessionVo;
 import org.dromara.ai.domain.vo.AiSourceVo;
@@ -117,6 +118,26 @@ public interface IAiSessionService {
      * @return 是否删除成功
      */
     Boolean deleteChatRound(Long sessionId, Long messageId);
+
+    /**
+     * 重新生成预检：校验轮次是否可重跑，并判定该轮是否发生过写操作。
+     *
+     * <p>只允许**最后一轮**；写操作（含未登记工具）按 fail-closed 拦截，避免重新生成导致
+     * 通知发布、数据变更等副作用被重复执行。</p>
+     *
+     * @param sessionId     会话主键
+     * @param userMessageId 本轮用户消息主键
+     * @return 预检结果（不允许时给出原因码与命中的写工具）
+     */
+    AiRegenerateCheckVo checkRegenerable(Long sessionId, Long userMessageId);
+
+    /**
+     * 逻辑删除某轮的全部助手消息（重新生成前清掉旧回答，保留行用于审计）。
+     *
+     * @param sessionId     会话主键
+     * @param userMessageId 本轮用户消息主键
+     */
+    void deleteRoundAnswers(Long sessionId, Long userMessageId);
 
     /**
      * 落库用户消息，并刷新会话活跃时间与消息条数（标题仍为默认时按首问改写）。

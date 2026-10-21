@@ -297,6 +297,20 @@
                 >
                   <DocumentCopy />
                 </el-icon>
+                <!-- 重新生成：仅最后一轮可重跑；写操作轮次由预检置灰并给出原因 -->
+                <el-button
+                  v-if="canRegenerate(msg)"
+                  class="msg-meta__regenerate"
+                  type="primary"
+                  link
+                  size="small"
+                  :disabled="regenerateBlocked"
+                  :title="regenerateHint"
+                  @click="handleRegenerate(msg)"
+                >
+                  <el-icon><Refresh /></el-icon>
+                  重新生成
+                </el-button>
                 <!-- 中止标记：本地停止或后端 aborted 时给出明确反馈 -->
                 <span v-if="msg.status === '3'" class="msg-meta__aborted">已中止</span>
                 <!-- 文字区域：悬停回复内容才显示；整体前带一个分隔竖线 -->
@@ -503,8 +517,10 @@ import { optionAgent, optionAgentExperts, optionAgentTool } from '@/api/ai/agent
 import type { AgentVO, ExpertOptionVO, ToolOptionVO } from '@/api/ai/agent/types';
 import {
   addChatResources,
+  buildChatRegenerateUrl,
   buildChatResumeUrl,
   buildChatStreamUrl,
+  checkChatRegenerate,
   closeChatSession,
   confirmChatTool,
   createChatSession,
@@ -530,6 +546,7 @@ import type {
   ChatAttachmentVO,
   ChatMessageVO,
   ChatPendingToolCall,
+  ChatRegenerateCheckVO,
   ChatResourceItem,
   ChatResourceType,
   ChatResourceVO,
@@ -690,6 +707,12 @@ const currentAssistantKey = ref<string | number | undefined>(undefined);
 const inputText = ref('');
 const streaming = ref(false);
 const sending = ref(false);
+/** 最后一轮重新生成预检结果（null 表示尚未检查或检查失败） */
+const regenerateCheck = ref<ChatRegenerateCheckVO | null>(null);
+/** 预检结果对应的用户消息主键，避免切换会话后误用旧结果 */
+const regenerateCheckMessageId = ref<string | number | undefined>(undefined);
+/** 重新生成失败回滚快照：后端在预检 / 上下文回退阶段拒绝时恢复旧回答 */
+let regenerateBackup: LocalMessage[] | null = null;
 const messageContainerRef = ref<HTMLElement>();
 const streamUrl = ref<string | undefined>(undefined);
 /** 待发送附件（登记成功后暂存，发送时随消息提交） */
@@ -1633,6 +1656,9 @@ const handleNewSession = () => {
   messages.value = [];
   expandedToolKeys.value = [];
   inputText.value = '';
+  regenerateCheck.value = null;
+  regenerateCheckMessageId.value = undefined;
+  regenerateBackup = null;
   // 资源选择（REQ-AI-32）：新建会话时清空，需重新选择；选项列表保留
   sessionResources.value = [];
   // 一并清掉本地兜底的专家选择：避免刷新后又把已被清空的旧选择恢复出来
@@ -1688,6 +1714,8 @@ const handleSelectSession = async (session: ChatSessionVO) => {
       confirmState: pending.expired ? 'expired' : 'pending'
     });
   });
+  // 最后一轮的重新生成可用性由后端预检决定（写操作轮次置灰）
+  void refreshRegenerateCheck();
   scrollToBottomSoon();
 };
 
@@ -1773,6 +1801,146 @@ const handleCopyMessage = async (msg: LocalMessage) => {
   modal.msgSuccess('已复制');
 };
 
+/** 取该助手消息所属轮次的用户提问（消息列表按时间顺序，向前找最近一条用户消息） */
+const roundUserMessageOf = (msg: LocalMessage) => {
+  const index = messages.value.findIndex((item) => String(item.id) === String(msg.id));
+  if (index < 0) {
+    return undefined;
+  }
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (messages.value[i].role === 'user') {
+      return messages.value[i];
+    }
+  }
+  return undefined;
+};
+
+/** 是否为会话最后一轮的助手消息（其后不再有用户提问） */
+const isLastRoundAssistant = (msg: LocalMessage) => {
+  if (msg.role !== 'assistant') {
+    return false;
+  }
+  const index = messages.value.findIndex((item) => String(item.id) === String(msg.id));
+  if (index < 0) {
+    return false;
+  }
+  return !messages.value.slice(index + 1).some((item) => item.role === 'user');
+};
+
+/** 是否展示「重新生成」入口：仅最后一轮、非流式中、非待确认 */
+const canRegenerate = (msg: LocalMessage) =>
+  isLastRoundAssistant(msg)
+  && !msg.streaming
+  && msg.status !== '2'
+  && roundUserMessageOf(msg) !== undefined;
+
+/** 会话最后一轮的用户提问 */
+const lastRoundUserMessage = computed(() =>
+  [...messages.value].reverse().find((item) => item.role === 'user')
+);
+
+/** 只采用与当前最后一轮匹配的预检结果（防止切换会话后误用旧结果） */
+const currentRegenerateCheck = computed(() => {
+  const lastUser = lastRoundUserMessage.value;
+  if (!lastUser || String(regenerateCheckMessageId.value) !== String(lastUser.id)) {
+    return null;
+  }
+  return regenerateCheck.value;
+});
+
+/** 是否被预检明确拒绝（按钮置灰） */
+const regenerateBlocked = computed(() => currentRegenerateCheck.value?.allowed === false);
+
+/** 重新生成按钮悬停提示：写操作轮次展示后端给出的拒绝原因 */
+const regenerateHint = computed(() => {
+  const check = currentRegenerateCheck.value;
+  return check && !check.allowed
+    ? check.reason || '该轮不支持重新生成'
+    : '重新生成该回答';
+});
+
+/** 刷新最后一轮的重新生成预检（切换会话 / 本轮结束后调用） */
+const refreshRegenerateCheck = async () => {
+  const sessionId = currentSessionId.value;
+  const lastUser = lastRoundUserMessage.value;
+  if (!sessionId || !lastUser || streaming.value) {
+    regenerateCheck.value = null;
+    regenerateCheckMessageId.value = undefined;
+    return;
+  }
+  try {
+    const res = await checkChatRegenerate(sessionId, lastUser.id);
+    regenerateCheck.value = res.data ?? null;
+    regenerateCheckMessageId.value = lastUser.id;
+  } catch {
+    // 预检失败不阻塞对话：按钮保持可用，点击时再校验并提示
+    regenerateCheck.value = null;
+    regenerateCheckMessageId.value = undefined;
+  }
+};
+
+/** 后端在预检 / 上下文回退阶段拒绝时，恢复旧回答展示（此时新回答尚未产生） */
+const restoreRegenerateBackup = () => {
+  const backup = regenerateBackup;
+  regenerateBackup = null;
+  if (!backup) {
+    return;
+  }
+  const placeholderId = currentAssistantKey.value;
+  messages.value = messages.value.filter((item) => item.id !== placeholderId);
+  messages.value.push(...backup);
+  finishStream();
+};
+
+/** 重新生成最后一轮回答：先预检，再以 SSE 重跑（旧回答由后端逻辑删除保留审计行） */
+const handleRegenerate = async (msg: LocalMessage) => {
+  const sessionId = currentSessionId.value;
+  const userMessage = roundUserMessageOf(msg);
+  if (!sessionId || !userMessage || streaming.value || sending.value) {
+    return;
+  }
+  try {
+    const res = await checkChatRegenerate(sessionId, userMessage.id);
+    const check = res.data;
+    regenerateCheck.value = check ?? null;
+    regenerateCheckMessageId.value = userMessage.id;
+    if (!check?.allowed) {
+      modal.msgWarning(check?.reason || '当前轮次不支持重新生成');
+      return;
+    }
+    const confirmed = await modal.confirm('是否重新生成该回答？旧回答将被替换。').catch(() => null);
+    if (!confirmed) {
+      return;
+    }
+    const userIndex = messages.value.findIndex(
+      (item) => String(item.id) === String(userMessage.id)
+    );
+    if (userIndex < 0) {
+      return;
+    }
+    // 暂存旧回答：后端若在预检 / 上下文回退阶段拒绝，需要把它放回
+    regenerateBackup = messages.value
+      .slice(userIndex + 1)
+      .map((item) => ({ ...item, parts: [...item.parts] }));
+    messages.value.splice(userIndex + 1);
+    const tempId = `pending-${Date.now()}`;
+    messages.value.push({
+      id: tempId,
+      role: 'assistant',
+      content: '',
+      parts: [],
+      streaming: true,
+      status: '0'
+    });
+    currentAssistantKey.value = tempId;
+    streaming.value = true;
+    streamUrl.value = buildChatRegenerateUrl(sessionId, userMessage.id);
+    openStream();
+  } catch (error) {
+    modal.msgError((error as Error)?.message || '重新生成失败');
+  }
+};
+
 /** 删除一问一答（整轮）：该用户消息及其助手回复（后端仅删记录，不影响模型上下文） */
 const handleDeleteMessage = async (msg: LocalMessage) => {
   const sessionId = currentSessionId.value;
@@ -1783,7 +1951,13 @@ const handleDeleteMessage = async (msg: LocalMessage) => {
   if (!confirmed) {
     return;
   }
-  await deleteChatMessage(sessionId, msg.id);
+  try {
+    await deleteChatMessage(sessionId, msg.id);
+  } catch (error) {
+    // 写操作轮次会被后端拒绝删除（保留审计链路），直接展示后端原因
+    modal.msgError((error as Error)?.message || '删除失败');
+    return;
+  }
   // 本地同步移除该轮：本条用户消息 + 紧随其后的助手消息（与后端口径一致）
   const start = messages.value.findIndex((item) => item.id === msg.id);
   if (start >= 0) {
@@ -1794,6 +1968,7 @@ const handleDeleteMessage = async (msg: LocalMessage) => {
     messages.value.splice(start, end - start);
   }
   modal.msgSuccess('删除成功');
+  void refreshRegenerateCheck();
   await getSessions();
 };
 
@@ -2039,6 +2214,9 @@ const handleStreamEvent = (raw: string) => {
       // done 载荷与 references 事件同结构：兜底回填（防 references 事件丢失）
       mergeMessageSources(msg, event.references);
       finishStream();
+      // 重新生成成功：旧回答快照已无意义，刷新预检（新一轮回答可能含写操作）
+      regenerateBackup = null;
+      void refreshRegenerateCheck();
       getSessions();
       // 编排轨迹回填：异步补齐专家原始结论，不阻塞本轮收尾
       void syncExpertConclusions(msg);
@@ -2052,15 +2230,24 @@ const handleStreamEvent = (raw: string) => {
       msg.durationMs = event.durationMs ?? msg.durationMs;
       msg.status = '3';
       finishStream();
+      regenerateBackup = null;
+      void refreshRegenerateCheck();
       break;
     }
     case 'error': {
+      if (event.reasonCode && regenerateBackup) {
+        // 预检 / 上下文回退被拒：本轮尚未产生新回答，恢复旧回答展示
+        restoreRegenerateBackup();
+        modal.msgError(event.message || '重新生成被拒绝');
+        break;
+      }
       msg.streaming = false;
       clearPhase(msg);
       msg.status = '1';
       msg.errorMsg = event.message || '对话失败';
       modal.msgError(msg.errorMsg);
       finishStream();
+      regenerateBackup = null;
       break;
     }
   }
@@ -2335,6 +2522,7 @@ watch(sseError, (err) => {
   }
   modal.msgError('连接中断，请重试');
   finishStream();
+  regenerateBackup = null;
 });
 
 onMounted(() => {
@@ -2738,6 +2926,13 @@ onMounted(() => {
 
 .msg-meta__icon:hover {
   color: var(--el-color-primary, #409eff);
+}
+
+/* 重新生成：与元信息同级的小号文字按钮，不额外撑高操作区 */
+.msg-meta__regenerate {
+  height: 18px;
+  padding: 0;
+  font-size: 12px;
 }
 
 /* 文字区域：悬停回复内容才显示；整体前带一个分隔竖线（文字项之间不加） */

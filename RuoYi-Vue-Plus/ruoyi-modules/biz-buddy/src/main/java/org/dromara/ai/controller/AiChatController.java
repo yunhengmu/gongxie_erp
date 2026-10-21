@@ -17,6 +17,7 @@ import org.dromara.ai.domain.bo.AiSessionResourceBatchBo;
 import org.dromara.ai.domain.vo.AiChatAttachmentVo;
 import org.dromara.ai.domain.vo.AiChatPendingVo;
 import org.dromara.ai.domain.vo.AiMessageVo;
+import org.dromara.ai.domain.vo.AiRegenerateCheckVo;
 import org.dromara.ai.domain.vo.AiRouteRunDetailVo;
 import org.dromara.ai.domain.vo.AiSessionResourceVo;
 import org.dromara.ai.domain.vo.AiSessionVo;
@@ -27,6 +28,7 @@ import org.dromara.ai.service.IAiSessionResourceService;
 import org.dromara.ai.service.IAiSessionService;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.validate.QueryGroup;
 import org.dromara.common.mybatis.core.page.PageQuery;
 import org.dromara.common.redis.annotation.RateLimiter;
@@ -374,6 +376,54 @@ public class AiChatController extends BaseController {
         SseEmitter emitter = new SseEmitter(aiProperties.getChat().getStreamTimeoutMs());
         try {
             aiChatFacade.streamResume(sessionId, messageId, emitter);
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
+        return emitter;
+    }
+
+    /**
+     * 重新生成预检：校验是否允许重跑，以及该轮是否发生过写操作。
+     *
+     * <p>前端据此决定「重新生成」按钮是否可用，并在禁用时展示原因与命中的写工具。</p>
+     *
+     * @param sessionId 会话主键
+     * @param messageId 本轮用户消息主键
+     */
+    @GetMapping("/session/{sessionId}/message/{messageId}/regenerate/check")
+    public R<AiRegenerateCheckVo> checkRegenerate(@NotNull(message = "会话不能为空")
+                                                  @PathVariable("sessionId") Long sessionId,
+                                                  @NotNull(message = "消息不能为空")
+                                                  @PathVariable("messageId") Long messageId) {
+        return R.ok(aiChatFacade.checkRegenerable(sessionId, messageId));
+    }
+
+    /**
+     * 重新生成最后一轮回答（只读轮次）
+     *
+     * <p>写操作轮次在预检阶段即被拒绝：通知发布、数据变更等副作用不允许因重跑而重复执行。</p>
+     *
+     * @param sessionId 会话主键
+     * @param messageId 本轮用户消息主键
+     * @param response  当前响应
+     */
+    @RateLimiter(key = "ai:chat:regenerate", time = 60, count = 10, message = "重新生成过于频繁，请稍后再试")
+    @GetMapping(value = "/session/{sessionId}/message/{messageId}/regenerate",
+        produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter regenerate(@NotNull(message = "会话不能为空")
+                                 @PathVariable("sessionId") Long sessionId,
+                                 @NotNull(message = "消息不能为空")
+                                 @PathVariable("messageId") Long messageId,
+                                 HttpServletResponse response) {
+        // 先做一次同步预检：拒绝时直接返回 JSON 错误，不建立 SSE 连接
+        AiRegenerateCheckVo check = aiChatFacade.checkRegenerable(sessionId, messageId);
+        if (!check.isAllowed()) {
+            throw new ServiceException(check.getReason());
+        }
+        prepareSseResponse(response);
+        SseEmitter emitter = new SseEmitter(aiProperties.getChat().getStreamTimeoutMs());
+        try {
+            aiChatFacade.regenerate(sessionId, messageId, emitter);
         } catch (Exception e) {
             emitter.completeWithError(e);
         }
