@@ -18,7 +18,6 @@ import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.common.core.exception.ServiceException;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -86,14 +86,6 @@ class AiMemoryServiceImplTest {
     @BeforeEach
     void prepareDailyLedger() throws IOException {
         Files.writeString(tempDir.resolve("2024-01-01.md"), "fact");
-    }
-
-    /**
-     * 关闭合并调度线程池，避免测试间线程堆积。
-     */
-    @AfterEach
-    void tearDown() {
-        memoryService.shutdownConsolidationScheduler();
     }
 
     /**
@@ -229,24 +221,25 @@ class AiMemoryServiceImplTest {
     }
 
     /**
-     * 验证自动合并入口对空主键短路。
+     * 验证归档目录按归档保留期清理：超过流水保留期但未到归档保留期的文件必须保留。
      */
     @Test
-    @DisplayName("自动合并空主键短路")
-    void shouldSkipConsolidateIfDueForNullArgs() {
-        memoryService.consolidateIfDue(null, 7L);
-        memoryService.consolidateIfDue(1L, null);
+    @DisplayName("归档目录按独立保留期清理")
+    void shouldCleanupArchiveWithOwnRetention() throws IOException {
+        WorkspaceManager workspace = stubWorkspace();
+        when(runtimeConfigStore.memory()).thenReturn(policy());
+        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
+        Path archive = Files.createDirectories(tempDir.resolve("archive"));
+        String dailyName = LocalDate.now().minusDays(100) + ".md";
+        String archiveName = LocalDate.now().minusDays(200) + ".md";
+        Files.writeString(tempDir.resolve(dailyName), "daily");
+        Files.writeString(archive.resolve(archiveName), "archived");
 
-        verifyNoInteractions(agentService, agentRegistry, runtimeConfigStore);
-    }
+        int removed = memoryService.cleanup(1L, 7L);
 
-    /**
-     * 验证合并调度器可安全关闭。
-     */
-    @Test
-    @DisplayName("关闭合并调度器")
-    void shouldShutdownScheduler() {
-        assertDoesNotThrow(() -> memoryService.shutdownConsolidationScheduler());
+        assertFalse(Files.exists(tempDir.resolve(dailyName)));
+        assertTrue(Files.exists(archive.resolve(archiveName)));
+        assertTrue(removed >= 1);
     }
 
     private WorkspaceManager stubWorkspace() {
@@ -264,6 +257,9 @@ class AiMemoryServiceImplTest {
         policy.setEnabled(true);
         policy.setConsolidationMaxTokens(1000);
         policy.setConsolidationMinGapMinutes(10);
+        policy.setDailyFileRetentionDays(90);
+        policy.setArchiveRetentionDays(365);
+        policy.setSessionRetentionDays(180);
         return policy;
     }
 

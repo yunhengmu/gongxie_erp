@@ -60,6 +60,13 @@ public class AiMemoryConfigBo implements Serializable {
     private int dailyFileRetentionDays;
 
     /**
+     * 归档目录（memory/archive/）保留天数
+     */
+    @Min(value = 1, message = "归档保留天数必须大于 0")
+    @Max(value = 3650, message = "归档保留天数不能超过 3650")
+    private int archiveRetentionDays;
+
+    /**
      * 会话日志保留天数
      */
     @Min(value = 1, message = "会话保留天数必须大于 0")

@@ -486,9 +486,29 @@ public class AiProperties {
         private int memorySessionRetentionDays = 180;
 
         /**
-         * 事实抽取（flush）触发策略：always 每轮抽取 / throttled 按间隔节流 / never 不自动抽取
+         * 归档目录（memory/archive/）的保留天数。
+         *
+         * <p>与每日流水保留天数分开配置：流水超期后先移入归档目录，
+         * 归档文件到期后才真正删除。</p>
          */
-        private String memoryFlushMode = "always";
+        private int memoryArchiveRetentionDays = 365;
+
+        /**
+         * 是否启用长期记忆自动归档与清理（按每日流水 / 归档 / 会话保留期执行）。
+         */
+        private boolean memoryAutoArchiveEnabled = true;
+
+        /**
+         * 自动归档与清理的执行间隔（分钟），默认每天一次。
+         */
+        private int memoryMaintenanceIntervalMinutes = 1440;
+
+        /**
+         * 事实抽取（flush）触发策略：always 每轮抽取 / throttled 按间隔节流 / never 不自动抽取。
+         *
+         * <p>默认节流：每轮抽取会产生额外的模型调用，且可能导致同一轮流水被重复写入。</p>
+         */
+        private String memoryFlushMode = "throttled";
 
         /**
          * 事实抽取节流间隔（分钟），仅 {@code memoryFlushMode=throttled} 时生效

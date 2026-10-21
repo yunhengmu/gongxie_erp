@@ -9,7 +9,6 @@ import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.AiToolCallLog;
 import org.dromara.ai.domain.AiTrace;
 import org.dromara.ai.domain.vo.AiSourceVo;
-import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
 import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSessionService;
@@ -71,8 +70,6 @@ class AiTurnFinisherTest {
     @Mock
     private IAiTraceService traceService;
     @Mock
-    private IAiMemoryService memoryService;
-    @Mock
     private AiRouteRecorder routeRecorder;
     @Mock
     private AiConfirmPendingStore pendingStore;
@@ -97,7 +94,7 @@ class AiTurnFinisherTest {
     @BeforeEach
     void setUp() {
         finisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
-            traceService, memoryService, aiProperties, routeRecorder, pendingStore,
+            traceService, aiProperties, routeRecorder, pendingStore,
             toolLabelResolver, streamBridge, safetyGuard, safetyEventService);
         // 安全守卫默认「原样放行」（pass 回填原文），既有断言不受影响
         lenient().when(safetyGuard.guard(any(), any()))

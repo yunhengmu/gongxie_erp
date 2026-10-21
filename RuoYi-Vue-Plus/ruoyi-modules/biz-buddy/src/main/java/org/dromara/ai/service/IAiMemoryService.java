@@ -52,8 +52,6 @@ public interface IAiMemoryService {
     /**
      * 归档超过保留期的每日流水（移动到记忆目录下的 {@code archive/} 子目录，保留证据、释放上下文）。
      *
-     * <p>替代框架「&gt;90 天归档」在用户级隔离目录下不生效的问题（与自实现合并同源）。</p>
-     *
      * @param agentId 智能体主键
      * @param userId  记忆归属用户主键
      * @return 归档的文件数
@@ -78,21 +76,5 @@ public interface IAiMemoryService {
      * @param userId  记忆归属用户主键
      */
     void deleteAll(Long agentId, Long userId);
-
-    /**
-     * 由对话链路在每轮收尾调用的**自动合并**入口（REQ-AI-09）：判定通过才真正合并。
-     *
-     * <p>只负责提交（延迟异步执行），不阻塞本轮回答；是否执行由三件事共同决定：
-     * ① 长期记忆开关已开启；② 距上次合并已超过「合并最小间隔」；③ 期间有新增的每日流水。
-     * 任一不满足即跳过，避免无收益的额外模型调用。</p>
-     *
-     * <p><b>为什么需要它</b>：框架的自动合并（{@code MemoryConsolidator}）在「按用户隔离」的
-     * 目录结构下读不到流水、恒跳过，导致 {@code MEMORY.md} 永不生成，新对话看不到已记事实；
-     * 故由平台自实现的合并 + 本入口补齐自动链路。</p>
-     *
-     * @param agentId 智能体主键
-     * @param userId  记忆归属用户主键
-     */
-    void consolidateIfDue(Long agentId, Long userId);
 
 }

@@ -9,7 +9,6 @@ import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.memory.MemoryConsolidator;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
-import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.core.agent.AgentRegistry;
@@ -23,7 +22,6 @@ import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
-import org.dromara.common.redis.utils.RedisUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -36,9 +34,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -81,26 +76,6 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
      * 手动合并的最长等待时间
      */
     private static final Duration CONSOLIDATE_TIMEOUT = Duration.ofMinutes(5);
-
-    /**
-     * 自动合并节流／水位键前缀（按「智能体 × 用户」记录上次合并时刻）
-     */
-    private static final String CONSOLIDATE_MARK_PREFIX = "bizbuddy:ai:memory:consolidated:";
-
-    /**
-     * 自动合并的延迟触发秒数：等待框架「事实抽取」异步落盘后再合并，避免读到空流水
-     */
-    private static final long AUTO_CONSOLIDATE_DELAY_SECONDS = 30L;
-
-    /**
-     * 自动合并调度器（单线程串行，避免同一用户并发合并）
-     */
-    private final ScheduledExecutorService consolidationScheduler =
-        Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "ai-memory-consolidate");
-            thread.setDaemon(true);
-            return thread;
-        });
 
     private final IAiAgentService agentService;
 
@@ -218,15 +193,16 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         int removed = 0;
         Path memoryDir = workspace.getMemoryDir(ctx);
         removed += deleteExpiredMemoryFiles(memoryDir, dailyCutoff);
-        removed += deleteExpiredMemoryFiles(memoryDir.resolve(ARCHIVE_DIR), dailyCutoff);
+        // 归档目录使用独立的保留期，避免与每日流水保留期相同导致「归档即删除」
+        LocalDate archiveCutoff = LocalDate.now()
+            .minusDays(Math.max(1, policy.getArchiveRetentionDays()));
+        removed += deleteExpiredMemoryFiles(memoryDir.resolve(ARCHIVE_DIR), archiveCutoff);
         // 会话态记忆（工作区 session 日志）：按会话保留天数清理
         LocalDate sessionCutoff = LocalDate.now().minusDays(Math.max(1, policy.getSessionRetentionDays()));
         removed += deleteExpiredSessionLogs(workspace, ctx, sessionCutoff);
-        // 水位一并清除：下次对话按新流水重新合并
-        RedisUtils.deleteObject(CONSOLIDATE_MARK_PREFIX + agentId + ":" + userId);
-        log.info("长期记忆清理完成：agent={}, userId={}, 删除 {} 个文件（流水 {} 天 / 会话 {} 天）",
+        log.info("长期记忆清理完成：agent={}, userId={}, 删除 {} 个文件（流水 {} 天 / 归档 {} 天 / 会话 {} 天）",
             definition.getAgentCode(), userId, removed, policy.getDailyFileRetentionDays(),
-            policy.getSessionRetentionDays());
+            policy.getArchiveRetentionDays(), policy.getSessionRetentionDays());
         return removed;
     }
 
@@ -242,7 +218,6 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         } catch (IOException e) {
             throw new ServiceException("删除长期记忆失败：" + e.getMessage());
         }
-        RedisUtils.deleteObject(CONSOLIDATE_MARK_PREFIX + agentId + ":" + userId);
         log.info("长期记忆已删除：agent={}, userId={}", definition.getAgentCode(), userId);
     }
 
@@ -552,121 +527,6 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             throw new ServiceException("非法的记忆文件路径：" + path);
         }
         return path;
-    }
-
-    @Override
-    public void consolidateIfDue(Long agentId, Long userId) {
-        if (agentId == null || userId == null) {
-            return;
-        }
-        // 延迟提交：给框架「事实抽取」异步落盘留出时间；只提交不阻塞本轮回答
-        consolidationScheduler.schedule(() -> {
-            try {
-                doConsolidateIfDue(agentId, userId);
-            } catch (Exception e) {
-                log.warn("长期记忆自动合并失败：agent={}, userId={}, err={}", agentId, userId, e.getMessage());
-            }
-        }, AUTO_CONSOLIDATE_DELAY_SECONDS, TimeUnit.SECONDS);
-    }
-
-    /**
-     * 自动合并的实际判定与执行：开关 → 节流 → 新增流水，三者满足才合并。
-     *
-     * @param agentId 智能体主键
-     * @param userId  记忆归属用户主键
-     */
-    private void doConsolidateIfDue(Long agentId, Long userId) {
-        AiMemoryConfigBo policy = runtimeConfigStore.memory();
-        if (!policy.isEnabled()) {
-            return;
-        }
-        String markKey = CONSOLIDATE_MARK_PREFIX + agentId + ":" + userId;
-        Long lastRun = readConsolidateMark(markKey);
-        long now = System.currentTimeMillis();
-        long gapMillis = Math.max(1, policy.getConsolidationMinGapMinutes()) * 60_000L;
-        if (lastRun != null && now - lastRun < gapMillis) {
-            return;
-        }
-        AiAgent definition = agentService.getEnabledAgent(agentId);
-        WorkspaceManager workspace = workspaceOf(definition);
-        RuntimeContext ctx = contextOf(userId);
-        long newest = latestDailyModified(workspace, ctx);
-        if (newest <= 0L || (lastRun != null && newest <= lastRun)) {
-            // 无新增流水：不产生额外模型调用
-            return;
-        }
-        // 先落水位：合并可能耗时数分钟，避免期间并发重复触发
-        RedisUtils.setCacheObject(markKey, String.valueOf(now));
-        try {
-            consolidate(agentId, userId);
-        } catch (RuntimeException e) {
-            // 失败则回退水位，允许后续对话尽快重试
-            RedisUtils.deleteObject(markKey);
-            throw e;
-        }
-    }
-
-    /**
-     * 读取上次自动合并时刻。
-     *
-     * @param key 水位键
-     * @return 上次合并毫秒时间戳；无记录时返回 null
-     */
-    private Long readConsolidateMark(String key) {
-        Object cached = RedisUtils.getCacheObject(key);
-        if (cached == null) {
-            return null;
-        }
-        try {
-            return Long.parseLong(String.valueOf(cached));
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    /**
-     * 取每日流水目录下最新的修改时间（无流水目录或读取失败时返回 0）。
-     *
-     * @param workspace 工作区管理器
-     * @param ctx       运行上下文
-     * @return 最新修改时间毫秒时间戳
-     */
-    private long latestDailyModified(WorkspaceManager workspace, RuntimeContext ctx) {
-        Path dir = workspace.getMemoryDir(ctx);
-        if (!Files.isDirectory(dir)) {
-            return 0L;
-        }
-        try (Stream<Path> files = Files.list(dir)) {
-            return files.filter(Files::isRegularFile)
-                .filter(path -> path.getFileName().toString().endsWith(".md"))
-                .mapToLong(path -> {
-                    try {
-                        return Files.getLastModifiedTime(path).toMillis();
-                    } catch (IOException e) {
-                        return 0L;
-                    }
-                })
-                .max().orElse(0L);
-        } catch (IOException e) {
-            log.warn("读取记忆流水目录失败：{}", e.getMessage());
-            return 0L;
-        }
-    }
-
-    /**
-     * 应用关闭时等待在跑的合并任务收尾。
-     */
-    @PreDestroy
-    public void shutdownConsolidationScheduler() {
-        consolidationScheduler.shutdown();
-        try {
-            if (!consolidationScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                consolidationScheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            consolidationScheduler.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
     }
 
 }

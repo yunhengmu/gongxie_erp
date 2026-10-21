@@ -111,7 +111,7 @@
               合并最小间隔（分钟）
               <el-tooltip placement="top">
                 <template #content>
-                  <div class="tip-content">两次自动合并之间的最小间隔（框架默认 30 分钟）。</div>
+                  <div class="tip-content">框架自动合并两次执行之间的最小间隔（默认 30 分钟）。</div>
                 </template>
                 <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
               </el-tooltip>
@@ -127,13 +127,27 @@
               每日流水保留天数
               <el-tooltip placement="top">
                 <template #content>
-                  <div class="tip-content">期望行为是把超期流水归档到 memory/archive/（框架默认 90 天）；<b>该归档依赖框架的文件系统检索，在当前「按用户隔离」的目录结构下不生效</b>，本项当前仅作配置保留。</div>
+                  <div class="tip-content">超过该天数的每日流水会移入 memory/archive/ 归档目录（默认 90 天），归档文件再按「归档保留天数」清理。</div>
                 </template>
                 <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
               </el-tooltip>
             </span>
           </template>
           <el-input-number v-model="form.dailyFileRetentionDays" :min="1" :max="3650" :step="10" />
+        </el-form-item>
+        <el-form-item label="归档保留天数" prop="archiveRetentionDays">
+          <template #label>
+            <span class="label-tip">
+              归档保留天数
+              <el-tooltip placement="top">
+                <template #content>
+                  <div class="tip-content">已移入 memory/archive/ 的流水保留天数（默认 365 天），到期后由自动清理删除。</div>
+                </template>
+                <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
+          <el-input-number v-model="form.archiveRetentionDays" :min="1" :max="3650" :step="30" />
         </el-form-item>
         <el-form-item label="会话日志保留天数" prop="sessionRetentionDays">
           <template #label>
@@ -305,8 +319,9 @@ const form = ref<MemoryConfig>({
   consolidationMaxTokens: 4000,
   consolidationMinGapMinutes: 30,
   dailyFileRetentionDays: 90,
+  archiveRetentionDays: 365,
   sessionRetentionDays: 180,
-  flushMode: 'always',
+  flushMode: 'throttled',
   flushThrottleMinutes: 30
 });
 
@@ -317,6 +332,7 @@ const rules = {
   consolidationMaxTokens: [{ required: true, message: '合并 Token 上限不能为空', trigger: 'blur' }],
   consolidationMinGapMinutes: [{ required: true, message: '合并最小间隔不能为空', trigger: 'blur' }],
   dailyFileRetentionDays: [{ required: true, message: '流水保留天数不能为空', trigger: 'blur' }],
+  archiveRetentionDays: [{ required: true, message: '归档保留天数不能为空', trigger: 'blur' }],
   sessionRetentionDays: [{ required: true, message: '会话保留天数不能为空', trigger: 'blur' }]
 };
 

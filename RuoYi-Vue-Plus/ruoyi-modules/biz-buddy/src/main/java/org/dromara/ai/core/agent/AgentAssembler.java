@@ -251,7 +251,7 @@ public class AgentAssembler {
         applyWorkspaceContext(builder, workspacePolicy);
         log.info("运行期策略：agent={}, compaction={}(triggerMessages={}, triggerTokens={}, keepMessages={}, "
                 + "flush={}, offload={}), toolResultEviction={}({}/{}), planMode={}(dir={}), "
-                + "taskList={}, memory={}(maxContextTokens={}, consolidation={} tokens/{} 分钟, retention={}/{} 天, "
+                + "taskList={}, memory={}(maxContextTokens={}, consolidation={} tokens/{} 分钟, retention={}/{}/{} 天, "
                 + "flush={}), workspace={}(additionalFiles={})",
             definition.getAgentCode(), compactionPolicy.isEnabled(), compactionPolicy.getTriggerMessages(),
             compactionPolicy.getTriggerTokens(), compactionPolicy.getKeepMessages(),
@@ -261,7 +261,8 @@ public class AgentAssembler {
             planPolicy.getPlanFileDirectory(), planPolicy.isTaskListEnabled(),
             memoryPolicy.isEnabled(), memoryPolicy.getMaxContextTokens(), memoryPolicy.getConsolidationMaxTokens(),
             memoryPolicy.getConsolidationMinGapMinutes(), memoryPolicy.getDailyFileRetentionDays(),
-            memoryPolicy.getSessionRetentionDays(), memoryPolicy.getFlushMode(), workspacePolicy.isEnabled(),
+            memoryPolicy.getArchiveRetentionDays(), memoryPolicy.getSessionRetentionDays(),
+            memoryPolicy.getFlushMode(), workspacePolicy.isEnabled(),
             workspacePolicy.getAdditionalContextFiles());
         log.info("当前时间注入：agent={}, enabled={}, zone={}", definition.getAgentCode(),
             aiProperties.getChat().isCurrentTimeEnabled(), aiProperties.getChat().getCurrentTimeZone());

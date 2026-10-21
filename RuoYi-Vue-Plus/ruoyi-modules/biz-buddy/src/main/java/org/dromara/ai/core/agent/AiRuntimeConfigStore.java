@@ -143,6 +143,10 @@ public class AiRuntimeConfigStore {
         if (StringUtils.isBlank(policy.getFlushMode())) {
             policy.setFlushMode(aiProperties.getChat().getMemoryFlushMode());
         }
+        // 旧版运行期配置没有归档保留期：补默认值，避免清理时把归档目录当流水一并删除
+        if (policy.getArchiveRetentionDays() <= 0) {
+            policy.setArchiveRetentionDays(aiProperties.getChat().getMemoryArchiveRetentionDays());
+        }
         return policy;
     }
 
@@ -154,9 +158,10 @@ public class AiRuntimeConfigStore {
     public void updateMemory(AiMemoryConfigBo bo) {
         RedisUtils.setCacheObject(MEMORY_KEY, JsonUtils.toJsonString(bo));
         log.info("长期记忆配置已更新：enabled={}, maxContextTokens={}, consolidation={} tokens/{} 分钟, "
-                + "retention={}/{} 天, flushMode={}({} 分钟)",
+                + "retention={}/{}/{} 天, flushMode={}({} 分钟)",
             bo.isEnabled(), bo.getMaxContextTokens(), bo.getConsolidationMaxTokens(),
-            bo.getConsolidationMinGapMinutes(), bo.getDailyFileRetentionDays(), bo.getSessionRetentionDays(),
+            bo.getConsolidationMinGapMinutes(), bo.getDailyFileRetentionDays(),
+            bo.getArchiveRetentionDays(), bo.getSessionRetentionDays(),
             bo.getFlushMode(), bo.getFlushThrottleMinutes());
     }
 
@@ -467,6 +472,7 @@ public class AiRuntimeConfigStore {
         bo.setConsolidationMaxTokens(chat.getMemoryConsolidationMaxTokens());
         bo.setConsolidationMinGapMinutes(chat.getMemoryConsolidationMinGapMinutes());
         bo.setDailyFileRetentionDays(chat.getMemoryDailyFileRetentionDays());
+        bo.setArchiveRetentionDays(chat.getMemoryArchiveRetentionDays());
         bo.setSessionRetentionDays(chat.getMemorySessionRetentionDays());
         bo.setFlushMode(chat.getMemoryFlushMode());
         bo.setFlushThrottleMinutes(chat.getMemoryFlushThrottleMinutes());

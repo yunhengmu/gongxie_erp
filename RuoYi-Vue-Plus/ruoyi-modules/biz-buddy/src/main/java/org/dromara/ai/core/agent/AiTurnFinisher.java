@@ -12,7 +12,6 @@ import org.dromara.ai.domain.AiRouteRun;
 import org.dromara.ai.domain.AiToolCallLog;
 import org.dromara.ai.domain.AiTrace;
 import org.dromara.ai.domain.dto.ChatTokenUsage;
-import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
 import org.dromara.ai.service.IAiSafetyEventService;
 import org.dromara.ai.service.IAiSessionService;
@@ -83,8 +82,6 @@ public class AiTurnFinisher {
     private final IAiUsageStatService usageStatService;
 
     private final IAiTraceService traceService;
-
-    private final IAiMemoryService memoryService;
 
     private final AiProperties aiProperties;
 
@@ -267,14 +264,6 @@ public class AiTurnFinisher {
         }
         AiSseSupport.send(emitter, payload);
         AiSseSupport.complete(emitter);
-        // 长期记忆自动合并（REQ-AI-09）：本轮已产生新的每日流水，按节流异步把流水并入 MEMORY.md，
-        // 否则新对话只会看到上一次的长期记忆（框架自动合并在用户隔离目录下恒跳过，见 AiMemoryServiceImpl）
-        try {
-            memoryService.consolidateIfDue(state.agentId, state.userId);
-        } catch (Exception e) {
-            log.warn("提交长期记忆自动合并失败：agent={}, user={}, err={}",
-                state.agentId, state.userId, e.getMessage());
-        }
         return assistant;
     }
 
