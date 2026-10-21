@@ -165,8 +165,8 @@ public class AiVectorServiceImpl implements IAiVectorService {
 
         markStatus(docId, STATUS_RUNNING, "");
         try {
-            // 重建语义：先清理该文档在本知识库中的旧向量，避免残留脏数据
-            removeVectors(knowledgeBase.getId(), collectVectorIds(chunks));
+            // 重建语义：按文档清理**全部**历史向量（含切片已重建、业务记录不再指向的孤儿）
+            vectorStore.deleteByDocId(knowledgeBase.getCollectionName(), knowledgeBase.getDimension(), docId);
 
             int pageCount = (chunks.size() + WRITE_PAGE_SIZE - 1) / WRITE_PAGE_SIZE;
             for (int page = 0; page < pageCount; page++) {
@@ -500,22 +500,6 @@ public class AiVectorServiceImpl implements IAiVectorService {
         lqw.eq(AiChunk::getDocId, docId);
         lqw.orderByAsc(AiChunk::getChunkIndex);
         return chunkMapper.selectList(lqw);
-    }
-
-    /**
-     * 收集切片上已记录的向量主键。
-     *
-     * @param chunks 切片列表
-     * @return 向量主键集合
-     */
-    private List<String> collectVectorIds(List<AiChunk> chunks) {
-        List<String> ids = new ArrayList<>();
-        for (AiChunk chunk : chunks) {
-            if (StringUtils.isNotBlank(chunk.getVectorId())) {
-                ids.add(chunk.getVectorId());
-            }
-        }
-        return ids;
     }
 
     /**
