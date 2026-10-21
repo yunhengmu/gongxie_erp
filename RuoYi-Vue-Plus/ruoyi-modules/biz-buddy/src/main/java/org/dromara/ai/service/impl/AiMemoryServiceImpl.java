@@ -5,6 +5,7 @@ import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.model.ChatResponse;
+import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.memory.MemoryConsolidator;
@@ -16,10 +17,12 @@ import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
+import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiMemoryService;
+import org.dromara.ai.service.IAiUsageStatService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.stereotype.Service;
@@ -83,6 +86,8 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
 
     private final AiRuntimeConfigStore runtimeConfigStore;
 
+    private final IAiUsageStatService usageStatService;
+
     @Override
     public List<AiMemoryFileVo> listFiles(Long agentId, Long userId) {
         AiAgent definition = agentService.getEnabledAgent(agentId);
@@ -130,9 +135,12 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         AiAgent definition = agentService.getEnabledAgent(agentId);
         WorkspaceManager workspace = workspaceOf(definition);
         RuntimeContext ctx = contextOf(userId);
-        int maxTokens = runtimeConfigStore.memory().getConsolidationMaxTokens();
+        AiMemoryConfigBo policy = runtimeConfigStore.memory();
+        int maxTokens = policy.getConsolidationMaxTokens();
+        // 输入预算与配置的合并 Token 上限对齐（1 Token ≈ 4 字符），超限只保留最近的流水
+        int maxChars = Math.max(4000, maxTokens * 4);
         String memoryMd = workspace.readMemoryMd(ctx);
-        String ledger = readDailyLedger(workspace, ctx);
+        String ledger = readDailyLedger(workspace, ctx, maxChars);
         if (StringUtils.isBlank(ledger)) {
             log.info("长期记忆合并跳过（无每日流水）：agent={}, userId={}",
                 definition.getAgentCode(), userId);
@@ -140,13 +148,16 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         }
         Model model = agentRegistry.memoryModelFor(definition);
         long started = System.currentTimeMillis();
-        String merged = callConsolidationModel(model, maxTokens, memoryMd, ledger);
-        if (StringUtils.isBlank(merged)) {
+        ConsolidationResult result = callConsolidationModel(model, maxTokens, memoryMd, ledger);
+        if (StringUtils.isBlank(result.content())) {
             throw new ServiceException("记忆合并失败：模型未返回有效内容，请检查记忆模型是否可用");
         }
-        workspace.writeUtf8WorkspaceRelative(ctx, MEMORY_MD, merged);
-        log.info("长期记忆合并完成：agent={}, userId={}, MEMORY.md {} 字符 → {} 字符, 耗时={}ms",
-            definition.getAgentCode(), userId, StringUtils.length(memoryMd), merged.length(),
+        workspace.writeUtf8WorkspaceRelative(ctx, MEMORY_MD, result.content());
+        recordConsolidationUsage(definition, userId, result.usage());
+        log.info("长期记忆合并完成：agent={}, userId={}, 流水 {} 字符, MEMORY.md {} 字符 → {} 字符, "
+                + "tokens={}, 耗时={}ms",
+            definition.getAgentCode(), userId, ledger.length(), StringUtils.length(memoryMd),
+            result.content().length(), result.usage() == null ? 0 : result.usage().totalTokens(),
             System.currentTimeMillis() - started);
     }
 
@@ -324,39 +335,65 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     }
 
     /**
-     * 拼接全部每日流水正文（用于合并）。
+     * 拼接每日流水正文（用于手动合并），并按字符预算优先保留最近的流水。
      *
      * @param workspace 工作区管理器
      * @param ctx       运行上下文
+     * @param maxChars  流水正文的字符上限（超限时只保留最近的流水）
      * @return 流水正文，无流水时为空串
      */
-    private String readDailyLedger(WorkspaceManager workspace, RuntimeContext ctx) {
-        StringBuilder ledger = new StringBuilder();
-        for (String path : safeMemoryPaths(workspace, ctx)) {
-            if (MEMORY_MD.equals(path)) {
+    private String readDailyLedger(WorkspaceManager workspace, RuntimeContext ctx, int maxChars) {
+        // 按文件名（YYYY-MM-DD.md）倒序，优先纳入最近几天；超限的旧流水跳过，
+        // 其内容通常已由框架的增量合并写入 MEMORY.md
+        List<String> dailyPaths = safeMemoryPaths(workspace, ctx).stream()
+            .filter(path -> !MEMORY_MD.equals(path))
+            .sorted(Comparator.comparing(this::fileNameOf).reversed())
+            .toList();
+        List<String> blocks = new ArrayList<>();
+        int chars = 0;
+        int skipped = 0;
+        for (String path : dailyPaths) {
+            String content = readQuietly(workspace, ctx, path);
+            if (StringUtils.isBlank(content)) {
                 continue;
             }
-            String content = readQuietly(workspace, ctx, path);
-            if (StringUtils.isNotBlank(content)) {
-                ledger.append("### ").append(fileNameOf(path)).append('\n').append(content).append("\n\n");
+            String block = "### " + fileNameOf(path) + '\n' + content;
+            // 首个（最新）流水即使超限也保留，避免空输入；其余按预算截断
+            if (!blocks.isEmpty() && chars + block.length() > maxChars) {
+                skipped++;
+                continue;
             }
+            blocks.add(0, block);
+            chars += block.length();
+        }
+        if (blocks.isEmpty()) {
+            return "";
+        }
+        StringBuilder ledger = new StringBuilder();
+        if (skipped > 0) {
+            ledger.append("（仅包含最近的 ").append(blocks.size())
+                .append(" 个流水文件，更早内容已省略）\n\n");
+        }
+        for (String block : blocks) {
+            ledger.append(block).append("\n\n");
         }
         return ledger.toString().trim();
     }
 
     /**
-     * 调用记忆模型执行合并，返回新的 MEMORY.md 全文。
+     * 调用记忆模型执行合并，返回新的 MEMORY.md 全文与用量。
      *
-     * <p>说明：框架的 {@code MemoryConsolidator} 通过 filesystem 的 {@code glob} 定位每日流水，
-     * 在用户级隔离目录下匹配不到文件（实测始终跳过），故此处按同一提示词自行调用模型完成合并。</p>
+     * <p>手动入口按框架同一提示词模板完成全量重跑；框架自动合并已按用户水位增量执行，
+     * 两者互不重复。</p>
      *
      * @param model     记忆模型
      * @param maxTokens 合并结果允许的 Token 上限
      * @param memoryMd  现有 MEMORY.md 内容
      * @param ledger    每日流水正文
-     * @return 合并后的 MEMORY.md 全文
+     * @return 合并结果（正文 + 用量）
      */
-    private String callConsolidationModel(Model model, int maxTokens, String memoryMd, String ledger) {
+    private ConsolidationResult callConsolidationModel(Model model, int maxTokens, String memoryMd,
+                                                       String ledger) {
         String userContent = "Current MEMORY.md content:\n\n"
             + (StringUtils.isBlank(memoryMd) ? "(empty)" : memoryMd)
             + "\n\nNew daily ledger entries to merge:\n\n" + ledger;
@@ -368,10 +405,17 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             .collectList()
             .block(CONSOLIDATE_TIMEOUT);
         if (responses == null) {
-            return "";
+            return new ConsolidationResult("", null);
         }
         StringBuilder merged = new StringBuilder();
+        int promptTokens = 0;
+        int completionTokens = 0;
         for (ChatResponse response : responses) {
+            ChatUsage usage = response.getUsage();
+            if (usage != null) {
+                promptTokens += usage.getInputTokens();
+                completionTokens += usage.getOutputTokens();
+            }
             if (response.getContent() == null) {
                 continue;
             }
@@ -380,7 +424,41 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
                 .map(TextBlock.class::cast)
                 .forEach(block -> merged.append(block.getText()));
         }
-        return merged.toString().trim();
+        ChatTokenUsage tokens = promptTokens + completionTokens == 0 ? null
+            : new ChatTokenUsage(promptTokens, completionTokens, promptTokens + completionTokens);
+        return new ConsolidationResult(merged.toString().trim(), tokens);
+    }
+
+    /**
+     * 把手动合并的模型调用计入用量统计（与对话同口径：按用户 × 智能体 × 模型 × 日期累加）。
+     *
+     * <p>用量记录失败只告警，不影响合并结果落盘。</p>
+     *
+     * @param definition 智能体定义
+     * @param userId     记忆归属用户主键
+     * @param usage      本次 Token 用量（为空表示提供方未返回）
+     */
+    private void recordConsolidationUsage(AiAgent definition, Long userId, ChatTokenUsage usage) {
+        if (usage == null) {
+            return;
+        }
+        try {
+            Long modelId = definition.getMemoryModelId() != null
+                ? definition.getMemoryModelId() : definition.getModelId();
+            usageStatService.accumulate(userId, definition.getId(), modelId, usage, 0, 1);
+        } catch (Exception e) {
+            log.warn("长期记忆合并用量记录失败：agent={}, userId={}, err={}",
+                definition.getAgentCode(), userId, e.getMessage());
+        }
+    }
+
+    /**
+     * 手动合并结果（正文 + 模型用量）。
+     *
+     * @param content 合并后的 MEMORY.md 全文
+     * @param usage   Token 用量（提供方未返回时为空）
+     */
+    private record ConsolidationResult(String content, ChatTokenUsage usage) {
     }
 
     /**

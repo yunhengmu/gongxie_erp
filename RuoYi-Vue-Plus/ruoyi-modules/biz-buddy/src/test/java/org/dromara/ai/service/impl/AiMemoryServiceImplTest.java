@@ -4,8 +4,10 @@ import cn.hutool.extra.spring.SpringUtil;
 import io.github.linpeilie.Converter;
 import com.baomidou.mybatisplus.core.incrementer.IdentifierGenerator;
 import io.agentscope.core.message.ContentBlock;
+import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.model.ChatResponse;
+import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.model.Model;
 import io.agentscope.harness.agent.HarnessAgent;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
@@ -14,9 +16,11 @@ import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
+import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
 import org.dromara.ai.service.IAiAgentService;
+import org.dromara.ai.service.IAiUsageStatService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +28,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -42,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.*;
 
 /**
@@ -62,6 +68,9 @@ class AiMemoryServiceImplTest {
 
     @Mock
     private AiRuntimeConfigStore runtimeConfigStore;
+
+    @Mock
+    private IAiUsageStatService usageStatService;
 
     @InjectMocks
     private AiMemoryServiceImpl memoryService;
@@ -218,6 +227,57 @@ class AiMemoryServiceImplTest {
         when(model.stream(any(), any(), any())).thenReturn(Flux.empty());
 
         assertThrows(ServiceException.class, () -> memoryService.consolidate(1L, 7L));
+    }
+
+    /**
+     * 验证手动合并的模型调用计入用量统计。
+     */
+    @Test
+    @DisplayName("合并调用计入用量统计")
+    void shouldRecordConsolidationUsage() {
+        WorkspaceManager workspace = stubWorkspace();
+        when(runtimeConfigStore.memory()).thenReturn(policy());
+        when(workspace.readMemoryMd(any())).thenReturn("old");
+        when(workspace.listMemoryFilePaths(any())).thenReturn(List.of("MEMORY.md", "memory/2024-01-01.md"));
+        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
+        Model model = mock(Model.class);
+        when(agentRegistry.memoryModelFor(any())).thenReturn(model);
+        when(model.stream(any(), any(), any()))
+            .thenReturn(Flux.just(new ChatResponse(null, List.of(TextBlock.builder().text("merged").build()),
+                new ChatUsage(120, 30, 0.2), null, null)));
+
+        memoryService.consolidate(1L, 7L);
+
+        verify(usageStatService).accumulate(eq(7L), any(), any(),
+            eq(new ChatTokenUsage(120, 30, 150)), eq(0), eq(1));
+    }
+
+    /**
+     * 验证合并输入按字符预算截断：优先纳入最新的流水，旧流水跳过并提示已省略。
+     */
+    @Test
+    @DisplayName("合并输入只保留预算内的最近流水")
+    void shouldCapDailyLedgerInput() throws IOException {
+        WorkspaceManager workspace = stubWorkspace();
+        when(runtimeConfigStore.memory()).thenReturn(policy());
+        when(workspace.readMemoryMd(any())).thenReturn("old");
+        when(workspace.listMemoryFilePaths(any()))
+            .thenReturn(List.of("MEMORY.md", "memory/2024-01-01.md", "memory/2024-01-02.md"));
+        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
+        Files.writeString(tempDir.resolve("2024-01-02.md"), "x".repeat(5000));
+        Model model = mock(Model.class);
+        when(agentRegistry.memoryModelFor(any())).thenReturn(model);
+        when(model.stream(any(), any(), any())).thenReturn(Flux.just(response("merged")));
+
+        memoryService.consolidate(1L, 7L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Msg>> captor = ArgumentCaptor.forClass(List.class);
+        verify(model).stream(captor.capture(), isNull(), any());
+        String userText = captor.getValue().get(1).getTextContent();
+        assertTrue(userText.contains("2024-01-02"));
+        assertFalse(userText.contains("2024-01-01"));
+        assertTrue(userText.contains("更早内容已省略"));
     }
 
     /**
