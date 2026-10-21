@@ -80,6 +80,11 @@ public class AiProperties {
     private Retention retention = new Retention();
 
     /**
+     * 中断任务回收配置：应用重启或线程静默死亡后，把长期停在「进行中」的记录落为终态
+     */
+    private Reaper reaper = new Reaper();
+
+    /**
      * 审计与运行数据保留策略。
      */
     @Data
@@ -89,6 +94,30 @@ public class AiProperties {
          * 审计 / 运行明细保留天数（0＝不限，不执行清理）
          */
         private int auditDays = 0;
+
+    }
+
+    /**
+     * 中断任务回收配置。
+     */
+    @Data
+    public static class Reaper {
+
+        /**
+         * 是否启用回收（默认启用）
+         */
+        private boolean enabled = true;
+
+        /**
+         * 判定为「已中断」的超时分钟数：最后更新时间早于该阈值才回收，
+         * 避免多副本部署时误伤另一副本正在跑的任务
+         */
+        private int staleMinutes = 30;
+
+        /**
+         * 周期扫描间隔（秒）
+         */
+        private int scanIntervalSeconds = 300;
 
     }
 
