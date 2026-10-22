@@ -33,6 +33,7 @@ import org.dromara.ai.domain.AiChannel;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
@@ -79,6 +80,18 @@ public final class AiChannelRuntime {
      * GitHub 默认 API 基地址
      */
     private static final String DEFAULT_GITHUB_API_BASE = "https://api.github.com";
+
+    /**
+     * 媒体响应缓冲上限：WebClient 默认仅 256KB，飞书 / 钉钉常见图片会超过该值而直接失败
+     */
+    private static final int MEDIA_BUFFER_BYTES = 16 * 1024 * 1024;
+
+    /**
+     * 媒体下载专用交换策略（放宽响应缓冲）
+     */
+    private static final ExchangeStrategies MEDIA_EXCHANGE_STRATEGIES = ExchangeStrategies.builder()
+        .codecs(config -> config.defaultCodecs().maxInMemorySize(MEDIA_BUFFER_BYTES))
+        .build();
 
     /**
      * 渠道主键（ai_channel.id）
@@ -347,7 +360,10 @@ public final class AiChannelRuntime {
         this.dingTalkRobotCode = dingTalkRobotCodeLocal;
         this.dingTalkAccountId = dingTalkAccountIdLocal;
         this.apiBase = resolvedBase;
-        this.apiClient = resolvedBase == null ? null : WebClient.builder().baseUrl(resolvedBase).build();
+        this.apiClient = resolvedBase == null ? null : WebClient.builder()
+            .baseUrl(resolvedBase)
+            .exchangeStrategies(MEDIA_EXCHANGE_STRATEGIES)
+            .build();
         this.inboundHandler = inboundHandler;
     }
 
@@ -697,7 +713,8 @@ public final class AiChannelRuntime {
      */
     private byte[] downloadWeCom(String mediaId, String url) {
         if (StringUtils.isNotBlank(url)) {
-            return WebClient.builder().build().get().uri(url)
+            return WebClient.builder().exchangeStrategies(MEDIA_EXCHANGE_STRATEGIES).build()
+                .get().uri(url)
                 .retrieve().bodyToMono(byte[].class).block(Duration.ofSeconds(20));
         }
         if (apiClient == null || weComTokenProvider == null || StringUtils.isBlank(mediaId)) {
@@ -737,7 +754,8 @@ public final class AiChannelRuntime {
             return null;
         }
         // 必须用 URI 原样传入：uri(String) 会按模板再编码一次，把签名里的 %2F 变成 %252F 导致 OSS 403
-        return WebClient.builder().build().get().uri(URI.create(downloadUrl))
+        return WebClient.builder().exchangeStrategies(MEDIA_EXCHANGE_STRATEGIES).build()
+            .get().uri(URI.create(downloadUrl))
             .retrieve().bodyToMono(byte[].class).block(Duration.ofSeconds(20));
     }
 

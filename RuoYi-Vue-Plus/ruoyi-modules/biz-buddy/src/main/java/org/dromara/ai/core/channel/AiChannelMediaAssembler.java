@@ -110,10 +110,20 @@ public class AiChannelMediaAssembler {
             return null;
         }
         if (ChannelMediaMetadata.KIND_IMAGE.equals(kind)) {
+            // 飞书 / 钉钉的图片消息不带文件名，不能只按后缀猜 MIME：
+            // 以字节魔数识别真实格式，避免把 JPEG 标成 image/png 导致模型读不出图
+            String mediaType = detectImageMediaType(bytes, fileName);
+            if (mediaType == null) {
+                log.warn("渠道图片内容无法识别，降级为标记文本：channelCode={}, bytes={}",
+                    runtime.getChannelCode(), bytes.length);
+                return null;
+            }
+            log.info("渠道图片已装配：channelCode={}, mediaType={}, bytes={}",
+                runtime.getChannelCode(), mediaType, bytes.length);
             return ImageBlock.builder()
                 .source(Base64Source.builder()
                     .data(Base64.getEncoder().encodeToString(bytes))
-                    .mediaType(guessImageMediaType(fileName))
+                    .mediaType(mediaType)
                     .build())
                 .build();
         }
@@ -167,17 +177,91 @@ public class AiChannelMediaAssembler {
     }
 
     /**
-     * 按后缀猜图片 MIME（未知时用 image/png）。
+     * 识别图片 MIME：优先按字节魔数，其次按文件名后缀；无法识别时返回 null。
+     *
+     * @param bytes    图片字节
+     * @param fileName 文件名（可空）
+     * @return MIME 类型；无法识别时返回 null
      */
-    private static String guessImageMediaType(String fileName) {
+    private static String detectImageMediaType(byte[] bytes, String fileName) {
+        String byMagic = imageMediaTypeOf(bytes);
+        if (byMagic != null) {
+            return byMagic;
+        }
         return switch (suffixOf(fileName)) {
             case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
             case "gif" -> "image/gif";
             case "webp" -> "image/webp";
+            case "bmp" -> "image/bmp";
+            case "tif", "tiff" -> "image/tiff";
             case "heic" -> "image/heic";
             case "heif" -> "image/heif";
-            default -> "image/png";
+            default -> null;
         };
+    }
+
+    /**
+     * 按文件头魔数识别常见图片格式。
+     *
+     * @param bytes 文件字节
+     * @return MIME 类型；无法识别时返回 null
+     */
+    private static String imageMediaTypeOf(byte[] bytes) {
+        if (bytes == null || bytes.length < 4) {
+            return null;
+        }
+        if (startsWith(bytes, 0, 0xFF, 0xD8, 0xFF)) {
+            return "image/jpeg";
+        }
+        if (startsWith(bytes, 0, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)) {
+            return "image/png";
+        }
+        if (startsWith(bytes, 0, 'G', 'I', 'F', '8')) {
+            return "image/gif";
+        }
+        if (startsWith(bytes, 0, 'R', 'I', 'F', 'F')
+            && startsWith(bytes, 8, 'W', 'E', 'B', 'P')) {
+            return "image/webp";
+        }
+        if (startsWith(bytes, 0, 'B', 'M')) {
+            return "image/bmp";
+        }
+        if (startsWith(bytes, 0, 'I', 'I', 0x2A, 0x00)
+            || startsWith(bytes, 0, 'M', 'M', 0x00, 0x2A)) {
+            return "image/tiff";
+        }
+        // HEIF / HEIC：ftyp 盒 + 品牌（heic/heix/hevc/mif1/msf1）
+        if (startsWith(bytes, 4, 'f', 't', 'y', 'p')) {
+            if (startsWith(bytes, 8, 'h', 'e', 'i', 'c')
+                || startsWith(bytes, 8, 'h', 'e', 'i', 'x')
+                || startsWith(bytes, 8, 'h', 'e', 'v', 'c')
+                || startsWith(bytes, 8, 'm', 'i', 'f', '1')
+                || startsWith(bytes, 8, 'm', 's', 'f', '1')) {
+                return "image/heic";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 判断字节序列在指定偏移处是否以给定值开头（越界返回 false）。
+     *
+     * @param bytes  字节数组
+     * @param offset 偏移
+     * @param values 期望值
+     * @return 是否匹配
+     */
+    private static boolean startsWith(byte[] bytes, int offset, int... values) {
+        if (bytes.length < offset + values.length) {
+            return false;
+        }
+        for (int i = 0; i < values.length; i++) {
+            if ((bytes[offset + i] & 0xFF) != (values[i] & 0xFF)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
