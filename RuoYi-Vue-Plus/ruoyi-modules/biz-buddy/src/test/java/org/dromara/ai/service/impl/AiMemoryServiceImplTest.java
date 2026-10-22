@@ -292,6 +292,10 @@ class AiMemoryServiceImplTest {
         List<List<Msg>> calls = captor.getAllValues();
         assertTrue(calls.get(0).get(1).getTextContent().contains("2024-01-01"));
         assertTrue(calls.get(1).get(1).getTextContent().contains("2024-01-02"));
+        // 合并提示词必须是平台个人信息口径：历史遗留的项目 / 知识库内容要删除
+        String systemPrompt = calls.get(0).get(0).getTextContent();
+        assertTrue(systemPrompt.contains("只保存「关于用户本人」的长期信息"));
+        assertTrue(systemPrompt.contains("一律删除"));
 
         ArgumentCaptor<String> watermark = ArgumentCaptor.forClass(String.class);
         verify(workspace, times(2)).writeUtf8WorkspaceRelative(any(),

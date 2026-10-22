@@ -364,6 +364,8 @@ public class AgentAssembler {
         MemoryConfig.Builder memory = MemoryConfig.builder()
             // 平台抽取提示词：只记个人画像与偏好，项目/知识库/工具过程不进入长期记忆
             .flushPrompt(AiMemoryPrompts.FLUSH_PROMPT)
+            // 平台合并提示词：只保留个人画像，并清理历史遗留的项目 / 知识库内容
+            .consolidationPrompt(AiMemoryPrompts.CONSOLIDATION_PROMPT)
             .consolidationMaxTokens(policy.getConsolidationMaxTokens())
             .consolidationMinGap(Duration.ofMinutes(policy.getConsolidationMinGapMinutes()))
             .dailyFileRetentionDays(policy.getDailyFileRetentionDays())

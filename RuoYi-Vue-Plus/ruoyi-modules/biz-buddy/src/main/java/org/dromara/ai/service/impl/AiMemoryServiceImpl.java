@@ -8,13 +8,13 @@ import io.agentscope.core.model.ChatResponse;
 import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
-import io.agentscope.harness.agent.memory.MemoryConsolidator;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.core.agent.AgentRegistry;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.core.memory.AiMemoryAuditLogger;
+import org.dromara.ai.core.memory.AiMemoryPrompts;
 import org.dromara.ai.core.memory.AiMemorySanitizer;
 import org.dromara.ai.core.memory.spi.MemoryBackendStats;
 import org.dromara.ai.domain.AiAgent;
@@ -942,17 +942,17 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     }
 
     /**
-     * 构造合并提示词（复用框架默认模板，仅填充其两个数字占位符）。
+     * 构造合并提示词（使用平台个人信息口径模板，仅填充其两个数字占位符）。
      *
      * @param maxTokens 合并结果允许的 Token 上限
      * @return 提示词
      */
     private String consolidationPrompt(int maxTokens) {
         try {
-            return String.format(MemoryConsolidator.DEFAULT_CONSOLIDATION_PROMPT, maxTokens, maxTokens * 4);
+            return String.format(AiMemoryPrompts.CONSOLIDATION_PROMPT, maxTokens, maxTokens * 4);
         } catch (RuntimeException e) {
-            log.warn("合并提示词格式化失败，回退原始模板：{}", e.getMessage());
-            return MemoryConsolidator.DEFAULT_CONSOLIDATION_PROMPT;
+            log.warn("合并提示词格式化失败，回退平台模板原文：{}", e.getMessage());
+            return AiMemoryPrompts.CONSOLIDATION_PROMPT;
         }
     }
 
