@@ -3,6 +3,7 @@ package org.dromara.ai.core.agent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.memory.AiMemoryConfigGuard;
 import org.dromara.ai.domain.bo.AiAuditRetentionBo;
 import org.dromara.ai.domain.bo.AiCompactionConfigBo;
 import org.dromara.ai.domain.bo.AiJevConfigBo;
@@ -143,20 +144,29 @@ public class AiRuntimeConfigStore {
         if (StringUtils.isBlank(policy.getFlushMode())) {
             policy.setFlushMode(aiProperties.getChat().getMemoryFlushMode());
         }
+        // 旧版运行期配置没有归档保留期：补默认值，避免清理时把归档目录当流水一并删除
+        if (policy.getArchiveRetentionDays() <= 0) {
+            policy.setArchiveRetentionDays(aiProperties.getChat().getMemoryArchiveRetentionDays());
+        }
         return policy;
     }
 
     /**
      * 保存长期记忆配置（写入 Redis 覆盖值）。
      *
+     * <p>写入前执行跨字段护栏校验，非法组合直接拒绝，避免把「归档即删除」「合并预算挤占注入预算」
+     * 这类配置持久化到 Redis（docs/24 §5.8）。</p>
+     *
      * @param bo 长期记忆配置
      */
     public void updateMemory(AiMemoryConfigBo bo) {
+        AiMemoryConfigGuard.validate(bo);
         RedisUtils.setCacheObject(MEMORY_KEY, JsonUtils.toJsonString(bo));
         log.info("长期记忆配置已更新：enabled={}, maxContextTokens={}, consolidation={} tokens/{} 分钟, "
-                + "retention={}/{} 天, flushMode={}({} 分钟)",
+                + "retention={}/{}/{} 天, flushMode={}({} 分钟)",
             bo.isEnabled(), bo.getMaxContextTokens(), bo.getConsolidationMaxTokens(),
-            bo.getConsolidationMinGapMinutes(), bo.getDailyFileRetentionDays(), bo.getSessionRetentionDays(),
+            bo.getConsolidationMinGapMinutes(), bo.getDailyFileRetentionDays(),
+            bo.getArchiveRetentionDays(), bo.getSessionRetentionDays(),
             bo.getFlushMode(), bo.getFlushThrottleMinutes());
     }
 
@@ -467,6 +477,7 @@ public class AiRuntimeConfigStore {
         bo.setConsolidationMaxTokens(chat.getMemoryConsolidationMaxTokens());
         bo.setConsolidationMinGapMinutes(chat.getMemoryConsolidationMinGapMinutes());
         bo.setDailyFileRetentionDays(chat.getMemoryDailyFileRetentionDays());
+        bo.setArchiveRetentionDays(chat.getMemoryArchiveRetentionDays());
         bo.setSessionRetentionDays(chat.getMemorySessionRetentionDays());
         bo.setFlushMode(chat.getMemoryFlushMode());
         bo.setFlushThrottleMinutes(chat.getMemoryFlushThrottleMinutes());

@@ -17,7 +17,6 @@ import org.dromara.ai.domain.vo.AiMessageVo;
 import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiChatAttachmentService;
-import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiPermissionDecisionService;
 import org.dromara.ai.service.IAiQuotaService;
 import org.dromara.ai.service.IAiSafetyEventService;
@@ -106,8 +105,6 @@ class AiChatFacadeTest {
     @Mock
     private IAiSkillService skillService;
     @Mock
-    private IAiMemoryService memoryService;
-    @Mock
     private IAiScenarioPackService scenarioPackService;
     @Mock
     private IAiSessionResourceService sessionResourceService;
@@ -160,7 +157,7 @@ class AiChatFacadeTest {
         AiRouteSupport routeSupport = new AiRouteSupport(skillService, scenarioPackService);
         AiTrustApplier trustApplier = new AiTrustApplier(agentRegistry, agentService);
         AiTurnFinisher turnFinisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
-            traceService, memoryService, aiProperties, routeRecorder, pendingStore,
+            traceService, aiProperties, routeRecorder, pendingStore,
             toolLabelResolver, streamBridge, safetyGuard, safetyEventService);
         integrationDriver = spy(new AiIntegrationDriver(sessionService, pendingStore, traceService,
             routeOrchestrator, streamBridge, runRegistry, turnFinisher));

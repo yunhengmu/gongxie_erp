@@ -14,6 +14,8 @@ export interface MemoryConfig {
   consolidationMinGapMinutes: number;
   /** 每日流水归档保留天数 */
   dailyFileRetentionDays: number;
+  /** 归档目录（memory/archive/）保留天数 */
+  archiveRetentionDays: number;
   /** 会话日志保留天数 */
   sessionRetentionDays: number;
   /** 事实抽取触发策略：always / throttled / never */

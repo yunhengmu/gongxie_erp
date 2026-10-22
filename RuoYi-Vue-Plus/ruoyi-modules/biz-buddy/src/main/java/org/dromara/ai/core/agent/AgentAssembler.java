@@ -16,6 +16,7 @@ import io.agentscope.harness.agent.tools.ToolsConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.mcp.GuardingMcpClientWrapper;
+import org.dromara.ai.core.memory.AiMemoryPrompts;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentTool;
@@ -63,6 +64,20 @@ public class AgentAssembler {
      * 否则会被 allow 名单裁掉）
      */
     private static final List<String> SKILL_BUILTIN_TOOLS = List.of("load_skill_through_path", "read_skill");
+
+    /**
+     * 只读记忆检索工具名（A1 POC 放行；写入类工具仍被 deny 裁掉）
+     */
+    private static final String MEMORY_SEARCH_TOOL = "memory_search";
+
+    private static final String MEMORY_GET_TOOL = "memory_get";
+
+    /**
+     * 记忆写入/跨会话检索工具名：模型不得自行改写长期记忆
+     */
+    private static final String MEMORY_SAVE_TOOL = "memory_save";
+
+    private static final String SESSION_SEARCH_TOOL = "session_search";
 
     /**
      * 专家「技能优先」纪律：装配期追加到专家提示词末尾，**不入库**。
@@ -212,6 +227,9 @@ public class AgentAssembler {
             AgentPermissionContextFactory.renderDecisions(
                 AgentPermissionContextFactory.mergeToolDecisions(bindings, resources.mergedToolDecisions())),
             resources.mergedToolDecisions(), mcpAssembly.toolNames(), resources.signature());
+        // 只读记忆检索 POC：开启后注册框架记忆工具，再由白名单只放行 memory_search / memory_get
+        boolean memoryReadTools =
+            memoryPolicy.isEnabled() && aiProperties.getChat().isMemoryReadToolsEnabled();
         HarnessAgent.Builder builder = HarnessAgent.builder()
             .name(definition.getAgentCode())
             .description(StringUtils.isBlank(definition.getDescription())
@@ -222,7 +240,7 @@ public class AgentAssembler {
             .stateStore(stateStore)
             .workspace(resolveWorkspace(workspaceCode))
             .maxIters(maxIters)
-            .toolsConfig(buildToolsConfig(registeredCodes, skillNames, mcpAssembly))
+            .toolsConfig(buildToolsConfig(registeredCodes, skillNames, mcpAssembly, memoryReadTools))
             // 工具授权：按「智能体 × 工具」「场景包 × 工具」与「会话直接选中」的合并决策生成 allow / ask / deny 规则
             //（越显式越优先：直接选中 > 包内 > 智能体绑定；写工具走 ask → HITL 确认）
             .permissionContext(AgentPermissionContextFactory.buildContext(permissionModeStore.resolve(),
@@ -251,7 +269,7 @@ public class AgentAssembler {
         applyWorkspaceContext(builder, workspacePolicy);
         log.info("运行期策略：agent={}, compaction={}(triggerMessages={}, triggerTokens={}, keepMessages={}, "
                 + "flush={}, offload={}), toolResultEviction={}({}/{}), planMode={}(dir={}), "
-                + "taskList={}, memory={}(maxContextTokens={}, consolidation={} tokens/{} 分钟, retention={}/{} 天, "
+                + "taskList={}, memory={}(maxContextTokens={}, consolidation={} tokens/{} 分钟, retention={}/{}/{} 天, "
                 + "flush={}), workspace={}(additionalFiles={})",
             definition.getAgentCode(), compactionPolicy.isEnabled(), compactionPolicy.getTriggerMessages(),
             compactionPolicy.getTriggerTokens(), compactionPolicy.getKeepMessages(),
@@ -261,14 +279,17 @@ public class AgentAssembler {
             planPolicy.getPlanFileDirectory(), planPolicy.isTaskListEnabled(),
             memoryPolicy.isEnabled(), memoryPolicy.getMaxContextTokens(), memoryPolicy.getConsolidationMaxTokens(),
             memoryPolicy.getConsolidationMinGapMinutes(), memoryPolicy.getDailyFileRetentionDays(),
-            memoryPolicy.getSessionRetentionDays(), memoryPolicy.getFlushMode(), workspacePolicy.isEnabled(),
+            memoryPolicy.getArchiveRetentionDays(), memoryPolicy.getSessionRetentionDays(),
+            memoryPolicy.getFlushMode(), workspacePolicy.isEnabled(),
             workspacePolicy.getAdditionalContextFiles());
         log.info("当前时间注入：agent={}, enabled={}, zone={}", definition.getAgentCode(),
             aiProperties.getChat().isCurrentTimeEnabled(), aiProperties.getChat().getCurrentTimeZone());
-        HarnessAgent.Builder tail = builder
-            // 记忆工具（memory_search / memory_get / memory_save / session_search）不注册，
+        HarnessAgent.Builder tail = builder;
+        if (!memoryReadTools) {
+            // 记忆工具（memory_search / memory_get / memory_save / session_search）全部不注册，
             // 记忆仅以「MEMORY.md 注入 + 自动抽取 + 自动合并」方式工作，保持工具集最小化
-            .disableMemoryTools();
+            tail = tail.disableMemoryTools();
+        }
         if (skillNames.isEmpty()) {
             // 未绑定技能且无资源集技能：不注册技能内置工具、不注入技能清单（与既往行为一致）
             tail = tail.disableDynamicSkills();
@@ -341,6 +362,10 @@ public class AgentAssembler {
             return;
         }
         MemoryConfig.Builder memory = MemoryConfig.builder()
+            // 平台抽取提示词：只记个人画像与偏好，项目/知识库/工具过程不进入长期记忆
+            .flushPrompt(AiMemoryPrompts.FLUSH_PROMPT)
+            // 平台合并提示词：只保留个人画像，并清理历史遗留的项目 / 知识库内容
+            .consolidationPrompt(AiMemoryPrompts.CONSOLIDATION_PROMPT)
             .consolidationMaxTokens(policy.getConsolidationMaxTokens())
             .consolidationMinGap(Duration.ofMinutes(policy.getConsolidationMinGapMinutes()))
             .dailyFileRetentionDays(policy.getDailyFileRetentionDays())
@@ -603,10 +628,12 @@ public class AgentAssembler {
      * @param skillNames      绑定且启用中的技能标识（非空时放行技能内置工具）
      * @param mcpAssembly     外部 MCP 连接装配结果（工具名已归一化，需显式放行；
      *                        连接注册由 {@link #registerMcpClients} 完成，不经 {@code mcpServers}）
+     * @param memoryReadTools 是否放行只读记忆检索工具（memory_search / memory_get）
      * @return 工具过滤配置
      */
     static ToolsConfig buildToolsConfig(List<String> registeredCodes,
-                                        List<String> skillNames, McpClientAssembly mcpAssembly) {
+                                        List<String> skillNames, McpClientAssembly mcpAssembly,
+                                        boolean memoryReadTools) {
         List<String> allow = new ArrayList<>(registeredCodes);
         if (!skillNames.isEmpty()) {
             // 技能内置工具由框架 DynamicSkillMiddleware 注册，必须显式放行，否则会被 allow 名单裁掉
@@ -617,9 +644,17 @@ public class AgentAssembler {
             // 与技能工具同款：必须显式放行，否则会被 ToolFilter 按 allow 名单裁掉
             allow.addAll(mcpAssembly.toolNames());
         }
+        List<String> deny = new ArrayList<>(List.of("web_search", "web_fetch"));
+        if (memoryReadTools) {
+            // 只放行只读检索；写入类记忆工具由 deny 兜底裁掉，避免模型自行改写长期记忆
+            allow.add(MEMORY_SEARCH_TOOL);
+            allow.add(MEMORY_GET_TOOL);
+            deny.add(MEMORY_SAVE_TOOL);
+            deny.add(SESSION_SEARCH_TOOL);
+        }
         ToolsConfig config = new ToolsConfig();
         config.setAllow(allow);
-        config.setDeny(List.of("web_search", "web_fetch"));
+        config.setDeny(deny);
         return config;
     }
 

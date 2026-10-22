@@ -498,7 +498,7 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 | `chat.compaction-enabled` 等 | true / 50 / 80000 / 20 | 上下文压缩开关、触发消息数 / Token 数、保留尾部条数 |
 | `chat.tool-result-eviction-enabled` 等 | true / 80000 / 2000 | 大工具结果卸载开关、阈值与预览字符数 |
 | `chat.plan-mode-enabled` / `task-list-enabled` | false | 计划模式与任务清单开关 |
-| `chat.memory-enabled` 等 | false / 8000 / 4000 / 30 | 长期记忆开关、注入上限、合并上限、最小间隔 |
+| `chat.memory-enabled` 等 | true / 8000 / 4000 / 30 | 长期记忆开关、注入上限、合并上限、最小间隔 |
 | `chat.workspace-enabled` | true | 工作区上下文注入开关（与记忆解耦） |
 | `chat.mcp-server-auth-enabled` / `mcp-server-token` | true / 空 | MCP 出口口令校验与口令 |
 | `chat.current-time-enabled` / `current-time-zone` | true / `Asia/Shanghai` | 每轮注入当前时间及其时区 |

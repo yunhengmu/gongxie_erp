@@ -5,25 +5,30 @@ import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
 import io.agentscope.core.model.ChatResponse;
+import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
-import io.agentscope.harness.agent.memory.MemoryConsolidator;
 import io.agentscope.harness.agent.workspace.WorkspaceManager;
-import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.core.agent.AgentRegistry;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
+import org.dromara.ai.core.memory.AiMemoryAuditLogger;
+import org.dromara.ai.core.memory.AiMemoryPrompts;
+import org.dromara.ai.core.memory.AiMemorySanitizer;
+import org.dromara.ai.core.memory.spi.MemoryBackendStats;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
+import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiMemoryService;
+import org.dromara.ai.service.IAiUsageStatService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
-import org.dromara.common.redis.utils.RedisUtils;
+import org.dromara.common.json.utils.JsonUtils;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -32,13 +37,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -67,6 +73,31 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     private static final String ARCHIVE_DIR = "archive";
 
     /**
+     * 净化前原文备份目录（位于记忆目录下）
+     */
+    private static final String QUARANTINE_DIR = ".quarantine";
+
+    /**
+     * 备份文件名时间戳格式
+     */
+    private static final DateTimeFormatter BACKUP_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
+    /**
+     * 框架合并水位文件（位于记忆目录下，记录最后一次成功合并时间）
+     */
+    private static final String CONSOLIDATION_STATE = ".consolidation_state";
+
+    /**
+     * 合并水位的工作区相对路径：与框架 {@code MemoryConsolidator} 使用同一文件，保证口径一致
+     */
+    private static final String CONSOLIDATION_STATE_PATH = "memory/" + CONSOLIDATION_STATE;
+
+    /**
+     * Token 与字符的粗略折算比例（1 Token ≈ 4 字符），统计口径与合并预算一致
+     */
+    private static final int CHARS_PER_TOKEN = 4;
+
+    /**
      * 记忆控制台使用的固定会话标识（用户级隔离下与会话无关）
      */
     private static final String CONSOLE_SESSION = "memory-console";
@@ -83,30 +114,21 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     private static final Duration CONSOLIDATE_TIMEOUT = Duration.ofMinutes(5);
 
     /**
-     * 自动合并节流／水位键前缀（按「智能体 × 用户」记录上次合并时刻）
+     * 单轮合并最多执行的批次数：积压较多时分多轮处理，避免一次占用模型过久
      */
-    private static final String CONSOLIDATE_MARK_PREFIX = "bizbuddy:ai:memory:consolidated:";
-
-    /**
-     * 自动合并的延迟触发秒数：等待框架「事实抽取」异步落盘后再合并，避免读到空流水
-     */
-    private static final long AUTO_CONSOLIDATE_DELAY_SECONDS = 30L;
-
-    /**
-     * 自动合并调度器（单线程串行，避免同一用户并发合并）
-     */
-    private final ScheduledExecutorService consolidationScheduler =
-        Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "ai-memory-consolidate");
-            thread.setDaemon(true);
-            return thread;
-        });
+    private static final int MAX_BATCHES_PER_RUN = 20;
 
     private final IAiAgentService agentService;
 
     private final AgentRegistry agentRegistry;
 
     private final AiRuntimeConfigStore runtimeConfigStore;
+
+    private final IAiUsageStatService usageStatService;
+
+    private final AiMemorySanitizer sanitizer;
+
+    private final AiMemoryAuditLogger auditLogger;
 
     @Override
     public List<AiMemoryFileVo> listFiles(Long agentId, Long userId) {
@@ -145,9 +167,22 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         WorkspaceManager workspace = workspaceOf(definition);
         RuntimeContext ctx = contextOf(bo.getUserId());
         String content = bo.getContent() == null ? "" : bo.getContent();
-        workspace.writeUtf8WorkspaceRelative(ctx, safePath, content);
+        // 人工编辑同样走净化：避免运维把 PII 或指令性内容直接写进会被注入的系统提示词
+        AiMemorySanitizer.SanitizeResult sanitized = sanitizer.sanitizeLedger(content);
+        String saved = sanitized.changed() ? sanitized.content() : content;
+        workspace.writeUtf8WorkspaceRelative(ctx, safePath, saved);
+        if (sanitized.changed()) {
+            log.info("长期记忆人工编辑已净化：agent={}, userId={}, path={}, 丢弃 {} 条, 去重 {} 条, "
+                    + "脱敏 {} 处, 截断 {} 条",
+                definition.getAgentCode(), bo.getUserId(), safePath, sanitized.dropped(),
+                sanitized.deduped(), sanitized.redacted(), sanitized.truncated());
+        }
+        auditLogger.record(definition.getId(), bo.getUserId(), AiMemoryAuditLogger.EVENT_MANUAL_EDIT, "OK",
+            Map.of("path", safePath, "charsBefore", content.length(), "charsAfter", saved.length(),
+                "dropped", sanitized.dropped(), "deduped", sanitized.deduped(),
+                "redacted", sanitized.redacted(), "truncated", sanitized.truncated()));
         log.info("长期记忆已更新：agent={}, userId={}, path={}, chars={}",
-            definition.getAgentCode(), bo.getUserId(), safePath, content.length());
+            definition.getAgentCode(), bo.getUserId(), safePath, saved.length());
     }
 
     @Override
@@ -155,24 +190,93 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         AiAgent definition = agentService.getEnabledAgent(agentId);
         WorkspaceManager workspace = workspaceOf(definition);
         RuntimeContext ctx = contextOf(userId);
-        int maxTokens = runtimeConfigStore.memory().getConsolidationMaxTokens();
-        String memoryMd = workspace.readMemoryMd(ctx);
-        String ledger = readDailyLedger(workspace, ctx);
-        if (StringUtils.isBlank(ledger)) {
-            log.info("长期记忆合并跳过（无每日流水）：agent={}, userId={}",
-                definition.getAgentCode(), userId);
+        AiMemoryConfigBo policy = runtimeConfigStore.memory();
+        int maxTokens = policy.getConsolidationMaxTokens();
+        // 单批输入预算与配置的合并 Token 上限对齐（1 Token ≈ 4 字符）
+        int maxChars = Math.max(4000, maxTokens * CHARS_PER_TOKEN);
+
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        Instant previousWatermark = readConsolidationWatermark(memoryDir);
+        List<DailyLedger> pending = loadPendingLedgers(
+            workspace, ctx, definition, userId, previousWatermark);
+        if (pending.isEmpty()) {
+            log.info("长期记忆合并跳过（无待合并流水）：agent={}, userId={}, watermark={}",
+                definition.getAgentCode(), userId, formatInstant(previousWatermark));
             return;
         }
+        // 在净化回写之后取本轮开始时间：否则回写刷新的 mtime 会晚于水位，
+        // 已合并文件会在下一轮被误判为未合并、反复重复合并
+        Instant runStart = Instant.now();
+
         Model model = agentRegistry.memoryModelFor(definition);
+        String memoryMd = workspace.readMemoryMd(ctx);
+        String memoryBefore = StringUtils.defaultString(memoryMd);
         long started = System.currentTimeMillis();
-        String merged = callConsolidationModel(model, maxTokens, memoryMd, ledger);
-        if (StringUtils.isBlank(merged)) {
-            throw new ServiceException("记忆合并失败：模型未返回有效内容，请检查记忆模型是否可用");
+        int batches = 0;
+        int mergedFiles = 0;
+        int mergedChars = 0;
+        int totalTokens = 0;
+        int index = 0;
+        try {
+            while (index < pending.size() && batches < MAX_BATCHES_PER_RUN) {
+                int end = nextBatchEnd(pending, index, maxChars);
+                List<DailyLedger> batch = pending.subList(index, end);
+                String ledger = renderBatch(batch);
+                ConsolidationResult result = callConsolidationModel(model, maxTokens, memoryMd, ledger);
+                if (StringUtils.isBlank(result.content())) {
+                    throw new ServiceException("记忆合并失败：模型未返回有效内容，请检查记忆模型是否可用");
+                }
+                // 模型输出同样过一遍净化：防止模型把流水中的 PII / 指令性内容原样带进长期记忆
+                AiMemorySanitizer.SanitizeResult merged = sanitizer.sanitizeLedger(result.content());
+                String mergedContent = merged.changed() ? merged.content() : result.content();
+                if (StringUtils.isBlank(mergedContent)) {
+                    // 净化后为空说明输出只剩敏感/指令内容：保留原 MEMORY.md，不推进水位，等待重试
+                    throw new ServiceException("记忆合并结果净化后为空，已保留原 MEMORY.md");
+                }
+                workspace.writeUtf8WorkspaceRelative(ctx, MEMORY_MD, mergedContent);
+                memoryMd = mergedContent;
+                if (merged.changed()) {
+                    auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_SANITIZE, "OK",
+                        Map.of("stage", "consolidationOutput", "batch", batches + 1,
+                            "dropped", merged.dropped(), "deduped", merged.deduped(),
+                            "redacted", merged.redacted(), "truncated", merged.truncated()));
+                }
+                int tokens = result.usage() == null ? 0 : result.usage().totalTokens();
+                recordConsolidationUsage(definition, userId, result.usage());
+                index = end;
+                batches++;
+                mergedFiles += batch.size();
+                mergedChars += ledger.length();
+                totalTokens += tokens;
+                // 每批成功即推进水位到「下一批最早文件之前」：已完成批次不再重读，
+                // 未完成文件仍晚于水位，下一轮/下一批继续合并，不会因截断而永久漏掉
+                Instant checkpoint = nextWatermark(pending, index, runStart, previousWatermark);
+                workspace.writeUtf8WorkspaceRelative(ctx, CONSOLIDATION_STATE_PATH, checkpoint.toString());
+                log.info("长期记忆合并批次完成：agent={}, userId={}, batch={}, files={}, chars={}, tokens={}",
+                    definition.getAgentCode(), userId, batches, batch.size(), ledger.length(), tokens);
+            }
+
+            int remaining = pending.size() - index;
+            if (remaining > 0) {
+                log.warn("长期记忆合并达到单轮批次上限，剩余 {} 个流水待下一轮：agent={}, userId={}",
+                    remaining, definition.getAgentCode(), userId);
+            }
+            long elapsed = System.currentTimeMillis() - started;
+            auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_CONSOLIDATE, "OK",
+                Map.of("batches", batches, "files", mergedFiles, "remaining", remaining,
+                    "ledgerChars", mergedChars, "memoryCharsBefore", memoryBefore.length(),
+                    "memoryCharsAfter", StringUtils.length(memoryMd), "elapsedMs", elapsed,
+                    "tokens", totalTokens));
+            log.info("长期记忆合并完成：agent={}, userId={}, 批次 {}, 文件 {}, 流水 {} 字符, "
+                    + "MEMORY.md {} 字符 → {} 字符, tokens={}, 耗时={}ms",
+                definition.getAgentCode(), userId, batches, mergedFiles, mergedChars,
+                memoryBefore.length(), StringUtils.length(memoryMd), totalTokens, elapsed);
+        } catch (RuntimeException e) {
+            auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_CONSOLIDATE, "FAIL",
+                Map.of("reason", StringUtils.defaultIfBlank(e.getMessage(), "未知错误"),
+                    "batches", batches, "files", mergedFiles));
+            throw e;
         }
-        workspace.writeUtf8WorkspaceRelative(ctx, MEMORY_MD, merged);
-        log.info("长期记忆合并完成：agent={}, userId={}, MEMORY.md {} 字符 → {} 字符, 耗时={}ms",
-            definition.getAgentCode(), userId, StringUtils.length(memoryMd), merged.length(),
-            System.currentTimeMillis() - started);
     }
 
     @Override
@@ -205,6 +309,11 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         }
         log.info("长期记忆归档完成：agent={}, userId={}, 归档 {} 个流水文件（保留 {} 天）",
             definition.getAgentCode(), userId, moved, days);
+        if (moved > 0) {
+            // 无文件搬动时不记审计，避免每个用户每天都产生一条空事件
+            auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_ARCHIVE, "OK",
+                Map.of("moved", moved, "retentionDays", days));
+        }
         return moved;
     }
 
@@ -218,15 +327,16 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         int removed = 0;
         Path memoryDir = workspace.getMemoryDir(ctx);
         removed += deleteExpiredMemoryFiles(memoryDir, dailyCutoff);
-        removed += deleteExpiredMemoryFiles(memoryDir.resolve(ARCHIVE_DIR), dailyCutoff);
+        // 归档目录使用独立的保留期，避免与每日流水保留期相同导致「归档即删除」
+        LocalDate archiveCutoff = LocalDate.now()
+            .minusDays(Math.max(1, policy.getArchiveRetentionDays()));
+        removed += deleteExpiredMemoryFiles(memoryDir.resolve(ARCHIVE_DIR), archiveCutoff);
         // 会话态记忆（工作区 session 日志）：按会话保留天数清理
         LocalDate sessionCutoff = LocalDate.now().minusDays(Math.max(1, policy.getSessionRetentionDays()));
         removed += deleteExpiredSessionLogs(workspace, ctx, sessionCutoff);
-        // 水位一并清除：下次对话按新流水重新合并
-        RedisUtils.deleteObject(CONSOLIDATE_MARK_PREFIX + agentId + ":" + userId);
-        log.info("长期记忆清理完成：agent={}, userId={}, 删除 {} 个文件（流水 {} 天 / 会话 {} 天）",
+        log.info("长期记忆清理完成：agent={}, userId={}, 删除 {} 个文件（流水 {} 天 / 归档 {} 天 / 会话 {} 天）",
             definition.getAgentCode(), userId, removed, policy.getDailyFileRetentionDays(),
-            policy.getSessionRetentionDays());
+            policy.getArchiveRetentionDays(), policy.getSessionRetentionDays());
         return removed;
     }
 
@@ -242,8 +352,215 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         } catch (IOException e) {
             throw new ServiceException("删除长期记忆失败：" + e.getMessage());
         }
-        RedisUtils.deleteObject(CONSOLIDATE_MARK_PREFIX + agentId + ":" + userId);
         log.info("长期记忆已删除：agent={}, userId={}", definition.getAgentCode(), userId);
+        auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_DELETE, "OK", null);
+    }
+
+    @Override
+    public boolean hasUnconsolidatedExpiringLedger(Long agentId, Long userId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        RuntimeContext ctx = contextOf(userId);
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        if (!Files.isDirectory(memoryDir)) {
+            return false;
+        }
+        LocalDate cutoff = LocalDate.now()
+            .minusDays(Math.max(1, runtimeConfigStore.memory().getDailyFileRetentionDays()));
+        Instant watermark = readConsolidationWatermark(memoryDir);
+        try (Stream<Path> files = Files.list(memoryDir)) {
+            // 只看「按文件名已过期」的流水：再过一轮就会被归档；其中任一文件晚于水位，说明尚未合并
+            return files.filter(Files::isRegularFile)
+                .filter(path -> isOnOrBefore(path, cutoff))
+                .anyMatch(path -> modifiedAfter(path, watermark));
+        } catch (IOException e) {
+            log.warn("读取即将归档流水失败：userId={}, err={}", userId, e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public List<Long> listMemoryUserIds(Long agentId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        Path root = workspace.getWorkspace();
+        if (root == null || !Files.isDirectory(root)) {
+            return List.of();
+        }
+        try (Stream<Path> dirs = Files.list(root)) {
+            return dirs.filter(Files::isDirectory)
+                .filter(dir -> dir.getFileName().toString().matches("\\d{1,19}"))
+                .filter(this::hasMemoryData)
+                .map(dir -> Long.valueOf(dir.getFileName().toString()))
+                .sorted()
+                .toList();
+        } catch (IOException e) {
+            log.warn("扫描记忆用户目录失败：agent={}, err={}", definition.getAgentCode(), e.getMessage());
+            return List.of();
+        }
+    }
+
+    @Override
+    public MemoryBackendStats stats(Long agentId, Long userId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        RuntimeContext ctx = contextOf(userId);
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        String memory = workspace.readMemoryMd(ctx);
+        int memoryChars = StringUtils.length(memory);
+        AuditSummary audit = summarizeAudit(memoryDir);
+        return new MemoryBackendStats(userId == null ? 0L : userId, memoryChars,
+            memoryChars / CHARS_PER_TOKEN, countLedgerFiles(memoryDir),
+            countLedgerFiles(memoryDir.resolve(ARCHIVE_DIR)),
+            formatInstant(readConsolidationWatermark(memoryDir)), audit.lastArchivedAt(),
+            audit.failedCount(), audit.lastBatches(), audit.lastMergedFiles(),
+            audit.lastRemainingFiles());
+    }
+
+    /**
+     * 判断用户目录下是否已有记忆数据（手工写入但从未对话的用户也要纳入维护）。
+     *
+     * @param userDir 用户命名空间目录
+     * @return 存在记忆目录或长期记忆文件时返回 true
+     */
+    private boolean hasMemoryData(Path userDir) {
+        return Files.isDirectory(userDir.resolve("memory"))
+            || Files.isRegularFile(userDir.resolve(MEMORY_MD));
+    }
+
+    /**
+     * 统计记忆目录下的每日流水数量（{@code YYYY-MM-DD.md}）。
+     *
+     * @param dir 记忆目录或归档目录
+     * @return 文件数
+     */
+    private int countLedgerFiles(Path dir) {
+        if (dir == null || !Files.isDirectory(dir)) {
+            return 0;
+        }
+        try (Stream<Path> files = Files.list(dir)) {
+            return (int) files.filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().endsWith(".md"))
+                .count();
+        } catch (IOException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * 读取框架合并水位（{@code memory/.consolidation_state}）。
+     *
+     * @param memoryDir 记忆目录
+     * @return 水位时间；文件缺失或无法解析时返回 {@link Instant#EPOCH}
+     */
+    private Instant readConsolidationWatermark(Path memoryDir) {
+        Path state = memoryDir.resolve(CONSOLIDATION_STATE);
+        if (!Files.isRegularFile(state)) {
+            return Instant.EPOCH;
+        }
+        try {
+            return Instant.parse(Files.readString(state, StandardCharsets.UTF_8).strip());
+        } catch (Exception e) {
+            return Instant.EPOCH;
+        }
+    }
+
+    /**
+     * 判断文件最后修改时间是否晚于合并水位。
+     */
+    private boolean modifiedAfter(Path file, Instant watermark) {
+        try {
+            return Files.getLastModifiedTime(file).toInstant().isAfter(watermark);
+        } catch (IOException e) {
+            // 读不到修改时间时按「未合并」处理，宁可多合并一次也不丢事实
+            return true;
+        }
+    }
+
+    /**
+     * 汇总审计文件中的归档时间与失败次数。
+     *
+     * @param memoryDir 记忆目录
+     * @return 审计摘要
+     */
+    @SuppressWarnings("unchecked")
+    private AuditSummary summarizeAudit(Path memoryDir) {
+        Path auditFile = memoryDir == null ? null : memoryDir.resolve(AiMemoryAuditLogger.AUDIT_FILE);
+        if (auditFile == null || !Files.isRegularFile(auditFile)) {
+            return new AuditSummary("", 0, 0, 0, 0);
+        }
+        String lastArchivedAt = "";
+        int failed = 0;
+        Map<String, Object> lastConsolidation = Map.of();
+        try (Stream<String> lines = Files.lines(auditFile, StandardCharsets.UTF_8)) {
+            for (String line : (Iterable<String>) lines::iterator) {
+                Map<String, Object> entry = JsonUtils.parseMap(line);
+                if (entry == null) {
+                    continue;
+                }
+                String event = String.valueOf(entry.getOrDefault("event", ""));
+                String result = String.valueOf(entry.getOrDefault("result", ""));
+                if ("FAIL".equals(result)) {
+                    failed++;
+                }
+                if (AiMemoryAuditLogger.EVENT_ARCHIVE.equals(event) && "OK".equals(result)) {
+                    Object ts = entry.get("ts");
+                    lastArchivedAt = ts == null ? lastArchivedAt : ts.toString();
+                }
+                if (AiMemoryAuditLogger.EVENT_CONSOLIDATE.equals(event) && "OK".equals(result)) {
+                    Object detail = entry.get("detail");
+                    if (detail instanceof Map<?, ?> map) {
+                        lastConsolidation = (Map<String, Object>) map;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("读取记忆审计日志失败：dir={}, err={}", memoryDir, e.getMessage());
+        }
+        return new AuditSummary(lastArchivedAt, failed,
+            auditInt(lastConsolidation.get("batches")),
+            auditInt(lastConsolidation.get("files")),
+            auditInt(lastConsolidation.get("remaining")));
+    }
+
+    /**
+     * 读取审计事件 detail 中的整数值（缺失或格式异常时返回 0）。
+     *
+     * @param value 原始值
+     * @return 整数值
+     */
+    private int auditInt(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
+     * 格式化时间用于接口展示（为空时返回空串）。
+     */
+    private String formatInstant(Instant instant) {
+        if (instant == null || Instant.EPOCH.equals(instant)) {
+            return "";
+        }
+        return instant.atZone(ZoneId.systemDefault()).toOffsetDateTime().toString();
+    }
+
+    /**
+     * 审计摘要（最后归档时间 + 失败事件数）。
+     *
+     * @param lastArchivedAt       最后归档时间（ISO 时间，无记录时为空串）
+     * @param failedCount          失败事件数
+     * @param lastBatches          最近一次成功合并的批次数
+     * @param lastMergedFiles      最近一次成功合并纳入的文件数
+     * @param lastRemainingFiles   最近一次成功合并后剩余未处理的文件数
+     */
+    private record AuditSummary(String lastArchivedAt, int failedCount, int lastBatches,
+                                int lastMergedFiles, int lastRemainingFiles) {
     }
 
     /**
@@ -349,39 +666,203 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     }
 
     /**
-     * 拼接全部每日流水正文（用于合并）。
+     * 读取「合并水位之后」的每日流水，并在参与合并前逐文件净化。
+     *
+     * <p>按文件名升序（旧→新）返回，配合 {@link #nextWatermark} 形成可恢复的批处理：
+     * 每批成功后水位只推进到下一批之前，未被本批纳入的文件仍晚于水位，不会被永久漏掉。</p>
+     *
+     * <p>每个流水文件先净化并就地回写（原文备份到 {@code memory/.quarantine/}），
+     * 这样无论后续是平台合并还是框架自动合并，读到的都是净化后的内容。</p>
      *
      * @param workspace 工作区管理器
      * @param ctx       运行上下文
-     * @return 流水正文，无流水时为空串
+     * @param definition 智能体定义
+     * @param userId    用户主键
+     * @param watermark 上一次合并水位
+     * @return 待合并流水（可能为空）
      */
-    private String readDailyLedger(WorkspaceManager workspace, RuntimeContext ctx) {
-        StringBuilder ledger = new StringBuilder();
-        for (String path : safeMemoryPaths(workspace, ctx)) {
-            if (MEMORY_MD.equals(path)) {
+    private List<DailyLedger> loadPendingLedgers(WorkspaceManager workspace, RuntimeContext ctx,
+                                                 AiAgent definition, Long userId, Instant watermark) {
+        List<String> dailyPaths = safeMemoryPaths(workspace, ctx).stream()
+            .filter(path -> !MEMORY_MD.equals(path))
+            .sorted(Comparator.comparing(this::fileNameOf))
+            .toList();
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        List<DailyLedger> pending = new ArrayList<>();
+        AiMemorySanitizer.SanitizeResult total = AiMemorySanitizer.SanitizeResult.empty("");
+        for (String path : dailyPaths) {
+            Path file = memoryDir.resolve(fileNameOf(path));
+            if (!Files.isRegularFile(file)) {
                 continue;
             }
-            String content = readQuietly(workspace, ctx, path);
-            if (StringUtils.isNotBlank(content)) {
-                ledger.append("### ").append(fileNameOf(path)).append('\n').append(content).append("\n\n");
+            // 水位只覆盖「已经合并过」的文件：早于或等于水位的流水不再重复读取
+            Instant modified = lastModified(file);
+            if (!modified.isAfter(watermark)) {
+                continue;
             }
+            String raw = readQuietly(workspace, ctx, path);
+            if (StringUtils.isBlank(raw)) {
+                continue;
+            }
+            AiMemorySanitizer.SanitizeResult sanitized = sanitizer.sanitizeLedger(raw);
+            if (sanitized.changed()) {
+                rewriteWithQuarantine(workspace, ctx, path, sanitized.content());
+                // 回写会刷新 mtime，水位按回写后的时间记录，避免下一轮重复合并
+                modified = lastModified(file);
+                total = total.plus(sanitized);
+            }
+            if (StringUtils.isBlank(sanitized.content())) {
+                // 全部条目都被净化剔除（例如只剩指令性内容）：文件已回写为空，不再送入模型
+                continue;
+            }
+            pending.add(new DailyLedger(path, sanitized.content(), modified,
+                sanitizer.countEntries(sanitized.content())));
+        }
+        if (total.changed()) {
+            auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_SANITIZE, "OK",
+                Map.of("dropped", total.dropped(), "deduped", total.deduped(),
+                    "redacted", total.redacted(), "truncated", total.truncated(),
+                    "kept", total.kept()));
+        }
+        return pending;
+    }
+
+    /**
+     * 计算当前批次的结束下标：在字符与条目预算内尽量多纳入文件，且至少包含一个文件。
+     *
+     * <p>单个文件自身超预算时也整文件纳入，保证事实不被截断；代价是该批 prompt 可能偏大。</p>
+     *
+     * @param pending  待合并流水（旧→新）
+     * @param start    当前批次起始下标
+     * @param maxChars 单批字符预算
+     * @return 批次结束下标（不含）
+     */
+    private int nextBatchEnd(List<DailyLedger> pending, int start, int maxChars) {
+        int end = start;
+        int chars = 0;
+        int entries = 0;
+        while (end < pending.size()) {
+            DailyLedger daily = pending.get(end);
+            String block = renderBlock(daily);
+            if (end > start && (chars + block.length() > maxChars
+                || entries + daily.entries() > AiMemorySanitizer.MAX_ENTRIES_PER_MERGE)) {
+                break;
+            }
+            chars += block.length();
+            entries += daily.entries();
+            end++;
+        }
+        return end;
+    }
+
+    /**
+     * 把一批流水渲染为合并输入正文。
+     *
+     * @param batch 批次
+     * @return 合并输入
+     */
+    private String renderBatch(List<DailyLedger> batch) {
+        StringBuilder ledger = new StringBuilder();
+        for (DailyLedger daily : batch) {
+            ledger.append(renderBlock(daily)).append("\n\n");
         }
         return ledger.toString().trim();
     }
 
     /**
-     * 调用记忆模型执行合并，返回新的 MEMORY.md 全文。
+     * 单个流水文件的合并输入块。
      *
-     * <p>说明：框架的 {@code MemoryConsolidator} 通过 filesystem 的 {@code glob} 定位每日流水，
-     * 在用户级隔离目录下匹配不到文件（实测始终跳过），故此处按同一提示词自行调用模型完成合并。</p>
+     * @param daily 流水
+     * @return 输入块
+     */
+    private String renderBlock(DailyLedger daily) {
+        return "### " + fileNameOf(daily.path()) + '\n' + daily.content();
+    }
+
+    /**
+     * 计算本批合并后应写入的水位。
+     *
+     * <p>水位必须严格小于「下一批最早文件」的修改时间，否则下一轮会把未合并文件误判为已合并。
+     * 本批处理完所有文件时使用 {@code runStart}：任何在合并开始后新写入的流水仍晚于水位，下一轮继续。</p>
+     *
+     * @param pending  待合并流水（旧→新）
+     * @param nextIndex 下一批起始下标
+     * @param runStart 本轮合并开始时间
+     * @param previous 本轮开始前的水位
+     * @return 应写入的水位
+     */
+    private Instant nextWatermark(List<DailyLedger> pending, int nextIndex, Instant runStart,
+                                  Instant previous) {
+        if (nextIndex >= pending.size()) {
+            return runStart;
+        }
+        Instant nextModified = pending.subList(nextIndex, pending.size()).stream()
+            .map(DailyLedger::modifiedAt)
+            .min(Comparator.naturalOrder())
+            .orElse(runStart);
+        if (Instant.EPOCH.equals(nextModified)) {
+            // 无法读取下一批文件时间时宁可不推进水位，避免把未合并文件误判为已合并
+            return previous;
+        }
+        Instant candidate = nextModified.isAfter(runStart)
+            ? runStart : nextModified.minusNanos(1);
+        return candidate.isBefore(previous) ? previous : candidate;
+    }
+
+    /**
+     * 读取文件最后修改时间；读取失败时返回当前时间，确保该文件仍会被纳入本轮合并。
+     *
+     * @param file 文件
+     * @return 修改时间
+     */
+    private Instant lastModified(Path file) {
+        try {
+            return Files.getLastModifiedTime(file).toInstant();
+        } catch (IOException e) {
+            return Instant.now();
+        }
+    }
+
+    /**
+     * 就地重写净化后的流水：先复制原文到 {@code memory/.quarantine/} 再覆盖，失败时保留原文件。
+     *
+     * @param workspace 工作区管理器
+     * @param ctx       运行上下文
+     * @param path      工作区相对路径
+     * @param content   净化后正文
+     */
+    private void rewriteWithQuarantine(WorkspaceManager workspace, RuntimeContext ctx,
+                                       String path, String content) {
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        Path file = memoryDir.resolve(fileNameOf(path));
+        if (!Files.isRegularFile(file)) {
+            return;
+        }
+        try {
+            Path backup = memoryDir.resolve(QUARANTINE_DIR)
+                .resolve(fileNameOf(path) + "." + BACKUP_TIME_FORMAT.format(java.time.LocalDateTime.now()) + ".bak");
+            Files.createDirectories(backup.getParent());
+            Files.copy(file, backup, StandardCopyOption.REPLACE_EXISTING);
+            Files.writeString(file, content, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log.warn("净化后回写流水失败，保留原文件：path={}, err={}", path, e.getMessage());
+        }
+    }
+
+    /**
+     * 调用记忆模型执行合并，返回新的 MEMORY.md 全文与用量。
+     *
+     * <p>手动入口按框架同一提示词模板完成全量重跑；框架自动合并已按用户水位增量执行，
+     * 两者互不重复。</p>
      *
      * @param model     记忆模型
      * @param maxTokens 合并结果允许的 Token 上限
      * @param memoryMd  现有 MEMORY.md 内容
      * @param ledger    每日流水正文
-     * @return 合并后的 MEMORY.md 全文
+     * @return 合并结果（正文 + 用量）
      */
-    private String callConsolidationModel(Model model, int maxTokens, String memoryMd, String ledger) {
+    private ConsolidationResult callConsolidationModel(Model model, int maxTokens, String memoryMd,
+                                                       String ledger) {
         String userContent = "Current MEMORY.md content:\n\n"
             + (StringUtils.isBlank(memoryMd) ? "(empty)" : memoryMd)
             + "\n\nNew daily ledger entries to merge:\n\n" + ledger;
@@ -393,10 +874,17 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             .collectList()
             .block(CONSOLIDATE_TIMEOUT);
         if (responses == null) {
-            return "";
+            return new ConsolidationResult("", null);
         }
         StringBuilder merged = new StringBuilder();
+        int promptTokens = 0;
+        int completionTokens = 0;
         for (ChatResponse response : responses) {
+            ChatUsage usage = response.getUsage();
+            if (usage != null) {
+                promptTokens += usage.getInputTokens();
+                completionTokens += usage.getOutputTokens();
+            }
             if (response.getContent() == null) {
                 continue;
             }
@@ -405,21 +893,66 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
                 .map(TextBlock.class::cast)
                 .forEach(block -> merged.append(block.getText()));
         }
-        return merged.toString().trim();
+        ChatTokenUsage tokens = promptTokens + completionTokens == 0 ? null
+            : new ChatTokenUsage(promptTokens, completionTokens, promptTokens + completionTokens);
+        return new ConsolidationResult(merged.toString().trim(), tokens);
     }
 
     /**
-     * 构造合并提示词（复用框架默认模板，仅填充其两个数字占位符）。
+     * 把手动合并的模型调用计入用量统计（与对话同口径：按用户 × 智能体 × 模型 × 日期累加）。
+     *
+     * <p>用量记录失败只告警，不影响合并结果落盘。</p>
+     *
+     * @param definition 智能体定义
+     * @param userId     记忆归属用户主键
+     * @param usage      本次 Token 用量（为空表示提供方未返回）
+     */
+    private void recordConsolidationUsage(AiAgent definition, Long userId, ChatTokenUsage usage) {
+        if (usage == null) {
+            return;
+        }
+        try {
+            Long modelId = definition.getMemoryModelId() != null
+                ? definition.getMemoryModelId() : definition.getModelId();
+            usageStatService.accumulate(userId, definition.getId(), modelId, usage, 0, 1);
+        } catch (Exception e) {
+            log.warn("长期记忆合并用量记录失败：agent={}, userId={}, err={}",
+                definition.getAgentCode(), userId, e.getMessage());
+        }
+    }
+
+    /**
+     * 手动合并结果（正文 + 模型用量）。
+     *
+     * @param content 合并后的 MEMORY.md 全文
+     * @param usage   Token 用量（提供方未返回时为空）
+     */
+    private record ConsolidationResult(String content, ChatTokenUsage usage) {
+    }
+
+    /**
+     * 待合并的单个流水文件。
+     *
+     * @param path       工作区相对路径
+     * @param content    净化后的正文
+     * @param modifiedAt 文件修改时间（净化回写后的时间）
+     * @param entries    条目数
+     */
+    private record DailyLedger(String path, String content, Instant modifiedAt, int entries) {
+    }
+
+    /**
+     * 构造合并提示词（使用平台个人信息口径模板，仅填充其两个数字占位符）。
      *
      * @param maxTokens 合并结果允许的 Token 上限
      * @return 提示词
      */
     private String consolidationPrompt(int maxTokens) {
         try {
-            return String.format(MemoryConsolidator.DEFAULT_CONSOLIDATION_PROMPT, maxTokens, maxTokens * 4);
+            return String.format(AiMemoryPrompts.CONSOLIDATION_PROMPT, maxTokens, maxTokens * 4);
         } catch (RuntimeException e) {
-            log.warn("合并提示词格式化失败，回退原始模板：{}", e.getMessage());
-            return MemoryConsolidator.DEFAULT_CONSOLIDATION_PROMPT;
+            log.warn("合并提示词格式化失败，回退平台模板原文：{}", e.getMessage());
+            return AiMemoryPrompts.CONSOLIDATION_PROMPT;
         }
     }
 
@@ -552,121 +1085,6 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             throw new ServiceException("非法的记忆文件路径：" + path);
         }
         return path;
-    }
-
-    @Override
-    public void consolidateIfDue(Long agentId, Long userId) {
-        if (agentId == null || userId == null) {
-            return;
-        }
-        // 延迟提交：给框架「事实抽取」异步落盘留出时间；只提交不阻塞本轮回答
-        consolidationScheduler.schedule(() -> {
-            try {
-                doConsolidateIfDue(agentId, userId);
-            } catch (Exception e) {
-                log.warn("长期记忆自动合并失败：agent={}, userId={}, err={}", agentId, userId, e.getMessage());
-            }
-        }, AUTO_CONSOLIDATE_DELAY_SECONDS, TimeUnit.SECONDS);
-    }
-
-    /**
-     * 自动合并的实际判定与执行：开关 → 节流 → 新增流水，三者满足才合并。
-     *
-     * @param agentId 智能体主键
-     * @param userId  记忆归属用户主键
-     */
-    private void doConsolidateIfDue(Long agentId, Long userId) {
-        AiMemoryConfigBo policy = runtimeConfigStore.memory();
-        if (!policy.isEnabled()) {
-            return;
-        }
-        String markKey = CONSOLIDATE_MARK_PREFIX + agentId + ":" + userId;
-        Long lastRun = readConsolidateMark(markKey);
-        long now = System.currentTimeMillis();
-        long gapMillis = Math.max(1, policy.getConsolidationMinGapMinutes()) * 60_000L;
-        if (lastRun != null && now - lastRun < gapMillis) {
-            return;
-        }
-        AiAgent definition = agentService.getEnabledAgent(agentId);
-        WorkspaceManager workspace = workspaceOf(definition);
-        RuntimeContext ctx = contextOf(userId);
-        long newest = latestDailyModified(workspace, ctx);
-        if (newest <= 0L || (lastRun != null && newest <= lastRun)) {
-            // 无新增流水：不产生额外模型调用
-            return;
-        }
-        // 先落水位：合并可能耗时数分钟，避免期间并发重复触发
-        RedisUtils.setCacheObject(markKey, String.valueOf(now));
-        try {
-            consolidate(agentId, userId);
-        } catch (RuntimeException e) {
-            // 失败则回退水位，允许后续对话尽快重试
-            RedisUtils.deleteObject(markKey);
-            throw e;
-        }
-    }
-
-    /**
-     * 读取上次自动合并时刻。
-     *
-     * @param key 水位键
-     * @return 上次合并毫秒时间戳；无记录时返回 null
-     */
-    private Long readConsolidateMark(String key) {
-        Object cached = RedisUtils.getCacheObject(key);
-        if (cached == null) {
-            return null;
-        }
-        try {
-            return Long.parseLong(String.valueOf(cached));
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    /**
-     * 取每日流水目录下最新的修改时间（无流水目录或读取失败时返回 0）。
-     *
-     * @param workspace 工作区管理器
-     * @param ctx       运行上下文
-     * @return 最新修改时间毫秒时间戳
-     */
-    private long latestDailyModified(WorkspaceManager workspace, RuntimeContext ctx) {
-        Path dir = workspace.getMemoryDir(ctx);
-        if (!Files.isDirectory(dir)) {
-            return 0L;
-        }
-        try (Stream<Path> files = Files.list(dir)) {
-            return files.filter(Files::isRegularFile)
-                .filter(path -> path.getFileName().toString().endsWith(".md"))
-                .mapToLong(path -> {
-                    try {
-                        return Files.getLastModifiedTime(path).toMillis();
-                    } catch (IOException e) {
-                        return 0L;
-                    }
-                })
-                .max().orElse(0L);
-        } catch (IOException e) {
-            log.warn("读取记忆流水目录失败：{}", e.getMessage());
-            return 0L;
-        }
-    }
-
-    /**
-     * 应用关闭时等待在跑的合并任务收尾。
-     */
-    @PreDestroy
-    public void shutdownConsolidationScheduler() {
-        consolidationScheduler.shutdown();
-        try {
-            if (!consolidationScheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-                consolidationScheduler.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            consolidationScheduler.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
     }
 
 }

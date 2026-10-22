@@ -88,7 +88,7 @@ class AgentAssemblerTest {
     void shouldBuildToolsConfig() {
         ToolsConfig config = AgentAssembler.buildToolsConfig(List.of("t1"),
             List.of("skill_a"), new McpClientAssembly(List.of("srv"), List.of("mcp_a"),
-                Map.of(), Map.of(), "sig"));
+                Map.of(), Map.of(), "sig"), false);
 
         assertEquals(List.of("t1", "load_skill_through_path", "read_skill", "mcp_a"), config.getAllow());
         assertEquals(List.of("web_search", "web_fetch"), config.getDeny());
@@ -98,10 +98,24 @@ class AgentAssemblerTest {
     @DisplayName("工具白名单：无技能无 MCP 时仅业务工具")
     void shouldBuildMinimalToolsConfig() {
         ToolsConfig config = AgentAssembler.buildToolsConfig(List.of("t1"), List.of(),
-            McpClientAssembly.empty());
+            McpClientAssembly.empty(), false);
 
         assertEquals(List.of("t1"), config.getAllow());
         assertFalse(config.getAllow().contains("read_skill"));
+    }
+
+    @Test
+    @DisplayName("只读记忆检索 POC：仅放行 memory_search / memory_get，写入类工具被拒绝")
+    void shouldAllowOnlyReadOnlyMemoryTools() {
+        ToolsConfig config = AgentAssembler.buildToolsConfig(List.of("t1"), List.of(),
+            McpClientAssembly.empty(), true);
+
+        assertTrue(config.getAllow().contains("memory_search"));
+        assertTrue(config.getAllow().contains("memory_get"));
+        assertFalse(config.getAllow().contains("memory_save"));
+        assertFalse(config.getAllow().contains("session_search"));
+        assertTrue(config.getDeny().contains("memory_save"));
+        assertTrue(config.getDeny().contains("session_search"));
     }
 
     @Test

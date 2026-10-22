@@ -85,14 +85,17 @@
 | `plan-mode-enabled` | `false` | 进入只读设计阶段，产出计划文件并经确认后执行 |
 | `plan-file-directory` | `plans` | 计划文件目录（相对工作区） |
 | `task-list-enabled` | `false` | 是否启用任务清单工具 |
-| `memory-enabled` | `false` | 长期记忆：开启后每轮自动抽取事实并合并进 `MEMORY.md`（产生额外模型调用成本） |
+| `memory-enabled` | `true` | 长期记忆：开启后每轮自动抽取事实并合并进 `MEMORY.md`（产生额外模型调用成本） |
 | `memory-max-context-tokens` | `8000` | 记忆注入 system prompt 的 Token 上限 |
 | `memory-consolidation-max-tokens` | `4000` | 合并时可读的每日流水 Token 上限 |
 | `memory-consolidation-min-gap-minutes` | `30` | 两次合并的最小间隔 |
-| `memory-daily-file-retention-days` | `90` | 每日流水保留天数 |
+| `memory-daily-file-retention-days` | `90` | 每日流水保留天数（超期移入 `memory/archive/`） |
+| `memory-archive-retention-days` | `365` | 归档目录保留天数（到期后由自动清理删除） |
 | `memory-session-retention-days` | `180` | 会话日志保留天数 |
-| `memory-flush-mode` | `always` | 事实抽取策略：`always` / `throttled` / `never` |
+| `memory-flush-mode` | `throttled` | 事实抽取策略：`always` / `throttled` / `never` |
 | `memory-flush-throttle-minutes` | `30` | 节流间隔（`throttled` 时生效） |
+| `memory-auto-archive-enabled` | `true` | 是否启用自动归档与清理（每日遍历有会话历史的用户） |
+| `memory-maintenance-interval-minutes` | `1440` | 自动归档与清理的执行间隔（分钟） |
 | `workspace-enabled` | `true` | 是否注入工作区上下文（`AGENTS.md` 等），与记忆开关解耦 |
 | `workspace-additional-context-files` | `[]` | 附加注入 system prompt 的文件清单（工作区相对路径） |
 
