@@ -48,6 +48,9 @@ spring.boot.admin.client:
 
 bizbuddy:
   ai:
+    chat:
+      # A1 只读检索 POC：仅放行 memory_search / memory_get，写入类记忆工具仍被拒绝
+      memory-read-tools-enabled: true
     milvus:
       uri: http://${MILVUS_HOST:milvus}:19530
       username: ${MILVUS_USERNAME:root}

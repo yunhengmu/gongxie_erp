@@ -209,7 +209,7 @@ RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器�
 |---|---|
 | L1 | 模型连通性（对话 + 向量） |
 | L2 | 专家提示词辅助生成（`POST /ai/agent/experts/prompt/generate`） |
-| L3 | 知识库链路：文档解析（按对象键从 OSS 取源文件）→ 向量化 → 检索命中 |
+| L3 | 知识库生命周期：单文档解析 → 批量解析/状态轮询 → 批量与单文档向量化 → 检索命中（原 L14 已并入） |
 | L4 | 对话与专家编排：建会话（指定专家强制路由）→ SSE 流 → 编排轨迹落库 |
 | L5 | HITL：写工具暂停 → 确认 / 拒绝 → 恢复执行至 `done` |
 | L6 | 停止生成：SSE 中途取消 → 后端执行中止 |
@@ -220,9 +220,9 @@ RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器�
 | L11 | MCP 客户端：连通探测 + 自演示连接登记 |
 | L12 | 结构化决策闸门（桩服务四分支）：真实外呼决策模型，需先启动 JEV 桩否则 SKIP |
 | L13 | 停止生成（中断专家编排）：SSE 中途取消 → 后端中止专家调用并收尾为「已中止」 |
-| L14 | 知识库批量解析与向量化：批量受理 → 排队 → 解析 / 向量化进入完成态 |
 | L15 | 只读轮次重新生成：预检放行 → SSE 重新生成 → 旧回答逻辑删除 |
 | L16 | 长期记忆生命周期：抽取落盘 → PII/指令净化 → 合并 → 水位推进 → 统计与配置护栏（临时改配置，收尾恢复） |
+| L17 | 只读记忆检索（A1 POC）：`memory_search` 命中当日流水标记；`memory_save` / `session_search` 不可调用 |
 
 ```bash
 # 需要栈已在运行（deploy/deploy-pg/ 或 deploy/deploy-mysql/ 任一）
@@ -232,7 +232,7 @@ node e2e/run.mjs --allow-writes            # L5 走「接受」路径（会真�
 node e2e/run.mjs --base-url http://localhost:8081   # 指向 MySQL 栈（PG 栈为 8080）
 ```
 
-- 配置：复制 [`e2e/.env.example`](e2e/.env.example) 为 `e2e/.env.local`（已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走平台「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**；L12 需 JEV 桩已启动（否则 SKIP），L13~L16 走平台密钥（真跑模型）。
+- 配置：复制 [`e2e/.env.example`](e2e/.env.example) 为 `e2e/.env.local`（已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走平台「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**；L12 需 JEV 桩已启动（否则 SKIP），L13~L17 走平台密钥（真跑模型）。
 - 退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败 / `3` 参数错误。
 - **L5 默认走「拒绝」路径、不产生任何业务数据**；`--allow-writes` 才真写，并在收尾按标题清理公告与会话。
 - 它**不进 `mvn test`**、不引 Testcontainers，与上面的单测**互不影响**；两个数据库栈均已实跑通过（PostgreSQL `8080` / MySQL `8081`）。

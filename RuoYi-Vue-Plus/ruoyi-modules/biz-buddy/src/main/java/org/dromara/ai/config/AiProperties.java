@@ -462,6 +462,14 @@ public class AiProperties {
         private boolean memoryEnabled = true;
 
         /**
+         * 是否放行只读记忆检索工具（{@code memory_search} / {@code memory_get}）。
+         *
+         * <p>默认关闭：开启后框架会注册全部记忆工具，再由 {@code ToolsConfig} 白名单裁掉
+         * {@code memory_save} / {@code session_search}；仅在确认只读检索收益后按环境开启（A1 POC）。</p>
+         */
+        private boolean memoryReadToolsEnabled = false;
+
+        /**
          * 记忆注入 system prompt 的上下文 Token 上限（超出时截断）
          */
         private int memoryMaxContextTokens = 8000;

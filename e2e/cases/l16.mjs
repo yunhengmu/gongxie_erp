@@ -14,38 +14,17 @@
 
 export const meta = { layer: 'L16', name: '长期记忆生命周期', needsKey: true };
 
+import {
+  createSession,
+  readMemory,
+  sendUserMessage,
+  sleep,
+  streamChat,
+  todayLedgerPath,
+  writeMemory
+} from '../lib/flow.mjs';
+
 const MEMORY_MD = 'MEMORY.md';
-
-/**
- * 当日流水的工作区相对路径（按宿主本地日期，与后端一致）。
- *
- * @returns {string} memory/YYYY-MM-DD.md
- */
-const todayLedgerPath = () => {
-  const now = new Date();
-  const pad = (value) => String(value).padStart(2, '0');
-  return `memory/${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.md`;
-};
-
-/**
- * 读取记忆文件（不存在或读取失败时返回空串）。
- */
-const readMemory = async (http, agentId, userId, path) => {
-  try {
-    const result = await http.request('GET', '/ai/memory/content', { query: { agentId, userId, path } });
-    return result?.content ?? '';
-  } catch {
-    return '';
-  }
-};
-
-/**
- * 写入记忆文件（人工编辑路径同样会经过净化）。
- */
-const writeMemory = (http, agentId, userId, path, content) =>
-  http.request('PUT', '/ai/memory/content', { body: { agentId, userId, path, content } });
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * @param {object} ctx 运行上下文
@@ -75,25 +54,15 @@ export const run = async (ctx) => {
     await http.request('PUT', '/ai/memory/config', { body: { ...config, flushMode: 'always' } });
     configTouched = true;
 
-    const session = await http.request('POST', '/ai/chat/session', {
-      query: { agentId, title: `E2E_L16_${registry.stamp}` }
-    });
+    const session = await createSession(http, agentId, `E2E_L16_${registry.stamp}`);
     registry.sessions.push(session.id);
     log(`  会话 ${session.id}（记忆生命周期用例）`);
 
     const message = await throttle(() =>
-      http.request('POST', `/ai/chat/session/${session.id}/message`, {
-        body: { content: '请记住：我长期偏好用表格展示数据，回答请保持简洁。', attachmentIds: [] }
-      })
+      sendUserMessage(http, session.id, '请记住：我长期偏好用表格展示数据，回答请保持简洁。')
     );
-    const { readSse, lastOfType } = await import('../lib/sse.mjs');
-    const { events } = await readSse(http, '/ai/chat/stream', {
-      query: { sessionId: session.id, messageId: message.id },
-      stopOn: ['done', 'error', 'aborted'],
-      timeoutMs: args.sseTimeoutMs,
-      idleMs: args.idleTimeoutMs,
-      log: () => {}
-    });
+    const { events } = await streamChat(http, args, session.id, message.id);
+    const { lastOfType } = await import('../lib/sse.mjs');
     const sseError = lastOfType(events, 'error');
     if (sseError) {
       return { status: 'FAIL', detail: `对话 SSE 返回错误：${sseError.message}` };
