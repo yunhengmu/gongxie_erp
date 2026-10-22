@@ -1,6 +1,8 @@
 package org.dromara.ai.controller;
 
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
+import org.dromara.ai.core.memory.spi.AiMemoryBackend;
+import org.dromara.ai.core.memory.spi.MemoryBackendStats;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
@@ -30,7 +32,10 @@ class AiMemoryControllerTest {
 
     private final AiRuntimeConfigStore store = mock(AiRuntimeConfigStore.class);
 
-    private final AiMemoryController controller = new AiMemoryController(memoryService, store);
+    private final AiMemoryBackend memoryBackend = mock(AiMemoryBackend.class);
+
+    private final AiMemoryController controller =
+        new AiMemoryController(memoryService, store, memoryBackend);
 
     @BeforeAll
     static void beforeAll() {
@@ -82,6 +87,14 @@ class AiMemoryControllerTest {
     void shouldConsolidate() {
         assertTrue(R.isSuccess(controller.consolidate(1L, 2L)));
         verify(memoryService).consolidate(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("查询记忆统计走记忆后端")
+    void shouldGetStatsFromBackend() {
+        MemoryBackendStats stats = MemoryBackendStats.empty(2L);
+        when(memoryBackend.stats(2L)).thenReturn(stats);
+        assertSame(stats, controller.stats(2L).getData());
     }
 
 }

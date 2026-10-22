@@ -4,6 +4,8 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
+import org.dromara.ai.core.memory.spi.AiMemoryBackend;
+import org.dromara.ai.core.memory.spi.MemoryBackendStats;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
@@ -42,6 +44,8 @@ public class AiMemoryController extends BaseController {
     private final IAiMemoryService memoryService;
 
     private final AiRuntimeConfigStore runtimeConfigStore;
+
+    private final AiMemoryBackend memoryBackend;
 
     /**
      * 查询当前生效的长期记忆配置
@@ -143,6 +147,17 @@ public class AiMemoryController extends BaseController {
     public R<Integer> cleanup(@NotNull(message = "智能体不能为空") @RequestParam Long agentId,
                               @NotNull(message = "用户不能为空") @RequestParam Long userId) {
         return R.ok(memoryService.cleanup(agentId, userId));
+    }
+
+    /**
+     * 查询某用户的记忆规模与维护状态（记忆后端不可用时返回空统计，不影响页面）
+     *
+     * @param userId 记忆归属用户主键
+     */
+    @SaCheckPermission("ai:memory:query")
+    @GetMapping("/stats")
+    public R<MemoryBackendStats> stats(@NotNull(message = "用户不能为空") @RequestParam Long userId) {
+        return R.ok(memoryBackend.stats(userId));
     }
 
     /**

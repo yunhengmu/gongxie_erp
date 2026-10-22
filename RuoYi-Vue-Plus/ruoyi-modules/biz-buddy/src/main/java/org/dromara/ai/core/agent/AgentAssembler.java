@@ -16,6 +16,7 @@ import io.agentscope.harness.agent.tools.ToolsConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.mcp.GuardingMcpClientWrapper;
+import org.dromara.ai.core.memory.AiMemoryPrompts;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentTool;
@@ -342,6 +343,8 @@ public class AgentAssembler {
             return;
         }
         MemoryConfig.Builder memory = MemoryConfig.builder()
+            // 平台抽取提示词：只记个人画像与偏好，项目/知识库/工具过程不进入长期记忆
+            .flushPrompt(AiMemoryPrompts.FLUSH_PROMPT)
             .consolidationMaxTokens(policy.getConsolidationMaxTokens())
             .consolidationMinGap(Duration.ofMinutes(policy.getConsolidationMinGapMinutes()))
             .dailyFileRetentionDays(policy.getDailyFileRetentionDays())

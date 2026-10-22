@@ -3,6 +3,7 @@ package org.dromara.ai.core.agent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.memory.AiMemoryConfigGuard;
 import org.dromara.ai.domain.bo.AiAuditRetentionBo;
 import org.dromara.ai.domain.bo.AiCompactionConfigBo;
 import org.dromara.ai.domain.bo.AiJevConfigBo;
@@ -153,9 +154,13 @@ public class AiRuntimeConfigStore {
     /**
      * 保存长期记忆配置（写入 Redis 覆盖值）。
      *
+     * <p>写入前执行跨字段护栏校验，非法组合直接拒绝，避免把「归档即删除」「合并预算挤占注入预算」
+     * 这类配置持久化到 Redis（docs/24 §5.8）。</p>
+     *
      * @param bo 长期记忆配置
      */
     public void updateMemory(AiMemoryConfigBo bo) {
+        AiMemoryConfigGuard.validate(bo);
         RedisUtils.setCacheObject(MEMORY_KEY, JsonUtils.toJsonString(bo));
         log.info("长期记忆配置已更新：enabled={}, maxContextTokens={}, consolidation={} tokens/{} 分钟, "
                 + "retention={}/{}/{} 天, flushMode={}({} 分钟)",

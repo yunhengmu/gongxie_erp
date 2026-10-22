@@ -456,9 +456,10 @@ public class AiProperties {
 
         /**
          * 是否启用长期记忆（REQ-AI-09）：开启后每轮对话自动抽取事实写入每日流水，
-         * 并按节流策略合并进 MEMORY.md；默认关闭以避免未经确认的额外模型调用成本
+         * 并按节流策略合并进 MEMORY.md。项目默认开启，如需关闭可通过运行期配置
+         * 或 {@code bizbuddy.ai.chat.memory-enabled=false} 显式关闭。
          */
-        private boolean memoryEnabled = false;
+        private boolean memoryEnabled = true;
 
         /**
          * 记忆注入 system prompt 的上下文 Token 上限（超出时截断）

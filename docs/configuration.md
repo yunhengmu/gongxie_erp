@@ -85,7 +85,7 @@
 | `plan-mode-enabled` | `false` | 进入只读设计阶段，产出计划文件并经确认后执行 |
 | `plan-file-directory` | `plans` | 计划文件目录（相对工作区） |
 | `task-list-enabled` | `false` | 是否启用任务清单工具 |
-| `memory-enabled` | `false` | 长期记忆：开启后每轮自动抽取事实并合并进 `MEMORY.md`（产生额外模型调用成本） |
+| `memory-enabled` | `true` | 长期记忆：开启后每轮自动抽取事实并合并进 `MEMORY.md`（产生额外模型调用成本） |
 | `memory-max-context-tokens` | `8000` | 记忆注入 system prompt 的 Token 上限 |
 | `memory-consolidation-max-tokens` | `4000` | 合并时可读的每日流水 Token 上限 |
 | `memory-consolidation-min-gap-minutes` | `30` | 两次合并的最小间隔 |
