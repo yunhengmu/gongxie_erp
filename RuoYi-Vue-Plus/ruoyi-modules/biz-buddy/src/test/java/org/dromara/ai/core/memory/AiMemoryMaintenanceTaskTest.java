@@ -7,8 +7,10 @@ import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.mapper.AiSessionMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiMemoryService;
+import org.dromara.ai.test.AiTestSupport;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.redis.utils.RedisUtils;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,12 @@ class AiMemoryMaintenanceTaskTest {
 
     private final AiMemoryMaintenanceTask task =
         new AiMemoryMaintenanceTask(aiProperties, configStore, agentService, memoryService, sessionMapper);
+
+    @BeforeAll
+    static void initStaticContext() {
+        // RedisUtils 静态字段需要容器中的 RedissonClient，否则静态 mock 会失败并污染 matcher 栈
+        AiTestSupport.initialize();
+    }
 
     @BeforeEach
     void prepare() {

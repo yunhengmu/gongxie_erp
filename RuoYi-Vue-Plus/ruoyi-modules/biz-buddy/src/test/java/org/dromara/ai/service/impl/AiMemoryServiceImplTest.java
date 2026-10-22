@@ -221,6 +221,8 @@ class AiMemoryServiceImplTest {
         memoryService.consolidate(1L, 7L);
 
         verify(workspace).writeUtf8WorkspaceRelative(any(), eq("MEMORY.md"), eq("merged"));
+        // 合并成功后必须推进水位，否则维护任务会重复合并同一批过期流水
+        verify(workspace).writeUtf8WorkspaceRelative(any(), eq("memory/.consolidation_state"), anyString());
     }
 
     /**

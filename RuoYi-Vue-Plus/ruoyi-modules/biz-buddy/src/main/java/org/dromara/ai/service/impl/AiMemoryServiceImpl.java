@@ -88,6 +88,11 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     private static final String CONSOLIDATION_STATE = ".consolidation_state";
 
     /**
+     * 合并水位的工作区相对路径：与框架 {@code MemoryConsolidator} 使用同一文件，保证口径一致
+     */
+    private static final String CONSOLIDATION_STATE_PATH = "memory/" + CONSOLIDATION_STATE;
+
+    /**
      * Token 与字符的粗略折算比例（1 Token ≈ 4 字符），统计口径与合并预算一致
      */
     private static final int CHARS_PER_TOKEN = 4;
@@ -194,6 +199,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         }
         Model model = agentRegistry.memoryModelFor(definition);
         long started = System.currentTimeMillis();
+        Instant runStart = Instant.now();
         try {
             ConsolidationResult result = callConsolidationModel(model, maxTokens, memoryMd, ledger);
             if (StringUtils.isBlank(result.content())) {
@@ -204,6 +210,9 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
                 sanitizer.sanitizeLedger(result.content());
             String mergedContent = merged.changed() ? merged.content() : result.content();
             workspace.writeUtf8WorkspaceRelative(ctx, MEMORY_MD, mergedContent);
+            // 推进合并水位：与框架 MemoryConsolidator 同口径落同一文件，
+            // 否则维护任务会认为过期流水仍未合并，导致每天重复调用模型
+            workspace.writeUtf8WorkspaceRelative(ctx, CONSOLIDATION_STATE_PATH, runStart.toString());
             if (merged.changed()) {
                 auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_SANITIZE, "OK",
                     Map.of("stage", "consolidationOutput", "dropped", merged.dropped(),
