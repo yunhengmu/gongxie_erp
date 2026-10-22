@@ -14,11 +14,15 @@ package org.dromara.ai.core.memory.spi;
  * @param lastConsolidatedAt  最后合并水位（ISO 时间）
  * @param lastArchivedAt      最后归档时间（ISO 时间）
  * @param failedEventCount    审计日志中的失败事件数
+ * @param lastBatches         最近一次成功合并执行的批次数
+ * @param lastMergedFiles     最近一次成功合并纳入的流水文件数
+ * @param lastRemainingFiles  最近一次成功合并后仍未处理的流水文件数（达到单轮批次上限时大于 0）
  * @author BizBuddy
  */
 public record MemoryBackendStats(long userId, int memoryChars, int estimatedTokens, int dailyFileCount,
                                  int archiveFileCount, String lastConsolidatedAt, String lastArchivedAt,
-                                 int failedEventCount) {
+                                 int failedEventCount, int lastBatches, int lastMergedFiles,
+                                 int lastRemainingFiles) {
 
     /**
      * 空统计（后端不可用时降级返回）。
@@ -27,6 +31,6 @@ public record MemoryBackendStats(long userId, int memoryChars, int estimatedToke
      * @return 空统计
      */
     public static MemoryBackendStats empty(long userId) {
-        return new MemoryBackendStats(userId, 0, 0, 0, 0, "", "", 0);
+        return new MemoryBackendStats(userId, 0, 0, 0, 0, "", "", 0, 0, 0, 0);
     }
 }

@@ -43,6 +43,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -196,8 +197,8 @@ class AiMemoryServiceImplTest {
     void shouldSkipConsolidateWhenNoLedger() {
         WorkspaceManager workspace = stubWorkspace();
         when(runtimeConfigStore.memory()).thenReturn(policy());
-        when(workspace.readMemoryMd(any())).thenReturn("old");
         when(workspace.listMemoryFilePaths(any())).thenReturn(List.of("MEMORY.md"));
+        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
 
         assertDoesNotThrow(() -> memoryService.consolidate(1L, 7L));
         verify(agentRegistry, never()).memoryModelFor(any());
@@ -267,11 +268,11 @@ class AiMemoryServiceImplTest {
     }
 
     /**
-     * 验证合并输入按字符预算截断：优先纳入最新的流水，旧流水跳过并提示已省略。
+     * 验证超预算时按文件分批合并：每个文件都会被纳入某一批，且水位逐批推进。
      */
     @Test
-    @DisplayName("合并输入只保留预算内的最近流水")
-    void shouldCapDailyLedgerInput() throws IOException {
+    @DisplayName("合并输入超预算时按批处理且不丢文件")
+    void shouldBatchDailyLedgerWithoutLoss() throws IOException {
         WorkspaceManager workspace = stubWorkspace();
         when(runtimeConfigStore.memory()).thenReturn(policy());
         when(workspace.readMemoryMd(any())).thenReturn("old");
@@ -287,11 +288,41 @@ class AiMemoryServiceImplTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Msg>> captor = ArgumentCaptor.forClass(List.class);
-        verify(model).stream(captor.capture(), isNull(), any());
-        String userText = captor.getValue().get(1).getTextContent();
-        assertTrue(userText.contains("2024-01-02"));
-        assertFalse(userText.contains("2024-01-01"));
-        assertTrue(userText.contains("更早内容已省略"));
+        verify(model, times(2)).stream(captor.capture(), isNull(), any());
+        List<List<Msg>> calls = captor.getAllValues();
+        assertTrue(calls.get(0).get(1).getTextContent().contains("2024-01-01"));
+        assertTrue(calls.get(1).get(1).getTextContent().contains("2024-01-02"));
+
+        ArgumentCaptor<String> watermark = ArgumentCaptor.forClass(String.class);
+        verify(workspace, times(2)).writeUtf8WorkspaceRelative(any(),
+            eq("memory/.consolidation_state"), watermark.capture());
+        assertTrue(Instant.parse(watermark.getAllValues().get(0))
+            .isBefore(Instant.parse(watermark.getAllValues().get(1))));
+    }
+
+    /**
+     * 验证净化回写后推进的水位晚于文件 mtime：否则已合并文件会被下一轮误判为未合并。
+     */
+    @Test
+    @DisplayName("净化回写后水位晚于文件 mtime")
+    void shouldAdvanceWatermarkPastSanitizedRewrite() throws IOException {
+        WorkspaceManager workspace = stubWorkspace();
+        when(runtimeConfigStore.memory()).thenReturn(policy());
+        when(workspace.readMemoryMd(any())).thenReturn("old");
+        when(workspace.listMemoryFilePaths(any())).thenReturn(List.of("MEMORY.md", "memory/2024-01-01.md"));
+        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
+        Files.writeString(tempDir.resolve("2024-01-01.md"), "- 用户手机号 13800138000\n");
+        Model model = mock(Model.class);
+        when(agentRegistry.memoryModelFor(any())).thenReturn(model);
+        when(model.stream(any(), any(), any())).thenReturn(Flux.just(response("merged")));
+
+        memoryService.consolidate(1L, 7L);
+
+        Instant fileMtime = Files.getLastModifiedTime(tempDir.resolve("2024-01-01.md")).toInstant();
+        ArgumentCaptor<String> watermark = ArgumentCaptor.forClass(String.class);
+        verify(workspace).writeUtf8WorkspaceRelative(any(),
+            eq("memory/.consolidation_state"), watermark.capture());
+        assertTrue(Instant.parse(watermark.getValue()).isAfter(fileMtime));
     }
 
     /**
