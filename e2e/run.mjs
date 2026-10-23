@@ -2,7 +2,7 @@
 /**
  * BizBuddy 端到端集成测试脚本（外部驱动）。
  *
- * 对**已运行**的容器栈发真实 HTTP 请求做断言，覆盖 L1~L18（L14 已并入 L3）；不参与 `mvn test`、不引 Testcontainers。
+ * 对**已运行**的容器栈发真实 HTTP 请求做断言，覆盖 L1~L19（L14 已并入 L3）；不参与 `mvn test`、不引 Testcontainers。
  * 详细设计见 `.trae/documents/端到端集成测试脚本方案.md`。</p>
  *
  * <p>用法：
@@ -38,8 +38,9 @@ import * as l15 from './cases/l15.mjs';
 import * as l16 from './cases/l16.mjs';
 import * as l17 from './cases/l17.mjs';
 import * as l18 from './cases/l18.mjs';
+import * as l19 from './cases/l19.mjs';
 
-const CASES = [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13, l15, l16, l17, l18];
+const CASES = [l1, l2, l3, l4, l5, l6, l7, l8, l9, l10, l11, l12, l13, l15, l16, l17, l18, l19];
 const EXIT = { OK: 0, FAIL: 1, PREFLIGHT: 2, USAGE: 3 };
 
 /** 参数错误 */
