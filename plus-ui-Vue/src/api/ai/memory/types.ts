@@ -34,6 +34,64 @@ export interface MemoryConfig {
   flushThrottleMinutes: number;
 }
 
+/** MEMORY.md 历史版本 */
+export interface MemoryVersion {
+  /** 版本 ID */
+  versionId: string;
+  /** 创建时间 */
+  createdAt: string;
+  /** 来源：PRE_MANUAL / MANUAL / PRE_CONSOLIDATE / CONSOLIDATE / PRE_RESTORE / RESTORE 等 */
+  source: string;
+  /** 操作人 */
+  operatorId?: string | number;
+  /** 字符数 */
+  chars: number;
+  /** 当时的合并水位 */
+  watermark?: string;
+  /** 备注 */
+  note?: string;
+  /** 被恢复的版本 ID */
+  restoredFrom?: string;
+  /** 是否为当前版本 */
+  current?: boolean;
+  /** 版本正文（详情接口返回） */
+  content?: string;
+}
+
+/** 版本恢复参数 */
+export interface MemoryRestoreForm {
+  agentId?: string | number;
+  userId?: string | number;
+  mode: 'CONTENT' | 'CONTENT_AND_WATERMARK';
+  note?: string;
+}
+
+/** 显式记忆条目（用户明确要求记住的个人偏好） */
+export interface MemoryDeclaredEntry {
+  /** 条目主键 */
+  id: string;
+  /** 事实正文 */
+  fact: string;
+  /** 用户原话证据 */
+  evidence?: string;
+  /** 创建时间 */
+  createdAt: string;
+  /** 是否已撤销 */
+  revoked: boolean;
+}
+
+/** 显式记忆新增参数 */
+export interface MemoryDeclaredForm {
+  /** 智能体主键 */
+  agentId: string | number;
+  /** 记忆归属用户主键 */
+  userId: string | number;
+  /** 事实正文 */
+  fact: string;
+  /** 用户原话证据 */
+  evidence?: string;
+}
+
 /** 记忆文件 */
 export interface MemoryFile {
   /** 工作区相对路径 */

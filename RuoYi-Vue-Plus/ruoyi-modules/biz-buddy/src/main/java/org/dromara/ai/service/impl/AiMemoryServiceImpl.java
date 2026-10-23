@@ -17,6 +17,7 @@ import org.dromara.ai.core.memory.AiMemoryAuditLogger;
 import org.dromara.ai.core.memory.AiMemoryDeclaredStore;
 import org.dromara.ai.core.memory.AiMemoryPrompts;
 import org.dromara.ai.core.memory.AiMemorySanitizer;
+import org.dromara.ai.core.memory.AiMemoryVersionStore;
 import org.dromara.ai.core.memory.spi.MemoryBackendStats;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
@@ -26,6 +27,7 @@ import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
+import org.dromara.ai.domain.vo.AiMemoryVersionVo;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.service.IAiUsageStatService;
@@ -145,6 +147,8 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
 
     private final AiMemoryDeclaredStore memoryDeclaredStore;
 
+    private final AiMemoryVersionStore memoryVersionStore;
+
     @Override
     public List<AiMemoryFileVo> listFiles(Long agentId, Long userId) {
         AiAgent definition = agentService.getEnabledAgent(agentId);
@@ -185,7 +189,17 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         // 人工编辑同样走净化：避免运维把 PII 或指令性内容直接写进会被注入的系统提示词
         AiMemorySanitizer.SanitizeResult sanitized = sanitizer.sanitizeLedger(content);
         String saved = sanitized.changed() ? sanitized.content() : content;
+        boolean memoryFile = MEMORY_MD.equals(safePath);
+        if (memoryFile) {
+            // 人工编辑 MEMORY.md：覆盖前必须成功留下旧版本，失败则中止本次写入
+            snapshotMemory(workspace.getMemoryDir(ctx), workspace.readMemoryMd(ctx),
+                "PRE_MANUAL", bo.getUserId(), "人工编辑前自动快照", null);
+        }
         workspace.writeUtf8WorkspaceRelative(ctx, safePath, saved);
+        if (memoryFile) {
+            snapshotMemory(workspace.getMemoryDir(ctx), saved, "MANUAL",
+                bo.getUserId(), "人工编辑", null);
+        }
         if (sanitized.changed()) {
             log.info("长期记忆人工编辑已净化：agent={}, userId={}, path={}, 丢弃 {} 条, 去重 {} 条, "
                     + "脱敏 {} 处, 截断 {} 条",
@@ -231,6 +245,9 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         Model model = agentRegistry.memoryModelFor(definition);
         String memoryMd = workspace.readMemoryMd(ctx);
         String memoryBefore = StringUtils.defaultString(memoryMd);
+        // 合并是整文件覆盖：先记录合并前版本，快照失败则中止本次合并
+        snapshotMemory(memoryDir, memoryMd, "PRE_CONSOLIDATE", userId,
+            "合并前自动快照", null);
         long started = System.currentTimeMillis();
         int batches = 0;
         int mergedFiles = 0;
@@ -282,6 +299,8 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
                 log.warn("长期记忆合并达到单轮批次上限，剩余 {} 个流水待下一轮：agent={}, userId={}",
                     remaining, definition.getAgentCode(), userId);
             }
+            snapshotMemory(memoryDir, memoryMd, "CONSOLIDATE", userId,
+                "合并后自动快照", null);
             long elapsed = System.currentTimeMillis() - started;
             auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_CONSOLIDATE, "OK",
                 Map.of("batches", batches, "files", mergedFiles, "remaining", remaining,
@@ -293,6 +312,13 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
                 definition.getAgentCode(), userId, batches, mergedFiles, mergedChars,
                 memoryBefore.length(), StringUtils.length(memoryMd), totalTokens, elapsed);
         } catch (RuntimeException e) {
+            // 部分批次可能已覆盖 MEMORY.md：尽力记录当前状态，便于恢复
+            try {
+                snapshotMemory(memoryDir, workspace.readMemoryMd(ctx), "CONSOLIDATE_PARTIAL", userId,
+                    "合并中断快照", null);
+            } catch (Exception snapshotError) {
+                log.warn("合并中断版本快照失败：userId={}, err={}", userId, snapshotError.getMessage());
+            }
             auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_CONSOLIDATE, "FAIL",
                 Map.of("reason", StringUtils.defaultIfBlank(e.getMessage(), "未知错误"),
                     "batches", batches, "files", mergedFiles));
@@ -355,9 +381,19 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         // 会话态记忆（工作区 session 日志）：按会话保留天数清理
         LocalDate sessionCutoff = LocalDate.now().minusDays(Math.max(1, policy.getSessionRetentionDays()));
         removed += deleteExpiredSessionLogs(workspace, ctx, sessionCutoff);
-        log.info("长期记忆清理完成：agent={}, userId={}, 删除 {} 个文件（流水 {} 天 / 归档 {} 天 / 会话 {} 天）",
+        // 净化原文备份与影子样本：按各自保留期清理，避免敏感原文与评测样本无限增长
+        removed += deleteExpiredByMtime(memoryDir.resolve(QUARANTINE_DIR),
+            LocalDate.now().minusDays(Math.max(1, policy.getQuarantineRetentionDays())));
+        removed += deleteExpiredByMtime(memoryDir.resolve(".extract_shadow"),
+            LocalDate.now().minusDays(Math.max(1, policy.getShadowRetentionDays())));
+        // 审计日志按行时间裁剪，保留近期事件
+        int auditPruned = pruneAudit(memoryDir.resolve(AiMemoryAuditLogger.AUDIT_FILE),
+            LocalDate.now().minusDays(Math.max(1, policy.getAuditRetentionDays())));
+        log.info("长期记忆清理完成：agent={}, userId={}, 删除 {} 个文件（流水 {} 天 / 归档 {} 天 / 会话 {} 天），"
+                + "审计裁剪 {} 行（保留 {} 天）",
             definition.getAgentCode(), userId, removed, policy.getDailyFileRetentionDays(),
-            policy.getArchiveRetentionDays(), policy.getSessionRetentionDays());
+            policy.getArchiveRetentionDays(), policy.getSessionRetentionDays(),
+            auditPruned, policy.getAuditRetentionDays());
         return removed;
     }
 
@@ -515,6 +551,114 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         vo.setEvidence(entry.evidence());
         vo.setCreatedAt(entry.createdAt());
         vo.setRevoked(entry.revoked());
+        return vo;
+    }
+
+    @Override
+    public List<AiMemoryVersionVo> listVersions(Long agentId, Long userId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        RuntimeContext ctx = contextOf(userId);
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        String current = workspace.readMemoryMd(ctx);
+        return memoryVersionStore.list(memoryDir).stream()
+            .map(entry -> {
+                AiMemoryVersionVo vo = toVersionVo(entry, null, current);
+                vo.setCurrent(memoryVersionStore.matches(entry, current));
+                return vo;
+            })
+            .toList();
+    }
+
+    @Override
+    public AiMemoryVersionVo readVersion(Long agentId, Long userId, String versionId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        RuntimeContext ctx = contextOf(userId);
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        AiMemoryVersionStore.VersionEntry entry = memoryVersionStore.read(memoryDir, versionId);
+        String content = memoryVersionStore.readContent(memoryDir, versionId);
+        return toVersionVo(entry, content, workspace.readMemoryMd(ctx));
+    }
+
+    @Override
+    public AiMemoryVersionVo restoreVersion(Long agentId, Long userId, String versionId,
+                                            String mode, String note) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        RuntimeContext ctx = contextOf(userId);
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        AiMemoryVersionStore.VersionEntry target = memoryVersionStore.read(memoryDir, versionId);
+        String targetContent = memoryVersionStore.readContent(memoryDir, versionId);
+        String current = workspace.readMemoryMd(ctx);
+        if (targetContent.equals(current)) {
+            return toVersionVo(target, targetContent, current);
+        }
+        // 恢复前先保存当前版本：即使恢复选错，也能再回退
+        snapshotMemory(memoryDir, current, "PRE_RESTORE", userId,
+            StringUtils.defaultIfBlank(note, "恢复前自动快照"), versionId);
+        workspace.writeUtf8WorkspaceRelative(ctx, MEMORY_MD, targetContent);
+        if ("CONTENT_AND_WATERMARK".equals(mode)) {
+            if (StringUtils.isBlank(target.watermark())) {
+                try {
+                    Files.deleteIfExists(memoryDir.resolve(CONSOLIDATION_STATE));
+                } catch (IOException e) {
+                    throw new ServiceException("恢复合并水位失败：" + e.getMessage());
+                }
+            } else {
+                workspace.writeUtf8WorkspaceRelative(ctx, CONSOLIDATION_STATE_PATH, target.watermark());
+            }
+        }
+        String newVersionId = snapshotMemory(memoryDir, targetContent, "RESTORE", userId,
+            StringUtils.defaultIfBlank(note, "从历史版本恢复"), versionId);
+        auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_RESTORE, "OK",
+            Map.of("versionId", versionId, "mode", mode,
+                "newVersionId", StringUtils.defaultString(newVersionId),
+                "chars", targetContent.length()));
+        log.info("长期记忆已恢复：agent={}, userId={}, version={}, mode={}, newVersion={}",
+            definition.getAgentCode(), userId, versionId, mode, newVersionId);
+        AiMemoryVersionStore.VersionEntry created = StringUtils.isBlank(newVersionId)
+            ? target : memoryVersionStore.read(memoryDir, newVersionId);
+        return toVersionVo(created, targetContent, targetContent);
+    }
+
+    /**
+     * 记录一次 MEMORY.md 版本快照；内容为空时跳过。
+     *
+     * @param memoryDir    记忆目录
+     * @param content      正文
+     * @param source       来源
+     * @param operatorId   操作人
+     * @param note         备注
+     * @param restoredFrom 恢复来源版本
+     * @return 版本 ID
+     */
+    private String snapshotMemory(Path memoryDir, String content, String source, Long operatorId,
+                                  String note, String restoredFrom) {
+        if (StringUtils.isBlank(content) || memoryDir == null) {
+            return null;
+        }
+        String watermark = formatInstant(readConsolidationWatermark(memoryDir));
+        return memoryVersionStore.record(memoryDir, content, source, watermark, operatorId,
+            note, restoredFrom, runtimeConfigStore.memory().getVersionRetention());
+    }
+
+    /**
+     * 版本实体转展示对象。
+     */
+    private AiMemoryVersionVo toVersionVo(AiMemoryVersionStore.VersionEntry entry, String content,
+                                          String current) {
+        AiMemoryVersionVo vo = new AiMemoryVersionVo();
+        vo.setVersionId(entry.versionId());
+        vo.setCreatedAt(entry.createdAt());
+        vo.setSource(entry.source());
+        vo.setOperatorId(entry.operatorId());
+        vo.setChars(entry.chars());
+        vo.setWatermark(entry.watermark());
+        vo.setNote(entry.note());
+        vo.setRestoredFrom(entry.restoredFrom());
+        vo.setContent(content);
+        vo.setCurrent(content != null && content.equals(current));
         return vo;
     }
 
@@ -689,6 +833,89 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             log.warn("清理记忆流水失败：dir={}, err={}", dir, e.getMessage());
         }
         return removed;
+    }
+
+    /**
+     * 按文件修改时间清理目录下的普通文件（隔离原文、影子样本等）。
+     *
+     * @param dir    目标目录
+     * @param cutoff 保留截止日期
+     * @return 删除的文件数
+     */
+    private int deleteExpiredByMtime(Path dir, LocalDate cutoff) {
+        if (!Files.isDirectory(dir)) {
+            return 0;
+        }
+        Instant threshold = cutoff.atStartOfDay(ZoneId.systemDefault()).toInstant();
+        int removed = 0;
+        try (Stream<Path> files = Files.list(dir)) {
+            List<Path> expired = files.filter(Files::isRegularFile)
+                .filter(path -> {
+                    try {
+                        return Files.getLastModifiedTime(path).toInstant().isBefore(threshold);
+                    } catch (IOException e) {
+                        return false;
+                    }
+                })
+                .toList();
+            for (Path file : expired) {
+                Files.deleteIfExists(file);
+                removed++;
+            }
+        } catch (IOException e) {
+            log.warn("清理记忆辅助文件失败：dir={}, err={}", dir, e.getMessage());
+        }
+        return removed;
+    }
+
+    /**
+     * 按行时间裁剪审计日志：仅保留 {@code ts >= cutoff} 的事件。
+     *
+     * @param auditFile 审计文件
+     * @param cutoff    保留截止日期
+     * @return 裁剪掉的行数
+     */
+    private int pruneAudit(Path auditFile, LocalDate cutoff) {
+        if (!Files.isRegularFile(auditFile)) {
+            return 0;
+        }
+        Instant threshold = cutoff.atStartOfDay(ZoneId.systemDefault()).toInstant();
+        try {
+            List<String> kept = new ArrayList<>();
+            int removed = 0;
+            for (String line : Files.readAllLines(auditFile, StandardCharsets.UTF_8)) {
+                if (StringUtils.isBlank(line)) {
+                    continue;
+                }
+                Map<String, Object> entry = JsonUtils.parseMap(line);
+                Object ts = entry == null ? null : entry.get("ts");
+                if (ts == null) {
+                    kept.add(line);
+                    continue;
+                }
+                try {
+                    if (Instant.parse(ts.toString()).isBefore(threshold)) {
+                        removed++;
+                    } else {
+                        kept.add(line);
+                    }
+                } catch (Exception e) {
+                    // 无法解析时间的事件保留，避免误删审计证据
+                    kept.add(line);
+                }
+            }
+            if (removed > 0) {
+                Path temp = auditFile.resolveSibling(auditFile.getFileName() + ".tmp");
+                Files.writeString(temp, String.join("\n", kept) + (kept.isEmpty() ? "" : "\n"),
+                    StandardCharsets.UTF_8);
+                Files.move(temp, auditFile, StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE);
+            }
+            return removed;
+        } catch (Exception e) {
+            log.warn("审计日志裁剪失败：file={}, err={}", auditFile, e.getMessage());
+            return 0;
+        }
     }
 
     /**

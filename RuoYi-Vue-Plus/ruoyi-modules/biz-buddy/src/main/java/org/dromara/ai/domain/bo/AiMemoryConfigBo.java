@@ -120,6 +120,34 @@ public class AiMemoryConfigBo implements Serializable {
     private int archiveRetentionDays;
 
     /**
+     * 净化原文备份目录保留天数
+     */
+    @Min(value = 1, message = "隔离文件保留天数必须大于 0")
+    @Max(value = 3650, message = "隔离文件保留天数不能超过 3650")
+    private int quarantineRetentionDays = 30;
+
+    /**
+     * 记忆审计日志保留天数
+     */
+    @Min(value = 1, message = "审计日志保留天数必须大于 0")
+    @Max(value = 3650, message = "审计日志保留天数不能超过 3650")
+    private int auditRetentionDays = 180;
+
+    /**
+     * 影子抽取样本保留天数
+     */
+    @Min(value = 1, message = "影子样本保留天数必须大于 0")
+    @Max(value = 3650, message = "影子样本保留天数不能超过 3650")
+    private int shadowRetentionDays = 30;
+
+    /**
+     * MEMORY.md 版本快照保留份数
+     */
+    @Min(value = 1, message = "版本保留份数不能小于 1")
+    @Max(value = 200, message = "版本保留份数不能超过 200")
+    private int versionRetention = 20;
+
+    /**
      * 会话日志保留天数
      */
     @Min(value = 1, message = "会话保留天数必须大于 0")

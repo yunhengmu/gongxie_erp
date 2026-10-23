@@ -6,6 +6,7 @@ import org.dromara.ai.domain.bo.AiMemoryDeclaredBo;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
+import org.dromara.ai.domain.vo.AiMemoryVersionVo;
 
 import java.util.List;
 
@@ -154,5 +155,36 @@ public interface IAiMemoryService {
      * @return 是否撤销成功
      */
     boolean revokeDeclared(Long agentId, Long userId, String entryId);
+
+    /**
+     * 列出 MEMORY.md 历史版本（新→旧）。
+     *
+     * @param agentId 智能体主键
+     * @param userId  用户主键
+     * @return 版本列表
+     */
+    List<AiMemoryVersionVo> listVersions(Long agentId, Long userId);
+
+    /**
+     * 读取版本详情（含正文）。
+     *
+     * @param agentId   智能体主键
+     * @param userId    用户主键
+     * @param versionId 版本 ID
+     * @return 版本详情
+     */
+    AiMemoryVersionVo readVersion(Long agentId, Long userId, String versionId);
+
+    /**
+     * 恢复到指定版本。
+     *
+     * @param agentId   智能体主键
+     * @param userId    用户主键
+     * @param versionId 版本 ID
+     * @param mode      CONTENT / CONTENT_AND_WATERMARK
+     * @param note      备注
+     * @return 恢复后生成的新版本
+     */
+    AiMemoryVersionVo restoreVersion(Long agentId, Long userId, String versionId, String mode, String note);
 
 }

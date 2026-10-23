@@ -9,9 +9,11 @@ import org.dromara.ai.core.memory.spi.MemoryBackendStats;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
 import org.dromara.ai.domain.bo.AiMemoryDeclaredBo;
+import org.dromara.ai.domain.bo.AiMemoryRestoreBo;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
+import org.dromara.ai.domain.vo.AiMemoryVersionVo;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.common.core.domain.R;
 import org.dromara.common.log.annotation.Log;
@@ -195,6 +197,39 @@ public class AiMemoryController extends BaseController {
                                      @NotNull(message = "用户不能为空") @RequestParam Long userId,
                                      @PathVariable String entryId) {
         return R.ok(memoryService.revokeDeclared(agentId, userId, entryId));
+    }
+
+    /**
+     * 列出 MEMORY.md 历史版本
+     */
+    @SaCheckPermission("ai:memory:query")
+    @GetMapping("/versions")
+    public R<List<AiMemoryVersionVo>> listVersions(@NotNull(message = "智能体不能为空") @RequestParam Long agentId,
+                                                   @NotNull(message = "用户不能为空") @RequestParam Long userId) {
+        return R.ok(memoryService.listVersions(agentId, userId));
+    }
+
+    /**
+     * 读取版本详情（含正文）
+     */
+    @SaCheckPermission("ai:memory:query")
+    @GetMapping("/versions/{versionId}")
+    public R<AiMemoryVersionVo> readVersion(@NotNull(message = "智能体不能为空") @RequestParam Long agentId,
+                                            @NotNull(message = "用户不能为空") @RequestParam Long userId,
+                                            @PathVariable String versionId) {
+        return R.ok(memoryService.readVersion(agentId, userId, versionId));
+    }
+
+    /**
+     * 恢复到指定版本（恢复前自动快照当前版本）
+     */
+    @SaCheckPermission("ai:memory:edit")
+    @Log(title = "AI长期记忆版本恢复", businessType = BusinessType.UPDATE)
+    @PostMapping("/versions/{versionId}/restore")
+    public R<AiMemoryVersionVo> restoreVersion(@PathVariable String versionId,
+                                               @Validated @RequestBody AiMemoryRestoreBo bo) {
+        return R.ok(memoryService.restoreVersion(bo.getAgentId(), bo.getUserId(), versionId,
+            bo.getMode(), bo.getNote()));
     }
 
     /**

@@ -377,6 +377,8 @@ public class AiChatFacade {
         RuntimeContext.Builder contextBuilder = RuntimeContext.builder()
             .userId(String.valueOf(userId))
             .sessionId(String.valueOf(sessionId))
+            // 用户本轮原话（过审口径）：显式记忆工具据此校验「证据确实摘自用户原话」
+            .put(AiRuntimeKeys.CURRENT_USER_MESSAGE, userContent)
             // 技能生效范围（REQ-AI-10）：按提问用户覆盖技能白名单（绑定 ∪ 资源集 ∩ 启用 ∩ 可见）
             .put(SkillFilter.class, routeSupport.runtimeSkillFilter(definition.getId(), resources, userId))
             // 子智能体（REQ-AI-04）：强制同步调用。本平台是「一问一答、回答即结束」的会话模型，

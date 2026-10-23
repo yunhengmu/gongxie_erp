@@ -18,6 +18,8 @@ import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.mcp.GuardingMcpClientWrapper;
 import org.dromara.ai.core.memory.AiMemoryDeclaredStore;
 import org.dromara.ai.core.memory.AiMemoryPrompts;
+import org.dromara.ai.core.agent.tools.ForgetUserPreferenceTool;
+import org.dromara.ai.core.agent.tools.RememberUserPreferenceTool;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentTool;
@@ -32,6 +34,7 @@ import org.dromara.ai.domain.dto.AgentSnapshot;
 import org.dromara.ai.domain.dto.AiSessionResourceSet;
 import org.dromara.ai.domain.dto.McpClientAssembly;
 import org.dromara.ai.service.IAiMcpClientService;
+import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -137,6 +140,13 @@ public class AgentAssembler {
     private final SubagentAssembler subagentAssembler;
 
     /**
+     * 长期记忆服务：仅供显式记忆工具复用「净化 + 去重 + 条数上限 + 审计」的既有口径。
+     *
+     * <p>用 {@code @Lazy} 注入以打破「装配器 → 记忆服务 → 注册表 → 装配器」的构造期循环依赖。</p>
+     */
+    private final IAiMemoryService memoryService;
+
+    /**
      * 专家编排器（REQ-AI-30）：仅供构造 {@link RouteDecisionTool} 使用。
      *
      * <p>用 {@code @Lazy} 注入以打破「注册表 → 装配器 → 编排器 → … → 智能体服务 → 注册表」的构造期循环依赖：
@@ -158,6 +168,7 @@ public class AgentAssembler {
      * @param permissionModeStore 全局权限模式
      * @param snapshotFactory    装配快照工厂
      * @param subagentAssembler  子智能体装配支撑
+     * @param memoryService      长期记忆服务（显式记忆工具复用其净化 / 审计口径，延迟注入）
      * @param routeOrchestrator  专家编排器（REQ-AI-30，延迟注入以打破循环依赖）
      */
     public AgentAssembler(AgentModelFactory modelFactory,
@@ -173,6 +184,7 @@ public class AgentAssembler {
                           AiPermissionModeStore permissionModeStore,
                           AgentSnapshotFactory snapshotFactory,
                           SubagentAssembler subagentAssembler,
+                          @Lazy IAiMemoryService memoryService,
                           @Lazy AiRouteOrchestrator routeOrchestrator) {
         this.modelFactory = modelFactory;
         this.aiProperties = aiProperties;
@@ -187,6 +199,7 @@ public class AgentAssembler {
         this.permissionModeStore = permissionModeStore;
         this.snapshotFactory = snapshotFactory;
         this.subagentAssembler = subagentAssembler;
+        this.memoryService = memoryService;
         this.routeOrchestrator = routeOrchestrator;
     }
 
@@ -218,6 +231,9 @@ public class AgentAssembler {
                             McpClientAssembly mcpAssembly, boolean expertMode, String workspaceCode) {
         AiModelConfig modelConfig = modelFactory.resolveChatModel(definition.getModelId());
         Model model = modelFactory.buildChatModel(modelConfig);
+        // 平台托管模式：关闭框架记忆 hooks 与记忆工具，由平台注入/抽取/合并接管
+        boolean platformMemory =
+            memoryPolicy.isEnabled() && "platform".equals(memoryPolicy.getPipelineMode());
         Toolkit toolkit = new Toolkit();
         List<String> registeredCodes = new ArrayList<>(
             registerTools(toolkit, enabledTools, kbIds, expertMode));
@@ -225,6 +241,8 @@ public class AgentAssembler {
         registerMcpClients(toolkit, mcpAssembly, definition);
         // 编排协议工具（REQ-AI-30）：只对入口智能体注册
         registeredCodes.addAll(registerProtocolTools(toolkit, definition));
+        // 显式记忆工具：仅平台托管模式的入口智能体
+        registeredCodes.addAll(registerDeclaredMemoryTools(toolkit, definition, platformMemory));
         // 子智能体可继承的工具池＝父级「实际注册成功的只读业务工具」；
         // 写入类工具永不下放（子智能体不继承父级 allow / ask 规则，没有人工确认闸门，见 docs/00 第 42 项）
         List<String> subagentToolPool = readOnlyRegisteredCodes(enabledTools, registeredCodes);
@@ -236,9 +254,8 @@ public class AgentAssembler {
             AgentPermissionContextFactory.renderDecisions(
                 AgentPermissionContextFactory.mergeToolDecisions(bindings, resources.mergedToolDecisions())),
             resources.mergedToolDecisions(), mcpAssembly.toolNames(), resources.signature());
-        // 平台托管模式：关闭框架记忆 hooks 与记忆工具，由平台注入/抽取/合并接管
-        boolean platformMemory =
-            memoryPolicy.isEnabled() && "platform".equals(memoryPolicy.getPipelineMode());
+        // 是否注册了显式记忆工具：注册了就必须在权限基线里默认放行，否则会落到全局默认（未命中即 ASK）
+        boolean declaredMemoryTools = platformMemory && definition.isEntry();
         // 只读记忆检索 POC：开启后注册框架记忆工具，再由白名单只放行 memory_search / memory_get；
         // 平台托管模式下框架记忆工具恒不注册（后续由平台侧检索工具替代）
         boolean memoryReadTools = memoryPolicy.isEnabled()
@@ -259,7 +276,7 @@ public class AgentAssembler {
             .permissionContext(AgentPermissionContextFactory.buildContext(permissionModeStore.resolve(),
                 bindings, resources.packToolDecisions(),
                 resources.directToolDecisions(), mcpAssembly.toolDecisions(),
-                !subagents.isEmpty(), definition.isEntry()))
+                !subagents.isEmpty(), definition.isEntry(), declaredMemoryTools))
             // 当前时间注入：平台级中间件，所有智能体自动生效；每轮现算，改开关/时区无需重建
             .middlewares(buildMiddlewares(definition, workspaceCode, platformMemory));
         if (subagents.isEmpty()) {
@@ -641,6 +658,31 @@ public class AgentAssembler {
             return List.of(RouteDecisionTool.TOOL_NAME);
         }
         return List.of();
+    }
+
+    /**
+     * 注册显式记忆工具：用户明确要求「记住 / 忘掉」时由模型落库。
+     *
+     * <p><b>为什么只在平台托管模式注册</b>：显式记忆文件 {@code memory/.declared.jsonl} 只由
+     * {@link PlatformMemoryContextMiddleware} 注入；framework 模式下写了也不会生效，注册反而会误导模型。</p>
+     *
+     * <p><b>为什么只给入口智能体</b>：专家只接收任务片段、看不到用户原话，
+     * {@code DeclaredMemoryGuard} 的原话证据校验必然失败；且记忆是用户级共享的，
+     * 由入口统一写入可避免多专家重复落同一事实。</p>
+     *
+     * @param toolkit        工具箱
+     * @param definition     智能体定义
+     * @param platformMemory 是否平台托管记忆
+     * @return 实际注册的工具名
+     */
+    private List<String> registerDeclaredMemoryTools(Toolkit toolkit, AiAgent definition,
+                                                     boolean platformMemory) {
+        if (!platformMemory || !definition.isEntry()) {
+            return List.of();
+        }
+        toolkit.registerAgentTool(new RememberUserPreferenceTool(memoryService, definition.getId()));
+        toolkit.registerAgentTool(new ForgetUserPreferenceTool(memoryService, definition.getId()));
+        return List.of(RememberUserPreferenceTool.TOOL_NAME, ForgetUserPreferenceTool.TOOL_NAME);
     }
 
     /**

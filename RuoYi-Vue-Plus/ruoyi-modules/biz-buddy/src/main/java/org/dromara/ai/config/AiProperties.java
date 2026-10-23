@@ -542,6 +542,26 @@ public class AiProperties {
         private int memoryArchiveRetentionDays = 365;
 
         /**
+         * 合并前净化原文备份目录（memory/.quarantine）保留天数
+         */
+        private int memoryQuarantineRetentionDays = 30;
+
+        /**
+         * 记忆审计日志（memory/audit.jsonl）保留天数
+         */
+        private int memoryAuditRetentionDays = 180;
+
+        /**
+         * 影子抽取样本（memory/.extract_shadow）保留天数
+         */
+        private int memoryShadowRetentionDays = 30;
+
+        /**
+         * MEMORY.md 版本快照保留份数
+         */
+        private int memoryVersionRetention = 20;
+
+        /**
          * 是否启用长期记忆自动归档与清理（按每日流水 / 归档 / 会话保留期执行）。
          */
         private boolean memoryAutoArchiveEnabled = true;

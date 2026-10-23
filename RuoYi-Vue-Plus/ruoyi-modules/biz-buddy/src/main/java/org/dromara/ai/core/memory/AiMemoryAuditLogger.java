@@ -86,6 +86,11 @@ public class AiMemoryAuditLogger {
      */
     public static final String EVENT_SHADOW_EXTRACT = "SHADOW_EXTRACT";
 
+    /**
+     * 事件：从历史版本恢复 MEMORY.md
+     */
+    public static final String EVENT_RESTORE = "RESTORE";
+
     private final IAiAgentService agentService;
 
     private final AgentRegistry agentRegistry;

@@ -7,10 +7,12 @@ import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.harness.agent.HarnessAgent;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.ai.core.agent.tools.ForgetUserPreferenceTool;
 import org.dromara.ai.core.agent.tools.GetCurrentDeptTool;
 import org.dromara.ai.core.agent.tools.GetCurrentPermissionsTool;
 import org.dromara.ai.core.agent.tools.GetCurrentTimeTool;
 import org.dromara.ai.core.agent.tools.GetCurrentUserTool;
+import org.dromara.ai.core.agent.tools.RememberUserPreferenceTool;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.AiAgentKb;
 import org.dromara.ai.domain.AiAgentTool;
@@ -73,6 +75,11 @@ public class AgentRegistry {
     public static final String SOURCE_BUILTIN = "builtin";
 
     /**
+     * 权限规则的来源标识：来自平台内置显式记忆工具的默认放行（平台托管模式专用）
+     */
+    public static final String SOURCE_MEMORY = "declared_memory";
+
+    /**
      * 权限规则的来源标识：来自子智能体编排工具的放行（REQ-AI-04）
      */
     public static final String SOURCE_SUBAGENT = "subagent";
@@ -132,6 +139,18 @@ public class AgentRegistry {
         GetCurrentUserTool.TOOL_NAME,
         GetCurrentDeptTool.TOOL_NAME,
         GetCurrentPermissionsTool.TOOL_NAME);
+
+    /**
+     * 平台内置的**显式记忆工具**：只在平台托管模式（{@code memory-pipeline-mode=platform}）
+     * 且只对入口智能体注册，装配期默认放行（用户明确要求记住属低风险写操作，
+     * 且只影响其本人的记忆、可在记忆页撤销），避免每次「请记住」都弹人工确认。
+     *
+     * <p>与 {@link #BUILTIN_READONLY_TOOL_CODES} 分开放置：那个集合的语义是「免绑定 + 默认放行的只读工具」，
+     * 显式记忆工具是写工具，混入会破坏该集合的契约。</p>
+     */
+    public static final Set<String> BUILTIN_MEMORY_TOOL_CODES = Set.of(
+        RememberUserPreferenceTool.TOOL_NAME,
+        ForgetUserPreferenceTool.TOOL_NAME);
 
     /**
      * 子智能体模型标识的前缀（{@code SubagentDeclaration.model} 只接受字符串，
@@ -484,7 +503,24 @@ public class AgentRegistry {
         List<AiSubagent> subagents = subagentService.queryBoundEnabledSubagents(definition.getId());
         return AgentPermissionContextFactory.buildContext(permissionModeStore.resolve(), bindings,
             res.packToolDecisions(), res.directToolDecisions(), mcpDecisions,
-            !subagents.isEmpty(), definition.isEntry());
+            !subagents.isEmpty(), definition.isEntry(), declaredMemoryToolsActive(definition));
+    }
+
+    /**
+     * 是否为「平台托管记忆 + 入口智能体」：只有这种装配会注册显式记忆工具。
+     *
+     * <p>权限基线必须与实际注册的工具集一致：装配期注册了工具而基线未放行，
+     * 每轮重建权限上下文后该工具会落到全局默认（未命中即 ASK）。</p>
+     *
+     * @param definition 智能体定义
+     * @return 是否启用显式记忆工具
+     */
+    private boolean declaredMemoryToolsActive(AiAgent definition) {
+        if (definition == null || !definition.isEntry()) {
+            return false;
+        }
+        AiMemoryConfigBo policy = runtimeConfigStore.memory();
+        return policy != null && policy.isEnabled() && "platform".equals(policy.getPipelineMode());
     }
 
     /**
@@ -525,7 +561,7 @@ public class AgentRegistry {
         return AgentPermissionContextFactory.buildContext(permissionModeStore.resolve(),
             queryBindings(definition.getId()), res.packToolDecisions(),
             res.directToolDecisions(), mcpDecisions,
-            false, false);
+            false, false, false);
     }
 
     /**

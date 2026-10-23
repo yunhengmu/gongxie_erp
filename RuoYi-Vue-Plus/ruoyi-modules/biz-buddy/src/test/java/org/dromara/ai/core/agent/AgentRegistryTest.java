@@ -119,6 +119,8 @@ class AgentRegistryTest {
     @Mock
     private SubagentAssembler subagentAssembler;
     @Mock
+    private org.dromara.ai.service.IAiMemoryService memoryService;
+    @Mock
     private AiRouteOrchestrator routeOrchestrator;
 
     private AgentRegistry registry;
@@ -140,7 +142,7 @@ class AgentRegistryTest {
     private AgentAssembler assembler() {
         return new AgentAssembler(modelFactory, aiProperties, runtimeConfigStore, stateStore, toolFactory, writeDedupStore,
             memoryDeclaredStore, safetyGuard, mcpClientService, aiSkillRepository, permissionModeStore, snapshotFactory,
-            subagentAssembler, routeOrchestrator);
+            subagentAssembler, memoryService, routeOrchestrator);
     }
 
     private AgentRegistry newRegistry(AgentAssembler assembler) {

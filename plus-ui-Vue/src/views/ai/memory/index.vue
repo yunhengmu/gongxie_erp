@@ -196,6 +196,15 @@
           </div>
           <div class="toolbar-actions">
             <el-button
+              v-hasPermi="['ai:memory:query']"
+              plain
+              icon="Clock"
+              :disabled="!query.agentId || !query.userId"
+              @click="handleOpenVersions"
+            >
+              版本历史
+            </el-button>
+            <el-button
               v-hasPermi="['ai:memory:consolidate']"
               type="warning"
               plain
@@ -307,6 +316,156 @@
         </el-col>
       </el-row>
     </el-card>
+
+    <el-card shadow="hover" class="table-panel declared-panel">
+      <template #header>
+        <div class="toolbar-shell">
+          <div class="table-heading">
+            <h3>显式记忆</h3>
+            <p>
+              用户在对话中明确要求「记住」的个人偏好。独立存放、不参与自动合并，注入时固定排在长期记忆之前；
+              平台托管模式下模型可通过 remember_user_preference / forget_user_preference 工具写入与撤销。
+            </p>
+          </div>
+          <div class="toolbar-actions">
+            <el-button icon="Refresh" @click="loadDeclared">刷新</el-button>
+            <el-button
+              v-hasPermi="['ai:memory:edit']"
+              type="primary"
+              icon="Plus"
+              :disabled="!query.agentId || !query.userId"
+              @click="handleOpenDeclared"
+            >
+              新增
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <el-table v-loading="declaredLoading" border empty-text="暂无显式记忆" :data="declared">
+        <el-table-column label="状态" align="center" width="90">
+          <template #default="scope">
+            <el-tag :type="scope.row.revoked ? 'info' : 'success'" effect="plain">
+              {{ scope.row.revoked ? '已撤销' : '生效中' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="记忆内容" prop="fact" min-width="220" :show-overflow-tooltip="true" />
+        <el-table-column label="用户原话" prop="evidence" min-width="220" :show-overflow-tooltip="true" />
+        <el-table-column label="创建时间" prop="createdAt" width="200" :show-overflow-tooltip="true" />
+        <el-table-column label="操作" align="center" width="100">
+          <template #default="scope">
+            <el-button
+              v-hasPermi="['ai:memory:edit']"
+              link
+              type="danger"
+              :disabled="scope.row.revoked"
+              @click="handleRevokeDeclared(scope.row)"
+            >
+              撤销
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-dialog v-model="declaredVisible" title="新增显式记忆" width="560px" destroy-on-close>
+      <el-form label-width="100px">
+        <el-form-item label="记忆内容" required>
+          <el-input
+            v-model="declaredForm.fact"
+            type="textarea"
+            :rows="3"
+            maxlength="200"
+            show-word-limit
+            placeholder="一句话描述要记住的偏好，如：用户偏好用表格统计数据"
+          />
+        </el-form-item>
+        <el-form-item label="用户原话">
+          <el-input
+            v-model="declaredForm.evidence"
+            maxlength="1000"
+            placeholder="可选，记录用户的原始表述，便于事后追溯"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="declaredVisible = false">取消</el-button>
+        <el-button type="primary" :loading="declaredSaving" @click="confirmDeclared">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="versionVisible" title="MEMORY.md 版本历史" width="900px" destroy-on-close>
+      <el-table v-loading="versionLoading" border empty-text="暂无历史版本" :data="versions">
+        <el-table-column label="时间" prop="createdAt" width="210" :show-overflow-tooltip="true" />
+        <el-table-column label="来源" width="150">
+          <template #default="scope">
+            <el-tag :type="scope.row.current ? 'success' : 'info'" effect="plain">
+              {{ sourceLabel(scope.row.source) }}
+            </el-tag>
+            <el-tag v-if="scope.row.current" type="success" size="small" class="version-current-tag">当前</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="字符数" prop="chars" align="center" width="90" />
+        <el-table-column label="备注" prop="note" :show-overflow-tooltip="true" />
+        <el-table-column label="操作" align="center" width="150">
+          <template #default="scope">
+            <el-button link type="primary" @click="handleViewVersion(scope.row)">查看</el-button>
+            <el-button
+              v-hasPermi="['ai:memory:edit']"
+              link
+              type="warning"
+              :disabled="scope.row.current"
+              @click="handleRestoreVersion(scope.row)"
+            >
+              恢复
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
+    <el-dialog v-model="versionDetailVisible" title="版本详情" width="760px" destroy-on-close>
+      <div v-if="versionDetail" class="version-detail-meta">
+        <span>版本：{{ versionDetail.versionId }}</span>
+        <span>来源：{{ sourceLabel(versionDetail.source) }}</span>
+        <span>水位：{{ versionDetail.watermark || '—' }}</span>
+      </div>
+      <el-input
+        :model-value="versionDetail?.content || ''"
+        type="textarea"
+        :rows="22"
+        readonly
+      />
+    </el-dialog>
+
+    <el-dialog v-model="restoreVisible" title="恢复 MEMORY.md 版本" width="560px" destroy-on-close>
+      <el-alert
+        type="warning"
+        :closable="false"
+        show-icon
+        title="恢复会覆盖当前 MEMORY.md；系统会先自动保存当前版本，可再次回退。"
+        class="restore-alert"
+      />
+      <el-form label-width="120px">
+        <el-form-item label="恢复模式">
+          <el-radio-group v-model="restoreForm.mode">
+            <el-radio value="CONTENT">只恢复内容</el-radio>
+            <el-radio value="CONTENT_AND_WATERMARK">内容 + 合并水位</el-radio>
+          </el-radio-group>
+          <div class="restore-tip">
+            只恢复内容时水位不变；同时恢复水位后，仍在 memory/ 的流水可能被重新合并。
+          </div>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="restoreForm.note" maxlength="200" show-word-limit placeholder="可选，记录本次恢复原因" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="restoreVisible = false">取消</el-button>
+        <el-button type="warning" :loading="restoring" @click="confirmRestore">确认恢复</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -314,17 +473,29 @@
 import { optionAgent } from '@/api/ai/agent';
 import type { AgentVO } from '@/api/ai/agent/types';
 import {
+  addDeclaredMemory,
   archiveMemory,
   cleanupMemory,
   consolidateMemory,
   getMemoryConfig,
   getMemoryContent,
+  getMemoryVersion,
+  listDeclaredMemories,
   listMemoryFiles,
+  listMemoryVersions,
   removeMemory,
+  restoreMemoryVersion,
+  revokeDeclaredMemory,
   updateMemoryConfig,
   updateMemoryContent
 } from '@/api/ai/memory';
-import type { MemoryConfig, MemoryFile } from '@/api/ai/memory/types';
+import type {
+  MemoryConfig,
+  MemoryDeclaredEntry,
+  MemoryFile,
+  MemoryRestoreForm,
+  MemoryVersion
+} from '@/api/ai/memory/types';
 import { listUser } from '@/api/system/user';
 import type { UserQuery, UserVO } from '@/api/system/user/types';
 import modal from '@/plugins/modal';
@@ -372,6 +543,104 @@ const current = ref<{ path: string }>({ path: '' });
 const content = ref('');
 const contentSaving = ref(false);
 const consolidating = ref(false);
+
+/** 显式记忆状态 */
+const declared = ref<MemoryDeclaredEntry[]>([]);
+const declaredLoading = ref(false);
+const declaredVisible = ref(false);
+const declaredSaving = ref(false);
+const declaredForm = ref<{ fact: string; evidence: string }>({ fact: '', evidence: '' });
+
+/** 版本历史状态 */
+const versionVisible = ref(false);
+const versionLoading = ref(false);
+const versions = ref<MemoryVersion[]>([]);
+const versionDetailVisible = ref(false);
+const versionDetail = ref<MemoryVersion | null>(null);
+const restoreVisible = ref(false);
+const restoring = ref(false);
+const restoreForm = ref<{
+  versionId: string;
+  mode: 'CONTENT' | 'CONTENT_AND_WATERMARK';
+  note: string;
+}>({ versionId: '', mode: 'CONTENT', note: '' });
+
+/** 版本来源中文标签 */
+const VERSION_SOURCE_LABELS: Record<string, string> = {
+  PRE_MANUAL: '人工编辑前',
+  MANUAL: '人工编辑',
+  PRE_CONSOLIDATE: '合并前',
+  CONSOLIDATE: '合并后',
+  CONSOLIDATE_PARTIAL: '合并中断',
+  PRE_RESTORE: '恢复前',
+  RESTORE: '恢复'
+};
+
+const sourceLabel = (source: string) => VERSION_SOURCE_LABELS[source] || source;
+
+/** 打开版本历史 */
+const handleOpenVersions = async () => {
+  if (!query.value.agentId || !query.value.userId) {
+    modal.msgWarning('请先选择智能体与用户');
+    return;
+  }
+  versionVisible.value = true;
+  await loadVersions();
+};
+
+/** 加载版本列表 */
+const loadVersions = async () => {
+  if (!query.value.agentId || !query.value.userId) {
+    versions.value = [];
+    return;
+  }
+  versionLoading.value = true;
+  try {
+    const res = await listMemoryVersions(query.value.agentId, query.value.userId);
+    versions.value = res.data || [];
+  } finally {
+    versionLoading.value = false;
+  }
+};
+
+/** 查看版本正文 */
+const handleViewVersion = async (row: MemoryVersion) => {
+  const res = await getMemoryVersion(query.value.agentId!, query.value.userId!, row.versionId);
+  versionDetail.value = res.data || null;
+  versionDetailVisible.value = true;
+};
+
+/** 打开恢复确认 */
+const handleRestoreVersion = (row: MemoryVersion) => {
+  restoreForm.value = { versionId: row.versionId, mode: 'CONTENT', note: '' };
+  restoreVisible.value = true;
+};
+
+/** 执行恢复 */
+const confirmRestore = async () => {
+  if (!query.value.agentId || !query.value.userId || !restoreForm.value.versionId) {
+    return;
+  }
+  restoring.value = true;
+  try {
+    const payload: MemoryRestoreForm = {
+      agentId: query.value.agentId,
+      userId: query.value.userId,
+      mode: restoreForm.value.mode,
+      note: restoreForm.value.note
+    };
+    await restoreMemoryVersion(restoreForm.value.versionId, payload);
+    modal.msgSuccess('已恢复；恢复前版本已自动保存');
+    restoreVisible.value = false;
+    await loadVersions();
+    await loadFiles();
+    if (current.value.path === 'MEMORY.md') {
+      await handleSelectFile({ path: 'MEMORY.md' } as MemoryFile);
+    }
+  } finally {
+    restoring.value = false;
+  }
+};
 
 /** 加载当前生效配置 */
 const loadConfig = async () => {
@@ -439,7 +708,65 @@ const loadFiles = async () => {
 
 /** 切换智能体或用户 */
 const handleScopeChange = async () => {
-  await loadFiles();
+  await Promise.all([loadFiles(), loadDeclared()]);
+};
+
+/** 加载显式记忆（含已撤销条目，便于审计） */
+const loadDeclared = async () => {
+  if (!query.value.agentId || !query.value.userId) {
+    declared.value = [];
+    return;
+  }
+  declaredLoading.value = true;
+  try {
+    const res = await listDeclaredMemories(query.value.agentId, query.value.userId);
+    declared.value = res.data || [];
+  } finally {
+    declaredLoading.value = false;
+  }
+};
+
+/** 打开新增显式记忆弹窗 */
+const handleOpenDeclared = () => {
+  if (!requireScope()) return;
+  declaredForm.value = { fact: '', evidence: '' };
+  declaredVisible.value = true;
+};
+
+/** 保存人工补充的显式记忆 */
+const confirmDeclared = async () => {
+  if (!requireScope()) return;
+  if (!declaredForm.value.fact.trim()) {
+    modal.msgWarning('记忆内容不能为空');
+    return;
+  }
+  declaredSaving.value = true;
+  try {
+    await addDeclaredMemory({
+      agentId: query.value.agentId!,
+      userId: query.value.userId!,
+      fact: declaredForm.value.fact.trim(),
+      evidence: declaredForm.value.evidence.trim()
+    });
+    modal.msgSuccess('显式记忆已保存，下一轮对话起生效');
+    declaredVisible.value = false;
+    await loadDeclared();
+  } finally {
+    declaredSaving.value = false;
+  }
+};
+
+/** 撤销一条显式记忆 */
+const handleRevokeDeclared = async (row: MemoryDeclaredEntry) => {
+  if (!requireScope()) return;
+  try {
+    await modal.confirm(`确认撤销「${row.fact}」？撤销后该条不再带入对话。`);
+  } catch {
+    return;
+  }
+  await revokeDeclaredMemory(query.value.agentId!, query.value.userId!, row.id);
+  modal.msgSuccess('已撤销');
+  await loadDeclared();
 };
 
 /** 选中文件并加载内容 */
@@ -544,7 +871,7 @@ const handleRemove = async () => {
   try {
     await removeMemory(query.value.agentId, query.value.userId);
     modal.msgSuccess('长期记忆已删除');
-    await loadFiles();
+    await Promise.all([loadFiles(), loadDeclared()]);
   } finally {
     removing.value = false;
   }
@@ -552,7 +879,7 @@ const handleRemove = async () => {
 
 onMounted(async () => {
   await Promise.all([loadConfig(), loadOptions()]);
-  await loadFiles();
+  await Promise.all([loadFiles(), loadDeclared()]);
 });
 </script>
 
@@ -563,6 +890,10 @@ onMounted(async () => {
 }
 
 .memory-panel {
+  margin-top: 12px;
+}
+
+.declared-panel {
   margin-top: 12px;
 }
 
@@ -594,5 +925,29 @@ onMounted(async () => {
 .editor-path {
   color: var(--el-text-color-secondary);
   font-size: 13px;
+}
+
+.version-current-tag {
+  margin-left: 6px;
+}
+
+.version-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.restore-alert {
+  margin-bottom: 16px;
+}
+
+.restore-tip {
+  margin-top: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>

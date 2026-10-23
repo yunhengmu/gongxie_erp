@@ -82,6 +82,9 @@ class AiMemoryServiceImplTest {
     @Mock
     private org.dromara.ai.core.memory.AiMemoryDeclaredStore memoryDeclaredStore;
 
+    @Mock
+    private org.dromara.ai.core.memory.AiMemoryVersionStore memoryVersionStore;
+
     /**
      * 净化器为纯函数组件，用真实实例参与测试，避免 mock 返回 null 掩盖净化行为。
      */
@@ -167,6 +170,31 @@ class AiMemoryServiceImplTest {
     /**
      * 验证路径非法时抛业务异常，阻断越权访问。
      */
+    @Test
+    @DisplayName("清理时轮转隔离原文与审计日志")
+    void shouldPruneQuarantineAndAudit() throws IOException {
+        WorkspaceManager workspace = stubWorkspace();
+        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
+        when(runtimeConfigStore.memory()).thenReturn(policy());
+        Path quarantine = Files.createDirectories(tempDir.resolve(".quarantine"));
+        Path oldBackup = quarantine.resolve("2024-01-01.md.old.bak");
+        Files.writeString(oldBackup, "raw");
+        Files.setLastModifiedTime(oldBackup,
+            java.nio.file.attribute.FileTime.from(Instant.now().minusSeconds(86400L * 40)));
+        Path audit = tempDir.resolve("audit.jsonl");
+        Files.writeString(audit, """
+            {"ts":"2020-01-01T00:00:00Z","event":"CONSOLIDATE","result":"OK"}
+            {"ts":"2999-01-01T00:00:00Z","event":"CONSOLIDATE","result":"OK"}
+            """);
+
+        memoryService.cleanup(1L, 7L);
+
+        assertFalse(Files.exists(oldBackup));
+        String remaining = Files.readString(audit);
+        assertFalse(remaining.contains("2020-01-01"));
+        assertTrue(remaining.contains("2999-01-01"));
+    }
+
     @Test
     @DisplayName("按水位判断待合并流水")
     void shouldDetectPendingLedger() throws IOException {

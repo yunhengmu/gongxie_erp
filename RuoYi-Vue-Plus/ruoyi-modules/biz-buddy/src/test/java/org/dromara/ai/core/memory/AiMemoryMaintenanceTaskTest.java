@@ -89,6 +89,28 @@ class AiMemoryMaintenanceTaskTest {
     }
 
     @Test
+    @DisplayName("platform 模式合并所有 pending，而不是只看即将过期流水")
+    void shouldConsolidateAllPendingInPlatformMode() {
+        AiMemoryConfigBo policy = new AiMemoryConfigBo();
+        policy.setEnabled(true);
+        policy.setPipelineMode("platform");
+        when(configStore.memory()).thenReturn(policy);
+        when(memoryService.hasPendingLedger(1L, 2L)).thenReturn(true);
+        when(memoryService.hasPendingLedger(1L, 3L)).thenReturn(false);
+        try (MockedStatic<RedisUtils> redis = acquireLock()) {
+            task.runNow();
+        }
+
+        verify(memoryService).hasPendingLedger(1L, 2L);
+        verify(memoryService).consolidate(1L, 2L);
+        verify(memoryService, never()).hasUnconsolidatedExpiringLedger(anyLong(), anyLong());
+        verify(memoryService).archiveDaily(1L, 2L);
+        verify(memoryService).cleanup(1L, 2L);
+        verify(memoryService).archiveDaily(1L, 3L);
+        verify(memoryService).cleanup(1L, 3L);
+    }
+
+    @Test
     @DisplayName("合并失败时跳过该用户归档与清理")
     void shouldSkipArchiveWhenConsolidateFails() {
         when(memoryService.hasUnconsolidatedExpiringLedger(anyLong(), anyLong())).thenReturn(true);

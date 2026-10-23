@@ -2,8 +2,10 @@ package org.dromara.ai.core.agent;
 
 import io.agentscope.core.permission.PermissionContextState;
 import io.agentscope.core.permission.PermissionMode;
+import org.dromara.ai.core.agent.tools.ForgetUserPreferenceTool;
 import org.dromara.ai.core.agent.tools.GetCurrentTimeTool;
 import org.dromara.ai.core.agent.tools.GetCurrentUserTool;
+import org.dromara.ai.core.agent.tools.RememberUserPreferenceTool;
 import org.dromara.ai.domain.AiAgentTool;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,7 +75,7 @@ class AgentPermissionContextFactoryTest {
             List.of(bind("t_bind", AiAgentTool.DECISION_ASK), bind("t_both", AiAgentTool.DECISION_DENY)),
             Map.of("t_both", AiAgentTool.DECISION_ASK, "t_pack", AiAgentTool.DECISION_ALLOW),
             Map.of("t_both", AiAgentTool.DECISION_ALLOW, "t_direct", AiAgentTool.DECISION_DENY),
-            Map.of(), false, false);
+            Map.of(), false, false, false);
 
         assertEquals(PermissionMode.DEFAULT, ctx.getMode());
         assertTrue(ctx.getAskRules().containsKey("t_bind"));
@@ -93,7 +95,7 @@ class AgentPermissionContextFactoryTest {
     @DisplayName("上下文构建：会话决策为 null 视为空集")
     void shouldTreatNullSessionDecisionsAsEmpty() {
         PermissionContextState ctx = AgentPermissionContextFactory.buildContext(PermissionMode.DEFAULT,
-            List.of(), Map.of(), null, Map.of(), false, false);
+            List.of(), Map.of(), null, Map.of(), false, false, false);
         assertTrue(ctx.getAllowRules().keySet().containsAll(AgentRegistry.BUILTIN_READONLY_TOOL_CODES));
     }
 
@@ -102,7 +104,7 @@ class AgentPermissionContextFactoryTest {
     void shouldNotApplyBuiltinDefaultWhenExplicitlyBound() {
         PermissionContextState ctx = AgentPermissionContextFactory.buildContext(PermissionMode.DEFAULT,
             List.of(bind(GetCurrentTimeTool.TOOL_NAME, AiAgentTool.DECISION_DENY)),
-            Map.of(), Map.of(), Map.of(), false, false);
+            Map.of(), Map.of(), Map.of(), false, false, false);
         assertTrue(ctx.getDenyRules().containsKey(GetCurrentTimeTool.TOOL_NAME));
         assertFalse(ctx.getAllowRules().containsKey(GetCurrentTimeTool.TOOL_NAME));
         assertTrue(ctx.getAllowRules().containsKey(GetCurrentUserTool.TOOL_NAME));
@@ -112,7 +114,7 @@ class AgentPermissionContextFactoryTest {
     @DisplayName("上下文构建：子智能体协调工具与入口路由工具放行")
     void shouldAllowSubagentAndRouteTools() {
         PermissionContextState ctx = AgentPermissionContextFactory.buildContext(PermissionMode.DEFAULT,
-            List.of(), Map.of(), Map.of(), Map.of(), true, true);
+            List.of(), Map.of(), Map.of(), Map.of(), true, true, false);
         assertEquals(AgentRegistry.SOURCE_SUBAGENT, ctx.getAllowRules().get("agent_spawn").get(0).source());
         assertTrue(ctx.getAllowRules().containsKey("wait_async_results"));
         assertEquals(AgentRegistry.SOURCE_ROUTE,
@@ -123,7 +125,7 @@ class AgentPermissionContextFactoryTest {
     @DisplayName("上下文构建：专家模式（子智能体关闭）不放行协调与路由工具")
     void shouldNotAllowSubagentOrRouteWhenDisabled() {
         PermissionContextState ctx = AgentPermissionContextFactory.buildContext(PermissionMode.DONT_ASK,
-            List.of(), Map.of(), Map.of(), Map.of(), false, false);
+            List.of(), Map.of(), Map.of(), Map.of(), false, false, false);
         assertEquals(PermissionMode.DONT_ASK, ctx.getMode());
         assertFalse(ctx.getAllowRules().containsKey("agent_spawn"));
         assertFalse(ctx.getAllowRules().containsKey(RouteDecisionTool.TOOL_NAME));
@@ -133,8 +135,27 @@ class AgentPermissionContextFactoryTest {
     @DisplayName("上下文构建：MCP 决策以场景包来源并入")
     void shouldAddMcpDecisionsWithPackSource() {
         PermissionContextState ctx = AgentPermissionContextFactory.buildContext(PermissionMode.DEFAULT,
-            List.of(), Map.of(), Map.of(), Map.of("mcp_a", AiAgentTool.DECISION_ASK), false, false);
+            List.of(), Map.of(), Map.of(), Map.of("mcp_a", AiAgentTool.DECISION_ASK), false, false, false);
         assertTrue(ctx.getAskRules().containsKey("mcp_a"));
         assertEquals(AgentRegistry.SOURCE_PACK, ctx.getAskRules().get("mcp_a").get(0).source());
+    }
+
+    @Test
+    @DisplayName("上下文构建：平台托管显式记忆工具默认放行")
+    void shouldAllowDeclaredMemoryToolsWhenEnabled() {
+        PermissionContextState ctx = AgentPermissionContextFactory.buildContext(PermissionMode.DEFAULT,
+            List.of(), Map.of(), Map.of(), Map.of(), false, true, true);
+        assertTrue(ctx.getAllowRules().keySet().containsAll(AgentRegistry.BUILTIN_MEMORY_TOOL_CODES));
+        assertEquals(AgentRegistry.SOURCE_MEMORY,
+            ctx.getAllowRules().get(RememberUserPreferenceTool.TOOL_NAME).get(0).source());
+    }
+
+    @Test
+    @DisplayName("上下文构建：未启用平台托管时不放行显式记忆工具")
+    void shouldNotAllowDeclaredMemoryToolsWhenDisabled() {
+        PermissionContextState ctx = AgentPermissionContextFactory.buildContext(PermissionMode.DEFAULT,
+            List.of(), Map.of(), Map.of(), Map.of(), false, true, false);
+        assertFalse(ctx.getAllowRules().containsKey(RememberUserPreferenceTool.TOOL_NAME));
+        assertFalse(ctx.getAllowRules().containsKey(ForgetUserPreferenceTool.TOOL_NAME));
     }
 }

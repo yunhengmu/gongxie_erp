@@ -152,6 +152,18 @@ public class AiRuntimeConfigStore {
         if (policy.getArchiveRetentionDays() <= 0) {
             policy.setArchiveRetentionDays(aiProperties.getChat().getMemoryArchiveRetentionDays());
         }
+        if (policy.getQuarantineRetentionDays() <= 0) {
+            policy.setQuarantineRetentionDays(aiProperties.getChat().getMemoryQuarantineRetentionDays());
+        }
+        if (policy.getAuditRetentionDays() <= 0) {
+            policy.setAuditRetentionDays(aiProperties.getChat().getMemoryAuditRetentionDays());
+        }
+        if (policy.getShadowRetentionDays() <= 0) {
+            policy.setShadowRetentionDays(aiProperties.getChat().getMemoryShadowRetentionDays());
+        }
+        if (policy.getVersionRetention() <= 0) {
+            policy.setVersionRetention(aiProperties.getChat().getMemoryVersionRetention());
+        }
         return policy;
     }
 
@@ -494,6 +506,10 @@ public class AiRuntimeConfigStore {
         bo.setConsolidationMinGapMinutes(chat.getMemoryConsolidationMinGapMinutes());
         bo.setDailyFileRetentionDays(chat.getMemoryDailyFileRetentionDays());
         bo.setArchiveRetentionDays(chat.getMemoryArchiveRetentionDays());
+        bo.setQuarantineRetentionDays(chat.getMemoryQuarantineRetentionDays());
+        bo.setAuditRetentionDays(chat.getMemoryAuditRetentionDays());
+        bo.setShadowRetentionDays(chat.getMemoryShadowRetentionDays());
+        bo.setVersionRetention(chat.getMemoryVersionRetention());
         bo.setSessionRetentionDays(chat.getMemorySessionRetentionDays());
         bo.setFlushMode(chat.getMemoryFlushMode());
         bo.setFlushThrottleMinutes(chat.getMemoryFlushThrottleMinutes());

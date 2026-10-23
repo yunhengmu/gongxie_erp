@@ -55,6 +55,7 @@ final class AgentPermissionContextFactory {
      * @param mcpDecisions      资源集内 MCP 工具的授权决策（归一化名 → 决策，可为空）
      * @param subagentsEnabled  是否绑定了启用中的子智能体（决定是否放行编排类平台工具）
      * @param entryAgent        是否入口智能体（决定是否放行 {@code route_decision}）
+     * @param declaredMemoryTools 是否为「平台托管记忆 + 入口智能体」（决定是否放行显式记忆工具）
      * @return 权限上下文
      */
     static PermissionContextState buildContext(PermissionMode mode,
@@ -63,7 +64,8 @@ final class AgentPermissionContextFactory {
                                                Map<String, String> sessionToolDecisions,
                                                Map<String, String> mcpDecisions,
                                                boolean subagentsEnabled,
-                                               boolean entryAgent) {
+                                               boolean entryAgent,
+                                               boolean declaredMemoryTools) {
         Map<String, String> sessionDecisions = sessionToolDecisions == null ? Map.of() : sessionToolDecisions;
         PermissionContextState.Builder builder = PermissionContextState.builder()
             .mode(mode);
@@ -112,6 +114,14 @@ final class AgentPermissionContextFactory {
         if (entryAgent) {
             builder.addAllowRule(RouteDecisionTool.TOOL_NAME, new PermissionRule(
                 RouteDecisionTool.TOOL_NAME, null, PermissionBehavior.ALLOW, AgentRegistry.SOURCE_ROUTE));
+        }
+        if (declaredMemoryTools) {
+            // 显式记忆工具是写工具，但只改写提问用户本人的记忆、可随时撤销，
+            // 且每次调用都要通过「原话证据 + 明确意图」校验，故默认放行、不弹确认卡片
+            for (String tool : AgentRegistry.BUILTIN_MEMORY_TOOL_CODES) {
+                builder.addAllowRule(tool, new PermissionRule(tool, null, PermissionBehavior.ALLOW,
+                    AgentRegistry.SOURCE_MEMORY));
+            }
         }
         return builder.build();
     }
