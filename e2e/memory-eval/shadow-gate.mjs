@@ -22,9 +22,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 /** 门禁阈值：必记召回 ≥90%、污染 ≤2%、PII 出境 0、needs_context 缺失 0 */
-const THRESHOLDS = { recall: 0.9, pollution: 0.02 };
+export const THRESHOLDS = { recall: 0.9, pollution: 0.02 };
 
 /** PII 命中模式（抽取正文中出现即视为出境） */
 const PII_PATTERNS = [
@@ -34,25 +35,34 @@ const PII_PATTERNS = [
   { name: '银行卡', regex: /\d{16,19}/g }
 ];
 
-const args = parseArgs(process.argv.slice(2));
-if (!args.samples || !args.labels) {
-  console.error('缺少参数：--samples <jsonl> --labels <jsonl>');
-  process.exit(2);
+/**
+ * 命令行入口：被 gate.mjs 复用时不执行（由 import.meta.url 判定）。
+ */
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (!args.samples || !args.labels) {
+    console.error('缺少参数：--samples <jsonl> --labels <jsonl>');
+    process.exit(2);
+  }
+
+  const samples = readJsonl(path.resolve(args.samples));
+  const labels = readJsonl(path.resolve(args.labels));
+  const memoryText = args.memory && fs.existsSync(path.resolve(args.memory))
+    ? fs.readFileSync(path.resolve(args.memory), 'utf8') : '';
+  const report = evaluate(samples, labels, memoryText);
+  printReport(report);
+
+  if (args.out) {
+    fs.writeFileSync(path.resolve(args.out), renderMarkdown(report), 'utf8');
+  }
+
+  if (args.gate) {
+    process.exit(report.passed ? 0 : 1);
+  }
 }
 
-const samples = readJsonl(path.resolve(args.samples));
-const labels = readJsonl(path.resolve(args.labels));
-const memoryText = args.memory && fs.existsSync(path.resolve(args.memory))
-  ? fs.readFileSync(path.resolve(args.memory), 'utf8') : '';
-const report = evaluate(samples, labels, memoryText);
-printReport(report);
-
-if (args.out) {
-  fs.writeFileSync(path.resolve(args.out), renderMarkdown(report), 'utf8');
-}
-
-if (args.gate) {
-  process.exit(report.passed ? 0 : 1);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
 }
 
 /**
@@ -83,7 +93,7 @@ function parseArgs(argv) {
 }
 
 /** 读取 JSONL（忽略空行）。 */
-function readJsonl(file) {
+export function readJsonl(file) {
   if (!fs.existsSync(file)) {
     console.error(`文件不存在：${file}`);
     process.exit(2);
@@ -131,7 +141,7 @@ function aggregateSessions(rows) {
  * @param {string}   memoryText 当前 MEMORY.md 正文（可为空）
  * @returns {object} 指标与明细
  */
-function evaluate(rows, labels, memoryText = '') {
+export function evaluate(rows, labels, memoryText = '') {
   const sessions = aggregateSessions(rows);
   const known = normalize(memoryText);
   const overall = {
@@ -217,7 +227,7 @@ function percent(value) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function printReport(report) {
+export function printReport(report) {
   console.log('\n=== 长期记忆真实流量影子门禁 ===');
   console.log(`样本：${report.sampleRecords} 条记录 / ${report.sampleSessions} 个会话；`
     + `标签：${report.labelSessions} 个会话（样本缺失 ${report.overall.missingSessions}）`);
@@ -244,7 +254,7 @@ function printReport(report) {
   console.log(`\n结论：${report.passed ? 'PASS（可用于平台模式切量）' : 'FAIL（保持 framework / shadow）'}`);
 }
 
-function renderMarkdown(report) {
+export function renderMarkdown(report) {
   const lines = ['# 长期记忆真实流量影子门禁报告', '',
     `- 样本：${report.sampleRecords} 条 / ${report.sampleSessions} 个会话`,
     `- 标签会话：${report.labelSessions}（样本缺失 ${report.overall.missingSessions}）`,

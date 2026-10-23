@@ -14,7 +14,7 @@
 {"id":"cite-source","slice":"preference","messages":[{"role":"user","content":"引用外部资料时要标注来源，请记住"}],"mustRemember":["来源"],"mustNotRemember":[]}
 {"id":"brevity","slice":"preference","messages":[{"role":"user","content":"回答控制在三句话以内，请记住"}],"mustRemember":["三句"],"mustNotRemember":[]}
 {"id":"unit-uniform","slice":"format","messages":[{"role":"user","content":"数值的货币单位统一用元，请记住"}],"mustRemember":["货币单位"],"mustNotRemember":[]}
-{"id":"numbering","slice":"format","messages":[{"role":"user","content":"序号统一用 1. 2. 3. 这种格式，请记住"}],"mustRemember":["序号"],"mustNotRemember":[]}
+{"id":"numbering","slice":"format","messages":[{"role":"user","content":"序号统一用 1. 2. 3. 这种格式，请记住"}],"mustRemember":["1. 2. 3"],"mustNotRemember":[]}
 {"id":"english-terms","slice":"preference","messages":[{"role":"user","content":"英文术语保留原文，不要翻译，请记住"}],"mustRemember":["原文"],"mustNotRemember":[]}
 {"id":"empty-cell","slice":"format","messages":[{"role":"user","content":"表格里的空值统一写「—」，请记住"}],"mustRemember":["空值"],"mustNotRemember":[]}
 {"id":"chart-blue","slice":"format","messages":[{"role":"user","content":"图表配色统一用蓝色系，请记住"}],"mustRemember":["蓝色"],"mustNotRemember":[]}
