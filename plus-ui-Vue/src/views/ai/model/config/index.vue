@@ -71,8 +71,8 @@
 
       <el-table v-loading="loading" border class="data-table" :data="configList" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="配置名称" align="center" prop="configName" :show-overflow-tooltip="true" />
-        <el-table-column label="提供商" align="center" width="120">
+        <el-table-column label="配置名称" align="left" prop="configName" :show-overflow-tooltip="true" />
+        <el-table-column label="提供商" align="left" width="120">
           <template #default="scope">{{ providerLabel(scope.row.provider) }}</template>
         </el-table-column>
         <el-table-column label="类型" align="center" width="100">
@@ -82,7 +82,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="模型标识" align="center" prop="modelCode" :show-overflow-tooltip="true" />
+        <el-table-column label="模型标识" align="left" prop="modelCode" :show-overflow-tooltip="true" />
         <el-table-column label="支持视觉" align="center" width="100">
           <template #default="scope">
             <span v-if="scope.row.modelType !== 'chat'" class="text-muted">-</span>

@@ -74,12 +74,12 @@
 
       <el-table v-loading="loading" border class="data-table" :data="agentList" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="55" align="center" />
-        <el-table-column label="名称" align="center" prop="agentName" :show-overflow-tooltip="true" />
-        <el-table-column label="编码" align="center" prop="agentCode" width="160" :show-overflow-tooltip="true" />
-        <el-table-column label="绑定模型" align="center" width="160" :show-overflow-tooltip="true">
+        <el-table-column label="名称" align="left" prop="agentName" :show-overflow-tooltip="true" />
+        <el-table-column label="编码" align="left" prop="agentCode" width="160" :show-overflow-tooltip="true" />
+        <el-table-column label="绑定模型" align="left" width="160" :show-overflow-tooltip="true">
           <template #default="scope">{{ modelLabel(scope.row) }}</template>
         </el-table-column>
-        <el-table-column label="归属部门" align="center" width="140" :show-overflow-tooltip="true">
+        <el-table-column label="归属部门" align="left" width="140" :show-overflow-tooltip="true">
           <template #default="scope">{{ deptLabel(scope.row.ownerDeptId) }}</template>
         </el-table-column>
         <el-table-column label="可见范围" align="center" width="110">

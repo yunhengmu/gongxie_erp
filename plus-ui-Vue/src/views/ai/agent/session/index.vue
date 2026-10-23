@@ -129,14 +129,14 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="智能体" align="center" prop="agentName" :show-overflow-tooltip="true" width="150" />
-        <el-table-column label="归属用户" align="center" width="120">
+        <el-table-column label="智能体" align="left" prop="agentName" :show-overflow-tooltip="true" width="150" />
+        <el-table-column label="归属用户" align="left" width="120">
           <template #default="scope">
             <span v-if="scope.row.userName">{{ scope.row.userName }}</span>
             <span v-else class="text-muted">{{ scope.row.userId ?? '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="部门" align="center" prop="deptName" :show-overflow-tooltip="true" width="140" />
+        <el-table-column label="部门" align="left" prop="deptName" :show-overflow-tooltip="true" width="140" />
         <el-table-column label="消息数" align="center" prop="messageCount" width="90" />
         <el-table-column label="状态" align="center" width="100">
           <template #default="scope">

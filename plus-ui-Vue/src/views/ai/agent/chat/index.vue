@@ -1,7 +1,7 @@
 <template>
   <div ref="workbenchRef" class="chat-workbench p-2 app-container" :style="workbenchStyle">
     <!-- 左侧：会话列表 -->
-    <aside class="chat-sidebar">
+    <aside class="chat-sidebar" :class="{ 'is-collapsed': sidebarCollapsed }">
       <div class="sidebar-top">
         <el-button type="primary" icon="Plus" class="new-session-btn" @click="handleNewSession">新建任务</el-button>
       </div>
@@ -40,6 +40,20 @@
 
     <!-- 右侧：会话内容 -->
     <section class="chat-main">
+      <div class="chat-mobile-bar">
+        <el-button link icon="Menu" @click="sidebarCollapsed = !sidebarCollapsed">
+          {{ sidebarCollapsed ? '显示任务列表' : '隐藏任务列表' }}
+        </el-button>
+      </div>
+      <div v-if="messages.length" class="chat-context-bar">
+        <span class="chat-context-bar__agent">
+          <img class="chat-context-bar__logo" :src="logo" alt="小Z" />
+          {{ pinnedExpert ? pinnedExpert.name : '小Z' }}
+        </span>
+        <span class="chat-context-bar__meta">
+          {{ resourceChips.length ? resourceChips.map((item) => item.label).join(' · ') : '默认资源' }}
+        </span>
+      </div>
       <div ref="messageContainerRef" class="message-area" :class="{ 'message-area--empty': !messages.length }">
         <template v-for="msg in messages" :key="String(msg.id)">
           <div v-if="msg.role === 'user'" class="msg-row msg-row--user">
@@ -377,6 +391,17 @@
         </div>
         <!-- 对话前标题：输入框上方约两行文字高度处，水平居中；发出第一条消息后移除 -->
         <div v-if="!messages.length" class="composer__title">BizBuddy, 我帮您</div>
+        <div v-if="!messages.length" class="composer__suggestions">
+          <button
+            v-for="item in PROMPT_SUGGESTIONS"
+            :key="item.label"
+            type="button"
+            class="composer-suggestion"
+            @click="applySuggestion(item.text)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
         <el-input
           v-model="inputText"
           type="textarea"
@@ -391,7 +416,7 @@
           <div class="resource-bar">
             <el-popover placement="top-start" :width="190" trigger="click" popper-class="resource-picker-popper">
               <template #reference>
-                <el-button class="resource-add-btn" icon="Plus" circle title="选择资源或上传附件" />
+                <el-button class="resource-add-btn" icon="Plus" title="选择资源或上传附件">资源</el-button>
               </template>
               <!-- 二级：分组列表；三级：悬浮飞出的选项面板（支持上下滚动） -->
               <div class="resource-menu">
@@ -744,6 +769,16 @@ interface ResourceMenuGroup {
 
 const agentOptions = ref<AgentVO[]>([]);
 const expertOptions = ref<ExpertOptionVO[]>([]);
+/** 窄屏下会话列表默认收起，避免占掉聊天区高度 */
+const sidebarCollapsed = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches);
+
+/** 首屏示例问题：点击填入输入框，用户可继续修改后发送 */
+const PROMPT_SUGGESTIONS = [
+  { label: '查通知公告', text: '帮我查一下最近的通知公告' },
+  { label: '知识库问答', text: '根据知识库说明 BizBuddy 的定位' },
+  { label: '建定时任务', text: '帮我建一个每天早上 9 点的日报任务' },
+  { label: '指定专家', text: '我想让公告管理专家处理这个问题' }
+];
 const packOptions = ref<ScenarioPackOptionVO[]>([]);
 const toolOptions = ref<ToolOptionVO[]>([]);
 const skillOptions = ref<SkillOptionVO[]>([]);
@@ -1762,6 +1797,11 @@ const getSessions = async () => {
   sessions.value = res.data?.rows ?? [];
 };
 
+/** 点击示例问题：填入输入框，不直接发送 */
+const applySuggestion = (text: string) => {
+  inputText.value = text;
+};
+
 /** 新建会话（清空当前会话上下文与资源选择，发送时再真正落库） */
 const handleNewSession = () => {
   finishStream();
@@ -1786,6 +1826,10 @@ const handleSelectSession = async (session: ChatSessionVO) => {
   }
   finishStream();
   currentSessionId.value = session.id;
+  // 窄屏选择任务后收起列表，把空间留给对话
+  if (window.matchMedia('(max-width: 900px)').matches) {
+    sidebarCollapsed.value = true;
+  }
   // 工具卡片展开态不跨会话保留
   expandedToolKeys.value = [];
   // 资源选择（REQ-AI-32）：切会话时载入该会话的服务端资源集与指定专家
@@ -2792,12 +2836,82 @@ onMounted(() => {
 
 /* 对话前标题：位于输入框上方约两行正文高度处，水平居中（对话后不渲染） */
 .composer__title {
-  margin-bottom: 44px;
+  margin-bottom: 16px;
   color: var(--el-text-color-primary, #303133);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-align: center;
+}
+
+.composer__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.composer-suggestion {
+  padding: 6px 12px;
+  border: 1px solid var(--app-surface-border);
+  border-radius: 999px;
+  background: var(--app-surface-bg);
+  color: var(--app-text-title);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.composer-suggestion:hover,
+.composer-suggestion:focus-visible {
+  border-color: var(--app-accent-strong);
+  color: var(--app-accent-strong);
+  background: var(--app-accent-soft);
+  outline: none;
+}
+
+.chat-mobile-bar {
+  display: none;
+  padding: 8px 12px 0;
+}
+
+.chat-context-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--app-surface-border);
+  background: var(--app-elevated-soft-bg);
+}
+
+.chat-context-bar__agent {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-text-title);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.chat-context-bar__logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.chat-context-bar__meta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--app-text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 首登检查清单：对话前的可关闭卡片 */
@@ -3858,10 +3972,18 @@ onMounted(() => {
     height: auto;
   }
 
+  .chat-mobile-bar {
+    display: flex;
+  }
+
   .chat-sidebar {
     width: 100%;
     flex: 0 0 auto;
     max-height: 260px;
+  }
+
+  .chat-sidebar.is-collapsed {
+    display: none;
   }
 
   .chat-main {
