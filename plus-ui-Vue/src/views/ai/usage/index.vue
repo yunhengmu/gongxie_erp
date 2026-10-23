@@ -25,13 +25,21 @@
             </el-select>
           </el-form-item>
           <el-form-item label="所属用户" prop="userId">
-            <el-input
+            <el-select
               v-model="queryParams.userId"
-              placeholder="请输入用户ID"
+              placeholder="全部（可输入用户ID）"
               clearable
-              style="width: 180px"
-              @keyup.enter="handleQuery"
-            />
+              filterable
+              allow-create
+              style="width: 200px"
+            >
+              <el-option
+                v-for="item in userOptions"
+                :key="String(item.userId)"
+                :label="`${item.nickName || item.userName}（${item.userName}）`"
+                :value="item.userId"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
@@ -154,12 +162,15 @@
 <script setup name="AiUsage" lang="ts">
 import { optionAgent } from '@/api/ai/agent';
 import type { AgentVO } from '@/api/ai/agent/types';
+import { listUser } from '@/api/system/user';
+import type { UserVO } from '@/api/system/user/types';
 import { exportUsageUrl, listUsageStat, usageOverview } from '@/api/ai/usage';
 import type { UsageOverviewVO, UsageStatQuery, UsageStatVO } from '@/api/ai/usage/types';
 import { download } from '@/utils/request';
 
 const usageList = ref<UsageStatVO[]>([]);
 const agentOptions = ref<AgentVO[]>([]);
+const userOptions = ref<UserVO[]>([]);
 const overview = ref<UsageOverviewVO>({ byDate: [], byAgent: [], byModel: [] });
 const loading = ref(true);
 const overviewLoading = ref(true);
@@ -212,6 +223,18 @@ const getAgentOptions = async () => {
   agentOptions.value = res.data ?? [];
 };
 
+/** 加载用户下拉选项（无权限时静默，仍可直接输入用户ID） */
+const getUserOptions = async () => {
+  try {
+    const res = (await listUser({ pageNum: 1, pageSize: 500 } as any)) as unknown as {
+      data?: { rows?: UserVO[] };
+    };
+    userOptions.value = res.data?.rows || [];
+  } catch {
+    userOptions.value = [];
+  }
+};
+
 const handleQuery = () => {
   queryParams.value.pageNum = 1;
   getList();
@@ -242,6 +265,7 @@ const handleExport = () => {
 
 onMounted(() => {
   getAgentOptions();
+  getUserOptions();
   getList();
 });
 </script>

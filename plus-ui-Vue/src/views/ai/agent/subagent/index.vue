@@ -128,7 +128,7 @@
               <el-button
                 v-hasPermi="['ai:subagent:remove']"
                 link
-                type="primary"
+                type="danger"
                 icon="Delete"
                 @click="handleDelete(scope.row)"
               ></el-button>

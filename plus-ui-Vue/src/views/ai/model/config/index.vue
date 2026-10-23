@@ -151,7 +151,7 @@
               <el-button
                 v-hasPermi="['ai:model:remove']"
                 link
-                type="primary"
+                type="danger"
                 icon="Delete"
                 @click="handleDelete(scope.row)"
               ></el-button>
@@ -210,6 +210,7 @@
             <el-radio value="0">否</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-divider content-position="left">连接与密钥</el-divider>
         <el-form-item label="服务地址" prop="baseUrl">
           <template #label>
             <span class="label-tip">
@@ -273,6 +274,7 @@
         <el-form-item label="重试次数" prop="maxRetries">
           <el-input-number v-model="form.maxRetries" :min="0" :max="5" controls-position="right" />
         </el-form-item>
+        <el-divider content-position="left">计费与状态</el-divider>
         <el-form-item label="输入单价" prop="inputPrice">
           <template #label>
             <span class="label-tip">

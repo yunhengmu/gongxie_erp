@@ -29,10 +29,10 @@
               <el-option label="失败" value="1" />
             </el-select>
           </el-form-item>
-          <el-form-item label="会话标题" prop="sessionTitle">
+          <el-form-item label="任务标题" prop="sessionTitle">
             <el-input
               v-model="queryParams.sessionTitle"
-              placeholder="请输入会话标题"
+              placeholder="请输入任务标题"
               clearable
               style="width: 200px"
               @keyup.enter="handleQuery"
@@ -80,7 +80,7 @@
       <template #header>
         <div class="toolbar-shell">
           <div class="table-heading">
-            <h3>会话与消息审计</h3>
+            <h3>任务与消息审计</h3>
             <p>留存人与智能体的完整交互记录，可按用户、智能体、时间范围检索消息明细，用于合规留档与争议溯源。</p>
           </div>
           <div class="toolbar-actions">
@@ -100,7 +100,7 @@
 
       <el-table v-loading="loading" border class="data-table" :data="messageList">
         <el-table-column label="时间" align="center" prop="createTime" width="170" />
-        <el-table-column label="会话标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
+        <el-table-column label="任务标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
         <el-table-column label="智能体" align="center" prop="agentName" width="150" :show-overflow-tooltip="true" />
         <el-table-column label="归属用户" align="center" width="120">
           <template #default="scope">
@@ -151,7 +151,7 @@
 
     <el-dialog v-model="detail.visible" title="消息详情" width="820px" append-to-body>
       <el-descriptions v-if="detail.record" :column="3" border size="small" class="detail-summary">
-        <el-descriptions-item label="会话标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="任务标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
         <el-descriptions-item label="智能体">{{ detail.record.agentName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="归属用户">
           {{ detail.record.userName || detail.record.userId || '-' }}

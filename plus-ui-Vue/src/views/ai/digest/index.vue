@@ -152,7 +152,7 @@
           <el-descriptions-item label="登录失败">{{ detail.record.loginFailCount ?? '-' }}</el-descriptions-item>
           <el-descriptions-item label="新 IP">{{ detail.record.loginAnomalyCount ?? '-' }}</el-descriptions-item>
           <el-descriptions-item label="来源任务执行">{{ detail.record.taskRunId ?? '-' }}</el-descriptions-item>
-          <el-descriptions-item label="来源会话">{{ detail.record.sessionId ?? '-' }}</el-descriptions-item>
+          <el-descriptions-item label="来源任务">{{ detail.record.sessionId ?? '-' }}</el-descriptions-item>
           <el-descriptions-item label="落库时间" :span="2">{{ detail.record.createTime || '-' }}</el-descriptions-item>
         </el-descriptions>
 

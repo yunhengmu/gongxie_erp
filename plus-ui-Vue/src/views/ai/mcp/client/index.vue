@@ -137,7 +137,7 @@
               <el-button
                 v-hasPermi="['ai:mcp:client:remove']"
                 link
-                type="primary"
+                type="danger"
                 icon="Delete"
                 @click="handleDelete(scope.row)"
               ></el-button>

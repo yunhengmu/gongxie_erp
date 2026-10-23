@@ -172,7 +172,7 @@
               <el-button
                 v-hasPermi="['ai:session:remove']"
                 link
-                type="primary"
+                type="danger"
                 icon="Delete"
                 @click="handleDelete(scope.row)"
               ></el-button>

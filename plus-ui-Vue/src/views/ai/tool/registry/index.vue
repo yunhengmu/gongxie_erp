@@ -172,7 +172,7 @@
               <el-button
                 v-hasPermi="['ai:tool:remove']"
                 link
-                type="primary"
+                type="danger"
                 icon="Delete"
                 @click="handleDelete(scope.row)"
               ></el-button>
@@ -347,7 +347,7 @@
               <el-button
                 v-hasPermi="['ai:tool:tag:remove']"
                 link
-                type="primary"
+                type="danger"
                 icon="Delete"
                 @click="handleDeleteTag(scope.row)"
               ></el-button>

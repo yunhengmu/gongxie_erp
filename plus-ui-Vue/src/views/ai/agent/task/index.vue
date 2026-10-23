@@ -42,7 +42,7 @@
           <div class="table-heading">
             <h3>定时任务</h3>
             <p>
-              按 Cron 定时运行智能体，产出即「后台任务结果」（以运行身份用户落在会话管理页，来源标记为定时任务）。
+              按 Cron 定时运行智能体，产出即「后台任务结果」（以运行身份用户落在任务管理页，来源标记为定时任务）。
               调度由 SnailJob 承担，新增任务无需到 SnailJob 控制台登记；执行中的写工具若被配置为「需确认」，将直接拒绝而不悬挂等待。
             </p>
           </div>
@@ -142,7 +142,7 @@
               <el-button
                 v-hasPermi="['ai:task:remove']"
                 link
-                type="primary"
+                type="danger"
                 icon="Delete"
                 @click="handleDelete(scope.row)"
               ></el-button>
@@ -272,13 +272,13 @@
         <el-table-column label="结果" align="left" :show-overflow-tooltip="true">
           <template #default="scope">
             <span v-if="scope.row.errorMsg" class="run-error">{{ scope.row.errorMsg }}</span>
-            <span v-else-if="scope.row.sessionId" class="text-muted">已在会话中留存回答</span>
+            <span v-else-if="scope.row.sessionId" class="text-muted">已在任务中留存回答</span>
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" align="center" width="120" class-name="small-padding fixed-width">
           <template #default="scope">
-            <el-tooltip content="查看后台任务结果（会话明细）" placement="top">
+            <el-tooltip content="查看后台任务结果（任务明细）" placement="top">
               <el-button
                 v-hasPermi="['ai:task:query']"
                 link
@@ -609,7 +609,7 @@ const getRunList = async () => {
   }
 };
 
-/** 跳转到会话管理页查看本次执行的完整对话（后台任务结果） */
+/** 跳转到任务管理页查看本次执行的完整对话（后台任务结果） */
 const goSession = (row: TaskRunVO) => {
   if (!row.sessionId) {
     return;

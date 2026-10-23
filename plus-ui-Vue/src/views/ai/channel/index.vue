@@ -50,8 +50,8 @@
                 <p>
                   接入飞书 / 企业微信 / GitHub / 钉钉：企业微信 / GitHub 为 Webhook（平台回调），
                   飞书可选 Webhook 或长连接，钉钉为长连接（应用主动建连、无需公网 IP 与回调地址）。
-                  外部身份需在「外部身份映射」中绑定平台账号，消息线程按「会话映射」续接同一条会话。
-                  执行走无人值守通道（写工具一律拒绝），产出落在会话管理页并标记来源为「渠道接入」。
+                  外部身份需在「外部身份映射」中绑定平台账号，消息线程按「任务映射」续接同一条任务。
+                  执行走无人值守通道（写工具一律拒绝），产出落在任务管理页并标记来源为「渠道接入」。
                 </p>
               </div>
               <div class="toolbar-actions">
@@ -142,7 +142,7 @@
                   <el-button
                     v-hasPermi="['ai:channel:remove']"
                     link
-                    type="primary"
+                    type="danger"
                     icon="Delete"
                     @click="handleDelete(scope.row)"
                   ></el-button>
@@ -258,7 +258,7 @@
                   <el-button
                     v-hasPermi="['ai:channel:remove']"
                     link
-                    type="primary"
+                    type="danger"
                     icon="Delete"
                     @click="handleIdentityDelete(scope.row)"
                   ></el-button>
@@ -277,16 +277,16 @@
         </el-card>
       </el-tab-pane>
 
-      <!-- ========== 会话映射 ========== -->
-      <el-tab-pane label="会话映射" name="thread">
+      <!-- ========== 任务映射 ========== -->
+      <el-tab-pane label="任务映射" name="thread">
         <el-card shadow="hover" class="table-panel">
           <template #header>
             <div class="toolbar-shell">
               <div class="table-heading">
-                <h3>消息线程 → 会话</h3>
+                <h3>消息线程 → 任务</h3>
                 <p>
-                  同一线程（飞书 chat_id / 企微 UserID / GitHub owner/repo#number）的后续消息续接同一条会话；
-                  会话结束后再次发言会自动新建并重新绑定。
+                  同一线程（飞书 chat_id / 企微 UserID / GitHub owner/repo#number）的后续消息续接同一条任务；
+                  任务结束后再次发言会自动新建并重新绑定。
                 </p>
               </div>
               <div class="toolbar-actions">
@@ -323,13 +323,13 @@
             <el-table-column type="selection" width="55" align="center" />
             <el-table-column label="渠道" align="left" width="180" prop="channelName" :show-overflow-tooltip="true" />
             <el-table-column label="线程标识" align="left" prop="threadKey" :show-overflow-tooltip="true" />
-            <el-table-column label="会话标题" align="left" :show-overflow-tooltip="true">
+            <el-table-column label="任务标题" align="left" :show-overflow-tooltip="true">
               <template #default="scope">
                 <span v-if="scope.row.sessionTitle">{{ scope.row.sessionTitle }}</span>
                 <span v-else class="text-muted">{{ scope.row.sessionId ?? '-' }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="会话状态" align="center" width="100">
+            <el-table-column label="任务状态" align="center" width="100">
               <template #default="scope">
                 <el-tag :type="scope.row.sessionStatus === '0' ? 'success' : 'info'" size="small" effect="plain">
                   {{ scope.row.sessionStatus === '0' ? '进行中' : '已结束' }}
@@ -339,7 +339,7 @@
             <el-table-column label="最后活跃" align="center" prop="lastActiveTime" width="170" />
             <el-table-column label="操作" align="center" width="90" class-name="small-padding fixed-width">
               <template #default="scope">
-                <el-tooltip content="查看会话明细" placement="top">
+                <el-tooltip content="查看任务明细" placement="top">
                   <el-button
                     v-hasPermi="['ai:channel:query']"
                     link
@@ -1021,7 +1021,7 @@ const submitForm = () => {
 /** 删除按钮操作 */
 const handleDelete = async (row?: Partial<ChannelVO>) => {
   const target = row?.id ?? ids.value;
-  await modal.confirm('是否确认删除该渠道？其外部身份映射与线程映射将一并清理，历史会话保留。');
+  await modal.confirm('是否确认删除该渠道？其外部身份映射与线程映射将一并清理，历史任务保留。');
   await delChannel(target);
   modal.msgSuccess('删除成功');
   await getList();
@@ -1266,7 +1266,7 @@ const handleIdentityDelete = async (row?: Partial<ChannelIdentityVO>) => {
 };
 
 // ------------------------------------------------------------------
-//  会话映射
+//  任务映射
 // ------------------------------------------------------------------
 const threadList = ref<ChannelThreadVO[]>([]);
 const threadLoading = ref(false);
@@ -1301,13 +1301,13 @@ const handleThreadSelectionChange = (selection: ChannelThreadVO[]) => {
 };
 
 const handleThreadDelete = async () => {
-  await modal.confirm('是否确认删除选中的线程映射？删除后同一线程的下一条消息将新建会话。');
+  await modal.confirm('是否确认删除选中的线程映射？删除后同一线程的下一条消息将新建任务。');
   await delThread(threadIds.value);
   modal.msgSuccess('删除成功');
   await getThreadList();
 };
 
-/** 跳转到会话管理页查看该线程的完整对话 */
+/** 跳转到任务管理页查看该线程的完整对话 */
 const goSession = (row: ChannelThreadVO) => {
   if (!row.sessionId) {
     return;

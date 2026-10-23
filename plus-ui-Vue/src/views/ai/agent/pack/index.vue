@@ -42,8 +42,8 @@
           <div class="table-heading">
             <h3>场景包</h3>
             <p>
-              场景包按角色 / 部门把业务工具、外部 MCP 工具与技能打包；用户在创建任务时选定并固化到会话，
-              包内能力叠加到智能体既有绑定之上（同一工具以包内决策优先）。<b>未选包的会话不接入任何 MCP 工具</b>。
+              场景包按角色 / 部门把业务工具、外部 MCP 工具与技能打包；用户在创建任务时选定并固化到任务，
+              包内能力叠加到智能体既有绑定之上（同一工具以包内决策优先）。<b>未选包的任务不接入任何 MCP 工具</b>。
             </p>
           </div>
           <div class="toolbar-actions">
@@ -124,7 +124,7 @@
               <el-button
                 v-hasPermi="['ai:pack:remove']"
                 link
-                type="primary"
+                type="danger"
                 icon="Delete"
                 @click="handleDelete(scope.row)"
               ></el-button>
@@ -150,7 +150,7 @@
               场景包编码
               <el-tooltip placement="top">
                 <template #content>
-                  <div class="tip-content">唯一标识，创建后不可修改；会作为会话快照保存。</div>
+                  <div class="tip-content">唯一标识，创建后不可修改；会作为任务快照保存。</div>
                 </template>
                 <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
               </el-tooltip>
@@ -224,7 +224,7 @@
               <el-tooltip placement="top">
                 <template #content>
                   <div class="tip-content">
-                    仅装配包内勾选项且必须在该连接的工具白名单内；<b>未选包的会话不接入任何 MCP 工具</b>。
+                    仅装配包内勾选项且必须在该连接的工具白名单内；<b>未选包的任务不接入任何 MCP 工具</b>。
                     连接未配置工具白名单时无可选项，请先到「MCP 客户端」页填写。
                   </div>
                 </template>

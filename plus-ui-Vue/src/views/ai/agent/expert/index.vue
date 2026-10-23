@@ -137,7 +137,7 @@
               <el-button
                 v-hasPermi="['ai:agent:remove']"
                 link
-                type="primary"
+                type="danger"
                 icon="Delete"
                 @click="handleDelete(scope.row)"
               ></el-button>
@@ -177,6 +177,7 @@
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="2" placeholder="一句话说明该专家的职责（也作为「AI 生成」与路由判断「擅长」的依据）" />
         </el-form-item>
+        <el-divider content-position="left">提示词</el-divider>
         <el-form-item label="快速生成">
           <div class="gen-row">
             <el-select
@@ -202,6 +203,7 @@
             placeholder="留空将使用平台默认提示词；建议只写「领域知识与口径」——执行纪律由平台统一注入"
           />
         </el-form-item>
+        <el-divider content-position="left">模型与路由</el-divider>
         <el-form-item label="绑定模型" prop="modelId">
           <el-select v-model="form.modelId" placeholder="请选择对话模型" style="width: 100%">
             <el-option v-for="item in modelOptions" :key="item.id" :label="item.configName" :value="item.id" />
@@ -214,8 +216,8 @@
               <el-tooltip placement="top">
                 <template #content>
                   <div class="tip-content">
-                    开启：进入小Z 的**自动候选清单**，用户提问时可被自动路由到；<br />
-                    关闭：不进自动候选，**只能被用户在任务工作台手动指定**（仍可见、仍可正常执行）。
+                    开启：进入小Z 的<b>自动候选清单</b>，用户提问时可被自动路由到；<br />
+                    关闭：不进自动候选，<b>只能被用户在任务工作台手动指定</b>（仍可见、仍可正常执行）。
                   </div>
                 </template>
                 <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
@@ -227,6 +229,7 @@
             <el-radio value="0">关闭（仅手动指定）</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-divider content-position="left">能力与授权</el-divider>
         <el-form-item label="工具集" prop="toolBindings">
           <el-select v-model="selectedToolCodes" multiple clearable placeholder="请选择业务工具" style="width: 100%">
             <el-option v-for="item in toolOptions" :key="item.toolCode" :label="item.toolName" :value="item.toolCode">
@@ -245,7 +248,7 @@
                     「需人工确认」的工具在执行前会暂停，等待你在对话页确认后才产生业务副作用。平台内置的无害只读工具（如「获取当前时间」）
                     <b>无需在此绑定即对所有智能体生效</b>；若显式绑定并配为「需确认 / 禁止」，则以该决策为准。
                     <br />
-                    注意：工具授权决策的改动需<b>新建会话</b>后完全生效——同一会话会沿用已有的权限判定。
+                    注意：工具授权决策的改动需<b>新建任务</b>后完全生效——同一任务会沿用已有的权限判定。
                   </div>
                 </template>
                 <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
@@ -295,6 +298,7 @@
           </div>
           <span v-else class="text-muted">暂无（用户在选择「记住该工具」后在此显示）</span>
         </el-form-item>
+        <el-divider content-position="left">知识、技能与子智能体</el-divider>
         <el-form-item label="知识库" prop="kbIds">
           <el-select v-model="form.kbIds" multiple clearable placeholder="请选择可检索的知识库" style="width: 100%">
             <el-option v-for="item in kbOptions" :key="item.id" :label="item.kbName" :value="item.id" />
@@ -328,7 +332,7 @@
               <el-tooltip placement="top">
                 <template #content>
                   <div class="tip-content">
-                    子智能体由主智能体按需委派（框架内置 agent_spawn 工具）；<b>仅只读工具可下放</b>——子智能体侧没有人工确认闸门，且子智能体只能用到主智能体已绑定的只读工具。绑定改动需新建会话后生效。
+                    子智能体由主智能体按需委派（框架内置 agent_spawn 工具）；<b>仅只读工具可下放</b>——子智能体侧没有人工确认闸门，且子智能体只能用到主智能体已绑定的只读工具。绑定改动需新建任务后生效。
                   </div>
                 </template>
                 <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
@@ -350,6 +354,7 @@
             </el-option>
           </el-select>
         </el-form-item>
+        <el-divider content-position="left">高级设置</el-divider>
         <el-form-item label="角色模型">
           <template #label>
             <span class="label-tip">

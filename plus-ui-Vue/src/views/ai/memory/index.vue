@@ -7,7 +7,7 @@
             <h3>长期记忆</h3>
             <p>
               记忆按用户隔离存放于智能体工作区：MEMORY.md 为合并后的长期记忆，memory/YYYY-MM-DD.md 为每日事实流水。
-              保存后写入运行期配置，下一次对话即按新策略重新装配生效。默认关闭，需显式开启后才会产生抽取与合并的模型调用。
+              保存后写入运行期配置，下一轮对话即按新策略重新装配生效。默认开启；关闭后保留已有记忆文件，但不再产生新的抽取与合并调用。
             </p>
           </div>
           <div class="toolbar-actions">
@@ -170,13 +170,13 @@
           </template>
           <el-input-number v-model="form.archiveRetentionDays" :min="1" :max="3650" :step="30" />
         </el-form-item>
-        <el-form-item label="会话日志保留天数" prop="sessionRetentionDays">
+        <el-form-item label="任务日志保留天数" prop="sessionRetentionDays">
           <template #label>
             <span class="label-tip">
-              会话日志保留天数
+              任务日志保留天数
               <el-tooltip placement="top">
                 <template #content>
-                  <div class="tip-content">超过该天数的会话日志将被清理（框架默认 180 天）。</div>
+                  <div class="tip-content">超过该天数的任务日志将被清理（框架默认 180 天）。</div>
                 </template>
                 <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
               </el-tooltip>
@@ -280,7 +280,7 @@
             <el-button
               v-hasPermi="['ai:memory:cleanup']"
               plain
-              icon="Delete"
+              icon="Brush"
               :loading="cleaning"
               @click="handleCleanup"
             >
@@ -520,6 +520,22 @@
         <el-button type="warning" :loading="restoring" @click="confirmRestore">确认恢复</el-button>
       </template>
     </el-dialog>
+
+    <div class="config-savebar">
+      <span class="config-savebar__tip">修改配置后需保存才会生效</span>
+      <div class="config-savebar__actions">
+        <el-button icon="Refresh" @click="loadConfig">重置</el-button>
+        <el-button
+          v-hasPermi="['ai:memory:edit']"
+          type="primary"
+          icon="Check"
+          :loading="configSaving"
+          @click="handleSaveConfig"
+        >
+          保存配置
+        </el-button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -587,7 +603,7 @@ const rules = {
   consolidationMinGapMinutes: [{ required: true, message: '合并最小间隔不能为空', trigger: 'blur' }],
   dailyFileRetentionDays: [{ required: true, message: '流水保留天数不能为空', trigger: 'blur' }],
   archiveRetentionDays: [{ required: true, message: '归档保留天数不能为空', trigger: 'blur' }],
-  sessionRetentionDays: [{ required: true, message: '会话保留天数不能为空', trigger: 'blur' }]
+  sessionRetentionDays: [{ required: true, message: '任务日志保留天数不能为空', trigger: 'blur' }]
 };
 
 const agentOptions = ref<AgentVO[]>([]);
@@ -1103,5 +1119,30 @@ onMounted(async () => {
   color: var(--el-text-color-secondary);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.config-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border: 1px solid var(--app-surface-border);
+  border-radius: var(--app-radius-base);
+  background: var(--app-surface-bg);
+  box-shadow: var(--app-shadow-md);
+}
+
+.config-savebar__tip {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.config-savebar__actions {
+  display: flex;
+  gap: 8px;
 }
 </style>

@@ -30,10 +30,10 @@
               <el-option label="已拒绝" value="0" />
             </el-select>
           </el-form-item>
-          <el-form-item label="会话ID" prop="sessionId">
+          <el-form-item label="任务ID" prop="sessionId">
             <el-input
               v-model="queryParams.sessionId"
-              placeholder="请输入会话ID"
+              placeholder="请输入任务ID"
               clearable
               style="width: 180px"
               @keyup.enter="handleQuery"
@@ -96,7 +96,7 @@
           </template>
         </el-table-column>
         <el-table-column label="来源" align="center" width="120" prop="decisionSource" :show-overflow-tooltip="true" />
-        <el-table-column label="会话标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
+        <el-table-column label="任务标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
         <el-table-column label="智能体" align="center" width="140" prop="agentName" :show-overflow-tooltip="true" />
         <el-table-column label="触发用户" align="center" width="120">
           <template #default="scope">
@@ -139,7 +139,7 @@
         </el-descriptions-item>
         <el-descriptions-item label="确认范围">{{ detail.record.confirmSource || '-' }}</el-descriptions-item>
         <el-descriptions-item label="决策说明" :span="2">{{ detail.record.reason || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="会话标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="任务标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
         <el-descriptions-item label="智能体">{{ detail.record.agentName || '-' }}</el-descriptions-item>
       </el-descriptions>
 

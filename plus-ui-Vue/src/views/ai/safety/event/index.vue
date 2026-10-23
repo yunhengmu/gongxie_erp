@@ -140,7 +140,7 @@
               <el-descriptions-item label="用户">
                 {{ detail.record.userName || detail.record.userId || '-' }}
               </el-descriptions-item>
-              <el-descriptions-item label="会话ID">{{ detail.record.sessionId ?? '-' }}</el-descriptions-item>
+              <el-descriptions-item label="任务ID">{{ detail.record.sessionId ?? '-' }}</el-descriptions-item>
               <el-descriptions-item label="消息ID">{{ detail.record.messageId ?? '-' }}</el-descriptions-item>
               <el-descriptions-item label="智能体ID">{{ detail.record.agentId ?? '-' }}</el-descriptions-item>
               <el-descriptions-item label="命中片段" :span="2">

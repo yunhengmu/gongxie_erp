@@ -141,7 +141,7 @@
           <el-empty description="暂无编排运行数据" :image-size="80" />
         </template>
         <el-table-column label="创建时间" align="center" prop="createTime" width="170" />
-        <el-table-column label="会话标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
+        <el-table-column label="任务标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
         <el-table-column label="入口智能体" align="center" prop="entryAgentName" width="140" :show-overflow-tooltip="true" />
         <el-table-column label="提问用户" align="center" width="110">
           <template #default="scope">
@@ -228,7 +228,7 @@
           <el-card shadow="never" class="detail-card">
             <template #header><span class="detail-card-title">基本信息</span></template>
             <el-descriptions :column="3" border size="small">
-              <el-descriptions-item label="会话标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="任务标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
               <el-descriptions-item label="入口智能体">{{ detail.record.entryAgentName || '-' }}</el-descriptions-item>
               <el-descriptions-item label="提问用户">
                 {{ detail.record.userName || detail.record.userId || '-' }}

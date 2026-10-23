@@ -65,7 +65,7 @@
           <div class="table-heading">
             <h3>链路追踪</h3>
             <p>
-              一次任务落一条链路，记录执行当时的模型版本、上下文清单与状态迁移，可按会话、智能体、来源、状态与时间范围检索，用于回溯与排障。
+              一次任务落一条链路，记录执行当时的模型版本、上下文清单与状态迁移，可按任务、智能体、来源、状态与时间范围检索，用于回溯与排障。
             </p>
           </div>
           <div class="toolbar-actions">
@@ -80,7 +80,7 @@
         </template>
         <el-table-column label="创建时间" align="center" prop="createTime" width="170" />
         <el-table-column label="智能体" align="center" prop="agentName" width="140" :show-overflow-tooltip="true" />
-        <el-table-column label="会话标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
+        <el-table-column label="任务标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
         <el-table-column label="来源" align="center" width="110">
           <template #default="scope">
             <el-tag :type="sourceTagType(scope.row.source)" effect="plain">{{ sourceLabel(scope.row.source) }}</el-tag>
@@ -137,7 +137,7 @@
           <el-card shadow="never" class="detail-card">
             <template #header><span class="detail-card-title">基本信息</span></template>
             <el-descriptions :column="3" border size="small">
-              <el-descriptions-item label="会话标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="任务标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
               <el-descriptions-item label="智能体">{{ detail.record.agentName || '-' }}</el-descriptions-item>
               <el-descriptions-item label="来源">
                 <el-tag :type="sourceTagType(detail.record.source)" effect="plain">
@@ -344,7 +344,7 @@ const CONTEXT_OBJECTS: ContextSection[] = [
       { key: 'maxContextTokens', label: '上下文 Token 上限' },
       { key: 'consolidationMaxTokens', label: '合并 Token 上限' },
       { key: 'dailyFileRetentionDays', label: '每日流水保留天数' },
-      { key: 'sessionRetentionDays', label: '会话保留天数' }
+      { key: 'sessionRetentionDays', label: '任务日志保留天数' }
     ]
   },
   {

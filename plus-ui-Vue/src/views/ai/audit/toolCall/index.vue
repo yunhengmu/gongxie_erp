@@ -42,23 +42,39 @@
               </el-option>
             </el-select>
           </el-form-item>
-          <el-form-item label="会话ID" prop="sessionId">
-            <el-input
+          <el-form-item label="任务ID" prop="sessionId">
+            <el-select
               v-model="queryParams.sessionId"
-              placeholder="请输入会话ID"
+              placeholder="输入或选择任务"
               clearable
-              style="width: 180px"
-              @keyup.enter="handleQuery"
-            />
+              filterable
+              allow-create
+              style="width: 220px"
+            >
+              <el-option
+                v-for="item in sessionOptions"
+                :key="String(item.id)"
+                :label="`${item.sessionTitle || '未命名任务'}（${item.id}）`"
+                :value="String(item.id)"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item label="触发用户" prop="userId">
-            <el-input
+            <el-select
               v-model="queryParams.userId"
-              placeholder="请输入用户ID"
+              placeholder="输入或选择用户"
               clearable
-              style="width: 160px"
-              @keyup.enter="handleQuery"
-            />
+              filterable
+              allow-create
+              style="width: 200px"
+            >
+              <el-option
+                v-for="item in userOptions"
+                :key="String(item.userId)"
+                :label="`${item.nickName || item.userName}（${item.userName}）`"
+                :value="item.userId"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item label="时间范围">
             <el-date-picker
@@ -123,7 +139,7 @@
               <el-tag :type="stateTagType(scope.row.state)" effect="plain">{{ stateLabel(scope.row.state) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="会话标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
+          <el-table-column label="任务标题" align="left" prop="sessionTitle" :show-overflow-tooltip="true" />
           <el-table-column label="发起智能体" align="center" prop="agentName" width="140" :show-overflow-tooltip="true" />
           <el-table-column label="触发用户" align="center" width="120">
             <template #default="scope">
@@ -165,7 +181,7 @@
             {{ stateLabel(detail.record.state) }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="会话标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="任务标题">{{ detail.record.sessionTitle || '-' }}</el-descriptions-item>
         <el-descriptions-item label="发起智能体">{{ detail.record.agentName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="触发用户">
           {{ detail.record.userName || detail.record.userId || '-' }}
@@ -194,10 +210,16 @@
 import type { AgentVO } from '@/api/ai/agent/types';
 import { listToolCallAudit, optionAuditAgents, toolCallStats } from '@/api/ai/audit';
 import type { ToolCallAuditQuery, ToolCallAuditVO, ToolCallStatVO } from '@/api/ai/audit/types';
+import { listChatSessions } from '@/api/ai/session';
+import type { SessionVO } from '@/api/ai/session/types';
+import { listUser } from '@/api/system/user';
+import type { UserVO } from '@/api/system/user/types';
 
 const toolCallList = ref<ToolCallAuditVO[]>([]);
 const statList = ref<ToolCallStatVO[]>([]);
 const agentOptions = ref<AgentVO[]>([]);
+const sessionOptions = ref<SessionVO[]>([]);
+const userOptions = ref<UserVO[]>([]);
 const loading = ref(true);
 const statLoading = ref(true);
 const showSearch = ref(true);
@@ -298,7 +320,22 @@ const getAgentOptions = async () => {
   agentOptions.value = res.data ?? [];
 };
 
+/** 加载任务与用户选项；无相关权限时静默，筛选框仍支持直接输入 ID */
+const getFilterOptions = async () => {
+  const [sessionRes, userRes] = await Promise.allSettled([
+    listChatSessions({ pageNum: 1, pageSize: 200 } as any),
+    listUser({ pageNum: 1, pageSize: 500 } as any)
+  ]);
+  if (sessionRes.status === 'fulfilled') {
+    sessionOptions.value = sessionRes.value.data?.rows || [];
+  }
+  if (userRes.status === 'fulfilled') {
+    userOptions.value = (userRes.value as unknown as { data?: { rows?: UserVO[] } }).data?.rows || [];
+  }
+};
+
 getAgentOptions();
+getFilterOptions();
 getList();
 </script>
 
