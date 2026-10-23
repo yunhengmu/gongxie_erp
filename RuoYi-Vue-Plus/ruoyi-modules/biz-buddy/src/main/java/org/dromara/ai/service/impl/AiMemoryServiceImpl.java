@@ -171,7 +171,9 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         List<AiMemoryFileVo> files = new ArrayList<>();
         files.add(buildFile(MEMORY_MD, "长期记忆（合并产物）", "MEMORY", null, workspace.readMemoryMd(ctx)));
         for (String path : safeMemoryPaths(workspace, ctx)) {
-            if (MEMORY_MD.equals(path)) {
+            if (MEMORY_MD.equals(path) || !ALLOWED_PATH.matcher(path).matches()) {
+                // 版本快照（memory/history/）与归档（memory/archive/）不在流水清单展示，
+                // 版本历史由「版本历史」弹窗单独提供
                 continue;
             }
             files.add(buildFile(path, fileNameOf(path), "DAILY", dateOf(path),

@@ -142,6 +142,29 @@ class AiMemoryServiceImplTest {
     }
 
     /**
+     * 验证记忆文件清单不混入版本快照、归档与内部文件，只保留长期记忆与每日流水。
+     */
+    @Test
+    @DisplayName("文件清单只保留长期记忆与每日流水")
+    void shouldExcludeVersionAndArchiveFiles() {
+        WorkspaceManager workspace = stubWorkspace();
+        when(workspace.readMemoryMd(any())).thenReturn("mem");
+        when(workspace.listMemoryFilePaths(any())).thenReturn(List.of(
+            "MEMORY.md",
+            "memory/2024-01-01.md",
+            "memory/history/MEMORY-20240101T000000Z-abcdef12.md",
+            "memory/archive/2023-12-01.md",
+            "memory/.declared.jsonl"));
+        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
+
+        List<AiMemoryFileVo> files = memoryService.listFiles(1L, 7L);
+
+        assertEquals(2, files.size());
+        assertEquals("MEMORY.md", files.get(0).getPath());
+        assertEquals("memory/2024-01-01.md", files.get(1).getPath());
+    }
+
+    /**
      * 验证读取长期记忆正文。
      */
     @Test
