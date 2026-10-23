@@ -14,7 +14,7 @@
 .panel-heading h3,
 .table-heading h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--app-font-size-section, 15px);
   letter-spacing: 0;
   color: var(--app-text-title);
 }
@@ -38,7 +38,7 @@
 
 .table-heading p {
   margin: 4px 0 0;
-  font-size: 13px;
+  font-size: var(--app-font-size-body, 13px);
   color: var(--app-text-muted);
   line-height: 1.5;
 }

@@ -155,6 +155,7 @@
                 link
                 type="primary"
                 icon="View"
+                aria-label="消息明细"
                 @click="handleDetail(scope.row)"
               ></el-button>
             </el-tooltip>
@@ -164,6 +165,7 @@
                 link
                 type="warning"
                 icon="VideoPause"
+                aria-label="终止任务"
                 :disabled="scope.row.status === '1'"
                 @click="handleClose(scope.row)"
               ></el-button>
@@ -174,6 +176,7 @@
                 link
                 type="danger"
                 icon="Delete"
+                aria-label="删除任务"
                 @click="handleDelete(scope.row)"
               ></el-button>
             </el-tooltip>

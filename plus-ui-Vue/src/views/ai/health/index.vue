@@ -12,6 +12,11 @@
             </p>
           </div>
           <div class="toolbar-actions">
+            <el-radio-group v-model="healthFilter" size="small">
+              <el-radio-button value="all">全部</el-radio-button>
+              <el-radio-button value="attention">失败/告警</el-radio-button>
+              <el-radio-button value="pass">通过</el-radio-button>
+            </el-radio-group>
             <el-button v-hasPermi="['ai:health:query']" icon="List" @click="openOnboarding">
               首登清单
             </el-button>
@@ -32,7 +37,7 @@
         <span class="health-summary__time">自检时刻：{{ report.checkedAt || '-' }}</span>
       </div>
 
-      <el-table :data="report.items" border>
+      <el-table :data="visibleItems" border empty-text="没有符合筛选的检查项">
         <el-table-column prop="name" label="检查项" min-width="180" show-overflow-tooltip />
         <el-table-column prop="category" label="分类" width="120" />
         <el-table-column label="状态" width="100">
@@ -182,6 +187,32 @@ const statusLabel = (status: HealthStatus) => {
   if (status === 'FAIL') return '失败';
   return '待探测';
 };
+
+/** 健康检查筛选：默认全部，失败/告警优先排序 */
+const healthFilter = ref<'all' | 'attention' | 'pass'>('all');
+
+/** 严重度排序：失败 → 告警 → 待探测 → 通过 */
+const SEVERITY: Record<HealthStatus, number> = {
+  FAIL: 0,
+  WARN: 1,
+  UNKNOWN: 2,
+  PASS: 3
+};
+
+/** 按筛选条件与严重度排序后的检查项 */
+const visibleItems = computed(() => {
+  const items = [...report.value.items];
+  const filtered = items.filter((item) => {
+    if (healthFilter.value === 'attention') {
+      return item.status === 'FAIL' || item.status === 'WARN';
+    }
+    if (healthFilter.value === 'pass') {
+      return item.status === 'PASS';
+    }
+    return true;
+  });
+  return filtered.sort((left, right) => (SEVERITY[left.status] ?? 9) - (SEVERITY[right.status] ?? 9));
+});
 
 /** 状态 → 标签配色 */
 const statusType = (status: HealthStatus): TagType => {

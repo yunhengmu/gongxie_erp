@@ -112,6 +112,7 @@
                 link
                 type="primary"
                 icon="View"
+                aria-label="查看"
                 @click="handleView(scope.row)"
               ></el-button>
             </el-tooltip>
@@ -121,6 +122,7 @@
                 link
                 type="primary"
                 icon="Edit"
+                aria-label="修改"
                 @click="handleUpdate(scope.row)"
               ></el-button>
             </el-tooltip>
@@ -130,6 +132,7 @@
                 link
                 type="primary"
                 icon="CopyDocument"
+                aria-label="复制"
                 @click="handleClone(scope.row)"
               ></el-button>
             </el-tooltip>
@@ -139,6 +142,7 @@
                 link
                 type="danger"
                 icon="Delete"
+                aria-label="删除"
                 @click="handleDelete(scope.row)"
               ></el-button>
             </el-tooltip>

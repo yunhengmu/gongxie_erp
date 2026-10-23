@@ -65,17 +65,24 @@
         </div>
       </template>
 
-      <div class="section-block">
-        <div class="section-title">合计</div>
-        <el-descriptions :column="5" border size="small">
-          <el-descriptions-item label="总 Token">{{ overview.total?.totalTokens ?? 0 }}</el-descriptions-item>
-          <el-descriptions-item label="输入 / 输出">
-            {{ overview.total?.promptTokens ?? 0 }} / {{ overview.total?.completionTokens ?? 0 }}
-          </el-descriptions-item>
-          <el-descriptions-item label="请求数">{{ overview.total?.requestCount ?? 0 }}</el-descriptions-item>
-          <el-descriptions-item label="工具调用">{{ overview.total?.toolCallCount ?? 0 }}</el-descriptions-item>
-          <el-descriptions-item label="费用(元)">{{ formatCost(overview.total?.cost) }}</el-descriptions-item>
-        </el-descriptions>
+      <div class="usage-kpi-grid">
+        <div class="usage-kpi">
+          <span class="usage-kpi__label">总 Token</span>
+          <strong class="usage-kpi__value">{{ overview.total?.totalTokens ?? 0 }}</strong>
+          <span class="usage-kpi__hint">
+            输入 {{ overview.total?.promptTokens ?? 0 }} · 输出 {{ overview.total?.completionTokens ?? 0 }}
+          </span>
+        </div>
+        <div class="usage-kpi">
+          <span class="usage-kpi__label">请求数</span>
+          <strong class="usage-kpi__value">{{ overview.total?.requestCount ?? 0 }}</strong>
+          <span class="usage-kpi__hint">工具调用 {{ overview.total?.toolCallCount ?? 0 }}</span>
+        </div>
+        <div class="usage-kpi">
+          <span class="usage-kpi__label">费用（元）</span>
+          <strong class="usage-kpi__value">{{ formatCost(overview.total?.cost) }}</strong>
+          <span class="usage-kpi__hint">按模型单价估算</span>
+        </div>
       </div>
 
       <div class="section-block">
@@ -298,5 +305,45 @@ onMounted(() => {
   color: var(--app-text-title);
   font-size: 14px;
   font-weight: 600;
+}
+
+.usage-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.usage-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--app-surface-border);
+  border-radius: var(--app-radius-base);
+  background: var(--app-elevated-soft-bg);
+}
+
+.usage-kpi__label {
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+.usage-kpi__value {
+  color: var(--app-text-title);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.usage-kpi__hint {
+  color: var(--app-text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .usage-kpi-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
