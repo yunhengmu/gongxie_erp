@@ -39,7 +39,7 @@ public class RememberUserPreferenceTool extends ToolBase {
      */
     private static final String DESCRIPTION =
         "把用户**明确要求长期记住**的个人偏好、习惯或约束写入长期记忆。"
-            + "仅在用户本轮消息里明确说“请记住 / 以后都 / 我习惯 / 我喜欢……”这类要求时才调用；"
+            + "仅在用户本轮消息里明确说“请记住 / 记下 / 帮我记 / 备忘 / 以后都 / 我习惯 / 我喜欢……”这类要求时才调用；"
             + "普通提问、闲聊或你推测出的偏好一律不要调用。"
             + "fact 用一句简短的第三人称陈述；evidence 必须原样摘录用户本轮要求记住的那句原话。";
 
