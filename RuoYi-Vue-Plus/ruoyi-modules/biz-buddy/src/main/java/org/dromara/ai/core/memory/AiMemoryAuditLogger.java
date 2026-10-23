@@ -71,6 +71,16 @@ public class AiMemoryAuditLogger {
      */
     public static final String EVENT_MANUAL_EDIT = "MANUAL_EDIT";
 
+    /**
+     * 事件：用户明确要求记住（显式记忆）
+     */
+    public static final String EVENT_USER_REMEMBER = "USER_REMEMBER";
+
+    /**
+     * 事件：用户撤销显式记忆
+     */
+    public static final String EVENT_USER_FORGET = "USER_FORGET";
+
     private final IAiAgentService agentService;
 
     private final AgentRegistry agentRegistry;

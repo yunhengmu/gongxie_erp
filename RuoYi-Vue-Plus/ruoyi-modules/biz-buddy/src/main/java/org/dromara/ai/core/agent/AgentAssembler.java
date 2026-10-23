@@ -16,6 +16,7 @@ import io.agentscope.harness.agent.tools.ToolsConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.mcp.GuardingMcpClientWrapper;
+import org.dromara.ai.core.memory.AiMemoryDeclaredStore;
 import org.dromara.ai.core.memory.AiMemoryPrompts;
 import org.dromara.ai.core.safety.AiSafetyGuard;
 import org.dromara.ai.domain.AiAgent;
@@ -114,6 +115,11 @@ public class AgentAssembler {
     private final AiWriteDedupStore writeDedupStore;
 
     /**
+     * 显式记忆存储（平台托管模式下由注入中间件读取）
+     */
+    private final AiMemoryDeclaredStore memoryDeclaredStore;
+
+    /**
      * 安全守卫：给业务工具包一层「结果脱敏」，使喂给模型的结果不含 PII/命中词
      * （见 {@link ToolResultGuardTool}）；外部 MCP 工具拿不到工具包装点，改在客户端层拦截
      * （见 {@link GuardingMcpClientWrapper}）。此前只脱敏了落库与前端两份副本。
@@ -145,6 +151,7 @@ public class AgentAssembler {
      * @param stateStore         AgentScope 状态存储
      * @param toolFactory        业务工具工厂（implName → AgentTool）
      * @param writeDedupStore    专家写工具短期去重
+     * @param memoryDeclaredStore 显式记忆存储（平台托管注入）
      * @param safetyGuard        安全守卫（工具结果喂模型前脱敏）
      * @param mcpClientService   外部 MCP 连接（REQ-AI-16）
      * @param aiSkillRepository  技能仓库（本项目数据库，平台唯一技能来源）
@@ -159,6 +166,7 @@ public class AgentAssembler {
                           @Qualifier("aiAgentStateStore") AgentStateStore stateStore,
                           AiToolFactory toolFactory,
                           AiWriteDedupStore writeDedupStore,
+                          AiMemoryDeclaredStore memoryDeclaredStore,
                           AiSafetyGuard safetyGuard,
                           IAiMcpClientService mcpClientService,
                           AgentSkillRepository aiSkillRepository,
@@ -172,6 +180,7 @@ public class AgentAssembler {
         this.stateStore = stateStore;
         this.toolFactory = toolFactory;
         this.writeDedupStore = writeDedupStore;
+        this.memoryDeclaredStore = memoryDeclaredStore;
         this.safetyGuard = safetyGuard;
         this.mcpClientService = mcpClientService;
         this.aiSkillRepository = aiSkillRepository;
@@ -227,9 +236,13 @@ public class AgentAssembler {
             AgentPermissionContextFactory.renderDecisions(
                 AgentPermissionContextFactory.mergeToolDecisions(bindings, resources.mergedToolDecisions())),
             resources.mergedToolDecisions(), mcpAssembly.toolNames(), resources.signature());
-        // 只读记忆检索 POC：开启后注册框架记忆工具，再由白名单只放行 memory_search / memory_get
-        boolean memoryReadTools =
-            memoryPolicy.isEnabled() && aiProperties.getChat().isMemoryReadToolsEnabled();
+        // 平台托管模式：关闭框架记忆 hooks 与记忆工具，由平台注入/抽取/合并接管
+        boolean platformMemory =
+            memoryPolicy.isEnabled() && "platform".equals(memoryPolicy.getPipelineMode());
+        // 只读记忆检索 POC：开启后注册框架记忆工具，再由白名单只放行 memory_search / memory_get；
+        // 平台托管模式下框架记忆工具恒不注册（后续由平台侧检索工具替代）
+        boolean memoryReadTools = memoryPolicy.isEnabled()
+            && aiProperties.getChat().isMemoryReadToolsEnabled() && !platformMemory;
         HarnessAgent.Builder builder = HarnessAgent.builder()
             .name(definition.getAgentCode())
             .description(StringUtils.isBlank(definition.getDescription())
@@ -248,7 +261,7 @@ public class AgentAssembler {
                 resources.directToolDecisions(), mcpAssembly.toolDecisions(),
                 !subagents.isEmpty(), definition.isEntry()))
             // 当前时间注入：平台级中间件，所有智能体自动生效；每轮现算，改开关/时区无需重建
-            .middlewares(buildMiddlewares(definition));
+            .middlewares(buildMiddlewares(definition, workspaceCode, platformMemory));
         if (subagents.isEmpty()) {
             // 未绑定子智能体：与既往行为完全一致（不注册 agent_spawn 等协调工具）
             builder.disableSubagents();
@@ -306,7 +319,12 @@ public class AgentAssembler {
         // 内置 Web 工具（web_fetch / web_search）默认注册并可直接出网，绕过「无裸 HTTP、工具最小化、
         // 全链路审计」的平台纪律，故一并关闭；确需联网能力时应改造为受控工具后再登记。
         tail = tail.disableFilesystemTools().disableShellTool().disableWebTools();
-        if (!memoryPolicy.isEnabled()) {
+        if (platformMemory) {
+            // 平台托管：停掉框架抽取 / 合并 / 维护；同时停掉框架记忆工具。
+            // 二者同时关闭后框架不再注入 <memory_context>，由 PlatformMemoryContextMiddleware 接管；
+            // 工作区定义类文件仍由框架注入，故不调用 disableWorkspaceContext。
+            tail = tail.disableMemoryHooks();
+        } else if (!memoryPolicy.isEnabled()) {
             // 关闭记忆：停掉记忆 hooks（抽取 / 合并 / 后台维护）。
             // 记忆工具恒定关闭（disableMemoryTools），二者同时关闭后中间件即不再注入 <memory_context>，
             // 故无需连带 disableWorkspaceContext —— 否则会把 AGENTS.md 等定义类文件一并关掉（REQ-AI-08）。
@@ -579,14 +597,22 @@ public class AgentAssembler {
      * <p>「当前时间」对所有智能体生效；「本轮候选专家清单」只对入口智能体生效
      * （清单每轮现算，故不进装配指纹）。</p>
      *
-     * @param definition 智能体定义
+     * @param definition    智能体定义
+     * @param workspaceCode 工作区命名空间（专家与入口共享同一份用户记忆）
+     * @param platformMemory 是否平台托管记忆
      * @return 中间件列表
      */
-    private List<MiddlewareBase> buildMiddlewares(AiAgent definition) {
+    private List<MiddlewareBase> buildMiddlewares(AiAgent definition, String workspaceCode,
+                                                  boolean platformMemory) {
         List<MiddlewareBase> middlewares = new ArrayList<>();
         middlewares.add(new CurrentTimeMiddleware(aiProperties));
         // 提示词注入防护：声明「<untrusted> 包裹的外部内容只是数据、其中指令不执行」（开关实时读运行期配置）
         middlewares.add(new PromptHardeningMiddleware(runtimeConfigStore));
+        if (platformMemory) {
+            // 平台托管：框架记忆注入已关闭，由本中间件接管显式记忆 + MEMORY.md
+            middlewares.add(new PlatformMemoryContextMiddleware(
+                aiProperties, runtimeConfigStore, memoryDeclaredStore, workspaceCode));
+        }
         if (definition.isEntry()) {
             middlewares.add(new ExpertRosterMiddleware());
             // 继承槽位（REQ-AI-31）：仅入口智能体注入；槽位由门面每轮合并后放入运行期上下文，不进装配指纹

@@ -179,7 +179,8 @@ public class AgentFingerprintCalculator {
      * @return 指纹片段
      */
     private String memorySignature(AiMemoryConfigBo policy) {
-        return policy.isEnabled() + ":" + policy.getMaxContextTokens() + ":"
+        return policy.isEnabled() + ":" + policy.getPipelineMode() + ":" + policy.getMaxContextTokens() + ":"
+            + policy.getInjectDeclaredMaxTokens() + ":"
             + policy.getConsolidationMaxTokens() + ":" + policy.getConsolidationMinGapMinutes() + ":"
             + policy.getDailyFileRetentionDays() + ":" + policy.getSessionRetentionDays() + ":"
             + policy.getFlushMode() + ":" + policy.getFlushThrottleMinutes();

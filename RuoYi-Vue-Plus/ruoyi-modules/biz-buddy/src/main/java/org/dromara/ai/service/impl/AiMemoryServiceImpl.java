@@ -14,14 +14,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.core.agent.AgentRegistry;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.core.memory.AiMemoryAuditLogger;
+import org.dromara.ai.core.memory.AiMemoryDeclaredStore;
 import org.dromara.ai.core.memory.AiMemoryPrompts;
 import org.dromara.ai.core.memory.AiMemorySanitizer;
 import org.dromara.ai.core.memory.spi.MemoryBackendStats;
 import org.dromara.ai.domain.AiAgent;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
+import org.dromara.ai.domain.bo.AiMemoryDeclaredBo;
 import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
+import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiMemoryService;
@@ -129,6 +132,8 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     private final AiMemorySanitizer sanitizer;
 
     private final AiMemoryAuditLogger auditLogger;
+
+    private final AiMemoryDeclaredStore memoryDeclaredStore;
 
     @Override
     public List<AiMemoryFileVo> listFiles(Long agentId, Long userId) {
@@ -415,6 +420,66 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             formatInstant(readConsolidationWatermark(memoryDir)), audit.lastArchivedAt(),
             audit.failedCount(), audit.lastBatches(), audit.lastMergedFiles(),
             audit.lastRemainingFiles());
+    }
+
+    @Override
+    public List<AiMemoryDeclaredVo> listDeclared(Long agentId, Long userId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        String workspaceCode = workspaceCodeOf(definition);
+        return memoryDeclaredStore.listAll(workspaceCode, String.valueOf(userId)).stream()
+            .map(this::toDeclaredVo)
+            .toList();
+    }
+
+    @Override
+    public AiMemoryDeclaredVo addDeclared(AiMemoryDeclaredBo bo) {
+        AiAgent definition = agentService.getEnabledAgent(bo.getAgentId());
+        String workspaceCode = workspaceCodeOf(definition);
+        AiMemorySanitizer.SanitizeResult sanitized = sanitizer.sanitizeLedger(bo.getFact());
+        String fact = sanitized.changed() ? sanitized.content().trim() : bo.getFact().trim();
+        if (StringUtils.isBlank(fact)) {
+            throw new ServiceException("记忆内容净化后为空，未写入显式记忆");
+        }
+        String evidence = bo.getEvidence() == null ? "" : sanitizer.sanitizeLedger(bo.getEvidence()).content();
+        try {
+            AiMemoryDeclaredStore.DeclaredMemory entry = memoryDeclaredStore.append(
+                workspaceCode, String.valueOf(bo.getUserId()), fact, evidence);
+            auditLogger.record(definition.getId(), bo.getUserId(),
+                AiMemoryAuditLogger.EVENT_USER_REMEMBER, "OK",
+                Map.of("entryId", entry.id(), "chars", entry.fact().length(),
+                    "redacted", sanitized.redacted()));
+            return toDeclaredVo(entry);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw new ServiceException(e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean revokeDeclared(Long agentId, Long userId, String entryId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        String workspaceCode = workspaceCodeOf(definition);
+        boolean revoked = memoryDeclaredStore.revoke(workspaceCode, String.valueOf(userId), entryId);
+        if (revoked) {
+            auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_USER_FORGET, "OK",
+                Map.of("entryId", entryId));
+        }
+        return revoked;
+    }
+
+    /**
+     * 把显式记忆实体转换为展示对象。
+     *
+     * @param entry 显式记忆实体
+     * @return 展示对象
+     */
+    private AiMemoryDeclaredVo toDeclaredVo(AiMemoryDeclaredStore.DeclaredMemory entry) {
+        AiMemoryDeclaredVo vo = new AiMemoryDeclaredVo();
+        vo.setId(entry.id());
+        vo.setFact(entry.fact());
+        vo.setEvidence(entry.evidence());
+        vo.setCreatedAt(entry.createdAt());
+        vo.setRevoked(entry.revoked());
+        return vo;
     }
 
     /**
@@ -976,6 +1041,23 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             }
         }
         return agentRegistry.get(memoryAgent).getWorkspaceManager();
+    }
+
+    /**
+     * 解析用户记忆所属的工作区命名空间：专家与入口共享入口智能体编码。
+     *
+     * @param definition 智能体定义
+     * @return 工作区编码
+     */
+    private String workspaceCodeOf(AiAgent definition) {
+        AiAgent memoryAgent = definition;
+        if (definition != null && !definition.isEntry()) {
+            AiAgent entry = agentService.getEntryAgent();
+            if (entry != null) {
+                memoryAgent = entry;
+            }
+        }
+        return memoryAgent == null ? "" : memoryAgent.getAgentCode();
     }
 
     /**

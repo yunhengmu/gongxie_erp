@@ -99,6 +99,8 @@ class AgentRegistryTest {
     @Mock
     private AiWriteDedupStore writeDedupStore;
     @Mock
+    private org.dromara.ai.core.memory.AiMemoryDeclaredStore memoryDeclaredStore;
+    @Mock
     private AiSafetyGuard safetyGuard;
     @Mock
     private AiPermissionModeStore permissionModeStore;
@@ -137,8 +139,8 @@ class AgentRegistryTest {
      */
     private AgentAssembler assembler() {
         return new AgentAssembler(modelFactory, aiProperties, runtimeConfigStore, stateStore, toolFactory, writeDedupStore,
-            safetyGuard, mcpClientService, aiSkillRepository, permissionModeStore, snapshotFactory, subagentAssembler,
-            routeOrchestrator);
+            memoryDeclaredStore, safetyGuard, mcpClientService, aiSkillRepository, permissionModeStore, snapshotFactory,
+            subagentAssembler, routeOrchestrator);
     }
 
     private AgentRegistry newRegistry(AgentAssembler assembler) {

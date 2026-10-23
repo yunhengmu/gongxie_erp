@@ -144,6 +144,10 @@ public class AiRuntimeConfigStore {
         if (StringUtils.isBlank(policy.getFlushMode())) {
             policy.setFlushMode(aiProperties.getChat().getMemoryFlushMode());
         }
+        // 旧版运行期配置没有管道模式与抽取上下文参数：补默认值，避免切换后读到 null
+        if (StringUtils.isBlank(policy.getPipelineMode())) {
+            policy.setPipelineMode(aiProperties.getChat().getMemoryPipelineMode());
+        }
         // 旧版运行期配置没有归档保留期：补默认值，避免清理时把归档目录当流水一并删除
         if (policy.getArchiveRetentionDays() <= 0) {
             policy.setArchiveRetentionDays(aiProperties.getChat().getMemoryArchiveRetentionDays());
@@ -160,14 +164,19 @@ public class AiRuntimeConfigStore {
      * @param bo 长期记忆配置
      */
     public void updateMemory(AiMemoryConfigBo bo) {
+        // 兼容旧版前端 / 旧报文：未携带管道模式时保留当前生效值，避免保存一次配置把 platform 重置回 framework
+        if (StringUtils.isBlank(bo.getPipelineMode())) {
+            bo.setPipelineMode(memory().getPipelineMode());
+        }
         AiMemoryConfigGuard.validate(bo);
         RedisUtils.setCacheObject(MEMORY_KEY, JsonUtils.toJsonString(bo));
-        log.info("长期记忆配置已更新：enabled={}, maxContextTokens={}, consolidation={} tokens/{} 分钟, "
-                + "retention={}/{}/{} 天, flushMode={}({} 分钟)",
-            bo.isEnabled(), bo.getMaxContextTokens(), bo.getConsolidationMaxTokens(),
+        log.info("长期记忆配置已更新：pipeline={}, enabled={}, maxContextTokens={}, consolidation={} tokens/{} 分钟, "
+                + "retention={}/{}/{} 天, flushMode={}({} 分钟), extractContext={}({})",
+            bo.getPipelineMode(), bo.isEnabled(), bo.getMaxContextTokens(), bo.getConsolidationMaxTokens(),
             bo.getConsolidationMinGapMinutes(), bo.getDailyFileRetentionDays(),
             bo.getArchiveRetentionDays(), bo.getSessionRetentionDays(),
-            bo.getFlushMode(), bo.getFlushThrottleMinutes());
+            bo.getFlushMode(), bo.getFlushThrottleMinutes(),
+            bo.getExtractContextMessages(), bo.getExtractContextMaxChars());
     }
 
     /**
@@ -473,6 +482,11 @@ public class AiRuntimeConfigStore {
         AiProperties.Chat chat = aiProperties.getChat();
         AiMemoryConfigBo bo = new AiMemoryConfigBo();
         bo.setEnabled(chat.isMemoryEnabled());
+        bo.setPipelineMode(chat.getMemoryPipelineMode());
+        bo.setExtractContextMessages(chat.getMemoryExtractContextMessages());
+        bo.setExtractContextMaxChars(chat.getMemoryExtractContextMaxChars());
+        bo.setExtractKnownMemoryMaxChars(chat.getMemoryExtractKnownMemoryMaxChars());
+        bo.setInjectDeclaredMaxTokens(chat.getMemoryInjectDeclaredMaxTokens());
         bo.setMaxContextTokens(chat.getMemoryMaxContextTokens());
         bo.setConsolidationMaxTokens(chat.getMemoryConsolidationMaxTokens());
         bo.setConsolidationMinGapMinutes(chat.getMemoryConsolidationMinGapMinutes());

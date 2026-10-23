@@ -6,6 +6,16 @@
 export interface MemoryConfig {
   /** 是否启用长期记忆 */
   enabled: boolean;
+  /** 记忆管道模式：framework 框架托管 / shadow 影子 / platform 平台托管 */
+  pipelineMode: 'framework' | 'shadow' | 'platform';
+  /** 抽取时携带的只读上下文消息条数 */
+  extractContextMessages: number;
+  /** 抽取只读上下文字符上限 */
+  extractContextMaxChars: number;
+  /** 抽取时已有记忆摘要字符上限 */
+  extractKnownMemoryMaxChars: number;
+  /** 显式记忆注入 Token 上限 */
+  injectDeclaredMaxTokens: number;
   /** 记忆注入 system prompt 的上下文 Token 上限 */
   maxContextTokens: number;
   /** 合并时允许读取的每日流水 Token 上限 */

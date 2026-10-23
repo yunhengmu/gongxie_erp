@@ -32,6 +32,43 @@ public class AiMemoryConfigBo implements Serializable {
     private boolean enabled;
 
     /**
+     * 记忆管道模式：framework / shadow / platform。
+     *
+     * <p>platform 会关闭框架记忆 hooks 与记忆工具，由平台接管抽取、注入、合并与维护。</p>
+     */
+    @Pattern(regexp = "^(framework|shadow|platform)$",
+        message = "记忆管道模式只能是 framework / shadow / platform")
+    private String pipelineMode;
+
+    /**
+     * 平台抽取时携带的只读上下文消息条数
+     */
+    @Min(value = 0, message = "抽取上下文消息条数不能小于 0")
+    @Max(value = 12, message = "抽取上下文消息条数不能超过 12")
+    private int extractContextMessages = 6;
+
+    /**
+     * 平台抽取的只读上下文字符上限
+     */
+    @Min(value = 1000, message = "抽取上下文字符上限不能小于 1000")
+    @Max(value = 50000, message = "抽取上下文字符上限不能超过 50000")
+    private int extractContextMaxChars = 8000;
+
+    /**
+     * 平台抽取时“已有记忆摘要”的字符上限
+     */
+    @Min(value = 0, message = "已有记忆摘要上限不能小于 0")
+    @Max(value = 10000, message = "已有记忆摘要上限不能超过 10000")
+    private int extractKnownMemoryMaxChars = 2000;
+
+    /**
+     * 显式记忆注入的 Token 上限（独立于 MEMORY.md 注入预算）
+     */
+    @Min(value = 100, message = "显式记忆注入上限不能小于 100")
+    @Max(value = 4000, message = "显式记忆注入上限不能超过 4000")
+    private int injectDeclaredMaxTokens = 800;
+
+    /**
      * 记忆注入 system prompt 的上下文 Token 上限
      */
     @Min(value = 500, message = "记忆注入上限必须不小于 500")

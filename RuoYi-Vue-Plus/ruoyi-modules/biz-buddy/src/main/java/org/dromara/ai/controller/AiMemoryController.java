@@ -8,7 +8,9 @@ import org.dromara.ai.core.memory.spi.AiMemoryBackend;
 import org.dromara.ai.core.memory.spi.MemoryBackendStats;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
+import org.dromara.ai.domain.bo.AiMemoryDeclaredBo;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
+import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.common.core.domain.R;
@@ -158,6 +160,41 @@ public class AiMemoryController extends BaseController {
     @GetMapping("/stats")
     public R<MemoryBackendStats> stats(@NotNull(message = "用户不能为空") @RequestParam Long userId) {
         return R.ok(memoryBackend.stats(userId));
+    }
+
+    /**
+     * 查询用户的显式记忆（用户明确要求记住的条目）
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     */
+    @SaCheckPermission("ai:memory:query")
+    @GetMapping("/declared")
+    public R<List<AiMemoryDeclaredVo>> listDeclared(@NotNull(message = "智能体不能为空") @RequestParam Long agentId,
+                                                    @NotNull(message = "用户不能为空") @RequestParam Long userId) {
+        return R.ok(memoryService.listDeclared(agentId, userId));
+    }
+
+    /**
+     * 新增一条显式记忆（管理端人工补充，仍走净化）
+     */
+    @SaCheckPermission("ai:memory:edit")
+    @Log(title = "AI显式记忆", businessType = BusinessType.INSERT)
+    @PostMapping("/declared")
+    public R<AiMemoryDeclaredVo> addDeclared(@Validated @RequestBody AiMemoryDeclaredBo bo) {
+        return R.ok(memoryService.addDeclared(bo));
+    }
+
+    /**
+     * 撤销一条显式记忆
+     */
+    @SaCheckPermission("ai:memory:edit")
+    @Log(title = "AI显式记忆", businessType = BusinessType.DELETE)
+    @DeleteMapping("/declared/{entryId}")
+    public R<Boolean> revokeDeclared(@NotNull(message = "智能体不能为空") @RequestParam Long agentId,
+                                     @NotNull(message = "用户不能为空") @RequestParam Long userId,
+                                     @PathVariable String entryId) {
+        return R.ok(memoryService.revokeDeclared(agentId, userId, entryId));
     }
 
     /**

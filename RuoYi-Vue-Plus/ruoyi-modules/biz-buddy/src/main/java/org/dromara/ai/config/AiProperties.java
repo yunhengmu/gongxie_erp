@@ -465,9 +465,38 @@ public class AiProperties {
          * 是否放行只读记忆检索工具（{@code memory_search} / {@code memory_get}）。
          *
          * <p>默认关闭：开启后框架会注册全部记忆工具，再由 {@code ToolsConfig} 白名单裁掉
-         * {@code memory_save} / {@code session_search}；仅在确认只读检索收益后按环境开启（A1 POC）。</p>
+         * {@code memory_save} / {@code session_search}；仅在确认只读检索收益后按环境开启（A1 POC）。
+         * 平台托管模式下框架记忆工具恒不注册，本开关仅对 framework 模式生效。</p>
          */
         private boolean memoryReadToolsEnabled = false;
+
+        /**
+         * 记忆管道模式：framework 框架托管（现状）/ shadow 平台抽取影子 / platform 平台全托管。
+         *
+         * <p>platform 模式会关闭框架记忆 hooks 与记忆工具，由平台负责抽取、注入、合并与维护；
+         * 切换必须同时保证平台注入中间件生效，否则会出现记忆失忆。</p>
+         */
+        private String memoryPipelineMode = "framework";
+
+        /**
+         * 平台抽取时携带的只读上下文消息条数（用于理解“这样 / 这个格式 / 那就 B”等指代）
+         */
+        private int memoryExtractContextMessages = 6;
+
+        /**
+         * 平台抽取的只读上下文字符上限
+         */
+        private int memoryExtractContextMaxChars = 8000;
+
+        /**
+         * 平台抽取时注入“已有记忆摘要”的字符上限，用于减少重复抽取
+         */
+        private int memoryExtractKnownMemoryMaxChars = 2000;
+
+        /**
+         * 显式记忆（用户明确要求记住）注入的 Token 上限，独立于 MEMORY.md 预算
+         */
+        private int memoryInjectDeclaredMaxTokens = 800;
 
         /**
          * 记忆注入 system prompt 的上下文 Token 上限（超出时截断）

@@ -2,7 +2,9 @@ package org.dromara.ai.service;
 
 import org.dromara.ai.core.memory.spi.MemoryBackendStats;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
+import org.dromara.ai.domain.bo.AiMemoryDeclaredBo;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
+import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
 
 import java.util.List;
@@ -107,5 +109,32 @@ public interface IAiMemoryService {
      * @return 记忆统计
      */
     MemoryBackendStats stats(Long agentId, Long userId);
+
+    /**
+     * 查询用户的显式记忆（用户明确要求记住的条目）。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 显式记忆列表（含已撤销项，供审计）
+     */
+    List<AiMemoryDeclaredVo> listDeclared(Long agentId, Long userId);
+
+    /**
+     * 新增一条显式记忆（管理端人工写入，仍走净化）。
+     *
+     * @param bo 写入参数
+     * @return 落库后的条目
+     */
+    AiMemoryDeclaredVo addDeclared(AiMemoryDeclaredBo bo);
+
+    /**
+     * 撤销一条显式记忆。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @param entryId 条目主键
+     * @return 是否撤销成功
+     */
+    boolean revokeDeclared(Long agentId, Long userId, String entryId);
 
 }
