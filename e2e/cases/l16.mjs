@@ -26,6 +26,21 @@ import {
 
 const MEMORY_MD = 'MEMORY.md';
 
+/** 本层注入的偏好事实与校验关键词（必须与既有 MEMORY.md 不同，否则会被平台按已有记忆去重） */
+const FACT_TEXT = '我工作时习惯先做完再汇报，不喜欢中途被打断。';
+const FACT_KEYWORD = '汇报';
+
+/**
+ * 读取当前生效的显式记忆条目。
+ *
+ * @param {object} http   HTTP 客户端
+ * @param {number} agentId 入口智能体主键
+ * @param {number} userId  用户主键
+ * @returns {Promise<object[]>} 显式记忆列表
+ */
+const listDeclared = async (http, agentId, userId) =>
+  (await http.request('GET', '/ai/memory/declared', { query: { agentId, userId } })) || [];
+
 /**
  * @param {object} ctx 运行上下文
  * @returns {Promise<object>} 用例结果
@@ -40,6 +55,8 @@ export const run = async (ctx) => {
   if (!config.enabled) {
     return { status: 'SKIP', detail: '长期记忆未开启（enabled=false），无法验证生命周期' };
   }
+  // 两种管道的落盘形态不同：framework 写「Memory Flush」段，platform 直接写抽取条目
+  const platformPipeline = config.pipelineMode === 'platform';
 
   const profile = await http.request('GET', '/system/user/profile');
   const userId = profile?.user?.userId;
@@ -47,6 +64,11 @@ export const run = async (ctx) => {
   const ledgerPath = todayLedgerPath();
   const originalMemory = await readMemory(http, agentId, userId, MEMORY_MD);
   const originalLedger = await readMemory(http, agentId, userId, ledgerPath);
+  const declaredBefore = await listDeclared(http, agentId, userId);
+  const declaredIds = new Set(declaredBefore.map((item) => item.id));
+  // 审计失败数是累计值：只看本层是否新增，避免历史失败让用例永久不可通过
+  const statsBefore = await http.request('GET', '/ai/memory/stats', { query: { userId } });
+  const failedBaseline = Number(statsBefore?.failedEventCount || 0);
   let configTouched = false;
 
   try {
@@ -58,8 +80,10 @@ export const run = async (ctx) => {
     registry.sessions.push(session.id);
     log(`  会话 ${session.id}（记忆生命周期用例）`);
 
+    // 事实必须与既有 MEMORY.md 不重复：platform 抽取会按「已有记忆摘要」去重，
+    // 重复偏好只会输出 NO_REPLY，流水不会增长
     const message = await throttle(() =>
-      sendUserMessage(http, session.id, '请记住：我长期偏好用表格展示数据，回答请保持简洁。')
+      sendUserMessage(http, session.id, `请记住：${FACT_TEXT}`)
     );
     const { events } = await streamChat(http, args, session.id, message.id);
     const { lastOfType } = await import('../lib/sse.mjs');
@@ -71,18 +95,33 @@ export const run = async (ctx) => {
       return { status: 'FAIL', detail: '对话未在超时内完成，无法触发记忆抽取' };
     }
 
-    // 2) 等待抽取落盘（后台任务异步执行，最多等 45s）
+    // 2) 等待落盘：framework 写「Memory Flush」段；platform 可能由显式记忆工具写入 .declared.jsonl，
+    //    也可能由抽取写入当日流水——两者任一出现即视为记住
     const deadline = Date.now() + 45000;
     let ledger = originalLedger;
+    let declared = declaredBefore;
+    const landed = () => ledger.length > originalLedger.length
+      || declared.some((item) => !declaredIds.has(item.id)
+        && String(item.fact || '').includes(FACT_KEYWORD));
     while (Date.now() < deadline) {
       await sleep(2000);
       ledger = await readMemory(http, agentId, userId, ledgerPath);
-      if (ledger.length > originalLedger.length && ledger.includes('Memory Flush')) {
+      declared = await listDeclared(http, agentId, userId);
+      if (!platformPipeline && ledger.includes('Memory Flush')) {
+        break;
+      }
+      if (platformPipeline && landed()) {
         break;
       }
     }
-    if (!ledger.includes('Memory Flush')) {
+    if (!platformPipeline && !ledger.includes('Memory Flush')) {
       return { status: 'FAIL', detail: '记忆抽取未落盘（45s 内当日流水无新增 Memory Flush 段）' };
+    }
+    if (platformPipeline && !landed()) {
+      return {
+        status: 'FAIL',
+        detail: '记忆未落盘（45s 内当日流水无新增条目，显式记忆也无新增）'
+      };
     }
 
     // 3) 确定性净化：人工写入 PII 与指令，读回必须是脱敏后的内容
@@ -111,8 +150,12 @@ export const run = async (ctx) => {
     if (!(stats.memoryChars > 0)) {
       return { status: 'FAIL', detail: '合并后 MEMORY.md 为空', evidence: { stats } };
     }
-    if (stats.failedEventCount > 0) {
-      return { status: 'FAIL', detail: `记忆审计存在失败事件（${stats.failedEventCount}）`, evidence: { stats } };
+    if (stats.failedEventCount > failedBaseline) {
+      return {
+        status: 'FAIL',
+        detail: `本层新增记忆审计失败事件（${stats.failedEventCount - failedBaseline}）`,
+        evidence: { stats, failedBaseline }
+      };
     }
 
     const memory = await readMemory(http, agentId, userId, MEMORY_MD);
@@ -142,7 +185,7 @@ export const run = async (ctx) => {
 
     return {
       status: 'PASS',
-      detail: '记忆生命周期通过（抽取落盘 → 净化 → 合并 → 水位推进 → 配置护栏）',
+      detail: '记忆生命周期通过（记忆落盘 → 净化 → 合并 → 水位推进 → 配置护栏）',
       evidence: {
         sessionId: session.id,
         ledgerChars: ledger.length,
@@ -158,5 +201,17 @@ export const run = async (ctx) => {
     }
     await writeMemory(http, agentId, userId, MEMORY_MD, originalMemory).catch(() => undefined);
     await writeMemory(http, agentId, userId, ledgerPath, originalLedger).catch(() => undefined);
+    // 模型可能自动调用 remember_user_preference：撤销本层新增的显式记忆，避免污染真实账号
+    try {
+      const declaredAfter = await listDeclared(http, agentId, userId);
+      for (const item of declaredAfter) {
+        if (!declaredIds.has(item.id)) {
+          await http.request('DELETE', `/ai/memory/declared/${item.id}`,
+            { query: { agentId, userId } }).catch(() => undefined);
+        }
+      }
+    } catch {
+      // 清理失败不影响用例结论：显式记忆可人工在记忆页撤销
+    }
   }
 };

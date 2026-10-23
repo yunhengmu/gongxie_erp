@@ -37,8 +37,8 @@ let dockerCmd = null;
 
 main();
 
-/** 编排入口：快照 → 跑流量 → 判门禁 → 还原。 */
-function main() {
+/** 编排入口：快照 → 跑流量 → 等样本 → 判门禁 → 还原。 */
+async function main() {
   const container = args.container || 'bizbuddy-admin';
   const agentCode = args['agent-code'] || 'entry_agent';
   const userId = String(args['user-id'] || '1761100000000000001');
@@ -67,8 +67,9 @@ function main() {
     }
 
     runTraffic(labelsPath);
-    const samples = readSamples(container, memoryDir);
     const labels = readJsonl(labelsPath);
+    // 轮末抽取是异步的：按标签会话数轮询样本文件，避免慢模型导致「样本缺失」误判
+    const samples = await waitForSamples(container, memoryDir, labels.length);
     report = evaluate(samples, labels, snapshots.get(`${memoryDir}/MEMORY.md`) || '');
     printReport(report);
 
@@ -226,16 +227,33 @@ function runTraffic(labelsPath) {
   }
 }
 
-/** 读取本次影子样本（按行解析，空文件视为无样本）。 */
-function readSamples(container, memoryDir) {
-  const result = runDocker(['exec', container, 'sh', '-c',
-    `cat '${memoryDir}/memory/.extract_shadow/'*.jsonl 2>/dev/null || true`], { allowFailure: true });
-  const rows = parseJsonl(result.stdout);
-  if (!rows.length) {
-    throw new Error(`未读到影子样本（${memoryDir}/memory/.extract_shadow）`);
+/**
+ * 轮询等待影子样本落盘：轮末抽取是异步的，慢模型可能晚于脚本自带的 20s 等待。
+ *
+ * @param {string} container 容器名
+ * @param {string} memoryDir 容器内记忆目录
+ * @param {number} expected  期望的会话数
+ * @param {number} [timeoutMs] 最长等待时间
+ * @returns {Promise<object[]>} 样本行（超时返回已读到的部分，交给门禁按缺失判定）
+ */
+async function waitForSamples(container, memoryDir, expected, timeoutMs = 120000) {
+  const deadline = Date.now() + timeoutMs;
+  let rows = [];
+  while (true) {
+    const result = runDocker(['exec', container, 'sh', '-c',
+      `cat '${memoryDir}/memory/.extract_shadow/'*.jsonl 2>/dev/null || true`], { allowFailure: true });
+    rows = parseJsonl(result.stdout);
+    const sessions = new Set(rows.map((row) => String(row.sessionId ?? '')));
+    if (sessions.size >= expected) {
+      console.log(`读到影子样本 ${rows.length} 条 / ${sessions.size} 个会话`);
+      return rows;
+    }
+    if (Date.now() >= deadline) {
+      console.warn(`等待样本超时：${sessions.size}/${expected} 个会话`);
+      return rows;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
   }
-  console.log(`读到影子样本 ${rows.length} 条`);
-  return rows;
 }
 
 /** 解析 JSONL 文本，忽略空行。 */

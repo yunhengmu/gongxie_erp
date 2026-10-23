@@ -29,6 +29,14 @@ export const run = async (ctx) => {
   if (!resolved.platformChatKeyReady) {
     return { status: 'SKIP', detail: '平台未为对话模型配置 API 密钥（「模型配置」页补全后可跑）' };
   }
+  // 平台托管模式不注册框架记忆检索工具（记忆由平台中间件注入），本层无适用对象
+  const config = await http.request('GET', '/ai/memory/config');
+  if (config.pipelineMode === 'platform') {
+    return {
+      status: 'SKIP',
+      detail: '平台托管模式不注册 memory_search / memory_get（记忆按上下文注入），本层不适用'
+    };
+  }
 
   const profile = await http.request('GET', '/system/user/profile');
   const userId = profile?.user?.userId;
