@@ -72,6 +72,9 @@ export const run = async (ctx) => {
   let configTouched = false;
 
   try {
+    // 固定用例事实可能与已有 MEMORY.md 重复，框架抽取会输出 NO_REPLY；
+    // 测试期间先清空长期记忆，finally 再还原原内容
+    await writeMemory(http, agentId, userId, MEMORY_MD, '');
     // 1) 临时切 always：跳过 30 分钟节流，确保本轮必触发抽取
     await http.request('PUT', '/ai/memory/config', { body: { ...config, flushMode: 'always' } });
     configTouched = true;
