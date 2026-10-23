@@ -34,6 +34,36 @@ export interface MemoryConfig {
   flushThrottleMinutes: number;
 }
 
+/** 记忆运行健康指标（近 N 天审计聚合，仅运行指标，不含语义召回率） */
+export interface MemoryQuality {
+  /** 统计窗口（天） */
+  days: number;
+  /** 抽取执行次数 */
+  extractRuns: number;
+  /** 其中无产出（NO_REPLY）的次数 */
+  extractEmpty: number;
+  /** 保留的事实条数 */
+  extractKept: number;
+  /** 丢弃的 needs_context 条数 */
+  needsContext: number;
+  /** 丢弃的低置信条数 */
+  lowConfidence: number;
+  /** 抽取失败次数 */
+  extractFailures: number;
+  /** 合并执行次数 */
+  consolidateRuns: number;
+  /** 合并失败次数 */
+  consolidateFailures: number;
+  /** 最近一次合并耗时（毫秒） */
+  lastConsolidateMs: number;
+  /** 最近一次合并消耗的 Token */
+  lastConsolidateTokens: number;
+  /** 最近一次成功抽取时间 */
+  lastExtractAt: string;
+  /** 最近一次成功合并时间 */
+  lastConsolidateAt: string;
+}
+
 /** MEMORY.md 历史版本 */
 export interface MemoryVersion {
   /** 版本 ID */

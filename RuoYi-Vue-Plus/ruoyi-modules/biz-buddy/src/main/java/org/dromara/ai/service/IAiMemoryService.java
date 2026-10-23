@@ -6,6 +6,7 @@ import org.dromara.ai.domain.bo.AiMemoryDeclaredBo;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
+import org.dromara.ai.domain.vo.AiMemoryQualityVo;
 import org.dromara.ai.domain.vo.AiMemoryVersionVo;
 
 import java.util.List;
@@ -128,6 +129,15 @@ public interface IAiMemoryService {
      * @return 记忆统计
      */
     MemoryBackendStats stats(Long agentId, Long userId);
+
+    /**
+     * 查询近 N 天的记忆运行健康指标（抽取、合并、失败数）。
+     *
+     * @param userId 记忆归属用户主键
+     * @param days   统计窗口（天，1~30）
+     * @return 运行健康指标
+     */
+    AiMemoryQualityVo quality(Long userId, Integer days);
 
     /**
      * 查询用户的显式记忆（用户明确要求记住的条目）。

@@ -27,6 +27,7 @@ import org.dromara.ai.domain.dto.ChatTokenUsage;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
+import org.dromara.ai.domain.vo.AiMemoryQualityVo;
 import org.dromara.ai.domain.vo.AiMemoryVersionVo;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiMemoryService;
@@ -44,8 +45,10 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -101,6 +104,11 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
      * Token 与字符的粗略折算比例（1 Token ≈ 4 字符），统计口径与合并预算一致
      */
     private static final int CHARS_PER_TOKEN = 4;
+
+    /**
+     * 运行健康统计的最大窗口（天），避免一次扫描过多审计历史
+     */
+    private static final int MAX_QUALITY_DAYS = 30;
 
     /**
      * 记忆控制台使用的固定会话标识（用户级隔离下与会话无关）
@@ -492,6 +500,125 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             formatInstant(readConsolidationWatermark(memoryDir)), audit.lastArchivedAt(),
             audit.failedCount(), audit.lastBatches(), audit.lastMergedFiles(),
             audit.lastRemainingFiles());
+    }
+
+    @Override
+    public AiMemoryQualityVo quality(Long userId, Integer days) {
+        AiMemoryQualityVo quality = new AiMemoryQualityVo();
+        int window = days == null ? 1 : Math.max(1, Math.min(days, MAX_QUALITY_DAYS));
+        quality.setDays(window);
+        AiAgent entry = agentService.getEntryAgent();
+        if (entry == null || userId == null) {
+            return quality;
+        }
+        Path memoryDir = workspaceOf(entry).getMemoryDir(contextOf(userId));
+        Path auditFile = memoryDir == null ? null : memoryDir.resolve(AiMemoryAuditLogger.AUDIT_FILE);
+        if (auditFile == null || !Files.isRegularFile(auditFile)) {
+            return quality;
+        }
+        Instant cutoff = Instant.now().minus(Duration.ofDays(window));
+        try (Stream<String> lines = Files.lines(auditFile, StandardCharsets.UTF_8)) {
+            for (String line : (Iterable<String>) lines::iterator) {
+                Map<String, Object> entryLine = JsonUtils.parseMap(line);
+                if (entryLine == null) {
+                    continue;
+                }
+                Instant ts = parseAuditTime(entryLine.get("ts"));
+                if (ts == null || ts.isBefore(cutoff)) {
+                    continue;
+                }
+                accumulateQuality(quality, entryLine, ts);
+            }
+        } catch (Exception e) {
+            log.warn("读取记忆审计日志失败：dir={}, err={}", memoryDir, e.getMessage());
+        }
+        return quality;
+    }
+
+    /**
+     * 按事件类型累加运行健康指标（只认抽取写流水与合并两类事件）。
+     *
+     * @param quality   指标对象
+     * @param entryLine 审计事件
+     * @param ts        事件时间
+     */
+    private void accumulateQuality(AiMemoryQualityVo quality, Map<String, Object> entryLine, Instant ts) {
+        String event = String.valueOf(entryLine.getOrDefault("event", ""));
+        String result = String.valueOf(entryLine.getOrDefault("result", ""));
+        Map<String, Object> detail = entryLine.get("detail") instanceof Map<?, ?> map
+            ? (Map<String, Object>) map : Map.of();
+        if (AiMemoryAuditLogger.EVENT_FLUSH_WRITE.equals(event)) {
+            if ("FAIL".equals(result)) {
+                quality.setExtractFailures(quality.getExtractFailures() + 1);
+                return;
+            }
+            // 影子样本不计入生产健康度
+            if (!"OK".equals(result) || "extract_shadow".equals(String.valueOf(detail.get("stage")))) {
+                return;
+            }
+            int kept = auditInt(detail.get("kept"));
+            quality.setExtractRuns(quality.getExtractRuns() + 1);
+            quality.setExtractKept(quality.getExtractKept() + kept);
+            if (kept == 0) {
+                quality.setExtractEmpty(quality.getExtractEmpty() + 1);
+            }
+            quality.setNeedsContext(quality.getNeedsContext() + auditInt(detail.get("needsContext")));
+            quality.setLowConfidence(quality.getLowConfidence() + auditInt(detail.get("lowConfidence")));
+            quality.setLastExtractAt(formatInstant(ts));
+            return;
+        }
+        if (!AiMemoryAuditLogger.EVENT_CONSOLIDATE.equals(event)) {
+            return;
+        }
+        if ("FAIL".equals(result)) {
+            quality.setConsolidateFailures(quality.getConsolidateFailures() + 1);
+            return;
+        }
+        if (!"OK".equals(result)) {
+            return;
+        }
+        quality.setConsolidateRuns(quality.getConsolidateRuns() + 1);
+        quality.setLastConsolidateMs(auditLong(detail.get("elapsedMs")));
+        quality.setLastConsolidateTokens(auditLong(detail.get("tokens")));
+        quality.setLastConsolidateAt(formatInstant(ts));
+    }
+
+    /**
+     * 解析审计时间；无时区后缀的本地时间按系统时区补全。
+     *
+     * @param value 原始时间值
+     * @return 时间点；无法解析时返回 null
+     */
+    private Instant parseAuditTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Instant.parse(String.valueOf(value).trim());
+        } catch (DateTimeParseException e) {
+            try {
+                return OffsetDateTime.parse(String.valueOf(value).trim()).toInstant();
+            } catch (DateTimeParseException ignored) {
+                return null;
+            }
+        }
+    }
+
+    /**
+     * 读取审计事件 detail 中的长整数值（缺失或格式异常时返回 0）。
+     *
+     * @param value 原始值
+     * @return 长整数值
+     */
+    private long auditLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
     }
 
     @Override

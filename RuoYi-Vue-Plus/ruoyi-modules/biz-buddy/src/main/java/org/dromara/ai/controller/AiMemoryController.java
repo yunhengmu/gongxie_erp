@@ -13,6 +13,7 @@ import org.dromara.ai.domain.bo.AiMemoryRestoreBo;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
+import org.dromara.ai.domain.vo.AiMemoryQualityVo;
 import org.dromara.ai.domain.vo.AiMemoryVersionVo;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.common.core.domain.R;
@@ -162,6 +163,19 @@ public class AiMemoryController extends BaseController {
     @GetMapping("/stats")
     public R<MemoryBackendStats> stats(@NotNull(message = "用户不能为空") @RequestParam Long userId) {
         return R.ok(memoryBackend.stats(userId));
+    }
+
+    /**
+     * 查询近 N 天的记忆运行健康指标（抽取、合并、失败数）
+     *
+     * @param userId 记忆归属用户主键
+     * @param days   统计窗口（天，默认 1，最大 30）
+     */
+    @SaCheckPermission("ai:memory:query")
+    @GetMapping("/quality")
+    public R<AiMemoryQualityVo> quality(@NotNull(message = "用户不能为空") @RequestParam Long userId,
+                                        @RequestParam(defaultValue = "1") Integer days) {
+        return R.ok(memoryService.quality(userId, days));
     }
 
     /**

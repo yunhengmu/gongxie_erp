@@ -7,6 +7,7 @@ import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryContentBo;
 import org.dromara.ai.domain.vo.AiMemoryContentVo;
 import org.dromara.ai.domain.vo.AiMemoryFileVo;
+import org.dromara.ai.domain.vo.AiMemoryQualityVo;
 import org.dromara.ai.service.IAiMemoryService;
 import org.dromara.ai.test.AiTestSupport;
 import org.dromara.common.core.domain.R;
@@ -95,6 +96,15 @@ class AiMemoryControllerTest {
         MemoryBackendStats stats = MemoryBackendStats.empty(2L);
         when(memoryBackend.stats(2L)).thenReturn(stats);
         assertSame(stats, controller.stats(2L).getData());
+    }
+
+    @Test
+    @DisplayName("查询记忆运行健康指标")
+    void shouldGetQuality() {
+        AiMemoryQualityVo quality = new AiMemoryQualityVo();
+        quality.setDays(7);
+        when(memoryService.quality(2L, 7)).thenReturn(quality);
+        assertSame(quality, controller.quality(2L, 7).getData());
     }
 
 }

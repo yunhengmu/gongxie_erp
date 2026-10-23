@@ -187,6 +187,60 @@
       </el-form>
     </el-card>
 
+    <el-card shadow="hover" class="table-panel quality-panel" v-loading="qualityLoading">
+      <template #header>
+        <div class="toolbar-shell">
+          <div class="table-heading">
+            <h3>运行健康</h3>
+            <p>
+              近 {{ quality.days }} 天抽取与合并的审计汇总；只反映「记忆是否还在工作」，语义召回率需用离线门禁评测。
+            </p>
+          </div>
+          <div class="toolbar-actions">
+            <el-radio-group v-model="qualityDays" size="small" @change="loadQuality">
+              <el-radio-button :value="1">近 1 天</el-radio-button>
+              <el-radio-button :value="7">近 7 天</el-radio-button>
+            </el-radio-group>
+            <el-button icon="Refresh" @click="loadQuality">刷新</el-button>
+          </div>
+        </div>
+      </template>
+
+      <div class="quality-grid">
+        <div class="quality-item">
+          <span class="quality-label">抽取执行</span>
+          <div class="quality-value">{{ quality.extractRuns }}<em>次</em></div>
+          <span class="quality-hint">无产出 {{ quality.extractEmpty }} 次</span>
+        </div>
+        <div class="quality-item">
+          <span class="quality-label">保留事实</span>
+          <div class="quality-value">{{ quality.extractKept }}<em>条</em></div>
+          <span class="quality-hint">
+            needs_context {{ quality.needsContext }} · 低置信 {{ quality.lowConfidence }}
+          </span>
+        </div>
+        <div class="quality-item">
+          <span class="quality-label">抽取失败</span>
+          <div class="quality-value" :class="{ 'quality-danger': quality.extractFailures > 0 }">
+            {{ quality.extractFailures }}<em>次</em>
+          </div>
+          <span class="quality-hint">最近抽取 {{ formatQualityTime(quality.lastExtractAt) }}</span>
+        </div>
+        <div class="quality-item">
+          <span class="quality-label">合并执行</span>
+          <div class="quality-value">{{ quality.consolidateRuns }}<em>次</em></div>
+          <span class="quality-hint">
+            失败 {{ quality.consolidateFailures }} 次 · 最近 {{ formatQualityTime(quality.lastConsolidateAt) }}
+          </span>
+        </div>
+        <div class="quality-item">
+          <span class="quality-label">上次合并消耗</span>
+          <div class="quality-value">{{ quality.lastConsolidateTokens }}<em>tokens</em></div>
+          <span class="quality-hint">耗时 {{ quality.lastConsolidateMs }} ms</span>
+        </div>
+      </div>
+    </el-card>
+
     <el-card shadow="hover" class="table-panel memory-panel">
       <template #header>
         <div class="toolbar-shell">
@@ -479,6 +533,7 @@ import {
   consolidateMemory,
   getMemoryConfig,
   getMemoryContent,
+  getMemoryQuality,
   getMemoryVersion,
   listDeclaredMemories,
   listMemoryFiles,
@@ -493,6 +548,7 @@ import type {
   MemoryConfig,
   MemoryDeclaredEntry,
   MemoryFile,
+  MemoryQuality,
   MemoryRestoreForm,
   MemoryVersion
 } from '@/api/ai/memory/types';
@@ -550,6 +606,25 @@ const declaredLoading = ref(false);
 const declaredVisible = ref(false);
 const declaredSaving = ref(false);
 const declaredForm = ref<{ fact: string; evidence: string }>({ fact: '', evidence: '' });
+
+/** 运行健康状态（审计聚合，仅运行指标） */
+const qualityDays = ref(1);
+const qualityLoading = ref(false);
+const quality = ref<MemoryQuality>({
+  days: 1,
+  extractRuns: 0,
+  extractEmpty: 0,
+  extractKept: 0,
+  needsContext: 0,
+  lowConfidence: 0,
+  extractFailures: 0,
+  consolidateRuns: 0,
+  consolidateFailures: 0,
+  lastConsolidateMs: 0,
+  lastConsolidateTokens: 0,
+  lastExtractAt: '',
+  lastConsolidateAt: ''
+});
 
 /** 版本历史状态 */
 const versionVisible = ref(false);
@@ -708,7 +783,36 @@ const loadFiles = async () => {
 
 /** 切换智能体或用户 */
 const handleScopeChange = async () => {
-  await Promise.all([loadFiles(), loadDeclared()]);
+  await Promise.all([loadFiles(), loadDeclared(), loadQuality()]);
+};
+
+/** 加载运行健康指标（按天窗口） */
+const loadQuality = async () => {
+  if (!query.value.userId) {
+    return;
+  }
+  qualityLoading.value = true;
+  try {
+    const res = await getMemoryQuality(query.value.userId, qualityDays.value);
+    if (res.data) {
+      quality.value = res.data;
+    }
+  } finally {
+    qualityLoading.value = false;
+  }
+};
+
+/** 格式化审计时间（ISO → MM-DD HH:mm） */
+const formatQualityTime = (value?: string) => {
+  if (!value) {
+    return '—';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
 /** 加载显式记忆（含已撤销条目，便于审计） */
@@ -812,7 +916,7 @@ const handleConsolidate = async () => {
   try {
     await consolidateMemory(query.value.agentId, query.value.userId);
     modal.msgSuccess('记忆合并已完成');
-    await loadFiles();
+    await Promise.all([loadFiles(), loadQuality()]);
   } finally {
     consolidating.value = false;
   }
@@ -879,7 +983,7 @@ const handleRemove = async () => {
 
 onMounted(async () => {
   await Promise.all([loadConfig(), loadOptions()]);
-  await Promise.all([loadFiles(), loadDeclared()]);
+  await Promise.all([loadFiles(), loadDeclared(), loadQuality()]);
 });
 </script>
 
@@ -891,6 +995,56 @@ onMounted(async () => {
 
 .memory-panel {
   margin-top: 12px;
+}
+
+.quality-panel {
+  margin-top: 12px;
+}
+
+.quality-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.quality-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: var(--el-fill-color-lighter);
+}
+
+.quality-label {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.quality-value {
+  color: var(--el-text-color-primary);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+
+  em {
+    margin-left: 4px;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    font-style: normal;
+    font-weight: 400;
+  }
+}
+
+.quality-danger {
+  color: var(--el-color-danger);
+}
+
+.quality-hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .declared-panel {

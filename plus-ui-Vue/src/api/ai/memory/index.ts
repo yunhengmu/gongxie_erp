@@ -5,6 +5,7 @@ import type {
   MemoryDeclaredEntry,
   MemoryDeclaredForm,
   MemoryFile,
+  MemoryQuality,
   MemoryRestoreForm,
   MemoryVersion
 } from '@/api/ai/memory/types';
@@ -112,6 +113,19 @@ export const cleanupMemory = (agentId: string | number, userId: string | number)
     url: '/ai/memory/cleanup',
     method: 'post',
     params: { agentId, userId }
+  });
+};
+
+/**
+ * 查询近 N 天的记忆运行健康指标（抽取、合并、失败数）
+ * @param userId 记忆归属用户主键
+ * @param days 统计窗口（天）
+ */
+export const getMemoryQuality = (userId: string | number, days = 1): AxiosPromise<MemoryQuality> => {
+  return request({
+    url: '/ai/memory/quality',
+    method: 'get',
+    params: { userId, days }
   });
 };
 
