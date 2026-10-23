@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+
+# 本地安装的 Agno 第三方包（非本项目源码）
+agno/
+bin/
+agno-3.1.8.dist-info/
+
+# 运行时数据与密钥
+*.db
+*.db-shm
+*.db-wal
+console.config.json
+console.accounts.json
+console.aux_models.json
+console.components.json
+console.tools.json
+audio/
+
+# 前端依赖与构建产物
+console-web/node_modules/
+console-web/dist/
