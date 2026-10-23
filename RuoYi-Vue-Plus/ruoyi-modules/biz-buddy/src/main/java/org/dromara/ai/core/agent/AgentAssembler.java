@@ -256,10 +256,11 @@ public class AgentAssembler {
             resources.mergedToolDecisions(), mcpAssembly.toolNames(), resources.signature());
         // 是否注册了显式记忆工具：注册了就必须在权限基线里默认放行，否则会落到全局默认（未命中即 ASK）
         boolean declaredMemoryTools = platformMemory && definition.isEntry();
-        // 只读记忆检索 POC：开启后注册框架记忆工具，再由白名单只放行 memory_search / memory_get；
-        // 平台托管模式下框架记忆工具恒不注册（后续由平台侧检索工具替代）
+        // 记忆工具：只读检索在 framework 模式受开关控制；平台托管模式恒开，
+        // 因为平台注入仍会按预算截断，超过预算的部分需要 memory_search / memory_get 兜底。
+        // 写入类工具（memory_save / session_search）始终由白名单裁掉。
         boolean memoryReadTools = memoryPolicy.isEnabled()
-            && aiProperties.getChat().isMemoryReadToolsEnabled() && !platformMemory;
+            && (platformMemory || aiProperties.getChat().isMemoryReadToolsEnabled());
         HarnessAgent.Builder builder = HarnessAgent.builder()
             .name(definition.getAgentCode())
             .description(StringUtils.isBlank(definition.getDescription())
@@ -337,8 +338,9 @@ public class AgentAssembler {
         // 全链路审计」的平台纪律，故一并关闭；确需联网能力时应改造为受控工具后再登记。
         tail = tail.disableFilesystemTools().disableShellTool().disableWebTools();
         if (platformMemory) {
-            // 平台托管：停掉框架抽取 / 合并 / 维护；同时停掉框架记忆工具。
-            // 二者同时关闭后框架不再注入 <memory_context>，由 PlatformMemoryContextMiddleware 接管；
+            // 平台托管：停掉框架抽取 / 合并 / 维护，由平台接管；
+            // 只读检索工具仍保留（按预算截断后的兜底），写入类记忆工具由白名单裁掉。
+            // 框架不再注入 <memory_context>，由 PlatformMemoryContextMiddleware 接管；
             // 工作区定义类文件仍由框架注入，故不调用 disableWorkspaceContext。
             tail = tail.disableMemoryHooks();
         } else if (!memoryPolicy.isEnabled()) {

@@ -831,6 +831,9 @@ public class AiChatFacade {
         RuntimeContext.Builder contextBuilder = RuntimeContext.builder()
             .userId(String.valueOf(runAsUserId))
             .sessionId(String.valueOf(sessionId))
+            // 用户本轮原话（渠道 / 定时任务同样可触发显式记忆工具，证据校验依赖此值）
+            .put(AiRuntimeKeys.CURRENT_USER_MESSAGE,
+                userMessage.getContent() == null ? "" : userMessage.getContent())
             // 技能生效范围（REQ-AI-10）：无人值守链路按运行身份用户过滤
             .put(SkillFilter.class, entryAgent
                 ? routeSupport.runtimeSkillFilter(definition.getId(), resources, runAsUserId)

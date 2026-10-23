@@ -5,6 +5,9 @@
  * ① 模型能实际调用只读检索工具并命中当日流水中的标记；
  * ② 写入类记忆工具（{@code memory_save} / {@code session_search}）未被调用（被白名单裁掉）。</p>
  *
+ * <p>framework 与 platform 两种管道都适用：platform 仅关闭框架抽取 / 合并 hooks，
+ * 只读检索保留作为注入截断后的兜底。</p>
+ *
  * <p>模型是否遵循「先检索」存在不确定性：未调用 `memory_search` 时判 SKIP 而非 FAIL；
  * 但只要出现 `memory_save` / `session_search` 调用即判 FAIL。收尾恢复原流水内容。</p>
  */
@@ -28,14 +31,6 @@ export const run = async (ctx) => {
   const { http, args, resolved, registry, log, throttle } = ctx;
   if (!resolved.platformChatKeyReady) {
     return { status: 'SKIP', detail: '平台未为对话模型配置 API 密钥（「模型配置」页补全后可跑）' };
-  }
-  // 平台托管模式不注册框架记忆检索工具（记忆由平台中间件注入），本层无适用对象
-  const config = await http.request('GET', '/ai/memory/config');
-  if (config.pipelineMode === 'platform') {
-    return {
-      status: 'SKIP',
-      detail: '平台托管模式不注册 memory_search / memory_get（记忆按上下文注入），本层不适用'
-    };
   }
 
   const profile = await http.request('GET', '/system/user/profile');
