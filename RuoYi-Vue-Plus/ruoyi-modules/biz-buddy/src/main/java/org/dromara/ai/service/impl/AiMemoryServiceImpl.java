@@ -15,6 +15,7 @@ import org.dromara.ai.core.agent.AgentRegistry;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.core.memory.AiMemoryAuditLogger;
 import org.dromara.ai.core.memory.AiMemoryDeclaredStore;
+import org.dromara.ai.core.memory.AiMemoryExtractionService;
 import org.dromara.ai.core.memory.AiMemoryPrompts;
 import org.dromara.ai.core.memory.AiMemorySanitizer;
 import org.dromara.ai.core.memory.AiMemoryVersionStore;
@@ -156,6 +157,11 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     private final AiMemoryDeclaredStore memoryDeclaredStore;
 
     private final AiMemoryVersionStore memoryVersionStore;
+
+    /**
+     * 平台抽取服务：清空记忆后写入截止水位、清理过期会话水位
+     */
+    private final AiMemoryExtractionService extractionService;
 
     @Override
     public List<AiMemoryFileVo> listFiles(Long agentId, Long userId) {
@@ -389,6 +395,8 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         // 会话态记忆（工作区 session 日志）：按会话保留天数清理
         LocalDate sessionCutoff = LocalDate.now().minusDays(Math.max(1, policy.getSessionRetentionDays()));
         removed += deleteExpiredSessionLogs(workspace, ctx, sessionCutoff);
+        // 抽取水位按会话保留期同步裁剪，避免 sessions 映射只增不减
+        int prunedWatermarks = extractionService.pruneWatermarks(memoryDir, userId, sessionCutoff);
         // 净化原文备份与影子样本：按各自保留期清理，避免敏感原文与评测样本无限增长
         removed += deleteExpiredByMtime(memoryDir.resolve(QUARANTINE_DIR),
             LocalDate.now().minusDays(Math.max(1, policy.getQuarantineRetentionDays())));
@@ -398,10 +406,10 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         int auditPruned = pruneAudit(memoryDir.resolve(AiMemoryAuditLogger.AUDIT_FILE),
             LocalDate.now().minusDays(Math.max(1, policy.getAuditRetentionDays())));
         log.info("长期记忆清理完成：agent={}, userId={}, 删除 {} 个文件（流水 {} 天 / 归档 {} 天 / 会话 {} 天），"
-                + "审计裁剪 {} 行（保留 {} 天）",
+                + "审计裁剪 {} 行（保留 {} 天），抽取水位裁剪 {} 条",
             definition.getAgentCode(), userId, removed, policy.getDailyFileRetentionDays(),
             policy.getArchiveRetentionDays(), policy.getSessionRetentionDays(),
-            auditPruned, policy.getAuditRetentionDays());
+            auditPruned, policy.getAuditRetentionDays(), prunedWatermarks);
         return removed;
     }
 
@@ -417,6 +425,8 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         } catch (IOException e) {
             throw new ServiceException("删除长期记忆失败：" + e.getMessage());
         }
+        // 清空后写入截止消息 ID：避免下一轮把历史会话重新抽取回来
+        extractionService.markCleared(memoryDir);
         log.info("长期记忆已删除：agent={}, userId={}", definition.getAgentCode(), userId);
         auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_DELETE, "OK", null);
     }

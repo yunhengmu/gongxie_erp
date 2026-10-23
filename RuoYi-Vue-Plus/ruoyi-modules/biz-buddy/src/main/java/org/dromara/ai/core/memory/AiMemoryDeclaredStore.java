@@ -103,7 +103,7 @@ public class AiMemoryDeclaredStore {
      * @param evidence      用户原话证据（可为空）
      * @return 新增或命中的条目
      */
-    public DeclaredMemory append(String workspaceCode, String userId, String fact, String evidence) {
+    public synchronized DeclaredMemory append(String workspaceCode, String userId, String fact, String evidence) {
         String normalized = normalize(fact);
         if (normalized.isBlank()) {
             throw new IllegalArgumentException("显式记忆内容不能为空");
@@ -137,7 +137,7 @@ public class AiMemoryDeclaredStore {
      * @param entryId       条目主键
      * @return 是否命中并撤销
      */
-    public boolean revoke(String workspaceCode, String userId, String entryId) {
+    public synchronized boolean revoke(String workspaceCode, String userId, String entryId) {
         if (entryId == null || entryId.isBlank()) {
             return false;
         }

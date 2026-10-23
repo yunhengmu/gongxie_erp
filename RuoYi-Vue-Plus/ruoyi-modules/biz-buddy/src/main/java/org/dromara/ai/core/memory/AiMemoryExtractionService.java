@@ -1,6 +1,7 @@
 package org.dromara.ai.core.memory;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.message.Msg;
 import io.agentscope.core.message.MsgRole;
@@ -74,6 +75,11 @@ public class AiMemoryExtractionService {
      * 影子抽取水位文件（与正式水位隔离）
      */
     private static final String SHADOW_STATE_FILE = ".extract_shadow_state.json";
+
+    /**
+     * 水位文件中的「清空记忆截止消息 ID」：小于等于该值的消息不再抽取
+     */
+    private static final String CLEARED_AT_ID = "clearedAtId";
 
     /**
      * 影子抽取记录目录
@@ -214,7 +220,9 @@ public class AiMemoryExtractionService {
         WorkspaceManager workspace = agentRegistry.get(entry).getWorkspaceManager();
         Path memoryDir = workspace.getMemoryDir(ctx);
         long watermark = readWatermark(memoryDir, sessionId, shadow);
-        List<AiMessage> pending = loadPending(sessionId, watermark, policy.getExtractContextMaxChars());
+        long clearedAtId = readClearedAtId(memoryDir);
+        List<AiMessage> pending = loadPending(sessionId, watermark, clearedAtId,
+            policy.getExtractContextMaxChars());
         if (pending.isEmpty()) {
             return false;
         }
@@ -287,12 +295,18 @@ public class AiMemoryExtractionService {
     }
 
     /**
-     * 读取水位之后的新消息；达到字符/条数上限即停止，水位只推进到已处理消息。
+     * 读取水位之后的新消息；清空记忆前的消息一律忽略。
+     *
+     * @param sessionId   会话主键
+     * @param watermark   会话抽取水位
+     * @param clearedAtId 清空记忆截止消息 ID（0 表示未清空）
+     * @param maxChars    字符预算
+     * @return 待抽取消息
      */
-    private List<AiMessage> loadPending(Long sessionId, long watermark, int maxChars) {
+    private List<AiMessage> loadPending(Long sessionId, long watermark, long clearedAtId, int maxChars) {
         LambdaQueryWrapper<AiMessage> wrapper = new LambdaQueryWrapper<AiMessage>()
             .eq(AiMessage::getSessionId, sessionId)
-            .gt(AiMessage::getId, watermark)
+            .gt(AiMessage::getId, Math.max(watermark, clearedAtId))
             .in(AiMessage::getRole, AiMessage.ROLE_USER, AiMessage.ROLE_ASSISTANT)
             .eq(AiMessage::getStatus, AiMessage.STATUS_NORMAL)
             .orderByAsc(AiMessage::getId)
@@ -520,6 +534,132 @@ public class AiMemoryExtractionService {
         } catch (Exception e) {
             log.warn("读取记忆抽取水位失败：sessionId={}, err={}", sessionId, e.getMessage());
             return 0L;
+        }
+    }
+
+    /**
+     * 读取「清空记忆截止消息 ID」；未清空时返回 0。
+     *
+     * @param memoryDir 记忆目录
+     * @return 截止消息 ID
+     */
+    private long readClearedAtId(Path memoryDir) {
+        Path state = memoryDir.resolve(EXTRACT_STATE_FILE);
+        if (!Files.isRegularFile(state)) {
+            return 0L;
+        }
+        try {
+            Map<String, Object> root = JsonUtils.parseMap(Files.readString(state, StandardCharsets.UTF_8));
+            Object value = root == null ? null : root.get(CLEARED_AT_ID);
+            if (value instanceof Number number) {
+                return number.longValue();
+            }
+            return value == null ? 0L : Long.parseLong(String.valueOf(value).trim());
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
+    /**
+     * 清空记忆后写入截止消息 ID，避免下一轮把历史会话重新抽回来。
+     *
+     * @param memoryDir 记忆目录（调用方已删除原内容）
+     */
+    public void markCleared(Path memoryDir) {
+        long maxId = maxMessageId();
+        writeClearedState(memoryDir.resolve(EXTRACT_STATE_FILE), maxId);
+        writeClearedState(memoryDir.resolve(SHADOW_STATE_FILE), maxId);
+    }
+
+    /**
+     * 取当前最大消息 ID，作为清空记忆的截止点。
+     *
+     * @return 最大消息 ID；无消息时为 0
+     */
+    private long maxMessageId() {
+        QueryWrapper<AiMessage> wrapper = new QueryWrapper<>();
+        wrapper.select("MAX(id) AS id");
+        AiMessage row = messageMapper.selectOne(wrapper);
+        return row == null || row.getId() == null ? 0L : row.getId();
+    }
+
+    /**
+     * 写入只含清空截止点的水位文件。
+     *
+     * @param state       水位文件
+     * @param clearedAtId 截止消息 ID
+     */
+    private void writeClearedState(Path state, long clearedAtId) {
+        try {
+            Map<String, Object> root = new LinkedHashMap<>();
+            root.put("sessions", new LinkedHashMap<>());
+            root.put(CLEARED_AT_ID, clearedAtId);
+            root.put("updatedAt", Instant.now().toString());
+            Files.createDirectories(state.getParent());
+            Files.writeString(state, JsonUtils.toJsonString(root), StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException e) {
+            throw new IllegalStateException("写入清空水位失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 清理已过期会话的抽取水位条目，避免 {@code sessions} 映射无限增长。
+     *
+     * @param memoryDir 记忆目录
+     * @param userId    用户主键
+     * @param cutoff    会话保留截止日期
+     * @return 清理的条目数
+     */
+    public int pruneWatermarks(Path memoryDir, Long userId, LocalDate cutoff) {
+        Set<String> alive = sessionMapper.selectList(new LambdaQueryWrapper<AiSession>()
+                .eq(AiSession::getUserId, userId)
+                .ge(AiSession::getUpdateTime, cutoff.atStartOfDay())
+                .select(AiSession::getId))
+            .stream()
+            .map(session -> String.valueOf(session.getId()))
+            .collect(Collectors.toSet());
+        return pruneState(memoryDir.resolve(EXTRACT_STATE_FILE), alive)
+            + pruneState(memoryDir.resolve(SHADOW_STATE_FILE), alive);
+    }
+
+    /**
+     * 删除水位文件中不再活跃的会话键。
+     *
+     * @param state 水位文件
+     * @param alive 仍活跃的会话主键集合
+     * @return 清理的条目数
+     */
+    private int pruneState(Path state, Set<String> alive) {
+        if (!Files.isRegularFile(state)) {
+            return 0;
+        }
+        try {
+            Map<String, Object> root = JsonUtils.parseMap(Files.readString(state, StandardCharsets.UTF_8));
+            if (root == null || !(root.get("sessions") instanceof Map<?, ?> sessions)) {
+                return 0;
+            }
+            Map<String, Object> kept = new LinkedHashMap<>();
+            int removed = 0;
+            for (Map.Entry<?, ?> entry : sessions.entrySet()) {
+                String key = String.valueOf(entry.getKey());
+                if (alive.contains(key)) {
+                    kept.put(key, entry.getValue());
+                } else {
+                    removed++;
+                }
+            }
+            if (removed == 0) {
+                return 0;
+            }
+            root.put("sessions", kept);
+            root.put("updatedAt", Instant.now().toString());
+            Files.writeString(state, JsonUtils.toJsonString(root), StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            return removed;
+        } catch (Exception e) {
+            log.warn("清理记忆抽取水位失败：file={}, err={}", state, e.getMessage());
+            return 0;
         }
     }
 

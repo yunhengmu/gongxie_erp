@@ -1,6 +1,8 @@
 package org.dromara.ai.core.memory;
 
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.test.AiTestSupport;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,11 @@ class AiMemoryDeclaredStoreTest {
     Path tempDir;
 
     private AiMemoryDeclaredStore store;
+
+    @BeforeAll
+    static void setUpClass() {
+        AiTestSupport.initialize();
+    }
 
     @BeforeEach
     void setUp() {

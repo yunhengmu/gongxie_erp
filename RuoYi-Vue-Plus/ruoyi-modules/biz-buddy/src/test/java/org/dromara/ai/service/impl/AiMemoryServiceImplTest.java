@@ -85,6 +85,9 @@ class AiMemoryServiceImplTest {
     @Mock
     private org.dromara.ai.core.memory.AiMemoryVersionStore memoryVersionStore;
 
+    @Mock
+    private org.dromara.ai.core.memory.AiMemoryExtractionService extractionService;
+
     /**
      * 净化器为纯函数组件，用真实实例参与测试，避免 mock 返回 null 掩盖净化行为。
      */
@@ -193,6 +196,24 @@ class AiMemoryServiceImplTest {
         String remaining = Files.readString(audit);
         assertFalse(remaining.contains("2020-01-01"));
         assertTrue(remaining.contains("2999-01-01"));
+    }
+
+    @Test
+    @DisplayName("清空记忆后写入抽取截止点，避免历史会话被回灌")
+    void shouldMarkClearedAfterDeleteAll() throws IOException {
+        WorkspaceManager workspace = stubWorkspace();
+        Path memoryDir = Files.createDirectories(tempDir.resolve("memory"));
+        Files.writeString(memoryDir.resolve("2024-01-01.md"), "fact");
+        Path memoryMd = tempDir.resolve("MEMORY.md");
+        Files.writeString(memoryMd, "mem");
+        when(workspace.getMemoryDir(any())).thenReturn(memoryDir);
+        when(workspace.resolveRuntimeDataPath(any(), eq("MEMORY.md"))).thenReturn(memoryMd);
+
+        memoryService.deleteAll(1L, 7L);
+
+        assertFalse(Files.exists(memoryDir));
+        assertFalse(Files.exists(memoryMd));
+        verify(extractionService).markCleared(memoryDir);
     }
 
     @Test

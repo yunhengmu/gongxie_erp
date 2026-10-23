@@ -1,5 +1,7 @@
 package org.dromara.ai.core.memory;
 
+import org.dromara.ai.domain.AiMessage;
+import org.dromara.ai.domain.AiSession;
 import org.dromara.ai.core.agent.AgentRegistry;
 import org.dromara.ai.core.agent.AiRuntimeConfigStore;
 import org.dromara.ai.mapper.AiMessageMapper;
@@ -11,11 +13,18 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentMatchers;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
+import org.dromara.common.json.utils.JsonUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -32,6 +41,13 @@ class AiMemoryExtractionServiceTest {
 
     private AiMemoryExtractionService service;
 
+    private AiMessageMapper messageMapper;
+
+    private AiSessionMapper sessionMapper;
+
+    @TempDir
+    Path tempDir;
+
     @BeforeAll
     static void setUpClass() {
         org.dromara.ai.test.AiTestSupport.initialize();
@@ -41,6 +57,8 @@ class AiMemoryExtractionServiceTest {
     void setUp() {
         declaredStore = Mockito.mock(AiMemoryDeclaredStore.class);
         Mockito.when(declaredStore.listActive(Mockito.anyString(), Mockito.anyString())).thenReturn(List.of());
+        messageMapper = Mockito.mock(AiMessageMapper.class);
+        sessionMapper = Mockito.mock(AiSessionMapper.class);
         service = new AiMemoryExtractionService(
             Mockito.mock(IAiAgentService.class),
             Mockito.mock(AgentRegistry.class),
@@ -49,8 +67,43 @@ class AiMemoryExtractionServiceTest {
             Mockito.mock(AiMemoryAuditLogger.class),
             declaredStore,
             Mockito.mock(IAiUsageStatService.class),
-            Mockito.mock(AiSessionMapper.class),
-            Mockito.mock(AiMessageMapper.class));
+            sessionMapper,
+            messageMapper);
+    }
+
+    @Test
+    @DisplayName("清空记忆后写入截止消息 ID")
+    void shouldMarkClearedWithMaxMessageId() throws Exception {
+        AiMessage row = new AiMessage();
+        row.setId(888L);
+        Mockito.when(messageMapper.selectOne(ArgumentMatchers.any())).thenReturn(row);
+
+        service.markCleared(tempDir);
+
+        Map<String, Object> state = JsonUtils.parseMap(
+            Files.readString(tempDir.resolve(".extract_state.json"), StandardCharsets.UTF_8));
+        assertEquals("888", String.valueOf(state.get("clearedAtId")));
+        assertTrue(((Map<?, ?>) state.get("sessions")).isEmpty());
+    }
+
+    @Test
+    @DisplayName("清理过期会话水位并保留清空截止点")
+    void shouldPruneExpiredWatermarks() throws Exception {
+        AiSession alive = new AiSession();
+        alive.setId(2L);
+        Mockito.when(sessionMapper.selectList(ArgumentMatchers.any())).thenReturn(List.of(alive));
+        Files.writeString(tempDir.resolve(".extract_state.json"),
+            "{\"sessions\":{\"1\":10,\"2\":20},\"clearedAtId\":5}", StandardCharsets.UTF_8);
+
+        int removed = service.pruneWatermarks(tempDir, 7L, LocalDate.now().minusDays(90));
+
+        assertEquals(1, removed);
+        Map<String, Object> state = JsonUtils.parseMap(
+            Files.readString(tempDir.resolve(".extract_state.json"), StandardCharsets.UTF_8));
+        Map<?, ?> sessions = (Map<?, ?>) state.get("sessions");
+        assertFalse(sessions.containsKey("1"));
+        assertTrue(sessions.containsKey("2"));
+        assertEquals("5", String.valueOf(state.get("clearedAtId")));
     }
 
     @Test

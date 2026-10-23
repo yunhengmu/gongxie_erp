@@ -134,6 +134,10 @@ public class AiMemoryPipeline {
         }
         AiMemoryConfigBo policy = runtimeConfigStore.memory();
         Long userId = session.getUserId();
+        // 先判 pending 再抢 gate：空轮不占用合并节流窗口
+        if (!memoryService.hasPendingLedger(entry.getId(), userId)) {
+            return;
+        }
         String gateKey = CONSOLIDATE_GATE_PREFIX + entry.getId() + ":" + userId;
         if (!RedisUtils.setObjectIfAbsent(gateKey, "1",
             Duration.ofMinutes(Math.max(1, policy.getConsolidationMinGapMinutes())))) {
@@ -144,9 +148,6 @@ public class AiMemoryPipeline {
             return;
         }
         try {
-            if (!memoryService.hasPendingLedger(entry.getId(), userId)) {
-                return;
-            }
             memoryService.consolidate(entry.getId(), userId, policy.getAutoConsolidateMaxBatches());
         } catch (Exception e) {
             // gate 保留：模型故障时避免每轮重试；每日维护会兜底
