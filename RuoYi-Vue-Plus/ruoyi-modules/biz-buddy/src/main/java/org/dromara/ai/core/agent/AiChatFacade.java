@@ -852,6 +852,10 @@ public class AiChatFacade {
         RuntimeContext ctx = contextBuilder.build();
         // 无人值守：权限模式恒为 DONT_ASK，并把「需确认」的写工具按会话降级为「拒绝」，不执行、不悬挂
         agent.setPermissionMode(ctx, PermissionMode.DONT_ASK);
+        if (entryAgent) {
+            // 会话槽位会持久化权限上下文；按当前装配基线重建，才能带上新增的显式记忆 / 只读检索放行规则
+            trustApplier.apply(agent, definition, resources, runAsUserId, sessionId);
+        }
         AiPermissionSupport.denyAskingTools(agent, String.valueOf(runAsUserId), String.valueOf(sessionId));
 
         AiStreamState state = new AiStreamState();

@@ -75,7 +75,7 @@ final class AiPermissionSupport {
     static void applyUserToolTrust(HarnessAgent agent, PermissionContextState base, Set<String> trusted,
                                    String userId, String sessionId) {
         PermissionContextState current = agent.getDelegate().getAgentState(userId, sessionId).getPermissionContext();
-        if (rememberAllowToolCodes(current).equals(trusted)) {
+        if (rememberAllowToolCodes(current).equals(trusted) && coversAllowRules(current, base)) {
             // 已一致：无需重建（绝大多数轮次走这里）
             return;
         }
@@ -95,6 +95,28 @@ final class AiPermissionSupport {
                 AiPermissionDecisionLog.SOURCE_REMEMBER));
         }
         agent.getDelegate().replacePermissionContext(userId, sessionId, builder.build());
+    }
+
+    /**
+     * 判断当前槽位是否已覆盖基线的全部 allow 规则。
+     *
+     * <p>会话槽位会持久化权限上下文；装配基线新增放行（例如平台模式新增
+     * {@code memory_search} / {@code remember_user_preference}）后，老会话仍保留旧上下文。
+     * 只比较「记住信任集合」会把这种情况误判为无需重建，导致工具一直 DENIED。</p>
+     *
+     * @param current 当前槽位上下文
+     * @param base    当前装配基线
+     * @return 基线允许的每个工具在槽位里都有 allow 规则时返回 true
+     */
+    private static boolean coversAllowRules(PermissionContextState current, PermissionContextState base) {
+        if (base == null) {
+            return true;
+        }
+        if (current == null) {
+            return false;
+        }
+        return base.getAllowRules().keySet().stream()
+            .allMatch(tool -> current.getAllowRules().containsKey(tool));
     }
 
     /**

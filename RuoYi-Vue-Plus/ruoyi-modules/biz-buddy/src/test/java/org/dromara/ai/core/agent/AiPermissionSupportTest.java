@@ -94,6 +94,32 @@ class AiPermissionSupportTest {
     }
 
     @Test
+    @DisplayName("基线新增放行规则时，即使信任集合一致也按基线重建")
+    void shouldRebuildWhenBaselineAddsAllowRule() {
+        PermissionContextState current = PermissionContextState.builder()
+            .mode(PermissionMode.DEFAULT)
+            .addAllowRule("toolA", rule("toolA", PermissionBehavior.ALLOW,
+                AiPermissionDecisionLog.SOURCE_REMEMBER))
+            .build();
+        bindState(current);
+        PermissionContextState base = PermissionContextState.builder()
+            .mode(PermissionMode.DEFAULT)
+            .addAllowRule("toolA", rule("toolA", PermissionBehavior.ALLOW, "config"))
+            .addAllowRule("memory_search", rule("memory_search", PermissionBehavior.ALLOW, "config"))
+            .build();
+
+        AiPermissionSupport.applyUserToolTrust(agent, base, Set.of("toolA"), "u", "s");
+
+        ArgumentCaptor<PermissionContextState> captor = ArgumentCaptor.forClass(PermissionContextState.class);
+        verify(delegate).replacePermissionContext(eq("u"), eq("s"), captor.capture());
+        PermissionContextState rebuilt = captor.getValue();
+        // 老槽位缺少的基线放行（平台模式新增记忆工具）必须补上
+        assertTrue(rebuilt.getAllowRules().containsKey("memory_search"));
+        assertTrue(rebuilt.getAllowRules().containsKey("toolA"));
+        assertEquals(Set.of("toolA"), AiPermissionSupport.rememberAllowToolCodes(rebuilt));
+    }
+
+    @Test
     @DisplayName("按基线重建并注入记住信任规则")
     void shouldRebuildTrustContext() {
         PermissionContextState current = PermissionContextState.builder().mode(PermissionMode.DEFAULT).build();
