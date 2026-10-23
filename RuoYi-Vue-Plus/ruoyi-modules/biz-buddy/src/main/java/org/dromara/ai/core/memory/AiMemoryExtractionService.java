@@ -86,6 +86,26 @@ public class AiMemoryExtractionService {
     private static final String GATE_PREFIX = "bizbuddy:ai:memory:extract:gate:";
 
     /**
+     * 抽取执行锁前缀（按会话）：同一会话的轮末抽取串行执行，避免两轮并发读到同一水位后重复抽取
+     */
+    private static final String LOCK_PREFIX = "bizbuddy:ai:memory:extract:lock:";
+
+    /**
+     * 抽取执行锁 TTL：覆盖单次抽取的最长耗时（模型超时 5 分钟），异常退出后自动释放
+     */
+    private static final Duration LOCK_TTL = Duration.ofMinutes(6);
+
+    /**
+     * 等待同会话抽取锁的最长时间：覆盖一次常规抽取耗时，避免用户快速追问时消息被漏抽
+     */
+    private static final long LOCK_WAIT_MILLIS = 15_000L;
+
+    /**
+     * 等待锁的重试间隔
+     */
+    private static final long LOCK_RETRY_MILLIS = 500L;
+
+    /**
      * 单条消息进入抽取输入的最大字符数，避免长文把预算吃满
      */
     private static final int MAX_MESSAGE_CHARS = 4000;
@@ -131,6 +151,53 @@ public class AiMemoryExtractionService {
             // 影子抽样：未命中直接跳过，不占用节流窗口，下一轮仍有机会被抽中
             return false;
         }
+        // 同会话串行：上一轮抽取未结束时短暂等待，避免用户快速追问的消息被漏抽
+        String lockKey = LOCK_PREFIX + sessionId;
+        if (!acquireLock(lockKey, LOCK_WAIT_MILLIS)) {
+            log.warn("同会话记忆抽取仍在执行，本轮跳过：sessionId={}", sessionId);
+            return false;
+        }
+        try {
+            return extractLocked(sessionId, shadow, policy);
+        } finally {
+            RedisUtils.deleteObject(lockKey);
+        }
+    }
+
+    /**
+     * 获取同会话抽取锁：在给定等待时间内重试，仍被占用则放弃。
+     *
+     * @param lockKey    锁键
+     * @param waitMillis 最长等待毫秒数（0 表示只尝试一次）
+     * @return 是否获取成功
+     */
+    boolean acquireLock(String lockKey, long waitMillis) {
+        long deadline = System.currentTimeMillis() + waitMillis;
+        while (true) {
+            if (RedisUtils.setObjectIfAbsent(lockKey, "1", LOCK_TTL)) {
+                return true;
+            }
+            if (System.currentTimeMillis() >= deadline) {
+                return false;
+            }
+            try {
+                Thread.sleep(Math.min(LOCK_RETRY_MILLIS, Math.max(1, deadline - System.currentTimeMillis())));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+    }
+
+    /**
+     * 持锁执行一次抽取（调用方保证同会话互斥）。
+     *
+     * @param sessionId 会话主键
+     * @param shadow    是否影子模式（只留样、不写流水）
+     * @param policy    记忆配置
+     * @return 是否实际执行了抽取
+     */
+    private boolean extractLocked(Long sessionId, boolean shadow, AiMemoryConfigBo policy) {
         AiSession session = sessionMapper.selectById(sessionId);
         if (session == null || session.getUserId() == null
             || AiSession.SOURCE_TASK.equals(session.getSource())) {
@@ -438,7 +505,18 @@ public class AiMemoryExtractionService {
                 return 0L;
             }
             Object value = map.get(String.valueOf(sessionId));
-            return value instanceof Number number ? number.longValue() : 0L;
+            if (value instanceof Number number) {
+                return number.longValue();
+            }
+            // 平台的 JSON 序列化会把 Long 写成字符串（避免前端精度丢失），故字符串也要认
+            if (value != null) {
+                try {
+                    return Long.parseLong(String.valueOf(value).trim());
+                } catch (NumberFormatException ignored) {
+                    return 0L;
+                }
+            }
+            return 0L;
         } catch (Exception e) {
             log.warn("读取记忆抽取水位失败：sessionId={}, err={}", sessionId, e.getMessage());
             return 0L;

@@ -72,9 +72,9 @@ public class AgentAssembler {
     /**
      * 只读记忆检索工具名（A1 POC 放行；写入类工具仍被 deny 裁掉）
      */
-    private static final String MEMORY_SEARCH_TOOL = "memory_search";
+    static final String MEMORY_SEARCH_TOOL = "memory_search";
 
-    private static final String MEMORY_GET_TOOL = "memory_get";
+    static final String MEMORY_GET_TOOL = "memory_get";
 
     /**
      * 记忆写入/跨会话检索工具名：模型不得自行改写长期记忆

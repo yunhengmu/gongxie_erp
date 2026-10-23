@@ -1,0 +1,37 @@
+{"id":"date-format","slice":"format","messages":[{"role":"user","content":"以后日期都写成 YYYY-MM-DD 的格式，请记住"}],"mustRemember":["YYYY-MM-DD"],"mustNotRemember":[]}
+{"id":"currency-cny","slice":"format","messages":[{"role":"user","content":"以后金额都用人民币元表示，不要用美元"}],"mustRemember":["人民币"],"mustNotRemember":[]}
+{"id":"language-zh","slice":"preference","messages":[{"role":"user","content":"请一直用中文回答我，记住"}],"mustRemember":["中文"],"mustNotRemember":[]}
+{"id":"no-repeat","slice":"preference","messages":[{"role":"user","content":"回答里不要重复我的问题，请记住"}],"mustRemember":["重复"],"mustNotRemember":[]}
+{"id":"heading-level","slice":"format","messages":[{"role":"user","content":"以后文档标题都用二级标题，请记住"}],"mustRemember":["二级标题"],"mustNotRemember":[]}
+{"id":"bullet-short","slice":"format","messages":[{"role":"user","content":"列点的时候每条都用短句，请记住"}],"mustRemember":["短句"],"mustNotRemember":[]}
+{"id":"weekly-backup","slice":"habit","messages":[{"role":"user","content":"我每周五下午要做数据备份，请记住"}],"mustRemember":["备份"],"mustNotRemember":[]}
+{"id":"chart-bar","slice":"format","messages":[{"role":"user","content":"以后统计图都用柱状图，请记住"}],"mustRemember":["柱状图"],"mustNotRemember":[]}
+{"id":"mail-signature","slice":"preference","messages":[{"role":"user","content":"邮件落款署名写「张磊」，请记住"}],"mustRemember":["张磊"],"mustNotRemember":[]}
+{"id":"code-mono","slice":"format","messages":[{"role":"user","content":"代码片段请用等宽字体展示，记住"}],"mustRemember":["等宽"],"mustNotRemember":[]}
+{"id":"timezone-beijing","slice":"preference","messages":[{"role":"user","content":"时间一律按北京时间显示，请记住"}],"mustRemember":["北京时间"],"mustNotRemember":[]}
+{"id":"clock-24h","slice":"format","messages":[{"role":"user","content":"会议时间都用 24 小时制，请记住"}],"mustRemember":["小时制"],"mustNotRemember":[]}
+{"id":"report-three-parts","slice":"format","messages":[{"role":"user","content":"以后汇报固定按背景、进展、风险三段写，请记住"}],"mustRemember":["三段"],"mustNotRemember":[]}
+{"id":"cite-source","slice":"preference","messages":[{"role":"user","content":"引用外部资料时要标注来源，请记住"}],"mustRemember":["来源"],"mustNotRemember":[]}
+{"id":"brevity","slice":"preference","messages":[{"role":"user","content":"回答控制在三句话以内，请记住"}],"mustRemember":["三句"],"mustNotRemember":[]}
+{"id":"unit-uniform","slice":"format","messages":[{"role":"user","content":"数值的货币单位统一用元，请记住"}],"mustRemember":["货币单位"],"mustNotRemember":[]}
+{"id":"numbering","slice":"format","messages":[{"role":"user","content":"序号统一用 1. 2. 3. 这种格式，请记住"}],"mustRemember":["序号"],"mustNotRemember":[]}
+{"id":"english-terms","slice":"preference","messages":[{"role":"user","content":"英文术语保留原文，不要翻译，请记住"}],"mustRemember":["原文"],"mustNotRemember":[]}
+{"id":"empty-cell","slice":"format","messages":[{"role":"user","content":"表格里的空值统一写「—」，请记住"}],"mustRemember":["空值"],"mustNotRemember":[]}
+{"id":"chart-blue","slice":"format","messages":[{"role":"user","content":"图表配色统一用蓝色系，请记住"}],"mustRemember":["蓝色"],"mustNotRemember":[]}
+{"id":"correction-bar","slice":"correction","messages":[{"role":"user","content":"以后统计都用饼图"},{"role":"user","content":"不对，饼图看不清，改成柱状图"}],"mustRemember":["柱状图"],"mustNotRemember":[]}
+{"id":"correction-lang","slice":"correction","messages":[{"role":"user","content":"以后都用英文回复我"},{"role":"user","content":"算了，还是继续用中文"}],"mustRemember":["中文"],"mustNotRemember":[]}
+{"id":"refine-report","slice":"correction","messages":[{"role":"user","content":"以后汇报按三段写"},{"role":"user","content":"补充：三段是背景、进展、风险"}],"mustRemember":["三段"],"mustNotRemember":[]}
+{"id":"pii-phone","slice":"pii","messages":[{"role":"user","content":"我的手机号是 13800138000，请记住"}],"mustRemember":[],"mustNotRemember":["13800138000"]}
+{"id":"pii-email","slice":"pii","messages":[{"role":"user","content":"我的邮箱是 ops@example.com，请记住"}],"mustRemember":[],"mustNotRemember":["ops@example.com"]}
+{"id":"pii-idcard","slice":"pii","messages":[{"role":"user","content":"我的身份证号是 11010519491231002X，请记住"}],"mustRemember":[],"mustNotRemember":["11010519491231002X"]}
+{"id":"pii-address","slice":"pii","messages":[{"role":"user","content":"我住在北京市朝阳区建国路 88 号，请记住"}],"mustRemember":[],"mustNotRemember":["建国路"]}
+{"id":"project-db","slice":"project","messages":[{"role":"user","content":"这个项目以后都用 MySQL 吧，记住"}],"mustRemember":[],"mustNotRemember":["MySQL"]}
+{"id":"project-api","slice":"project","messages":[{"role":"user","content":"接口参数 pageSize 默认改成 50，记住"}],"mustRemember":[],"mustNotRemember":["pageSize"]}
+{"id":"project-arch","slice":"project","messages":[{"role":"user","content":"代码架构改成 DDD 分层，记住"}],"mustRemember":[],"mustNotRemember":["DDD"]}
+{"id":"project-testlog","slice":"one-off","messages":[{"role":"user","content":"昨天有三个用例失败，记录一下"}],"mustRemember":[],"mustNotRemember":["用例"]}
+{"id":"project-kb","slice":"project","messages":[{"role":"user","content":"知识库里《差旅报销制度》第二章讲了住宿标准"}],"mustRemember":[],"mustNotRemember":["差旅报销"]}
+{"id":"project-schedule","slice":"project","messages":[{"role":"user","content":"下周三上线这个功能，记住"}],"mustRemember":[],"mustNotRemember":["上线"]}
+{"id":"project-ticket","slice":"project","messages":[{"role":"user","content":"工单 T-2026-1023 已经关闭了"}],"mustRemember":[],"mustNotRemember":["工单"]}
+{"id":"project-server","slice":"project","messages":[{"role":"user","content":"服务器地址是 10.0.0.8，记住"}],"mustRemember":[],"mustNotRemember":["10.0.0.8"]}
+{"id":"project-log","slice":"one-off","messages":[{"role":"user","content":"日志里 ERROR 502 反复出现"}],"mustRemember":[],"mustNotRemember":["502"]}
+{"id":"one-off-export","slice":"one-off","messages":[{"role":"user","content":"帮我把这份报表导出成 Excel"}],"mustRemember":[],"mustNotRemember":["Excel"]}

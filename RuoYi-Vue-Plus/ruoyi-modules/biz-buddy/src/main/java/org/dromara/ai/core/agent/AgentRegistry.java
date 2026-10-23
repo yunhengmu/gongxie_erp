@@ -138,7 +138,12 @@ public class AgentRegistry {
         GetCurrentTimeTool.TOOL_NAME,
         GetCurrentUserTool.TOOL_NAME,
         GetCurrentDeptTool.TOOL_NAME,
-        GetCurrentPermissionsTool.TOOL_NAME);
+        GetCurrentPermissionsTool.TOOL_NAME,
+        // 框架提供的只读记忆检索工具：只被当前用户可见的记忆命中，无副作用；
+        // 仅在开启「只读记忆检索」时注册，未注册时允许规则无实际作用。
+        // 不放行会落到全局默认（未命中即 ASK），模型每次查记忆都弹确认卡片
+        AgentAssembler.MEMORY_SEARCH_TOOL,
+        AgentAssembler.MEMORY_GET_TOOL);
 
     /**
      * 平台内置的**显式记忆工具**：只在平台托管模式（{@code memory-pipeline-mode=platform}）

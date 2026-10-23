@@ -6,9 +6,13 @@ import org.dromara.ai.mapper.AiMessageMapper;
 import org.dromara.ai.mapper.AiSessionMapper;
 import org.dromara.ai.service.IAiAgentService;
 import org.dromara.ai.service.IAiUsageStatService;
+import org.dromara.common.redis.utils.RedisUtils;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 import java.util.List;
@@ -16,6 +20,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mockStatic;
 
 /**
  * 平台抽取输出契约：needs_context / 低置信过滤、supersedes 保留、NO_REPLY 处理。
@@ -26,6 +31,11 @@ class AiMemoryExtractionServiceTest {
     private AiMemoryDeclaredStore declaredStore;
 
     private AiMemoryExtractionService service;
+
+    @BeforeAll
+    static void setUpClass() {
+        org.dromara.ai.test.AiTestSupport.initialize();
+    }
 
     @BeforeEach
     void setUp() {
@@ -77,5 +87,31 @@ class AiMemoryExtractionServiceTest {
 
         assertEquals(0, result.kept());
         assertTrue(result.content().isEmpty());
+    }
+
+    @Test
+    @DisplayName("同会话抽取锁被占用时（零等待）放弃获取，不查会话与消息")
+    void shouldSkipWhenSessionLockHeld() {
+        try (MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
+            redis.when(() -> RedisUtils.setObjectIfAbsent(
+                    ArgumentMatchers.startsWith("bizbuddy:ai:memory:extract:lock:"),
+                    ArgumentMatchers.any(), ArgumentMatchers.any()))
+                .thenReturn(false);
+
+            assertFalse(service.acquireLock("bizbuddy:ai:memory:extract:lock:9", 0));
+        }
+    }
+
+    @Test
+    @DisplayName("抽取锁空闲时获取成功")
+    void shouldAcquireLockWhenFree() {
+        try (MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
+            redis.when(() -> RedisUtils.setObjectIfAbsent(
+                    ArgumentMatchers.startsWith("bizbuddy:ai:memory:extract:lock:"),
+                    ArgumentMatchers.any(), ArgumentMatchers.any()))
+                .thenReturn(true);
+
+            assertTrue(service.acquireLock("bizbuddy:ai:memory:extract:lock:9", 0));
+        }
     }
 }
