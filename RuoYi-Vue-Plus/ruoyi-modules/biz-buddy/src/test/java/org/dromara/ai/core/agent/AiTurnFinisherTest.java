@@ -94,7 +94,7 @@ class AiTurnFinisherTest {
     @BeforeEach
     void setUp() {
         finisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
-            traceService, aiProperties, routeRecorder, pendingStore,
+            traceService, org.mockito.Mockito.mock(AiMemoryPipeline.class), aiProperties, routeRecorder, pendingStore,
             toolLabelResolver, streamBridge, safetyGuard, safetyEventService);
         // 安全守卫默认「原样放行」（pass 回填原文），既有断言不受影响
         lenient().when(safetyGuard.guard(any(), any()))

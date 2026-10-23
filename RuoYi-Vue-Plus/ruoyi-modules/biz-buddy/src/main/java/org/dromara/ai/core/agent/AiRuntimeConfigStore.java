@@ -487,6 +487,8 @@ public class AiRuntimeConfigStore {
         bo.setExtractContextMaxChars(chat.getMemoryExtractContextMaxChars());
         bo.setExtractKnownMemoryMaxChars(chat.getMemoryExtractKnownMemoryMaxChars());
         bo.setInjectDeclaredMaxTokens(chat.getMemoryInjectDeclaredMaxTokens());
+        bo.setAutoConsolidateMaxBatches(chat.getMemoryAutoConsolidateMaxBatches());
+        bo.setExtractShadowSampleRate(chat.getMemoryExtractShadowSampleRate());
         bo.setMaxContextTokens(chat.getMemoryMaxContextTokens());
         bo.setConsolidationMaxTokens(chat.getMemoryConsolidationMaxTokens());
         bo.setConsolidationMinGapMinutes(chat.getMemoryConsolidationMinGapMinutes());

@@ -121,6 +121,16 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
      */
     private static final int MAX_BATCHES_PER_RUN = 20;
 
+    /**
+     * 每日流水文件名：仅根目录的 YYYY-MM-DD.md 参与合并，排除 history / archive / 保留文件
+     */
+    private static final Pattern LEDGER_FILE_PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2}\\.md");
+
+    /**
+     * 工作区相对路径形式的每日流水：仅 memory 根目录，排除 archive/ 与 history/
+     */
+    private static final Pattern LEDGER_PATH_PATTERN = Pattern.compile("^memory/\\d{4}-\\d{2}-\\d{2}\\.md$");
+
     private final IAiAgentService agentService;
 
     private final AgentRegistry agentRegistry;
@@ -192,6 +202,11 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
 
     @Override
     public void consolidate(Long agentId, Long userId) {
+        consolidate(agentId, userId, MAX_BATCHES_PER_RUN);
+    }
+
+    @Override
+    public void consolidate(Long agentId, Long userId, int maxBatches) {
         AiAgent definition = agentService.getEnabledAgent(agentId);
         WorkspaceManager workspace = workspaceOf(definition);
         RuntimeContext ctx = contextOf(userId);
@@ -223,7 +238,8 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         int totalTokens = 0;
         int index = 0;
         try {
-            while (index < pending.size() && batches < MAX_BATCHES_PER_RUN) {
+            int batchLimit = Math.max(1, maxBatches);
+            while (index < pending.size() && batches < batchLimit) {
                 int end = nextBatchEnd(pending, index, maxChars);
                 List<DailyLedger> batch = pending.subList(index, end);
                 String ledger = renderBatch(batch);
@@ -359,6 +375,26 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         }
         log.info("长期记忆已删除：agent={}, userId={}", definition.getAgentCode(), userId);
         auditLogger.record(definition.getId(), userId, AiMemoryAuditLogger.EVENT_DELETE, "OK", null);
+    }
+
+    @Override
+    public boolean hasPendingLedger(Long agentId, Long userId) {
+        AiAgent definition = agentService.getEnabledAgent(agentId);
+        WorkspaceManager workspace = workspaceOf(definition);
+        RuntimeContext ctx = contextOf(userId);
+        Path memoryDir = workspace.getMemoryDir(ctx);
+        if (!Files.isDirectory(memoryDir)) {
+            return false;
+        }
+        Instant watermark = readConsolidationWatermark(memoryDir);
+        try (Stream<Path> files = Files.list(memoryDir)) {
+            return files.filter(Files::isRegularFile)
+                .filter(path -> LEDGER_FILE_PATTERN.matcher(path.getFileName().toString()).matches())
+                .anyMatch(path -> lastModified(path).isAfter(watermark));
+        } catch (IOException e) {
+            log.warn("读取待合并流水失败：userId={}, err={}", userId, e.getMessage());
+            return false;
+        }
     }
 
     @Override
@@ -749,7 +785,8 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     private List<DailyLedger> loadPendingLedgers(WorkspaceManager workspace, RuntimeContext ctx,
                                                  AiAgent definition, Long userId, Instant watermark) {
         List<String> dailyPaths = safeMemoryPaths(workspace, ctx).stream()
-            .filter(path -> !MEMORY_MD.equals(path))
+            // 只认根目录的 YYYY-MM-DD.md：history/ 版本、archive/、.declared.jsonl 一律不参与合并
+            .filter(path -> LEDGER_PATH_PATTERN.matcher(path).matches())
             .sorted(Comparator.comparing(this::fileNameOf))
             .toList();
         Path memoryDir = workspace.getMemoryDir(ctx);

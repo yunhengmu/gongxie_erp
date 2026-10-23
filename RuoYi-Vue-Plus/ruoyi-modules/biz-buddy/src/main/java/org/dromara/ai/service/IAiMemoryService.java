@@ -53,6 +53,24 @@ public interface IAiMemoryService {
     void consolidate(Long agentId, Long userId);
 
     /**
+     * 手动触发记忆合并，并限制单轮最大批次数（自动合并使用较小上限，避免占用线程过久）。
+     *
+     * @param agentId    智能体主键
+     * @param userId     记忆归属用户主键
+     * @param maxBatches 单轮最大批次数
+     */
+    void consolidate(Long agentId, Long userId, int maxBatches);
+
+    /**
+     * 判断该用户是否存在合并水位之后的待合并流水。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 存在待合并流水时返回 true
+     */
+    boolean hasPendingLedger(Long agentId, Long userId);
+
+    /**
      * 归档超过保留期的每日流水（移动到记忆目录下的 {@code archive/} 子目录，保留证据、释放上下文）。
      *
      * @param agentId 智能体主键

@@ -79,6 +79,9 @@ class AiMemoryServiceImplTest {
     @Mock
     private AiMemoryAuditLogger auditLogger;
 
+    @Mock
+    private org.dromara.ai.core.memory.AiMemoryDeclaredStore memoryDeclaredStore;
+
     /**
      * 净化器为纯函数组件，用真实实例参与测试，避免 mock 返回 null 掩盖净化行为。
      */
@@ -164,6 +167,20 @@ class AiMemoryServiceImplTest {
     /**
      * 验证路径非法时抛业务异常，阻断越权访问。
      */
+    @Test
+    @DisplayName("按水位判断待合并流水")
+    void shouldDetectPendingLedger() throws IOException {
+        WorkspaceManager workspace = stubWorkspace();
+        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
+        Files.writeString(tempDir.resolve(".consolidation_state"), Instant.EPOCH.toString());
+
+        assertTrue(memoryService.hasPendingLedger(1L, 7L));
+
+        Files.writeString(tempDir.resolve(".consolidation_state"),
+            Instant.now().plusSeconds(3600).toString());
+        assertFalse(memoryService.hasPendingLedger(1L, 7L));
+    }
+
     @Test
     @DisplayName("非法路径被拒绝")
     void shouldRejectInvalidPath() {

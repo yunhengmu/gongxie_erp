@@ -83,6 +83,11 @@ public class AiTurnFinisher {
 
     private final IAiTraceService traceService;
 
+    /**
+     * 平台托管记忆管道（platform/shadow 模式轮末触发；framework 模式为空操作）
+     */
+    private final AiMemoryPipeline memoryPipeline;
+
     private final AiProperties aiProperties;
 
     /**
@@ -264,6 +269,12 @@ public class AiTurnFinisher {
         }
         AiSseSupport.send(emitter, payload);
         AiSseSupport.complete(emitter);
+        // 平台托管记忆：轮末异步抽取 + 合并；异常只记日志，绝不影响已完成的回答
+        try {
+            memoryPipeline.onTurnCompleted(sessionId);
+        } catch (Exception e) {
+            log.warn("平台记忆管道触发失败：sessionId={}, err={}", sessionId, e.getMessage());
+        }
         return assistant;
     }
 

@@ -157,7 +157,7 @@ class AiChatFacadeTest {
         AiRouteSupport routeSupport = new AiRouteSupport(skillService, scenarioPackService);
         AiTrustApplier trustApplier = new AiTrustApplier(agentRegistry, agentService);
         AiTurnFinisher turnFinisher = new AiTurnFinisher(sessionService, decisionService, usageStatService,
-            traceService, aiProperties, routeRecorder, pendingStore,
+            traceService, org.mockito.Mockito.mock(AiMemoryPipeline.class), aiProperties, routeRecorder, pendingStore,
             toolLabelResolver, streamBridge, safetyGuard, safetyEventService);
         integrationDriver = spy(new AiIntegrationDriver(sessionService, pendingStore, traceService,
             routeOrchestrator, streamBridge, runRegistry, turnFinisher));

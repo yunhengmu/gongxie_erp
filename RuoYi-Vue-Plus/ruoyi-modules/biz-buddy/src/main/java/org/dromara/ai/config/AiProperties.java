@@ -499,6 +499,16 @@ public class AiProperties {
         private int memoryInjectDeclaredMaxTokens = 800;
 
         /**
+         * 平台自动合并单轮最大批次数（人工/维护合并仍为 20）
+         */
+        private int memoryAutoConsolidateMaxBatches = 5;
+
+        /**
+         * 影子抽取抽样比例（0~1）：仅 memory-pipeline-mode=shadow 时生效
+         */
+        private double memoryExtractShadowSampleRate = 0.1;
+
+        /**
          * 记忆注入 system prompt 的上下文 Token 上限（超出时截断）
          */
         private int memoryMaxContextTokens = 8000;

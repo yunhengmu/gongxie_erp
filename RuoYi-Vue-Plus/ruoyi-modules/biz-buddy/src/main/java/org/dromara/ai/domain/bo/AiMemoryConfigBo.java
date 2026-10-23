@@ -1,5 +1,7 @@
 package org.dromara.ai.domain.bo;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -67,6 +69,20 @@ public class AiMemoryConfigBo implements Serializable {
     @Min(value = 100, message = "显式记忆注入上限不能小于 100")
     @Max(value = 4000, message = "显式记忆注入上限不能超过 4000")
     private int injectDeclaredMaxTokens = 800;
+
+    /**
+     * 平台自动合并单轮最大批次数
+     */
+    @Min(value = 1, message = "自动合并批次数不能小于 1")
+    @Max(value = 20, message = "自动合并批次数不能超过 20")
+    private int autoConsolidateMaxBatches = 5;
+
+    /**
+     * 影子抽取抽样比例（0~1）
+     */
+    @DecimalMin(value = "0.0", message = "影子抽取比例不能小于 0")
+    @DecimalMax(value = "1.0", message = "影子抽取比例不能大于 1")
+    private double extractShadowSampleRate = 0.1;
 
     /**
      * 记忆注入 system prompt 的上下文 Token 上限

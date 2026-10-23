@@ -1,0 +1,10 @@
+{"id":"direct-preference","slice":"direct","pendingFrom":0,"messages":[{"role":"user","content":"我喜欢按照表格统计数据，请记住"}],"mustRemember":["表格"],"mustNotRemember":[]}
+{"id":"coreference-table","slice":"coreference","pendingFrom":1,"messages":[{"role":"assistant","content":"建议用表格展示统计结果"},{"role":"user","content":"好的，以后都这样"}],"mustRemember":["表格"],"mustNotRemember":[]}
+{"id":"coreference-format","slice":"coreference","pendingFrom":1,"messages":[{"role":"assistant","content":"我按日期、金额、状态三列给你列一下"},{"role":"user","content":"对，就按这个格式"}],"mustRemember":["日期","金额","状态"],"mustNotRemember":[]}
+{"id":"correction-card","slice":"correction","pendingFrom":1,"messages":[{"role":"user","content":"以后统计用表格"},{"role":"user","content":"不对，表格太宽，改成卡片"}],"mustRemember":["卡片"],"mustNotRemember":[]}
+{"id":"pii-mobile","slice":"pii","pendingFrom":0,"messages":[{"role":"user","content":"我的手机号是 13800138000，请记住"}],"mustRemember":[],"mustNotRemember":["13800138000"]}
+{"id":"one-off-task","slice":"one-off","pendingFrom":0,"messages":[{"role":"user","content":"帮我把这份文档解析一下，拆成切片"}],"mustRemember":[],"mustNotRemember":["切片"]}
+{"id":"project-fact","slice":"project","pendingFrom":0,"messages":[{"role":"user","content":"这个项目以后都用 MySQL 吧，记住"}],"mustRemember":[],"mustNotRemember":["MySQL"]}
+{"id":"tool-precision","slice":"tool","pendingFrom":1,"messages":[{"role":"assistant","content":"工具返回金额 1234.5 元"},{"role":"user","content":"以后金额都保留两位小数"}],"mustRemember":["两位小数"],"mustNotRemember":[]}
+{"id":"needs-context","slice":"needs-context","pendingFrom":1,"messages":[{"role":"assistant","content":"我给你一个周报模板"},{"role":"user","content":"以后就按这个来"}],"mustRemember":[],"mustNotRemember":[],"expectNeedsContext":true}
+{"id":"channel-short","slice":"channel","pendingFrom":0,"messages":[{"role":"user","content":"表格"},{"role":"user","content":"对"},{"role":"user","content":"以后都这样"}],"mustRemember":["表格"],"mustNotRemember":[]}

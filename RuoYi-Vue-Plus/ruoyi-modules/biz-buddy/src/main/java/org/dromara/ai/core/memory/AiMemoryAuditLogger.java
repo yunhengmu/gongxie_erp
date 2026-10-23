@@ -81,6 +81,11 @@ public class AiMemoryAuditLogger {
      */
     public static final String EVENT_USER_FORGET = "USER_FORGET";
 
+    /**
+     * 事件：影子抽取（只记录、不写正式流水）
+     */
+    public static final String EVENT_SHADOW_EXTRACT = "SHADOW_EXTRACT";
+
     private final IAiAgentService agentService;
 
     private final AgentRegistry agentRegistry;
