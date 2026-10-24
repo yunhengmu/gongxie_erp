@@ -18,7 +18,7 @@
 | 加一个业务工具 | [development.md](development.md) |
 | 改智能体装配 / 路由 / 权限 | `biz-buddy` 的 `core/agent`（先读 [architecture.md](architecture.md)） |
 | **做「定时任务 × 技能」的无人值守产出** | 参考「平台运行日报」样板：只读工具 + 写工具（`core/agent/tools`）+ 落库服务（`core/digest`）+ 技能正文 + 1 行任务配置；注意无人值守下写工具须配「允许」 |
-| 改对话交互 / 前端页面 | `plus-ui-Vue`（对话工作台：`src/views/ai/agent/chat`） |
+| 改对话交互 / 前端页面 | `code/front-end`（对话工作台：`src/views/ai/agent/chat`） |
 | 调整模型 / 压缩 / 记忆等运行策略 | [configuration.md](configuration.md) |
 | 部署到服务器 | PostgreSQL 栈 [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md)、MySQL 8.0 栈 [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md)（均含构建前置与已知坑） |
 | **验证「真的跑通了」** | [../e2e/](../e2e)（接口层，零依赖 Node）与 [../e2e-ui/](../e2e-ui)（浏览器层，Playwright），见下文常用命令 |
@@ -28,7 +28,7 @@
 
 ```bash
 # AI 模块单测（改动 core/agent 后必做）
-cd RuoYi-Vue-Plus
+cd code/back-end
 ./mvnw -o -pl ruoyi-modules/biz-buddy test
 # 覆盖率报告：ruoyi-modules/biz-buddy/target/site/jacoco/index.html
 # 集成测试（4 类：真库方言一致性 / 实体↔schema / 技能仓库 / 上下文装配；需两栈已运行，设 BIZBUDDY_IT=true 才跑）
@@ -37,7 +37,7 @@ BIZBUDDY_IT=true ./mvnw -o -pl ruoyi-admin -am test
 # 后端
 ./mvnw -pl ruoyi-admin spring-boot:run
 # 前端
-cd plus-ui-Vue && pnpm install && pnpm dev
+cd ../../code/front-end && pnpm install && pnpm dev
 ```
 
 ### 端到端（e2e）回归

@@ -21,7 +21,7 @@ const repoRoot = path.resolve(here, '../..');
 const args = parseArgs(process.argv.slice(2));
 
 const casesPath = path.resolve(here, args.cases || 'cases.jsonl');
-const promptPath = path.resolve(here, args.prompt || '../../RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/core/memory/AiMemoryPrompts.java');
+const promptPath = path.resolve(here, args.prompt || '../../code/back-end/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/core/memory/AiMemoryPrompts.java');
 const baseUrl = (args['base-url'] || process.env.BIZBUDDY_LLM_BASE_URL || '').replace(/\/$/, '');
 const apiKey = args['api-key'] || process.env.BIZBUDDY_LLM_API_KEY || '';
 const model = args.model || process.env.BIZBUDDY_LLM_MODEL || '';

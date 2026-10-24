@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
 /**
- * 登录接口（`/auth/login`）的加解密，规则与前端 `plus-ui-Vue/src/utils/{request,crypto,jsencrypt}.ts` 一致：
+ * 登录接口（`/auth/login`）的加解密，规则与前端 `code/front-end/src/utils/{request,crypto,jsencrypt}.ts` 一致：
  * 请求体 AES-256-ECB/PKCS7 加密，AES 密钥经 RSA 公钥加密后放请求头 `encrypt-key`；
  * 响应若带 `encrypt-key` 头，则用 RSA 私钥解出 AES 密钥再解密响应体。
  *

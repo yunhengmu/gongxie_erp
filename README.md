@@ -2,7 +2,7 @@
 
 # BizBuddy
 
-**企业级智能业务运行平台 · 源码仓库（后端 `RuoYi-Vue-Plus` + 前端 `plus-ui-Vue`）**
+**企业级智能业务运行平台 · 源码仓库（后端 `code/back-end` + 前端 `code/front-end`）**
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-success.svg)]()
 [![JDK](https://img.shields.io/badge/JDK-21-green.svg)]()
@@ -33,10 +33,10 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 
 | 目录 | 说明 |
 |---|---|
-| [`RuoYi-Vue-Plus/`](RuoYi-Vue-Plus) | **后端工程**：Spring Boot 4.1.1 + JDK 21，多模块 Maven；AI 能力在 `ruoyi-modules/biz-buddy`（AgentScope 2.0.4 内核） |
-| [`plus-ui-Vue/`](plus-ui-Vue) | **前端工程**：Vue 3 + TypeScript + Element Plus + Vite，包管理 pnpm |
+| [`code/back-end/`](code/back-end) | **后端工程**：Spring Boot 4.1.1 + JDK 21，多模块 Maven；AI 能力在 `ruoyi-modules/biz-buddy`（AgentScope 2.0.4 内核） |
+| [`code/front-end/`](code/front-end) | **前端工程**：Vue 3 + TypeScript + Element Plus + Vite，包管理 pnpm |
 | [`docs/`](docs/README.md) | **开发者文档**：一键运行（Docker Compose）与快速开始（源码手工跑）、运行时架构、二次开发（新增业务工具）、配置项参考 |
-| [`RuoYi-Vue-Plus/docs/`](RuoYi-Vue-Plus/docs) | 平台功能说明（含 9 张运行界面截图） |
+| [`code/back-end/docs/`](code/back-end/docs) | 平台功能说明（含 9 张运行界面截图） |
 | [`deploy/deploy-pg/`](deploy/deploy-pg) | **PostgreSQL 全栈容器编排**：PG 14 + Redis + Milvus + 后端 + 调度 + Nginx（`docker compose up -d --build` 即「有表有数据可登录」） |
 | [`deploy/deploy-mysql/`](deploy/deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
 | [`e2e/`](e2e) | **端到端测试脚本（接口层）**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP / SSE 断言，见下文「测试与覆盖率」 |
@@ -44,7 +44,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 
 ## 功能说明
 
-平台完整功能说明见 **[RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md)**，按真实菜单与代码梳理，涵盖：
+平台完整功能说明见 **[code/back-end/docs/BizBuddy平台功能说明.md](code/back-end/docs/BizBuddy平台功能说明.md)**，按真实菜单与代码梳理，涵盖：
 
 - **功能地图与权限模型**——6 个分组、34 个功能页与权限标识约定、工具三档授权（含无人值守链路的口径）；
 - **智能体与对话**——任务工作台、入口智能体「小Z」配置、专家配置（含提示词 **AI 辅助生成 / 模板套用 / 克隆专家 / 保存前体检**）、任务管理、定时任务、计划模式、技能仓库、长期记忆、工作区文件、子智能体、场景包；
@@ -84,12 +84,12 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 
 ### 前端
 
-Vue 3.5 + TypeScript 6 + Element Plus 2.14 + Vite 8 + Pinia + vue-router，包管理使用 pnpm（Node ≥ 20.19.0）。详见 [`plus-ui-Vue/README.md`](plus-ui-Vue/README.md)。
+Vue 3.5 + TypeScript 6 + Element Plus 2.14 + Vite 8 + Pinia + vue-router，包管理使用 pnpm（Node ≥ 20.19.0）。详见 [`code/front-end/README.md`](code/front-end/README.md)。
 
 ## 后端模块结构
 
 ```
-RuoYi-Vue-Plus
+code/back-end
 ├── ruoyi-admin          # Web 服务入口（启动类 org.dromara.DromaraApplication）
 ├── ruoyi-common         # 通用能力（20 余个子模块，BOM 统一版本）
 ├── ruoyi-api            # 跨模块调用契约（Service 接口 + DTO）
@@ -121,7 +121,7 @@ RuoYi-Vue-Plus
 - **入口智能体「小Z」+ 专家路由**——入口智能体判断意图并给出候选专家，随后把任务直接委派给对应专家；
 - **专家直答**——专家回复直接交付用户，入口智能体只负责选择专家；
 - **写操作人工确认（HITL）**——涉及写库 / 写外部系统的工具调用暂停待确认，确认后才执行；专家链路内置写工具短期去重，避免重复副作用；
-- **统一配置**——AI 平台配置前缀 `bizbuddy.ai`，绑定 [`AiProperties`](RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/config/AiProperties.java)。
+- **统一配置**——AI 平台配置前缀 `bizbuddy.ai`，绑定 [`AiProperties`](code/back-end/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/config/AiProperties.java)。
 
 ## 一键运行（Docker Compose）
 
@@ -137,7 +137,7 @@ RuoYi-Vue-Plus
 
 ## 配置说明
 
-### 后端（`RuoYi-Vue-Plus/ruoyi-admin/src/main/resources/`）
+### 后端（`code/back-end/ruoyi-admin/src/main/resources/`）
 
 - `application.yml` —— 通用配置：端口 `8080`、Sa-Token、MyBatis-Plus、接口加解密、统一消息推送、Warm-Flow、LiteFlow、MQTT、Easy-Es 等
 - `application-dev.yml` / `application-prod.yml` —— 环境配置：数据源、SnailJob 客户端、SQL 日志等
@@ -158,9 +158,9 @@ spring:
 
 > 换 MySQL 8.0 只需把 `url` 换成 `jdbc:mysql://localhost:3306/biz_buddy?...`（带 `allowPublicKeyRetrieval=true&useSSL=false`），无需改驱动声明。
 
-AI 平台配置前缀为 `bizbuddy.ai`（见 [`AiProperties`](RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/config/AiProperties.java)）：模型密钥加密 Key、Milvus 连接、对话迭代上限、专家调用超时与 Token / 墙钟预算、写工具去重、上下文压缩、工作区与长期记忆开关、MCP 出口口令等。
+AI 平台配置前缀为 `bizbuddy.ai`（见 [`AiProperties`](code/back-end/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/config/AiProperties.java)）：模型密钥加密 Key、Milvus 连接、对话迭代上限、专家调用超时与 Token / 墙钟预算、写工具去重、上下文压缩、工作区与长期记忆开关、MCP 出口口令等。
 
-### 前端（`plus-ui-Vue/.env.*`）
+### 前端（`code/front-end/.env.*`）
 
 | 变量 | 开发 | 生产 |
 |---|---|---|
@@ -174,15 +174,15 @@ AI 平台配置前缀为 `bizbuddy.ai`（见 [`AiProperties`](RuoYi-Vue-Plus/ruo
 AI 模块（`biz-buddy`）是本项目的测试主力，覆盖工具、智能体装配、路由编排、权限决策、渠道路由、MCP、各 Service 与 Controller：
 
 ```bash
-# 在 RuoYi-Vue-Plus 目录下，仅跑 AI 模块
+# 在 code/back-end 目录下，仅跑 AI 模块
 ./mvnw.cmd -o -pl ruoyi-modules/biz-buddy test
 ```
 
 JaCoCo 覆盖率报告（构建后生成）：
 
 ```
-RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/index.html   # HTML 报告
-RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器可读
+code/back-end/ruoyi-modules/biz-buddy/target/site/jacoco/index.html   # HTML 报告
+code/back-end/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器可读
 ```
 
 ### 集成测试（真库 schema 与框架装配）
@@ -195,7 +195,7 @@ RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器�
 - `AiContextIntegrationTest`（`ruoyi-admin`）——`@SpringBootTest`（随机端口、`snail-job.enabled=false`）验证整套 Bean 能否装配、运行期配置走真 Redis（覆盖优先）、审计超期统计走真库。
 
 ```bash
-# 在 RuoYi-Vue-Plus 目录下；先设 BIZBUDDY_IT=true（PowerShell：$env:BIZBUDDY_IT='true'）
+# 在 code/back-end 目录下；先设 BIZBUDDY_IT=true（PowerShell：$env:BIZBUDDY_IT='true'）
 ./mvnw.cmd -o -pl ruoyi-admin -am test
 ```
 
@@ -264,8 +264,8 @@ BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test   # MySQL 栈
 | 文档 | 位置 |
 |---|---|
 | **开发者文档**（架构 / 二次开发 / 配置） | [`docs/README.md`](docs/README.md) |
-| 平台功能说明（含界面截图） | [`RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md`](RuoYi-Vue-Plus/docs/BizBuddy平台功能说明.md) |
-| 前端工程说明 | [`plus-ui-Vue/README.md`](plus-ui-Vue/README.md) |
+| 平台功能说明（含界面截图） | [`code/back-end/docs/BizBuddy平台功能说明.md`](code/back-end/docs/BizBuddy平台功能说明.md) |
+| 前端工程说明 | [`code/front-end/README.md`](code/front-end/README.md) |
 
 ## 联系我们
 

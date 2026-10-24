@@ -7,7 +7,7 @@
 ## 1. 集成测试（双栈真库）
 
 ```bash
-cd RuoYi-Vue-Plus
+cd code/back-end
 BIZBUDDY_IT=true ./mvnw -o -pl ruoyi-admin -am test
 # Windows PowerShell：$env:BIZBUDDY_IT='true'; .\mvnw.cmd -o -pl ruoyi-admin -am test
 ```

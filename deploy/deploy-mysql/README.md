@@ -23,14 +23,14 @@
 
 ```bash
 # 后端 jar（ruoyi-admin/target/ruoyi-admin.jar）
-cd RuoYi-Vue-Plus
+cd code/back-end
 ./mvnw clean package -DskipTests          # Windows: .\mvnw.cmd clean package -DskipTests
 
 # 调度服务端 jar（ruoyi-extend/ruoyi-snailjob-server/target/ruoyi-snailjob-server.jar）
 ./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
 
-# 前端静态资源（plus-ui-Vue/dist，由 Nginx 直接托管）
-cd ../../plus-ui-Vue
+# 前端静态资源（code/front-end/dist，由 Nginx 直接托管）
+cd ../../code/front-end
 pnpm install && pnpm build:prod
 ```
 
@@ -192,5 +192,5 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 ## 9. 相关文档
 
 - 部署总览（PostgreSQL 版，含更多背景说明）：[../deploy-pg/README.md](../deploy-pg/README.md)
-- 后端配置项：[../../RuoYi-Vue-Plus/docs/configuration.md](../../RuoYi-Vue-Plus/docs/configuration.md)
-- 架构与二次开发：[../../RuoYi-Vue-Plus/docs/README.md](../../RuoYi-Vue-Plus/docs/README.md)
+- 后端配置项：[../../code/back-end/docs/configuration.md](../../code/back-end/docs/configuration.md)
+- 架构与二次开发：[../../code/back-end/docs/README.md](../../code/back-end/docs/README.md)

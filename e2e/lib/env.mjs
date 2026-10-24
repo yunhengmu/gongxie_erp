@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 
 /**
  * 配置解析：环境变量 > `e2e/.env.local` > 默认值；
- * RSA 密钥对缺省时回退读前端 `plus-ui-Vue/.env.development`（该密钥对前端已公开，非机密）。
+ * RSA 密钥对缺省时回退读前端 `code/front-end/.env.development`（该密钥对前端已公开，非机密）。
  */
 
 const here = path.dirname(url.fileURLToPath(import.meta.url));
@@ -99,7 +99,7 @@ export const parseEnvFile = (file) => {
  * @returns {object} 配置
  */
 export const loadConfig = (cli = {}) => {
-  const frontendEnv = parseEnvFile(path.join(repoRoot, 'plus-ui-Vue', '.env.development'));
+  const frontendEnv = parseEnvFile(path.join(repoRoot, 'code/front-end', '.env.development'));
   const localEnv = parseEnvFile(path.join(e2eDir, '.env.local'));
 
   const pick = (key, fallback = '') => process.env[key] ?? localEnv[key] ?? fallback;

@@ -6,7 +6,7 @@
  * 只有页面上下文能同时满足这两点。
  */
 
-/** 生产经 nginx 的接口前缀（对应 `plus-ui-Vue/.env.production` 的 `VITE_APP_BASE_API`） */
+/** 生产经 nginx 的接口前缀（对应 `code/front-end/.env.production` 的 `VITE_APP_BASE_API`） */
 export const API_PREFIX = '/prod-api';
 
 /**

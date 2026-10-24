@@ -4,7 +4,7 @@
 
 | 文件 | 内容 |
 |---|---|
-| `RuoYi-Vue-Plus/ruoyi-admin/src/main/resources/application.yml` | 通用配置 + **AI 平台配置 `bizbuddy.ai.*`** + 安全排除路径 |
+| `code/back-end/ruoyi-admin/src/main/resources/application.yml` | 通用配置 + **AI 平台配置 `bizbuddy.ai.*`** + 安全排除路径 |
 | `.../application-dev.yml` | 开发环境：数据源、Redis、SnailJob 客户端、SQL 日志 |
 | `.../application-prod.yml` | 生产环境：同上（日志更安静、连接池更大） |
 | `.env`（可选，见 `deploy/deploy-pg/.env.example`） | 容器化部署的端口与口令变量 |
@@ -17,7 +17,7 @@
 
 ## 2. AI 平台配置 `bizbuddy.ai`
 
-前缀绑定到 [`AiProperties`](../RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/config/AiProperties.java)。
+前缀绑定到 [`AiProperties`](../code/back-end/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/config/AiProperties.java)。
 下表只列**需要你关注的**项，其余保持默认即可。
 
 ### 2.1 密钥与模型
@@ -175,7 +175,7 @@
 
 ## 4. 生产环境必改清单
 
-> **启动自检**：**任何 profile** 启动时，[`ProductionConfigGuard`](../RuoYi-Vue-Plus/ruoyi-admin/src/main/java/org/dromara/web/config/ProductionConfigGuard.java) 都会逐项比对下表 1~5 及 7 的**出厂示例值**，命中即**直接拒绝启动**并列出命中项与对应环境变量——即这些项已不是「靠自觉」，漏改会立刻失败。原实现只对 `prod` 生效，导致默认（`dev` profile）部署可带出厂口令跑起来；现默认对所有 profile 生效，非 `prod` 可用 `BIZBUDDY_SECURITY_GUARD_MODE=warn` 显式降级为「仅告警」，`prod` 下该开关被忽略。
+> **启动自检**：**任何 profile** 启动时，[`ProductionConfigGuard`](../code/back-end/ruoyi-admin/src/main/java/org/dromara/web/config/ProductionConfigGuard.java) 都会逐项比对下表 1~5 及 7 的**出厂示例值**，命中即**直接拒绝启动**并列出命中项与对应环境变量——即这些项已不是「靠自觉」，漏改会立刻失败。原实现只对 `prod` 生效，导致默认（`dev` profile）部署可带出厂口令跑起来；现默认对所有 profile 生效，非 `prod` 可用 `BIZBUDDY_SECURITY_GUARD_MODE=warn` 显式降级为「仅告警」，`prod` 下该开关被忽略。
 
 | # | 配置项 | 环境变量 | 原因 |
 |---|---|---|---|

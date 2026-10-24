@@ -30,7 +30,7 @@ const STACK_DOWN_FLAG = path.join(ARTIFACTS_DIR, 'stack-down.flag');
 const DEFAULT_UI_BASE_URL = 'http://localhost';
 const DEFAULT_USERNAME = 'admin';
 const DEFAULT_PASSWORD = 'admin123';
-/** 默认客户端 id：与 `plus-ui-Vue/.env.production` 的 `VITE_APP_CLIENT_ID` 一致（已公开） */
+/** 默认客户端 id：与 `code/front-end/.env.production` 的 `VITE_APP_CLIENT_ID` 一致（已公开） */
 const DEFAULT_CLIENT_ID = 'e5cd7e4891bf95d1d19206ce24a7b32e';
 
 /**

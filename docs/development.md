@@ -16,7 +16,7 @@ ai_tool 表（元数据：编码/描述/参数/实现标识/启停）
 
 ## 1. 实现工具类
 
-在 `RuoYi-Vue-Plus/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/core/agent/tools/` 下新增类，继承 `io.agentscope.core.tool.ToolBase`：
+在 `code/back-end/ruoyi-modules/biz-buddy/src/main/java/org/dromara/ai/core/agent/tools/` 下新增类，继承 `io.agentscope.core.tool.ToolBase`：
 
 ```java
 package org.dromara.ai.core.agent.tools;
@@ -127,7 +127,7 @@ if (IMPL_GET_SOMETHING.equals(implName)) {
 | 状态 `status` | `0` | `0` 启用 / `1` 停用 |
 | 对外暴露 `mcp_exposed` | `0` | `1` 才会出现在自建 `/mcp` 出口（**仅只读工具可勾选**） |
 
-**(b) 写入种子脚本（交付推荐）** —— 在 `RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_ai.sql` 的 `ai_tool` 种子段追加一行 `insert`，保证新环境一键建库即带此工具。
+**(b) 写入种子脚本（交付推荐）** —— 在 `code/back-end/script/sql/postgres/postgres_ry_ai.sql` 的 `ai_tool` 种子段追加一行 `insert`，保证新环境一键建库即带此工具。
 
 ## 4. 让智能体用上它
 
@@ -168,7 +168,7 @@ if (!perms.contains("*:*:*") && !perms.contains("system:xxx:add")) {
 - 业务异常 → 返回 error 而非抛出。
 
 ```bash
-cd RuoYi-Vue-Plus
+cd code/back-end
 ./mvnw -o -pl ruoyi-modules/biz-buddy test
 ```
 

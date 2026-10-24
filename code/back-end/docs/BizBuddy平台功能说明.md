@@ -65,7 +65,7 @@ BizBuddy 是构建在 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-V
 | 规则编排 | LiteFlow | 2.16.2.1 |
 | 前端 | Vue 3.5 + TypeScript + Element Plus 2.14 + Vite 8 | 包管理 pnpm |
 
-AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端页面集中在 `plus-ui-Vue/src/views/ai/**`。
+AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端页面集中在 `code/front-end/src/views/ai/**`。
 
 ## 2. 功能地图与权限模型
 

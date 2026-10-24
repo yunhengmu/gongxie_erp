@@ -22,20 +22,20 @@
 镜像里**只放 jar / dist、不在镜像内编译**，所以 `up` 之前必须先构建：
 
 ```bash
-# ① 后端 jar → RuoYi-Vue-Plus/ruoyi-admin/target/ruoyi-admin.jar
-cd RuoYi-Vue-Plus
+# ① 后端 jar → code/back-end/ruoyi-admin/target/ruoyi-admin.jar
+cd code/back-end
 ./mvnw clean package -DskipTests                 # Windows: .\mvnw.cmd clean package -DskipTests
 
 # ② 调度服务端 jar → ruoyi-extend/ruoyi-snailjob-server/target/ruoyi-snailjob-server.jar
 ./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
 
-# ③ 前端静态资源 → plus-ui-Vue/dist
-cd ../plus-ui-Vue
+# ③ 前端静态资源 → code/front-end/dist
+cd ../../code/front-end
 pnpm install && pnpm build:prod
 ```
 
 > 只调中间件时可跳过构建，例如只要一个 PostgreSQL：`cd deploy/deploy-pg && docker compose up -d postgres`。
-> **前端产物 `dist/` 不入库**（见 `plus-ui-Vue/.gitignore`）：改了 `plus-ui-Vue/src` 下任何源码（含页面 / 文案）都必须重新 `pnpm build:prod`，否则 Nginx 托管的仍是旧包。
+> **前端产物 `dist/` 不入库**（见 `code/front-end/.gitignore`）：改了 `code/front-end/src` 下任何源码（含页面 / 文案）都必须重新 `pnpm build:prod`，否则 Nginx 托管的仍是旧包。
 
 ## 2. 启动 PostgreSQL 栈
 

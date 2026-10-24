@@ -2,7 +2,7 @@
 
 用 Docker Compose 拉起 BizBuddy 全栈：**PostgreSQL 14 + Redis + Milvus standalone（etcd + 复用平台 MinIO）+ 后端 + 调度服务端 + Nginx（前端）**。
 
-> 与 `RuoYi-Vue-Plus/script/docker/docker-compose.yml` 的区别：那个是上游 RuoYi 模板（MySQL、无 Milvus、直接用成品镜像）；本目录针对本项目的**真实技术栈**，并把建库脚本按依赖顺序挂进 PostgreSQL 的初始化目录，`up` 完即是「有表、有数据、可登录」的环境。
+> 与 `code/back-end/script/docker/docker-compose.yml` 的区别：那个是上游 RuoYi 模板（MySQL、无 Milvus、直接用成品镜像）；本目录针对本项目的**真实技术栈**，并把建库脚本按依赖顺序挂进 PostgreSQL 的初始化目录，`up` 完即是「有表、有数据、可登录」的环境。
 
 > 需要 **MySQL 8.0** 时，用并列的 [`deploy-mysql/`](../deploy-mysql)（组件一致，仅数据库 / JDBC 驱动 / 技能仓库实现不同；项目按数据源自动装配，无需改配置）。两套编排的项目名与端口已错开，可同时运行。
 
@@ -12,14 +12,14 @@
 
 ```bash
 # 后端 jar（ruoyi-admin/target/ruoyi-admin.jar）
-cd RuoYi-Vue-Plus
+cd code/back-end
 ./mvnw clean package -DskipTests          # Windows: .\mvnw.cmd clean package -DskipTests
 
 # 调度服务端 jar（ruoyi-extend/ruoyi-snailjob-server/target/ruoyi-snailjob-server.jar）
 ./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
 
-# 前端静态资源（plus-ui-Vue/dist，由 Nginx 直接托管）
-cd ../../plus-ui-Vue
+# 前端静态资源（code/front-end/dist，由 Nginx 直接托管）
+cd ../../code/front-end
 pnpm install && pnpm build:prod
 ```
 

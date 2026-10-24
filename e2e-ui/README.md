@@ -64,14 +64,14 @@ BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test
 
 ### 坑 1：请求必须带 `clientid` 头（否则被判未登录）
 
-前端**每个请求都带两个头**（[`src/utils/request.ts:94-102`](../plus-ui-Vue/src/utils/request.ts)）：
+前端**每个请求都带两个头**（[`src/utils/request.ts:94-102`](../code/front-end/src/utils/request.ts)）：
 
 ```ts
 Authorization: 'Bearer ' + getToken(),
 clientid: import.meta.env.VITE_APP_CLIENT_ID
 ```
 
-少了 `clientid`，后端按 Sa-Token 客户端校验直接把请求判成未登录（返回 `{"code":401,"data":null}`）。本套件调菜单接口时已带上该头（[`lib/menu.mjs`](lib/menu.mjs)），客户端 id 默认取 `plus-ui-Vue/.env.production` 的 `VITE_APP_CLIENT_ID`（已公开），可用 `BIZBUDDY_CLIENT_ID` 覆盖。
+少了 `clientid`，后端按 Sa-Token 客户端校验直接把请求判成未登录（返回 `{"code":401,"data":null}`）。本套件调菜单接口时已带上该头（[`lib/menu.mjs`](lib/menu.mjs)），客户端 id 默认取 `code/front-end/.env.production` 的 `VITE_APP_CLIENT_ID`（已公开），可用 `BIZBUDDY_CLIENT_ID` 覆盖。
 
 ### 坑 2：栈比仓库旧会被误判成「页面坏了」
 
@@ -132,7 +132,7 @@ clientid: import.meta.env.VITE_APP_CLIENT_ID
 
 ### 维护点：菜单清单
 
-`02-menu.spec.mjs` 的 33 条 URL **硬编码自建库脚本的菜单种子**（`RuoYi-Vue-Plus/script/sql/ry_ai.sql` 的 `sys_menu` insert，与 [docs/15](../docs/15-BizBuddy页面与接口清单.md) 页面清单一致）。
+`02-menu.spec.mjs` 的 33 条 URL **硬编码自建库脚本的菜单种子**（`code/back-end/script/sql/ry_ai.sql` 的 `sys_menu` insert，与 [docs/15](../docs/15-BizBuddy页面与接口清单.md) 页面清单一致）。
 **菜单增删时必须同步该清单**——刻意不使用「从侧边栏抓链接」的自动方式：Element Plus 可能惰性渲染未展开项，会导致**静默少跑**（覆盖变少却依然全绿）。
 
 运行时还会把该清单与**栈上真实的 `getRouters`** 比对，未注册的页单独归类为「栈旧」而非「页面缺陷」（见上方坑 2）。

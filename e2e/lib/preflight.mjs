@@ -32,7 +32,7 @@ export const preflight = async (client, cfg, options = {}) => {
         `  1) 栈是否在跑：wsl -d ${wslDistro()} -- docker ps（应看到 bizbuddy-admin）\n` +
         `  2) 地址是否可达：浏览器打开 ${cfg.baseUrl}/swagger-ui.html\n` +
         `  3) 账号密码是否正确（默认 admin/admin123，可用 BIZBUDDY_USERNAME/PASSWORD 覆盖）\n` +
-        `  4) 接口加密密钥是否与后端一致（默认读 plus-ui-Vue/.env.development）`
+        `  4) 接口加密密钥是否与后端一致（默认读 code/front-end/.env.development）`
     );
   }
   log('· 登录成功');
