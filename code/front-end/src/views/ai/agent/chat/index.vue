@@ -1982,15 +1982,23 @@ const currentRegenerateCheck = computed(() => {
   return regenerateCheck.value;
 });
 
-/** 是否被预检明确拒绝（按钮置灰） */
-const regenerateBlocked = computed(() => currentRegenerateCheck.value?.allowed === false);
+/** 预检中的瞬时原因：本轮刚落库、执行标记尚未释放，再点一次即可通过，不应把按钮长期置灰 */
+const TRANSIENT_REGENERATE_CODES = new Set(['CONVERSATION_BUSY', 'ROUND_STREAMING']);
 
-/** 重新生成按钮悬停提示：写操作轮次展示后端给出的拒绝原因 */
+/** 是否被预检明确拒绝（按钮置灰；瞬时原因除外） */
+const regenerateBlocked = computed(() => {
+  const check = currentRegenerateCheck.value;
+  if (!check || check.allowed !== false) {
+    return false;
+  }
+  return !TRANSIENT_REGENERATE_CODES.has(check.reasonCode ?? '');
+});
+
+/** 重新生成按钮悬停提示：写操作轮次展示后端给出的拒绝原因（瞬时原因不提示，按钮保持可用） */
 const regenerateHint = computed(() => {
   const check = currentRegenerateCheck.value;
-  return check && !check.allowed
-    ? check.reason || '该轮不支持重新生成'
-    : '重新生成该回答';
+  const rejected = check?.allowed === false && !TRANSIENT_REGENERATE_CODES.has(check.reasonCode ?? '');
+  return rejected ? check.reason || '该轮不支持重新生成' : '重新生成该回答';
 });
 
 /** 刷新最后一轮的重新生成预检（切换会话 / 本轮结束后调用） */
