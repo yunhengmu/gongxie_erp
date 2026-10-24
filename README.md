@@ -39,8 +39,8 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 | [`docs/BizBuddy平台功能说明.md`](docs/BizBuddy平台功能说明.md) | 平台功能说明（含 9 张运行界面截图） |
 | [`deploy/deploy-pg/`](deploy/deploy-pg) | **PostgreSQL 全栈容器编排**：PG 14 + Redis + Milvus + 后端 + 调度 + Nginx（`docker compose up -d --build` 即「有表有数据可登录」） |
 | [`deploy/deploy-mysql/`](deploy/deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
-| [`e2e-http/`](e2e-http) | **端到端测试脚本（接口层）**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP / SSE 断言，见下文「测试与覆盖率」 |
-| [`e2e-ui/`](e2e-ui) | **端到端测试套件（浏览器层）**（Playwright + chromium，独立目录承载重依赖）：登录 / 菜单可达性 / 会话主路径 / 指定专家 / 停止生成 / HITL 等前端关键路径，见下文「测试与覆盖率」 |
+| [`e2e/http/`](e2e/http) | **端到端测试脚本（接口层）**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP / SSE 断言，见下文「测试与覆盖率」 |
+| [`e2e/ui/`](e2e/ui) | **端到端测试套件（浏览器层）**（Playwright + chromium，独立目录承载重依赖）：登录 / 菜单可达性 / 会话主路径 / 指定专家 / 停止生成 / HITL 等前端关键路径，见下文「测试与覆盖率」 |
 
 ## 功能说明
 
@@ -203,7 +203,7 @@ code/back-end/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器�
 
 ### 端到端测试（e2e）
 
-单测证明「代码分支正确」，但不证明「跑起来能用」——模型是否真的连通、知识库是否真的检索得到、小Z 是否真的把问题路由给专家、写工具的人工确认闭环是否真的通，都需要在**真实运行**的栈上验证。`e2e-http/` 为此提供一套**外部驱动脚本**（Node.js 纯 ESM、**零 npm 依赖**），对**已运行**的容器栈发真实 HTTP 请求做断言：
+单测证明「代码分支正确」，但不证明「跑起来能用」——模型是否真的连通、知识库是否真的检索得到、小Z 是否真的把问题路由给专家、写工具的人工确认闭环是否真的通，都需要在**真实运行**的栈上验证。`e2e/http/` 为此提供一套**外部驱动脚本**（Node.js 纯 ESM、**零 npm 依赖**），对**已运行**的容器栈发真实 HTTP 请求做断言：
 
 | 层 | 覆盖 |
 |---|---|
@@ -227,29 +227,29 @@ code/back-end/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器�
 
 ```bash
 # 需要栈已在运行（deploy/deploy-pg/ 或 deploy/deploy-mysql/ 任一）
-node e2e-http/run.mjs                          # 全量；未配置密钥的层自动 SKIP
-node e2e-http/run.mjs --only L1,L3 --verbose    # 指定层级
-node e2e-http/run.mjs --allow-writes            # L5 走「接受」路径（会真建公告，收尾自动清理）
-node e2e-http/run.mjs --base-url http://localhost:8081   # 指向 MySQL 栈（PG 栈为 8080）
+node e2e/http/run.mjs                          # 全量；未配置密钥的层自动 SKIP
+node e2e/http/run.mjs --only L1,L3 --verbose    # 指定层级
+node e2e/http/run.mjs --allow-writes            # L5 走「接受」路径（会真建公告，收尾自动清理）
+node e2e/http/run.mjs --base-url http://localhost:8081   # 指向 MySQL 栈（PG 栈为 8080）
 ```
 
-- 配置：复制 [`e2e-http/.env.example`](e2e-http/.env.example) 为 `e2e-http/.env.local`（已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走平台「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**；L12 需 JEV 桩已启动（否则 SKIP），L13~L18 走平台密钥（真跑模型）。
+- 配置：复制 [`e2e/http/.env.example`](e2e/http/.env.example) 为 `e2e/http/.env.local`（已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走平台「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**；L12 需 JEV 桩已启动（否则 SKIP），L13~L18 走平台密钥（真跑模型）。
 - 退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败 / `3` 参数错误。
 - **L5 默认走「拒绝」路径、不产生任何业务数据**；`--allow-writes` 才真写，并在收尾按标题清理公告与会话。
 - 它**不进 `mvn test`**、不引 Testcontainers，与上面的单测**互不影响**；两个数据库栈均已实跑通过（PostgreSQL `8080` / MySQL `8081`）。
 
-另附 **RAG 检索质量评测** [`e2e-http/eval/eval-rag.mjs`](e2e-http/eval/eval-rag.mjs)（同样零依赖）：自动建评测库、按语料目录入库，跑 `hit@1/3/5`、`recall@5`、`MRR@5` 与平均耗时并按用例类别汇总，用于重排 / 装配等检索改动的 A/B（当前基线 56 用例、10 篇语料：hit@1 **75.0%** / hit@3 89.3% / hit@5 98.2% / MRR@5 0.829）。
+另附 **RAG 检索质量评测** [`e2e/http/eval/eval-rag.mjs`](e2e/http/eval/eval-rag.mjs)（同样零依赖）：自动建评测库、按语料目录入库，跑 `hit@1/3/5`、`recall@5`、`MRR@5` 与平均耗时并按用例类别汇总，用于重排 / 装配等检索改动的 A/B（当前基线 56 用例、10 篇语料：hit@1 **75.0%** / hit@3 89.3% / hit@5 98.2% / MRR@5 0.829）。
 
 ```bash
-node e2e-http/eval/eval-rag.mjs --base-url http://localhost:8081 --rebuild
+node e2e/http/eval/eval-rag.mjs --base-url http://localhost:8081 --rebuild
 ```
 
-### 浏览器端 e2e（`e2e-ui`）
+### 浏览器端 e2e（`e2e/ui`）
 
-接口层的 `e2e-http/` 看不到「页面到底渲染没渲染」。`e2e-ui/` 用 **Playwright 驱动真实 chromium** 打在**已部署的容器栈**上，覆盖登录与路由守卫、**菜单可达性巡检（34 个功能页逐个渲染干净）**、会话主路径（SSE 流式）、指定专家、停止生成、HITL 写工具确认与各配置页。
+接口层的 `e2e/http/` 看不到「页面到底渲染没渲染」。`e2e/ui/` 用 **Playwright 驱动真实 chromium** 打在**已部署的容器栈**上，覆盖登录与路由守卫、**菜单可达性巡检（34 个功能页逐个渲染干净）**、会话主路径（SSE 流式）、指定专家、停止生成、HITL 写工具确认与各配置页。
 
 ```bash
-cd e2e-ui
+cd e2e/ui
 pnpm install && pnpm run install-browser             # 首次：装依赖 + 下载 chromium
 pnpm test                                            # PG 栈（前端 http://localhost）
 BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test   # MySQL 栈
@@ -257,7 +257,7 @@ BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test   # MySQL 栈
 
 - 判定为**三条同时成立**：`console.error` / 未捕获异常计数为 0、网络层无 4xx·5xx、关键元素可见（静态资源类噪声在白名单里）；
 - 栈不可达 / 入口智能体未启用 / 未配模型密钥 → **SKIP**（属环境问题，不是代码缺陷）；
-- 因是**重依赖**（`@playwright/test`），**独立目录**承载，刻意不破坏 `e2e-http/` 的零依赖设计；细节见 [`e2e-ui/README.md`](e2e-ui/README.md)。
+- 因是**重依赖**（`@playwright/test`），**独立目录**承载，刻意不破坏 `e2e/http/` 的零依赖设计；细节见 [`e2e/ui/README.md`](e2e/ui/README.md)。
 
 ## 文档
 

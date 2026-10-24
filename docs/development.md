@@ -176,10 +176,10 @@ cd code/back-end
 
 ```bash
 cd ..                       # 仓库根（biz-buddy/）
-node e2e-http/run.mjs --only L4,L5 --verbose   # L4 对话与专家编排；L5 写工具 HITL 闭环
+node e2e/http/run.mjs --only L4,L5 --verbose   # L4 对话与专家编排；L5 写工具 HITL 闭环
 ```
 
-`e2e-http/` 自带用例，**一般不需要为单个工具写新用例**；它会真实建会话、发 SSE、触发工具调用并核对编排轨迹。用法与前置见仓库根 [README](../README.md#端到端测试e2e) 或 [docs/README.md](README.md)。
+`e2e/http/` 自带用例，**一般不需要为单个工具写新用例**；它会真实建会话、发 SSE、触发工具调用并核对编排轨迹。用法与前置见仓库根 [README](../README.md#端到端测试e2e) 或 [docs/README.md](README.md)。
 
 ## 7. 常见坑
 

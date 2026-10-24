@@ -125,4 +125,4 @@ flowchart LR
 - [development.md](development.md) —— 加一个业务工具（最常见的扩展）
 - [configuration.md](configuration.md) —— 配置项参考
 - [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md) / [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md) —— 两套容器编排（PostgreSQL 14 / MySQL 8.0，端口错开可并存）
-- [../e2e-http/](../e2e-http) —— 端到端脚本（在真实栈上验证上述链路：模型连通、知识库检索、专家编排、HITL 闭环）
+- [../e2e/http/](../e2e/http) —— 端到端脚本（在真实栈上验证上述链路：模型连通、知识库检索、专家编排、HITL 闭环）

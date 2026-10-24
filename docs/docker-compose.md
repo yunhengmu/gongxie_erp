@@ -107,9 +107,9 @@ docker compose down -v                   # 停止并删数据卷：下次启动�
 栈起来后可跑端到端脚本，对**真实运行**的环境做断言（模型连通 / 知识库检索 / 专家编排 / 写工具确认闭环）：
 
 ```bash
-node e2e-http/run.mjs                                   # PostgreSQL 栈（后端默认 8080）
-node e2e-http/run.mjs --base-url http://localhost:8081  # MySQL 栈
+node e2e/http/run.mjs                                   # PostgreSQL 栈（后端默认 8080）
+node e2e/http/run.mjs --base-url http://localhost:8081  # MySQL 栈
 ```
 
-> 上述命令需在**仓库根目录**执行；脚本说明与前置条件见 [../e2e-http/](../e2e-http)（唯一机密 `BIZBUDDY_LLM_API_KEY` 见 `e2e-http/.env.example`）。
+> 上述命令需在**仓库根目录**执行；脚本说明与前置条件见 [../e2e/http/](../e2e/http)（唯一机密 `BIZBUDDY_LLM_API_KEY` 见 `e2e/http/.env.example`）。
 > 部署排障：PostgreSQL 栈见 [`deploy/deploy-pg/README.md`](../deploy/deploy-pg/README.md)，MySQL 栈见 [`deploy/deploy-mysql/README.md`](../deploy/deploy-mysql/README.md)（含 OSS 对外地址、MySQL 认证插件、端口改动等已知坑）。

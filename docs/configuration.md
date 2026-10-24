@@ -125,7 +125,7 @@
 | `assemble-max-chars` | `6000` | 装配后正文的绝对字符上限 |
 | `assemble-max-tokens` | `6000` | 装配后正文的 Token 预算（与字符上限取小，`CJK≈1 token/字符`） |
 
-> **2026-10-14**：`rerank-enabled` / `rerank-model` / `rerank-endpoint` 已删除——重排的**模型与开关**已迁至「模型配置」（`model_type=rerank`，`baseUrl` 填完整重排端点、密钥为该模型自带）+「知识库」配置（`rerank_enabled` / `rerank_model_id`）；本节只保留**与模型无关的算法参数**。启用且绑定可用重排模型才重排，否则保持向量原序；未配密钥 / 非 2xx / 超时 / 结构异常一律**降级为原顺序**。上下文装配（`assemble-*`）只作用于返回集后处理，**不改排序**。改动后可用 `e2e-http/eval/eval-rag.mjs` 做 A/B。
+> **2026-10-14**：`rerank-enabled` / `rerank-model` / `rerank-endpoint` 已删除——重排的**模型与开关**已迁至「模型配置」（`model_type=rerank`，`baseUrl` 填完整重排端点、密钥为该模型自带）+「知识库」配置（`rerank_enabled` / `rerank_model_id`）；本节只保留**与模型无关的算法参数**。启用且绑定可用重排模型才重排，否则保持向量原序；未配密钥 / 非 2xx / 超时 / 结构异常一律**降级为原顺序**。上下文装配（`assemble-*`）只作用于返回集后处理，**不改排序**。改动后可用 `e2e/http/eval/eval-rag.mjs` 做 A/B。
 
 ### 2.8 安全合规（`bizbuddy.ai.security.*`）
 
@@ -195,4 +195,4 @@
 - [architecture.md](architecture.md) —— 这些配置在链路里作用于哪一环
 - [development.md](development.md) —— 新增业务工具
 - [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md) / [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md) —— 容器化部署、变量覆盖与已知坑（含 OSS 地址与「文档需先解析再向量化」）
-- [../e2e-http/](../e2e-http) —— 端到端脚本：改完配置后在真实栈上验证（L1~L11 + RAG 检索质量评测 `e2e-http/eval/`）
+- [../e2e/http/](../e2e/http) —— 端到端脚本：改完配置后在真实栈上验证（L1~L11 + RAG 检索质量评测 `e2e/http/eval/`）
