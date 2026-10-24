@@ -36,7 +36,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 | [`code/back-end/`](code/back-end) | **后端工程**：Spring Boot 4.1.1 + JDK 21，多模块 Maven；AI 能力在 `ruoyi-modules/biz-buddy`（AgentScope 2.0.4 内核） |
 | [`code/front-end/`](code/front-end) | **前端工程**：Vue 3 + TypeScript + Element Plus + Vite，包管理 pnpm |
 | [`docs/`](docs/README.md) | **开发者文档**：一键运行（Docker Compose）与快速开始（源码手工跑）、运行时架构、二次开发（新增业务工具）、配置项参考 |
-| [`code/back-end/docs/`](code/back-end/docs) | 平台功能说明（含 9 张运行界面截图） |
+| [`docs/BizBuddy平台功能说明.md`](docs/BizBuddy平台功能说明.md) | 平台功能说明（含 9 张运行界面截图） |
 | [`deploy/deploy-pg/`](deploy/deploy-pg) | **PostgreSQL 全栈容器编排**：PG 14 + Redis + Milvus + 后端 + 调度 + Nginx（`docker compose up -d --build` 即「有表有数据可登录」） |
 | [`deploy/deploy-mysql/`](deploy/deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
 | [`e2e/`](e2e) | **端到端测试脚本（接口层）**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP / SSE 断言，见下文「测试与覆盖率」 |
@@ -44,7 +44,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 
 ## 功能说明
 
-平台完整功能说明见 **[code/back-end/docs/BizBuddy平台功能说明.md](code/back-end/docs/BizBuddy平台功能说明.md)**，按真实菜单与代码梳理，涵盖：
+平台完整功能说明见 **[docs/BizBuddy平台功能说明.md](docs/BizBuddy平台功能说明.md)**，按真实菜单与代码梳理，涵盖：
 
 - **功能地图与权限模型**——6 个分组、34 个功能页与权限标识约定、工具三档授权（含无人值守链路的口径）；
 - **智能体与对话**——任务工作台、入口智能体「小Z」配置、专家配置（含提示词 **AI 辅助生成 / 模板套用 / 克隆专家 / 保存前体检**）、任务管理、定时任务、计划模式、技能仓库、长期记忆、工作区文件、子智能体、场景包；
@@ -264,14 +264,14 @@ BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test   # MySQL 栈
 | 文档 | 位置 |
 |---|---|
 | **开发者文档**（架构 / 二次开发 / 配置） | [`docs/README.md`](docs/README.md) |
-| 平台功能说明（含界面截图） | [`code/back-end/docs/BizBuddy平台功能说明.md`](code/back-end/docs/BizBuddy平台功能说明.md) |
+| 平台功能说明（含界面截图） | [`docs/BizBuddy平台功能说明.md`](docs/BizBuddy平台功能说明.md) |
 | 前端工程说明 | [`code/front-end/README.md`](code/front-end/README.md) |
 
 ## 联系我们
 
 微信公众号：**BizBuddy**
 
-![微信公众号 BizBuddy 二维码](docs/weixin.jpg)
+![微信公众号 BizBuddy 二维码](docs/images/weixin.jpg)
 
 ## 版权
 

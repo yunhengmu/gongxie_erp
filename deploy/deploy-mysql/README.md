@@ -192,5 +192,5 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 ## 9. 相关文档
 
 - 部署总览（PostgreSQL 版，含更多背景说明）：[../deploy-pg/README.md](../deploy-pg/README.md)
-- 后端配置项：[../../code/back-end/docs/configuration.md](../../code/back-end/docs/configuration.md)
-- 架构与二次开发：[../../code/back-end/docs/README.md](../../code/back-end/docs/README.md)
+- 后端配置项：[../../docs/configuration.md](../../docs/configuration.md)
+- 架构与二次开发：[../../docs/README.md](../../docs/README.md)
