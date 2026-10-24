@@ -52,7 +52,7 @@ class AiRetrievalControllerTest {
             login.when(LoginHelper::getUserId).thenReturn(1L);
             assertSame(hits, controller.test(3L, "查询", 5, new BigDecimal("0.5"), null, null, null).getData());
         }
-        verify(kbService).validateVisible(3L, 1L, "检索");
+        verify(kbService).validateRetrievable(List.of(3L), 1L, "检索");
     }
 
     @Test

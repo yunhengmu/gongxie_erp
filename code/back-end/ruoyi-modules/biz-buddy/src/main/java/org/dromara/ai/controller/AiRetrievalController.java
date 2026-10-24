@@ -47,7 +47,8 @@ public class AiRetrievalController extends BaseController {
     /**
      * 检索测试：按查询文本召回切片，用于上线前验证问答质量
      *
-     * <p>按知识库生效范围校验：对当前用户不可见的知识库直接拒绝，避免绕过范围直接检索。</p>
+     * <p>按知识库生效范围与启用状态校验：对当前用户不可见或已停用的知识库直接拒绝，
+     * 避免绕过范围或对停用库直接检索。</p>
      *
      * @param kbId      知识库主键
      * @param query     查询文本
@@ -73,7 +74,7 @@ public class AiRetrievalController extends BaseController {
                                           @RequestParam(required = false) Boolean rerank,
                                           @RequestParam(required = false) Boolean assemble,
                                           @RequestParam(required = false) String rerankMode) {
-        aiKnowledgeBaseService.validateVisible(kbId, LoginHelper.getUserId(), "检索");
+        aiKnowledgeBaseService.validateRetrievable(List.of(kbId), LoginHelper.getUserId(), "检索");
         // 是否重排：传参显式覆盖；未传时按知识库配置（rerank_enabled + 绑定的重排模型）
         List<AiRetrievalHitVo> hits = aiVectorService.retrieve(kbId, query, topK, threshold, rerank, rerankMode);
         if (Boolean.TRUE.equals(assemble)) {

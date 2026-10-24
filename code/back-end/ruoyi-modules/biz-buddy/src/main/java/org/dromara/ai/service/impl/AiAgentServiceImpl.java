@@ -721,11 +721,9 @@ public class AiAgentServiceImpl implements IAiAgentService {
             return List.of();
         }
         List<Long> result = new ArrayList<>(new LinkedHashSet<>(kbIds));
-        for (Long kbId : result) {
-            knowledgeBaseService.getEnabledKnowledgeBase(kbId);
-        }
-        // 生效范围（REQ-AI-17）：只能绑定对**保存人**可见的知识库，避免配了用不上、或代人越权绑定
-        knowledgeBaseService.validateVisible(result, LoginHelper.getUserId(), "绑定");
+        // 生效范围 + 启用状态（REQ-AI-17）：只能绑定对保存人可见且启用中的知识库，
+        // 避免绑定停用库后要到对话时才失效，或代人越权绑定
+        knowledgeBaseService.validateRetrievable(result, LoginHelper.getUserId(), "绑定");
         return result;
     }
 

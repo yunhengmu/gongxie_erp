@@ -220,14 +220,14 @@ class AiKnowledgeBaseServiceImplTest {
     }
 
     /**
-     * 验证可见性校验：空输入放行、无法识别用户拒绝、全部可见放行。
+     * 验证可检索校验：空输入放行、无法识别用户拒绝、全部（可见且启用）放行。
      */
     @Test
-    @DisplayName("可见性校验放行分支")
-    void shouldPassValidateVisible() {
-        assertDoesNotThrow(() -> knowledgeBaseService.validateVisible(List.of(), 1L, "使用"));
+    @DisplayName("可检索校验放行分支")
+    void shouldPassValidateRetrievable() {
+        assertDoesNotThrow(() -> knowledgeBaseService.validateRetrievable(List.of(), 1L, "使用"));
 
-        assertThrows(ServiceException.class, () -> knowledgeBaseService.validateVisible(List.of(1L), null, "使用"));
+        assertThrows(ServiceException.class, () -> knowledgeBaseService.validateRetrievable(List.of(1L), null, "使用"));
 
         AiKnowledgeBase kb1 = new AiKnowledgeBase();
         kb1.setId(1L);
@@ -235,41 +235,50 @@ class AiKnowledgeBaseServiceImplTest {
         kb2.setId(2L);
         when(userService.selectById(7L)).thenReturn(null);
         when(baseMapper.selectList(any())).thenReturn(List.of(kb1, kb2));
-        assertDoesNotThrow(() -> knowledgeBaseService.validateVisible(List.of(1L, 2L), 7L, "使用"));
+        assertDoesNotThrow(() -> knowledgeBaseService.validateRetrievable(List.of(1L, 2L), 7L, "使用"));
     }
 
     /**
-     * 验证越权知识库被拒绝并列出名称。
+     * 验证停用库与越权库都被拒绝，并在提示中区分原因。
      */
     @Test
-    @DisplayName("越权知识库被拒绝")
-    void shouldRejectDeniedKb() {
-        AiKnowledgeBase kb1 = new AiKnowledgeBase();
-        kb1.setId(1L);
+    @DisplayName("停用库与越权库被拒绝")
+    void shouldRejectDisabledAndDeniedKb() {
+        AiKnowledgeBase allowed = new AiKnowledgeBase();
+        allowed.setId(1L);
         when(userService.selectById(7L)).thenReturn(null);
-        when(baseMapper.selectList(any())).thenReturn(List.of(kb1));
+        when(baseMapper.selectList(any())).thenReturn(List.of(allowed));
         AiKnowledgeBase denied = new AiKnowledgeBase();
+        denied.setId(2L);
         denied.setKbName("敏感库");
+        denied.setStatus("0");
         when(baseMapper.selectById(2L)).thenReturn(denied);
+        AiKnowledgeBase disabled = new AiKnowledgeBase();
+        disabled.setId(3L);
+        disabled.setKbName("旧库");
+        disabled.setStatus("1");
+        when(baseMapper.selectById(3L)).thenReturn(disabled);
 
         ServiceException ex = assertThrows(ServiceException.class,
-            () -> knowledgeBaseService.validateVisible(List.of(1L, 2L), 7L, "使用"));
-        assertTrue(ex.getMessage().contains("敏感库"));
+            () -> knowledgeBaseService.validateRetrievable(List.of(1L, 2L, 3L), 7L, "绑定"));
+        assertTrue(ex.getMessage().contains("敏感库（不在生效范围）"));
+        assertTrue(ex.getMessage().contains("旧库（已停用）"));
+        assertTrue(ex.getMessage().contains("绑定"));
     }
 
     /**
-     * 验证越权校验命中已删除知识库时以主键占位展示。
+     * 验证不可用校验命中已删除知识库时以主键占位展示。
      */
     @Test
-    @DisplayName("越权校验占位已删除知识库")
+    @DisplayName("不可用校验占位已删除知识库")
     void shouldUseIdPlaceholderWhenDeniedKbMissing() {
         when(userService.selectById(7L)).thenReturn(null);
         when(baseMapper.selectList(any())).thenReturn(List.of());
         when(baseMapper.selectById(3L)).thenReturn(null);
 
         ServiceException ex = assertThrows(ServiceException.class,
-            () -> knowledgeBaseService.validateVisible(List.of(3L), 7L, "使用"));
-        assertTrue(ex.getMessage().contains("#3"));
+            () -> knowledgeBaseService.validateRetrievable(List.of(3L), 7L, "使用"));
+        assertTrue(ex.getMessage().contains("#3（已删除）"));
     }
 
     /**

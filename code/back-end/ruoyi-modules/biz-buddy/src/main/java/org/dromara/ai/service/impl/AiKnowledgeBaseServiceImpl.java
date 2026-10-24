@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -192,34 +193,43 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
     }
 
     @Override
-    public void validateVisible(Collection<Long> kbIds, Long userId, String scene) {
+    public void validateRetrievable(Collection<Long> kbIds, Long userId, String scene) {
         if (kbIds == null || kbIds.isEmpty()) {
             return;
         }
         if (userId == null) {
             throw new ServiceException("无法识别当前用户，不能" + scene + "知识库");
         }
-        List<Long> visible = filterVisibleKbIds(kbIds, userId);
-        if (visible.size() == new HashSet<>(kbIds).size()) {
+        // 去重后一次性求「可见且启用」交集，避免逐个知识库查询
+        Set<Long> uniqueIds = new LinkedHashSet<>(kbIds);
+        Set<Long> allowed = new HashSet<>(intersectVisible(uniqueIds, userId, true));
+        if (allowed.size() == uniqueIds.size()) {
             return;
         }
-        Set<Long> allowed = new HashSet<>(visible);
         List<String> denied = new ArrayList<>();
-        for (Long kbId : kbIds) {
+        for (Long kbId : uniqueIds) {
             if (!allowed.contains(kbId)) {
-                AiKnowledgeBase kb = baseMapper.selectById(kbId);
-                denied.add(kb == null ? ("#" + kbId) : kb.getKbName());
+                denied.add(describeUnavailable(kbId));
             }
         }
-        throw new ServiceException("以下知识库不在你的生效范围内，不能" + scene + "：" + String.join("、", denied));
+        throw new ServiceException("以下知识库不可用于" + scene + "：" + String.join("、", denied));
     }
 
-    @Override
-    public void validateVisible(Long kbId, Long userId, String scene) {
-        if (kbId == null) {
-            return;
+    /**
+     * 描述知识库不可用的原因，便于用户直接定位是停用、删除还是越权。
+     *
+     * @param kbId 知识库主键
+     * @return 面向用户的描述
+     */
+    private String describeUnavailable(Long kbId) {
+        AiKnowledgeBase kb = baseMapper.selectById(kbId);
+        if (kb == null) {
+            return "#" + kbId + "（已删除）";
         }
-        validateVisible(List.of(kbId), userId, scene);
+        if (!STATUS_NORMAL.equals(kb.getStatus())) {
+            return kb.getKbName() + "（已停用）";
+        }
+        return kb.getKbName() + "（不在生效范围）";
     }
 
     /**

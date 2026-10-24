@@ -53,8 +53,8 @@ public interface IAiKnowledgeBaseService {
     /**
      * 求「指定知识库集合」与「指定用户可见集合」的交集。
      *
-     * <p>**只判可见性**，不含启用状态；供绑定校验等场景使用。检索链路请用
-     * {@link #filterRetrievableKbIds(Collection, Long)}。</p>
+     * <p>**只判可见性**，不含启用状态；供文档管理等「停用后仍需维护」的场景使用。绑定与检索请用
+     * {@link #filterRetrievableKbIds(Collection, Long)} / {@link #validateRetrievable(Collection, Long, String)}。</p>
      *
      * @param kbIds  待过滤的知识库主键集合
      * @param userId 提问用户主键
@@ -76,22 +76,16 @@ public interface IAiKnowledgeBaseService {
     List<Long> filterRetrievableKbIds(Collection<Long> kbIds, Long userId);
 
     /**
-     * 校验知识库集合对指定用户是否全部可见，不可见时抛出业务异常。
+     * 校验知识库集合对指定用户是否全部「可见且启用」，否则抛出业务异常。
+     *
+     * <p>用于**绑定**与**检索测试**等实际使用知识库的场景：停用库不可绑定、不可检索，
+     * 避免配置了停用库却要到对话时才失效。</p>
      *
      * @param kbIds  待校验的知识库主键集合
      * @param userId 用户主键
      * @param scene  场景描述（用于错误提示，如「绑定」「检索」）
      */
-    void validateVisible(Collection<Long> kbIds, Long userId, String scene);
-
-    /**
-     * 校验单个知识库对指定用户是否可见，不可见时抛出业务异常。
-     *
-     * @param kbId   知识库主键
-     * @param userId 用户主键
-     * @param scene  场景描述
-     */
-    void validateVisible(Long kbId, Long userId, String scene);
+    void validateRetrievable(Collection<Long> kbIds, Long userId, String scene);
 
     /**
      * 查询「公开且启用」的知识库主键集合（供 MCP 出口使用）。
