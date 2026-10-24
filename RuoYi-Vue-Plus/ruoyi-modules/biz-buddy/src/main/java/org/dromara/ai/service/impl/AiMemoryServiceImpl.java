@@ -112,6 +112,11 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     private static final int MAX_QUALITY_DAYS = 30;
 
     /**
+     * 框架读取空工作区文件时返回的内部提示：属展示噪音，接口层统一归一为空串
+     */
+    private static final String EMPTY_FILE_REMINDER = "System reminder: File exists but has empty contents";
+
+    /**
      * 记忆控制台使用的固定会话标识（用户级隔离下与会话无关）
      */
     private static final String CONSOLE_SESSION = "memory-console";
@@ -169,7 +174,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         WorkspaceManager workspace = workspaceOf(definition);
         RuntimeContext ctx = contextOf(userId);
         List<AiMemoryFileVo> files = new ArrayList<>();
-        files.add(buildFile(MEMORY_MD, "长期记忆（合并产物）", "MEMORY", null, workspace.readMemoryMd(ctx)));
+        files.add(buildFile(MEMORY_MD, "长期记忆（合并产物）", "MEMORY", null, readMemoryMd(workspace, ctx)));
         for (String path : safeMemoryPaths(workspace, ctx)) {
             if (MEMORY_MD.equals(path) || !ALLOWED_PATH.matcher(path).matches()) {
                 // 版本快照（memory/history/）与归档（memory/archive/）不在流水清单展示，
@@ -208,7 +213,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         boolean memoryFile = MEMORY_MD.equals(safePath);
         if (memoryFile) {
             // 人工编辑 MEMORY.md：覆盖前必须成功留下旧版本，失败则中止本次写入
-            snapshotMemory(workspace.getMemoryDir(ctx), workspace.readMemoryMd(ctx),
+            snapshotMemory(workspace.getMemoryDir(ctx), readMemoryMd(workspace, ctx),
                 "PRE_MANUAL", bo.getUserId(), "人工编辑前自动快照", null);
         }
         workspace.writeUtf8WorkspaceRelative(ctx, safePath, saved);
@@ -259,7 +264,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         Instant runStart = Instant.now();
 
         Model model = agentRegistry.memoryModelFor(definition);
-        String memoryMd = workspace.readMemoryMd(ctx);
+        String memoryMd = readMemoryMd(workspace, ctx);
         String memoryBefore = StringUtils.defaultString(memoryMd);
         // 合并是整文件覆盖：先记录合并前版本，快照失败则中止本次合并
         snapshotMemory(memoryDir, memoryMd, "PRE_CONSOLIDATE", userId,
@@ -330,7 +335,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         } catch (RuntimeException e) {
             // 部分批次可能已覆盖 MEMORY.md：尽力记录当前状态，便于恢复
             try {
-                snapshotMemory(memoryDir, workspace.readMemoryMd(ctx), "CONSOLIDATE_PARTIAL", userId,
+                snapshotMemory(memoryDir, readMemoryMd(workspace, ctx), "CONSOLIDATE_PARTIAL", userId,
                     "合并中断快照", null);
             } catch (Exception snapshotError) {
                 log.warn("合并中断版本快照失败：userId={}, err={}", userId, snapshotError.getMessage());
@@ -503,7 +508,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         WorkspaceManager workspace = workspaceOf(definition);
         RuntimeContext ctx = contextOf(userId);
         Path memoryDir = workspace.getMemoryDir(ctx);
-        String memory = workspace.readMemoryMd(ctx);
+        String memory = readMemoryMd(workspace, ctx);
         int memoryChars = StringUtils.length(memory);
         AuditSummary audit = summarizeAudit(memoryDir);
         return new MemoryBackendStats(userId == null ? 0L : userId, memoryChars,
@@ -699,7 +704,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         WorkspaceManager workspace = workspaceOf(definition);
         RuntimeContext ctx = contextOf(userId);
         Path memoryDir = workspace.getMemoryDir(ctx);
-        String current = workspace.readMemoryMd(ctx);
+        String current = readMemoryMd(workspace, ctx);
         return memoryVersionStore.list(memoryDir).stream()
             .map(entry -> {
                 AiMemoryVersionVo vo = toVersionVo(entry, null, current);
@@ -717,7 +722,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         Path memoryDir = workspace.getMemoryDir(ctx);
         AiMemoryVersionStore.VersionEntry entry = memoryVersionStore.read(memoryDir, versionId);
         String content = memoryVersionStore.readContent(memoryDir, versionId);
-        return toVersionVo(entry, content, workspace.readMemoryMd(ctx));
+        return toVersionVo(entry, content, readMemoryMd(workspace, ctx));
     }
 
     @Override
@@ -729,7 +734,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         Path memoryDir = workspace.getMemoryDir(ctx);
         AiMemoryVersionStore.VersionEntry target = memoryVersionStore.read(memoryDir, versionId);
         String targetContent = memoryVersionStore.readContent(memoryDir, versionId);
-        String current = workspace.readMemoryMd(ctx);
+        String current = readMemoryMd(workspace, ctx);
         if (targetContent.equals(current)) {
             return toVersionVo(target, targetContent, current);
         }
@@ -1494,6 +1499,30 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     }
 
     /**
+     * 读取长期记忆正文；框架对空文件会返回内部提示，这里统一归一为空串。
+     *
+     * @param workspace 工作区管理器
+     * @param ctx       运行上下文
+     * @return 长期记忆正文，空记忆时为空串
+     */
+    private String readMemoryMd(WorkspaceManager workspace, RuntimeContext ctx) {
+        return normalizeMemoryText(workspace.readMemoryMd(ctx));
+    }
+
+    /**
+     * 将框架的空文件占位提示归一为空串，避免界面把内部提示当成用户记忆展示。
+     *
+     * @param content 原始正文
+     * @return 归一后的正文
+     */
+    private static String normalizeMemoryText(String content) {
+        if (content == null) {
+            return null;
+        }
+        return EMPTY_FILE_REMINDER.equals(content.trim()) ? "" : content;
+    }
+
+    /**
      * 安全读取工作区记忆文件（不存在或读取失败时返回 null）。
      *
      * <p>长期记忆走框架的 {@code readMemoryMd}；每日流水按用户隔离后的记忆目录直接读取，
@@ -1507,7 +1536,7 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
     private String readQuietly(WorkspaceManager workspace, RuntimeContext ctx, String path) {
         try {
             if (MEMORY_MD.equals(path)) {
-                return workspace.readMemoryMd(ctx);
+                return readMemoryMd(workspace, ctx);
             }
             Path file = workspace.getMemoryDir(ctx).resolve(fileNameOf(path));
             return Files.exists(file) ? Files.readString(file, StandardCharsets.UTF_8) : null;

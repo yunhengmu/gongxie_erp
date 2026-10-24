@@ -165,6 +165,25 @@ class AiMemoryServiceImplTest {
     }
 
     /**
+     * 验证框架对空 MEMORY.md 返回的内部提示不会透出到接口层。
+     */
+    @Test
+    @DisplayName("空长期记忆归一为空串")
+    void shouldNormalizeEmptyMemoryReminder() {
+        WorkspaceManager workspace = stubWorkspace();
+        when(workspace.readMemoryMd(any()))
+            .thenReturn("System reminder: File exists but has empty contents");
+        when(workspace.listMemoryFilePaths(any())).thenReturn(List.of("MEMORY.md"));
+
+        AiMemoryContentVo content = memoryService.readContent(1L, 7L, "MEMORY.md");
+        List<AiMemoryFileVo> files = memoryService.listFiles(1L, 7L);
+
+        assertEquals("", content.getContent());
+        assertEquals(1, files.size());
+        assertEquals(0, files.get(0).getChars());
+    }
+
+    /**
      * 验证读取长期记忆正文。
      */
     @Test
