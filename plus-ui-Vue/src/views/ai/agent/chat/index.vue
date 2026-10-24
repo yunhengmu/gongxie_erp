@@ -391,17 +391,6 @@
         </div>
         <!-- 对话前标题：输入框上方约两行文字高度处，水平居中；发出第一条消息后移除 -->
         <div v-if="!messages.length" class="composer__title">BizBuddy, 我帮您</div>
-        <div v-if="!messages.length" class="composer__suggestions">
-          <button
-            v-for="item in PROMPT_SUGGESTIONS"
-            :key="item.label"
-            type="button"
-            class="composer-suggestion"
-            @click="applySuggestion(item.text)"
-          >
-            {{ item.label }}
-          </button>
-        </div>
         <el-input
           v-model="inputText"
           type="textarea"
@@ -772,13 +761,6 @@ const expertOptions = ref<ExpertOptionVO[]>([]);
 /** 窄屏下会话列表默认收起，避免占掉聊天区高度 */
 const sidebarCollapsed = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches);
 
-/** 首屏示例问题：点击填入输入框，用户可继续修改后发送 */
-const PROMPT_SUGGESTIONS = [
-  { label: '查通知公告', text: '帮我查一下最近的通知公告' },
-  { label: '知识库问答', text: '根据知识库说明 BizBuddy 的定位' },
-  { label: '建定时任务', text: '帮我建一个每天早上 9 点的日报任务' },
-  { label: '指定专家', text: '我想让公告管理专家处理这个问题' }
-];
 const packOptions = ref<ScenarioPackOptionVO[]>([]);
 const toolOptions = ref<ToolOptionVO[]>([]);
 const skillOptions = ref<SkillOptionVO[]>([]);
@@ -1795,11 +1777,6 @@ const loadSessionResourceSet = async (session: ChatSessionVO) => {
 const getSessions = async () => {
   const res = await listChatSession({ pageNum: 1, pageSize: 50, status: '0' });
   sessions.value = res.data?.rows ?? [];
-};
-
-/** 点击示例问题：填入输入框，不直接发送 */
-const applySuggestion = (text: string) => {
-  inputText.value = text;
 };
 
 /** 新建会话（清空当前会话上下文与资源选择，发送时再真正落库） */
@@ -2836,42 +2813,12 @@ onMounted(() => {
 
 /* 对话前标题：位于输入框上方约两行正文高度处，水平居中（对话后不渲染） */
 .composer__title {
-  margin-bottom: 16px;
+  margin-bottom: 44px;
   color: var(--el-text-color-primary, #303133);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.5px;
   text-align: center;
-}
-
-.composer__suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
-.composer-suggestion {
-  padding: 6px 12px;
-  border: 1px solid var(--app-surface-border);
-  border-radius: 999px;
-  background: var(--app-surface-bg);
-  color: var(--app-text-title);
-  font-size: 13px;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-
-.composer-suggestion:hover,
-.composer-suggestion:focus-visible {
-  border-color: var(--app-accent-strong);
-  color: var(--app-accent-strong);
-  background: var(--app-accent-soft);
-  outline: none;
 }
 
 .chat-mobile-bar {
