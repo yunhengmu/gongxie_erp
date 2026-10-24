@@ -18,7 +18,7 @@
 
 ## 平台简介
 
-BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus) `6.0.0` 的成熟中后台底座（RBAC、工作流、调度、代码生成、文件存储、消息推送等）之上，以 **AgentScope Java 2.0.4** 为智能体内核，叠加了一整套可运营的 AI 能力。
+BizBuddy 是一个**企业级智能业务运行平台**：它在成熟的开源中后台底座（RBAC、工作流、调度、代码生成、文件存储、消息推送等）之上，以 **AgentScope Java 2.0.4** 为智能体内核，叠加了一整套可运营的 AI 能力。
 
 核心运行形态：
 
@@ -41,6 +41,22 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在 [Dromara RuoYi-
 | [`deploy/deploy-mysql/`](deploy/deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
 | [`e2e/http/`](e2e/http) | **端到端测试脚本（接口层）**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP / SSE 断言，见下文「测试与覆盖率」 |
 | [`e2e/ui/`](e2e/ui) | **端到端测试套件（浏览器层）**（Playwright + chromium，独立目录承载重依赖）：登录 / 菜单可达性 / 会话主路径 / 指定专家 / 停止生成 / HITL 等前端关键路径，见下文「测试与覆盖率」 |
+
+```
+biz-buddy/
+├── code/
+│   ├── back-end/        # 后端工程（Spring Boot 4.1.1 + JDK 21，多模块 Maven）
+│   └── front-end/       # 前端工程（Vue 3 + TypeScript + Element Plus + Vite）
+├── deploy/
+│   ├── deploy-pg/       # PostgreSQL 全栈容器编排
+│   └── deploy-mysql/    # MySQL 8.0 全栈容器编排
+├── docs/                # 开发者文档 + 平台功能说明 + 界面截图（images/）
+└── e2e/
+    ├── http/            # 接口层端到端（Node.js 零依赖）
+    └── ui/              # 浏览器层端到端（Playwright + chromium）
+```
+
+> **2026-10 目录重组**：后端与前端工程的原目录更名为 `back-end` / `front-end`，并统一收拢到 `code/`；平台功能说明与截图由 `back-end/docs/` 迁入 `docs/`；原 `e2e-http`、`e2e-ui` 收拢为 `e2e/http`、`e2e/ui`。文档与脚本内的路径已同步。
 
 ## 功能说明
 
@@ -277,4 +293,4 @@ BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test   # MySQL 栈
 
 Copyright © 2026 [AI架构师张磊](https://space.bilibili.com/482393709) All Rights Reserved.
 
-后端底座源自 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus)（MIT License），本仓库在其基础上进行 BizBuddy 平台化改造。
+后端底座基于成熟的开源中后台框架（MIT License）构建，本仓库在其基础上进行 BizBuddy 平台化改造。

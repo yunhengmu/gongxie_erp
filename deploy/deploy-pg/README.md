@@ -89,7 +89,7 @@ comment on column ai_channel.mode is '接入形态：webhook Webhook 回调（�
 |---|---|
 | bizbuddy-postgres / redis / milvus / milvus-etcd | Up (healthy) |
 | bizbuddy-minio（平台 OSS，Milvus 复用其 `milvus-bucket` 桶） | Up (healthy)；`minio-init` 一次性建桶 / 上传演示文档后退出 |
-| bizbuddy-admin | Up，日志 `RuoYi-Vue-Plus启动成功`，无 ERROR |
+| bizbuddy-admin | Up，启动成功日志，无 ERROR |
 | bizbuddy-snailjob-server | Up，无 ERROR |
 | bizbuddy-web | Up |
 

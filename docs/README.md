@@ -11,6 +11,19 @@
 | [configuration.md](configuration.md) | 配置项参考（`bizbuddy.ai.*`）与生产必改清单 |
 | [release-checklist.md](release-checklist.md) | **发版门禁清单**：五道门禁（集成测试 / e2e 全量 / 重建冒烟 / 日志与体检 / 存量库升级）与实测基线 |
 
+## 仓库目录
+
+| 目录 | 说明 |
+|---|---|
+| `code/back-end/` | 后端工程：Spring Boot 4.1.1 + JDK 21，AI 能力在 `ruoyi-modules/biz-buddy` |
+| `code/front-end/` | 前端工程：Vue 3 + TypeScript + Element Plus + Vite |
+| `deploy/deploy-pg/`、`deploy/deploy-mysql/` | 两套全栈容器编排（PostgreSQL / MySQL 8.0），端口错开可同时运行 |
+| `docs/` | 本目录：开发者文档、平台功能说明 [BizBuddy平台功能说明.md](BizBuddy平台功能说明.md) 与界面截图 `images/` |
+| `e2e/http/` | 接口层端到端（Node.js 零依赖，`node e2e/http/run.mjs`） |
+| `e2e/ui/` | 浏览器层端到端（Playwright，`cd e2e/ui && pnpm test`） |
+
+> **2026-10 目录重组**：后端 / 前端工程更名为 `back-end` / `front-end` 并收拢到 `code/`；平台功能说明与截图由 `back-end/docs/` 迁入本目录（`docs/`）；`e2e-http`、`e2e-ui` 收拢为 `e2e/http`、`e2e/ui`。
+
 ## 我要改哪里？
 
 | 想做的事 | 从哪里入手 |
@@ -45,7 +58,7 @@ cd ../../code/front-end && pnpm install && pnpm dev
 单测基于 Mockito 打桩、**不起 Spring 容器**；要验证「模型连通 / 知识库检索 / 专家编排 / 写工具人工确认 / 安全合规 / MCP 双向」在真实环境下的行为，用仓库根目录的 `e2e/http/`（Node.js 零依赖，对**已运行**的栈发真实 HTTP 断言）：
 
 ```bash
-cd ..                       # 回到仓库根（biz-buddy/）
+cd ../..                    # 回到仓库根（biz-buddy/）
 node e2e/http/run.mjs                                  # 全量（未配置密钥的层自动 SKIP）
 node e2e/http/run.mjs --only L1,L3 --verbose            # 指定层级
 node e2e/http/run.mjs --base-url http://localhost:8081  # 指向 MySQL 栈（PG 栈默认 8080）
@@ -76,4 +89,4 @@ AI 能力集中在 `ruoyi-modules/biz-buddy`（包 `org.dromara.ai`）：
 
 ## 许可与署名
 
-本项目采用 [MIT License](../LICENSE)。后端底座源自 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus)（MIT），智能体内核为 AgentScope Harness。二次分发时请保留署名。
+本项目采用 [MIT License](../LICENSE)，智能体内核为 AgentScope Harness。二次分发时请保留 `LICENSE` 中的版权与许可声明。
