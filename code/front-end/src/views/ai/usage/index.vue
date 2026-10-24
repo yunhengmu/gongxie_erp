@@ -24,6 +24,12 @@
               <el-option v-for="item in agentOptions" :key="String(item.id)" :label="item.agentName" :value="item.id" />
             </el-select>
           </el-form-item>
+          <el-form-item label="类型" prop="usageType">
+            <el-select v-model="queryParams.usageType" placeholder="全部" clearable style="width: 140px">
+              <el-option label="对话" value="0" />
+              <el-option label="知识库入库" value="1" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="所属用户" prop="userId">
             <el-select
               v-model="queryParams.userId"
@@ -54,7 +60,7 @@
         <div class="toolbar-shell">
           <div class="table-heading">
             <h3>用量与配额</h3>
-            <p>按「日期 + 智能体 + 模型 + 用户」汇总 Token 与费用；费用按模型配置的单价估算，未配置单价时按 0 计。</p>
+            <p>按「日期 + 智能体 + 模型 + 用户 + 类型」汇总 Token 与费用；知识库入库记在「知识库入库」名下，只计入成本、不占对话配额。费用按模型配置的单价估算，未配置单价时按 0 计。</p>
           </div>
           <div class="toolbar-actions">
             <el-button v-hasPermi="['ai:usage:export']" type="primary" plain icon="Download" @click="handleExport">
@@ -76,7 +82,7 @@
         <div class="usage-kpi">
           <span class="usage-kpi__label">请求数</span>
           <strong class="usage-kpi__value">{{ overview.total?.requestCount ?? 0 }}</strong>
-          <span class="usage-kpi__hint">工具调用 {{ overview.total?.toolCallCount ?? 0 }}</span>
+          <span class="usage-kpi__hint">仅对话 · 工具调用 {{ overview.total?.toolCallCount ?? 0 }}</span>
         </div>
         <div class="usage-kpi">
           <span class="usage-kpi__label">费用（元）</span>
@@ -129,6 +135,13 @@
         <div class="section-title">用量明细</div>
         <el-table v-loading="loading" border class="data-table" :data="usageList">
           <el-table-column label="日期" align="center" prop="statDate" width="120" />
+          <el-table-column label="类型" align="center" width="110">
+            <template #default="scope">
+              <el-tag :type="scope.row.usageType === '1' ? 'info' : 'primary'" effect="plain" size="small">
+                {{ scope.row.usageType === '1' ? '知识库入库' : '对话' }}
+              </el-tag>
+            </template>
+          </el-table-column>
           <el-table-column label="智能体" align="left" prop="agentName" :show-overflow-tooltip="true" />
           <el-table-column label="模型" align="left" width="160" :show-overflow-tooltip="true">
             <template #default="scope">
@@ -192,6 +205,7 @@ const queryParams = ref<UsageStatQuery>({
   beginDate: undefined,
   endDate: undefined,
   agentId: undefined,
+  usageType: undefined,
   userId: undefined
 });
 

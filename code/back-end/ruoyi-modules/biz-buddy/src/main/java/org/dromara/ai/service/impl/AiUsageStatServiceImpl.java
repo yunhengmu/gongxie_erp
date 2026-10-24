@@ -130,12 +130,49 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
         stat.setAgentId(agentId);
         stat.setModelId(modelId);
         stat.setUserId(userId);
+        stat.setUsageType(AiUsageStat.USAGE_TYPE_CHAT);
         stat.setPromptTokens(prompt);
         stat.setCompletionTokens(completion);
         stat.setTotalTokens(total);
         stat.setRequestCount(requestCount);
         stat.setToolCallCount(toolCallCount);
         stat.setCost(cost);
+        if (!writeStat(stat)) {
+            return;
+        }
+        incrementCounters(userId, total, requestCount);
+    }
+
+    @Override
+    public void accumulateEmbedding(Long userId, Long modelId, long tokens) {
+        if (userId == null || tokens <= 0) {
+            return;
+        }
+        AiUsageStat stat = new AiUsageStat();
+        stat.setId(IdGeneratorUtil.nextLongId());
+        stat.setStatDate(LocalDate.now());
+        // 入库无智能体归属：用哨兵 0 记账（雪花主键不会产生 0），保留 agent_id 非空约束
+        stat.setAgentId(AiUsageStat.NO_AGENT_ID);
+        stat.setModelId(modelId);
+        stat.setUserId(userId);
+        stat.setUsageType(AiUsageStat.USAGE_TYPE_EMBEDDING);
+        // 向量化只有输入侧消耗；请求数固定 0，避免入库批次污染对话配额口径
+        stat.setPromptTokens(tokens);
+        stat.setCompletionTokens(0L);
+        stat.setTotalTokens(tokens);
+        stat.setRequestCount(0);
+        stat.setToolCallCount(0);
+        stat.setCost(estimateCost(modelId, tokens, 0));
+        writeStat(stat);
+    }
+
+    /**
+     * 按数据源方言写入一行用量增量。
+     *
+     * @param stat 用量增量
+     * @return 写入成功返回 true；失败（吞掉异常）返回 false
+     */
+    private boolean writeStat(AiUsageStat stat) {
         try {
             // 两方言的累加 upsert 语法不同（PostgreSQL on conflict / MySQL on duplicate key），按数据源选择
             if (isMysqlDialect()) {
@@ -143,12 +180,13 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
             } else {
                 usageStatMapper.upsert(stat);
             }
+            return true;
         } catch (Exception e) {
-            // 统计失败不影响对话主流程
-            log.error("用量统计写入失败：userId={}, agentId={}, modelId={}", userId, agentId, modelId, e);
-            return;
+            // 统计失败不影响主流程（对话 / 入库继续）
+            log.error("用量统计写入失败：userId={}, agentId={}, modelId={}, usageType={}",
+                stat.getUserId(), stat.getAgentId(), stat.getModelId(), stat.getUsageType(), e);
+            return false;
         }
-        incrementCounters(userId, total, requestCount);
     }
 
     /**
@@ -202,7 +240,7 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
             String dateKey = row.getStatDate() == null ? "-" : row.getStatDate().toString();
             merge(byDate, dateKey, dateKey, row);
             String agentKey = String.valueOf(row.getAgentId());
-            merge(byAgent, agentKey, agentNames.getOrDefault(row.getAgentId(), "已删除智能体"), row);
+            merge(byAgent, agentKey, agentLabel(row, agentNames), row);
             String modelKey = String.valueOf(row.getModelId());
             merge(byModel, modelKey, modelNames.getOrDefault(row.getModelId(), "未指定模型"), row);
         }
@@ -220,6 +258,7 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
         for (AiUsageStatVo row : rows) {
             AiUsageStatExportVo vo = new AiUsageStatExportVo();
             vo.setStatDate(row.getStatDate() == null ? "" : row.getStatDate().toString());
+            vo.setUsageTypeName(AiUsageStat.USAGE_TYPE_EMBEDDING.equals(row.getUsageType()) ? "知识库入库" : "对话");
             vo.setAgentName(row.getAgentName());
             vo.setModelName(row.getModelName());
             vo.setUserName(row.getUserName());
@@ -255,6 +294,8 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
         LambdaQueryWrapper<AiUsageStat> lqw = Wrappers.lambdaQuery();
         lqw.eq(AiUsageStat::getUserId, userId);
         lqw.eq(AiUsageStat::getStatDate, today);
+        // 只统计对话用量：知识库入库不占用用户的对话配额
+        lqw.ne(AiUsageStat::getUsageType, AiUsageStat.USAGE_TYPE_EMBEDDING);
         long sum = 0L;
         for (AiUsageStat row : usageStatMapper.selectList(lqw)) {
             sum += row.getRequestCount() == null ? 0L : row.getRequestCount();
@@ -285,6 +326,8 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
         lqw.eq(AiUsageStat::getUserId, userId);
         lqw.ge(AiUsageStat::getStatDate, begin);
         lqw.le(AiUsageStat::getStatDate, end);
+        // 只统计对话用量：知识库入库只影响成本展示，不占用用户的对话配额
+        lqw.ne(AiUsageStat::getUsageType, AiUsageStat.USAGE_TYPE_EMBEDDING);
         long sum = 0L;
         for (AiUsageStat row : usageStatMapper.selectList(lqw)) {
             sum += row.getTotalTokens() == null ? 0L : row.getTotalTokens();
@@ -403,6 +446,7 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
         lqw.eq(bo.getAgentId() != null, AiUsageStat::getAgentId, bo.getAgentId());
         lqw.eq(bo.getModelId() != null, AiUsageStat::getModelId, bo.getModelId());
         lqw.eq(bo.getUserId() != null, AiUsageStat::getUserId, bo.getUserId());
+        lqw.eq(bo.getUsageType() != null, AiUsageStat::getUsageType, bo.getUsageType());
         lqw.orderByDesc(AiUsageStat::getStatDate);
         lqw.orderByDesc(AiUsageStat::getId);
         return lqw;
@@ -431,7 +475,7 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
         for (AiUsageStat entity : list) {
             AiUsageStatVo vo = new AiUsageStatVo();
             BeanUtils.copyProperties(entity, vo);
-            vo.setAgentName(agentNames.get(entity.getAgentId()));
+            vo.setAgentName(agentLabel(entity, agentNames));
             vo.setUserName(userNames.get(entity.getUserId()));
             ModelMeta meta = modelMeta.get(entity.getModelId());
             vo.setModelName(meta == null ? null : meta.name());
@@ -439,6 +483,20 @@ public class AiUsageStatServiceImpl implements IAiUsageStatService {
             rows.add(vo);
         }
         return rows;
+    }
+
+    /**
+     * 解析用量行的智能体展示名：入库用哨兵 0，显示为平台动作而非「已删除智能体」。
+     *
+     * @param row        用量行
+     * @param agentNames 智能体主键 → 名称
+     * @return 展示名
+     */
+    private String agentLabel(AiUsageStat row, Map<Long, String> agentNames) {
+        if (AiUsageStat.NO_AGENT_ID.equals(row.getAgentId())) {
+            return "知识库入库";
+        }
+        return agentNames.getOrDefault(row.getAgentId(), "已删除智能体");
     }
 
     /**

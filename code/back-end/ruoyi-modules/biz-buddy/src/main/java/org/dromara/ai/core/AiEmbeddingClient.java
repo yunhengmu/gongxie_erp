@@ -42,7 +42,21 @@ public class AiEmbeddingClient {
      */
     private static final String ENDPOINT_SUFFIX = "/embeddings";
 
+    /**
+     * Token 与字符的粗略折算比例（响应未返回 usage 时兜底估算，与记忆计量同口径）
+     */
+    private static final int CHARS_PER_TOKEN = 4;
+
     private final AiProperties aiProperties;
+
+    /**
+     * 向量化结果。
+     *
+     * @param vectors     向量列表，与入参顺序一致
+     * @param totalTokens 本次调用消耗的 Token（响应未带 usage 时按字符数估算）
+     */
+    public record EmbeddingResult(List<double[]> vectors, long totalTokens) {
+    }
 
     /**
      * 批量文本向量化。
@@ -50,12 +64,12 @@ public class AiEmbeddingClient {
      * @param config  向量模型配置
      * @param apiKey  明文密钥（可为空，本地模型无需密钥）
      * @param texts   待向量化文本，顺序与返回结果一一对应
-     * @return 向量列表，与入参顺序一致
+     * @return 向量列表与本次消耗的 Token
      */
-    public List<double[]> embed(AiModelConfig config, String apiKey, List<String> texts) {
+    public EmbeddingResult embed(AiModelConfig config, String apiKey, List<String> texts) {
         List<double[]> result = new ArrayList<>(texts.size());
         if (texts.isEmpty()) {
-            return result;
+            return new EmbeddingResult(result, 0L);
         }
         validate(config);
         List<String> prepared = new ArrayList<>(texts.size());
@@ -68,16 +82,19 @@ public class AiEmbeddingClient {
             prepared.add(trimmed.length() > max ? trimmed.substring(0, max) : trimmed);
         }
 
+        long totalTokens = 0L;
         int batchSize = Math.max(1, aiProperties.getEmbeddingBatchSize());
         for (int start = 0; start < prepared.size(); start += batchSize) {
             int end = Math.min(start + batchSize, prepared.size());
-            result.addAll(embedBatch(config, apiKey, prepared.subList(start, end)));
+            EmbeddingResult batchResult = embedBatch(config, apiKey, prepared.subList(start, end));
+            result.addAll(batchResult.vectors());
+            totalTokens += batchResult.totalTokens();
         }
-        return result;
+        return new EmbeddingResult(result, totalTokens);
     }
 
     /**
-     * 单条文本向量化。
+     * 单条文本向量化（检索查询向量；用量不计入入库统计）。
      *
      * @param config 向量模型配置
      * @param apiKey 明文密钥
@@ -85,7 +102,7 @@ public class AiEmbeddingClient {
      * @return 向量
      */
     public double[] embedOne(AiModelConfig config, String apiKey, String text) {
-        return embed(config, apiKey, List.of(text)).get(0);
+        return embed(config, apiKey, List.of(text)).vectors().get(0);
     }
 
     /**
@@ -94,9 +111,9 @@ public class AiEmbeddingClient {
      * @param config 向量模型配置
      * @param apiKey 明文密钥
      * @param batch  本批文本
-     * @return 向量列表
+     * @return 向量列表与本批 Token
      */
-    private List<double[]> embedBatch(AiModelConfig config, String apiKey, List<String> batch) {
+    private EmbeddingResult embedBatch(AiModelConfig config, String apiKey, List<String> batch) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", config.getModelCode());
         body.put("input", batch);
@@ -126,7 +143,35 @@ public class AiEmbeddingClient {
         if (status < 200 || status >= 300) {
             throw new ServiceException("向量化失败（HTTP " + status + "）：" + extractError(responseBody));
         }
-        return parseVectors(responseBody, batch.size());
+        JsonNode root = JsonUtils.getJsonMapper().readTree(responseBody);
+        return new EmbeddingResult(parseVectors(root, batch.size(), responseBody), parseUsageTokens(root, batch));
+    }
+
+    /**
+     * 解析响应中的 Token 用量。
+     *
+     * <p>OpenAI 兼容响应通常带 {@code usage.total_tokens}；部分网关不返回，此时按
+     * 「1 Token ≈ 4 字符」估算，保证入库成本仍然可见（与记忆计量同口径）。</p>
+     *
+     * @param root  响应根节点
+     * @param batch 本批文本
+     * @return 本批消耗的 Token（至少 1）
+     */
+    private long parseUsageTokens(JsonNode root, List<String> batch) {
+        JsonNode usage = root.path("usage");
+        long total = usage.path("total_tokens").asLong(0);
+        if (total > 0) {
+            return total;
+        }
+        long prompt = usage.path("prompt_tokens").asLong(0);
+        if (prompt > 0) {
+            return prompt;
+        }
+        long chars = 0L;
+        for (String text : batch) {
+            chars += text.length();
+        }
+        return Math.max(1L, chars / CHARS_PER_TOKEN);
     }
 
     /**
@@ -136,12 +181,13 @@ public class AiEmbeddingClient {
      * `qwen3.7-text-embedding-flash`）对批量输入**只回 `index=0`**。故此处两遍解析：
      * `index` 完整且互不重复时按 `index` 归位，缺失 / 越界 / 重复时退回「响应顺序＝入参顺序」。</p>
      *
-     * @param responseBody 响应体
+     * @param root         响应根节点
      * @param expected     期望条数
+     * @param responseBody 响应原文（仅用于异常提示）
      * @return 向量列表，与入参顺序一致
      */
-    private List<double[]> parseVectors(String responseBody, int expected) {
-        JsonNode data = JsonUtils.getJsonMapper().readTree(responseBody).path("data");
+    private List<double[]> parseVectors(JsonNode root, int expected, String responseBody) {
+        JsonNode data = root.path("data");
         if (!data.isArray() || data.size() != expected) {
             throw new ServiceException("向量化返回条数与请求不一致（期望 " + expected
                 + "，实际 " + (data.isArray() ? data.size() : 0) + "）：" + abbreviate(responseBody));

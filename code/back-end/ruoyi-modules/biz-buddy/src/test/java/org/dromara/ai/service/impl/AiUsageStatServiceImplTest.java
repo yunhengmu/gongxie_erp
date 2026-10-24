@@ -120,6 +120,8 @@ class AiUsageStatServiceImplTest {
             assertEquals(300L, stat.getTotalTokens());
             assertEquals(2, stat.getToolCallCount());
             assertEquals(1, stat.getRequestCount());
+            // 对话用量与知识库入库用量共用一张表，类型必须区分
+            assertEquals(AiUsageStat.USAGE_TYPE_CHAT, stat.getUsageType());
             // (100/1000)*2 + (200/1000)*3 = 0.2 + 0.6 = 0.8
             assertEquals(0, new BigDecimal("0.800000").compareTo(stat.getCost()));
             // 当日 + 当月 Token 各累加 300；当日请求累加 1
@@ -157,6 +159,43 @@ class AiUsageStatServiceImplTest {
     }
 
     /**
+     * 验证知识库入库用量：记入哨兵智能体、类型为入库，只累计 Token 与费用，不占用对话配额。
+     */
+    @Test
+    @DisplayName("入库用量只记成本不占对话配额")
+    void shouldAccumulateEmbeddingWithoutQuota() {
+        AiModelConfig model = model(9L, "embed");
+        model.setInputPrice(new BigDecimal("2"));
+        when(modelConfigMapper.selectById(9L)).thenReturn(model);
+        when(usageStatMapper.upsert(any(AiUsageStat.class))).thenReturn(1);
+
+        try (MockedStatic<IdGeneratorUtil> id = mockStatic(IdGeneratorUtil.class)) {
+            id.when(IdGeneratorUtil::nextLongId).thenReturn(321L);
+
+            usageStatService.accumulateEmbedding(7L, 9L, 1500L);
+
+            ArgumentCaptor<AiUsageStat> captor = ArgumentCaptor.forClass(AiUsageStat.class);
+            verify(usageStatMapper).upsert(captor.capture());
+            AiUsageStat stat = captor.getValue();
+            assertEquals(321L, stat.getId());
+            assertEquals(7L, stat.getUserId());
+            // 入库无智能体归属，固定记在哨兵 0 名下
+            assertEquals(AiUsageStat.NO_AGENT_ID, stat.getAgentId());
+            assertEquals(AiUsageStat.USAGE_TYPE_EMBEDDING, stat.getUsageType());
+            // 向量化只有输入侧消耗
+            assertEquals(1500L, stat.getPromptTokens());
+            assertEquals(0L, stat.getCompletionTokens());
+            assertEquals(1500L, stat.getTotalTokens());
+            assertEquals(0, stat.getRequestCount());
+            assertEquals(0, stat.getToolCallCount());
+            // (1500/1000)*2 = 3
+            assertEquals(0, new BigDecimal("3.000000").compareTo(stat.getCost()));
+            // 入库不累加 Redis 日 / 月配额计数
+            verifyNoInteractions(redissonClient);
+        }
+    }
+
+    /**
      * 验证缺少用户 / 智能体 / Token 时直接跳过，不产生任何写入。
      */
     @Test
@@ -165,6 +204,9 @@ class AiUsageStatServiceImplTest {
         usageStatService.accumulate(null, 5L, 9L, new ChatTokenUsage(1, 2, 3), 0, 1);
         usageStatService.accumulate(7L, null, 9L, new ChatTokenUsage(1, 2, 3), 0, 1);
         usageStatService.accumulate(7L, 5L, 9L, null, 0, 1);
+        // 入库用量：无归属用户或 Token 非正数同样跳过
+        usageStatService.accumulateEmbedding(null, 9L, 10L);
+        usageStatService.accumulateEmbedding(7L, 9L, 0L);
 
         verifyNoInteractions(usageStatMapper, redissonClient);
     }

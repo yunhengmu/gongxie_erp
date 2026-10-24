@@ -18,6 +18,7 @@ import org.dromara.ai.mapper.AiModelConfigMapper;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiModelConfigService;
 import org.dromara.ai.service.IAiSafetyEventService;
+import org.dromara.ai.service.IAiUsageStatService;
 import org.dromara.common.core.exception.ServiceException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -64,6 +65,9 @@ class AiVectorServiceImplTest {
     private AiEmbeddingClient embeddingClient;
 
     @Mock
+    private IAiUsageStatService usageStatService;
+
+    @Mock
     private AiVectorStore vectorStore;
 
     @Mock
@@ -92,8 +96,8 @@ class AiVectorServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new AiVectorServiceImpl(chunkMapper, documentMapper, modelConfigMapper,
-            knowledgeBaseService, modelConfigService, embeddingClient, vectorStore, rerankClient, aiProperties,
-            safetyGuard, safetyEventService);
+            knowledgeBaseService, modelConfigService, embeddingClient, usageStatService, vectorStore, rerankClient,
+            aiProperties, safetyGuard, safetyEventService);
         // 融合相关配置复位到与「纯替换」等价，避免用例间相互影响；召回条数固定 20 以匹配桩
         aiProperties.getRag().setRerankMode("replace");
         aiProperties.getRag().setRerankTriggerMargin(0);
@@ -150,6 +154,8 @@ class AiVectorServiceImplTest {
         doc.setDocName("doc");
         doc.setParseStatus("2");
         doc.setVectorStatus("0");
+        // 入库成本归属：异步线程无登录上下文时退回文档创建人
+        doc.setCreateBy(9L);
         return doc;
     }
 
@@ -198,7 +204,8 @@ class AiVectorServiceImplTest {
         claimed.setVectorStatus("1");
         when(documentMapper.selectById(1L)).thenReturn(claimed);
         when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(1L, "a")));
-        when(embeddingClient.embed(model, "key", List.of("a"))).thenReturn(List.of(new double[]{1, 2, 3}));
+        when(embeddingClient.embed(model, "key", List.of("a")))
+            .thenReturn(new AiEmbeddingClient.EmbeddingResult(List.of(new double[]{1, 2, 3}), 12L));
         when(vectorStore.add(eq("col"), eq(3), any())).thenReturn(List.of("v1"));
         when(documentMapper.selectVoById(1L)).thenReturn(new AiDocumentVo());
 
@@ -250,7 +257,8 @@ class AiVectorServiceImplTest {
         AiChunk c2 = chunk(2L, "b");
         when(chunkMapper.selectList(any())).thenReturn(List.of(c1, c2));
         when(embeddingClient.embed(model, "key", List.of("a", "b")))
-            .thenReturn(List.of(new double[]{1, 2, 3}, new double[]{4, 5, 6}));
+            .thenReturn(new AiEmbeddingClient.EmbeddingResult(
+                List.of(new double[]{1, 2, 3}, new double[]{4, 5, 6}), 20L));
         when(vectorStore.add(eq("col"), eq(3), any())).thenReturn(List.of("v1", "v2"));
         when(documentMapper.selectVoById(1L)).thenReturn(new AiDocumentVo());
 
@@ -269,7 +277,7 @@ class AiVectorServiceImplTest {
         stubVectorizeCommon(kb, model);
         when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(1L, "a")));
         when(embeddingClient.embed(model, "key", List.of("a")))
-            .thenReturn(List.of(new double[]{1, 2}));
+            .thenReturn(new AiEmbeddingClient.EmbeddingResult(List.of(new double[]{1, 2}), 12L));
 
         assertThrows(ServiceException.class, () -> service.vectorizeDocument(1L));
     }

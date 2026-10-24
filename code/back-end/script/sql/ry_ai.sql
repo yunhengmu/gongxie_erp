@@ -1023,21 +1023,22 @@ create table if not exists ai_agent_task_run (
 create table if not exists ai_usage_stat (
     id                bigint(20)         not null,
     stat_date         date           not null comment '统计日期',
-    agent_id          bigint(20)         not null,
+    agent_id          bigint(20)         not null comment '智能体主键；知识库入库等无智能体归属的平台调用固定为 0',
     model_id          bigint(20),
     user_id           bigint(20)         not null,
+    usage_type        char(1)        not null default '0' comment '用量类型（0对话 1知识库入库）',
     prompt_tokens     bigint(20)         default 0,
     completion_tokens bigint(20)         default 0,
     total_tokens      bigint(20)         default 0,
-    request_count     int        default 0 comment '请求（对话轮次）数',
+    request_count     int        default 0 comment '请求（对话轮次）数；知识库入库固定为 0',
     tool_call_count   int        default 0 comment '工具调用次数',
     cost              decimal(14, 6) default 0 comment '费用估算（元；按模型单价计算，未配置单价按 0 计）',
     create_time       datetime,
     update_time       datetime,
     constraint pk_ai_usage_stat primary key (id),
     key idx_ai_usage_user (user_id, stat_date DESC),
-    unique key uk_ai_usage (stat_date, agent_id, model_id, user_id)
-) engine=innodb default charset=utf8mb4 comment='AI 用量统计表（按日期 / 智能体 / 模型 / 用户聚合）';
+    unique key uk_ai_usage (stat_date, agent_id, model_id, user_id, usage_type)
+) engine=innodb default charset=utf8mb4 comment='AI 用量统计表（按日期 / 智能体 / 模型 / 用户 / 用量类型聚合）';
 
 create table if not exists ai_daily_digest (
     id                        bigint(20)     not null,

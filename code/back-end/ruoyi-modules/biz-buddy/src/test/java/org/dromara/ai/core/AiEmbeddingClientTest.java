@@ -89,7 +89,7 @@ class AiEmbeddingClientTest {
     @Test
     @DisplayName("空文本列表直接返回空结果")
     void shouldReturnEmptyForEmptyInput() {
-        assertTrue(client.embed(config("https://api.test/v1"), "key", List.of()).isEmpty());
+        assertTrue(client.embed(config("https://api.test/v1"), "key", List.of()).vectors().isEmpty());
     }
 
     @Test
@@ -124,7 +124,7 @@ class AiEmbeddingClientTest {
             + "{\"index\":0,\"embedding\":[0.1,0.2]}]}";
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(200, body));
-            List<double[]> result = client.embed(config("https://api.test/v1/"), "key", List.of(" a ", "b"));
+            List<double[]> result = client.embed(config("https://api.test/v1/"), "key", List.of(" a ", "b")).vectors();
             assertEquals(2, result.size());
             assertArrayEquals(new double[]{0.1, 0.2}, result.get(0));
             assertArrayEquals(new double[]{0.3, 0.4, 0.5}, result.get(1));
@@ -174,7 +174,7 @@ class AiEmbeddingClientTest {
         String body = "{\"data\":[{\"index\":0,\"embedding\":[0.1]}]}";
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(200, body));
-            List<double[]> result = client.embed(config("https://api.test/v1"), "key", List.of("a", "b"));
+            List<double[]> result = client.embed(config("https://api.test/v1"), "key", List.of("a", "b")).vectors();
             assertEquals(2, result.size());
             httpUtil.verify(() -> HttpUtil.createPost(anyString()), times(2));
         }
@@ -261,7 +261,7 @@ class AiEmbeddingClientTest {
         String body = "{\"data\":[{\"index\":0,\"embedding\":[0.1]},{\"index\":0,\"embedding\":[0.2]}]}";
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(200, body));
-            List<double[]> result = client.embed(config("https://api.test/v1"), "key", List.of("a", "b"));
+            List<double[]> result = client.embed(config("https://api.test/v1"), "key", List.of("a", "b")).vectors();
             assertEquals(2, result.size());
             assertArrayEquals(new double[]{0.1}, result.get(0));
             assertArrayEquals(new double[]{0.2}, result.get(1));
@@ -274,10 +274,32 @@ class AiEmbeddingClientTest {
         String body = "{\"data\":[{\"embedding\":[0.1]},{\"embedding\":[0.2]}]}";
         try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
             requestWith(httpUtil, response(200, body));
-            List<double[]> result = client.embed(config("https://api.test/v1"), "key", List.of("a", "b"));
+            List<double[]> result = client.embed(config("https://api.test/v1"), "key", List.of("a", "b")).vectors();
             assertEquals(2, result.size());
             assertArrayEquals(new double[]{0.1}, result.get(0));
             assertArrayEquals(new double[]{0.2}, result.get(1));
+        }
+    }
+
+    @Test
+    @DisplayName("解析响应 usage 中的 Token 用量")
+    void shouldParseUsageTokens() {
+        String body = "{\"data\":[{\"index\":0,\"embedding\":[0.1]}],"
+            + "\"usage\":{\"prompt_tokens\":8,\"total_tokens\":8}}";
+        try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
+            requestWith(httpUtil, response(200, body));
+            assertEquals(8L, client.embed(config("https://api.test/v1"), "key", List.of("a")).totalTokens());
+        }
+    }
+
+    @Test
+    @DisplayName("响应无 usage 时按字符数估算 Token")
+    void shouldEstimateTokensWhenUsageMissing() {
+        String body = "{\"data\":[{\"index\":0,\"embedding\":[0.1]}]}";
+        try (MockedStatic<HttpUtil> httpUtil = mockStatic(HttpUtil.class)) {
+            requestWith(httpUtil, response(200, body));
+            // "abcd" 4 字符 → 1 Token
+            assertEquals(1L, client.embed(config("https://api.test/v1"), "key", List.of("abcd")).totalTokens());
         }
     }
 

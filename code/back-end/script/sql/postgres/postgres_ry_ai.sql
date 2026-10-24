@@ -1190,6 +1190,7 @@ create table if not exists ai_usage_stat (
     agent_id          bigint         not null,
     model_id          bigint,
     user_id           bigint         not null,
+    usage_type        char(1)        not null default '0',
     prompt_tokens     bigint         default 0,
     completion_tokens bigint         default 0,
     total_tokens      bigint         default 0,
@@ -1200,13 +1201,15 @@ create table if not exists ai_usage_stat (
     update_time       timestamp,
     constraint pk_ai_usage_stat primary key (id)
 );
-comment on table ai_usage_stat is 'AI 用量统计表（按日期 / 智能体 / 模型 / 用户聚合）';
+comment on table ai_usage_stat is 'AI 用量统计表（按日期 / 智能体 / 模型 / 用户 / 用量类型聚合）';
 comment on column ai_usage_stat.stat_date is '统计日期';
-comment on column ai_usage_stat.request_count is '请求（对话轮次）数';
+comment on column ai_usage_stat.agent_id is '智能体主键；知识库入库等无智能体归属的平台调用固定为 0';
+comment on column ai_usage_stat.usage_type is '用量类型（0对话 1知识库入库）';
+comment on column ai_usage_stat.request_count is '请求（对话轮次）数；知识库入库固定为 0';
 comment on column ai_usage_stat.tool_call_count is '工具调用次数';
 comment on column ai_usage_stat.cost is '费用估算（元；按模型单价计算，未配置单价按 0 计）';
 create index if not exists idx_ai_usage_user on ai_usage_stat (user_id, stat_date DESC);
-create unique index if not exists uk_ai_usage on ai_usage_stat (stat_date, agent_id, model_id, user_id);
+create unique index if not exists uk_ai_usage on ai_usage_stat (stat_date, agent_id, model_id, user_id, usage_type);
 
 create table if not exists ai_daily_digest (
     id                        bigint        not null,

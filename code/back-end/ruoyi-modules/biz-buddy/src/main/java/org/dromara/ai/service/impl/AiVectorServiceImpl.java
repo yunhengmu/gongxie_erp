@@ -24,9 +24,11 @@ import org.dromara.ai.mapper.AiModelConfigMapper;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiModelConfigService;
 import org.dromara.ai.service.IAiSafetyEventService;
+import org.dromara.ai.service.IAiUsageStatService;
 import org.dromara.ai.service.IAiVectorService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
+import org.dromara.common.satoken.utils.LoginHelper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -84,6 +86,11 @@ public class AiVectorServiceImpl implements IAiVectorService {
     private final IAiModelConfigService modelConfigService;
 
     private final AiEmbeddingClient embeddingClient;
+
+    /**
+     * 用量统计：入库消耗的 Token / 费用计入 {@code ai_usage_stat}
+     */
+    private final IAiUsageStatService usageStatService;
 
     private final AiVectorStore vectorStore;
 
@@ -164,6 +171,8 @@ public class AiVectorServiceImpl implements IAiVectorService {
         auditChunks(docId, chunks);
 
         markStatus(docId, STATUS_RUNNING, "");
+        // 入库成本归属：页面触发取当前登录人；批量线程没有登录上下文时退回文档创建人
+        Long usageUserId = resolveUsageUserId(document);
         try {
             // 重建语义：按文档清理**全部**历史向量（含切片已重建、业务记录不再指向的孤儿）
             vectorStore.deleteByDocId(knowledgeBase.getCollectionName(), knowledgeBase.getDimension(), docId);
@@ -177,7 +186,10 @@ public class AiVectorServiceImpl implements IAiVectorService {
                 List<String> texts = pageChunks.stream()
                     .map(chunk -> safetyGuard.mask(chunk.getContent(), SafetyScene.KB_INGEST))
                     .toList();
-                List<double[]> vectors = embeddingClient.embed(model, apiKey, texts);
+                AiEmbeddingClient.EmbeddingResult embedded = embeddingClient.embed(model, apiKey, texts);
+                // 先记账再落库：即使后续写库失败，已消耗的 Token 也不会从成本视图消失
+                recordIngestUsage(usageUserId, model.getId(), embedded.totalTokens());
+                List<double[]> vectors = embedded.vectors();
                 validateDimension(vectors, knowledgeBase);
                 writePage(knowledgeBase, document, pageChunks, vectors);
             }
@@ -196,6 +208,45 @@ public class AiVectorServiceImpl implements IAiVectorService {
             throw new ServiceException("文档向量化失败：" + e.getMessage());
         }
         return documentMapper.selectVoById(docId);
+    }
+
+    /**
+     * 记录一批入库（向量化）消耗的 Token 与费用。
+     *
+     * <p>入库没有智能体归属，由用量服务统一记在「知识库入库」名下；统计失败只告警，
+     * 不影响入库主流程。</p>
+     *
+     * @param userId 归属用户（为空时无法归属，跳过）
+     * @param modelId 向量模型主键
+     * @param tokens  本批消耗的 Token
+     */
+    private void recordIngestUsage(Long userId, Long modelId, long tokens) {
+        if (userId == null || tokens <= 0) {
+            return;
+        }
+        try {
+            usageStatService.accumulateEmbedding(userId, modelId, tokens);
+        } catch (Exception e) {
+            log.warn("入库用量统计失败：userId={}, modelId={}, cause={}", userId, modelId, e.getMessage());
+        }
+    }
+
+    /**
+     * 解析入库用量的归属用户：优先当前登录人，异步线程无上下文时退回文档创建人。
+     *
+     * @param document 文档实体
+     * @return 用户主键；均缺失时返回 null
+     */
+    private Long resolveUsageUserId(AiDocument document) {
+        try {
+            Long current = LoginHelper.getUserId();
+            if (current != null) {
+                return current;
+            }
+        } catch (Exception ignored) {
+            // 批量任务线程没有 Sa-Token 上下文，继续走文档创建人
+        }
+        return document.getCreateBy();
     }
 
     @Override

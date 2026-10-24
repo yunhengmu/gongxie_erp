@@ -60,6 +60,11 @@ public class AiUsageStatVo implements Serializable {
     private String userName;
 
     /**
+     * 用量类型（0对话 1知识库入库）
+     */
+    private String usageType;
+
+    /**
      * 输入 Token 数
      */
     private Long promptTokens;

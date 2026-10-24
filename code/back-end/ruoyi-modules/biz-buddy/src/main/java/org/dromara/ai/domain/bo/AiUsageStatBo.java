@@ -45,4 +45,9 @@ public class AiUsageStatBo implements Serializable {
      */
     private Long userId;
 
+    /**
+     * 用量类型（0对话 1知识库入库；为空表示全部）
+     */
+    private String usageType;
+
 }

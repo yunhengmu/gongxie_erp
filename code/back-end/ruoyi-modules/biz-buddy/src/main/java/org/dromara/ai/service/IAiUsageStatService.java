@@ -31,6 +31,18 @@ public interface IAiUsageStatService {
                     int requestCount);
 
     /**
+     * 累加知识库入库（文档向量化）的用量。
+     *
+     * <p>入库没有智能体归属，统一记在哨兵 {@code agent_id=0}、{@code usage_type='1'} 下；
+     * 只记 Token 与费用，<b>不计入</b>用户的对话配额（请求数固定 0、不累加 Redis 计数）。</p>
+     *
+     * @param userId  归属用户（页面触发取当前登录人；异步批量任务退化为文档创建人）
+     * @param modelId 向量模型主键
+     * @param tokens  本次入库消耗的 Token
+     */
+    void accumulateEmbedding(Long userId, Long modelId, long tokens);
+
+    /**
      * 分页查询用量明细。
      *
      * @param bo        查询条件

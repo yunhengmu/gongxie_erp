@@ -217,7 +217,8 @@ public interface PlatformDigestMapper {
     @Select("""
         select s.agent_id,
                coalesce(e.agent_code, x.agent_code) as agent_code,
-               coalesce(e.agent_name, x.agent_name) as agent_name,
+               coalesce(e.agent_name, x.agent_name,
+                        case when s.agent_id = 0 then '知识库入库' end) as agent_name,
                sum(s.total_tokens)                  as total_tokens,
                sum(s.request_count)                 as request_count,
                sum(s.tool_call_count)               as tool_call_count
@@ -225,7 +226,9 @@ public interface PlatformDigestMapper {
         left join ai_entry_agent e on e.id = s.agent_id
         left join ai_expert_agent x on x.id = s.agent_id
         where s.stat_date = #{statDate}
-        group by s.agent_id, coalesce(e.agent_code, x.agent_code), coalesce(e.agent_name, x.agent_name)
+        group by s.agent_id, coalesce(e.agent_code, x.agent_code),
+                 coalesce(e.agent_name, x.agent_name,
+                          case when s.agent_id = 0 then '知识库入库' end)
         order by sum(s.total_tokens) desc
         limit #{limit}
         """)

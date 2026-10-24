@@ -19,6 +19,8 @@ export interface UsageStatVO {
   userId?: string | number;
   /** 用户昵称 */
   userName?: string;
+  /** 用量类型（0 对话 / 1 知识库入库） */
+  usageType?: string;
   /** 输入 Token 数 */
   promptTokens?: number;
   /** 输出 Token 数 */
@@ -78,4 +80,6 @@ export interface UsageStatQuery extends PageQuery {
   modelId?: string | number;
   /** 用户主键 */
   userId?: string | number;
+  /** 用量类型（0 对话 / 1 知识库入库；不传为全部） */
+  usageType?: string;
 }
