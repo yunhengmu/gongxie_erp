@@ -60,7 +60,7 @@ BizBuddy 是构建在成熟的开源中后台底座（`6.0.0`）之上的**企�
 | 向量库 | Milvus | v2.6.13（gRPC 19530） |
 | 权限认证 | Sa-Token | 1.46.0 |
 | ORM | MyBatis-Plus / MyBatis | 3.5.17 / 3.5.19 |
-| 定时调度 | SnailJob | 2.0.2 |
+| 定时调度 | 应用内调度器（`ScheduledExecutorService`） | — |
 | 工作流引擎 | Warm-Flow | 1.8.9 |
 | 规则编排 | LiteFlow | 2.16.2.1 |
 | 前端 | Vue 3.5 + TypeScript + Element Plus 2.14 + Vite 8 | 包管理 pnpm |
@@ -245,7 +245,7 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 - 任务表单：任务名称、智能体、**运行身份用户**、Cron 表达式、任务提示词、状态、备注与配额；
 - 操作：新增 / 修改 / 删除 / **立即执行一次**（不影响 Cron 排期）/ 查看只读详情；
 - **执行记录**弹窗：状态、耗时、Token、工具次数，并可深链到该次运行的会话明细；
-- 调度承载为 SnailJob（应用侧按各任务 Cron 判定到点，并以 `last_run_time` 原子抢占去重）。
+- 调度承载为应用内调度器（`AiAgentTaskDispatchScheduler` 每 60 秒派发，应用侧按各任务 Cron 判定到点，并以 `last_run_time` 原子抢占去重）。
 
 > 无人值守场景（定时任务 / 渠道）**没有人类可确认**：命中「需确认」档的写工具一律被改写为**拒绝**（不暂停、不悬挂）；只有**显式配为「允许」**的写工具才会执行——如日报落库的 `write_daily_digest`（见 [7.6](#76-平台运行日报)）。需要人工确认的写操作必须在对话页完成。
 
@@ -474,10 +474,9 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 
 | 组件 | 说明 |
 |---|---|
-| 关系库（二选一） | PostgreSQL 14：库 `biz_buddy`，导入 `script/sql/postgres/` 下四个脚本；MySQL 8.0：库 `biz_buddy`，导入 `script/sql/` 下四个脚本（含 `ry_ai.sql`）。技能仓库按数据源类型自动装配，无需改配置 |
+| 关系库（二选一） | PostgreSQL 14：库 `biz_buddy`，导入 `script/sql/postgres/` 下三个脚本；MySQL 8.0：库 `biz_buddy`，导入 `script/sql/` 下三个脚本（含 `ry_ai.sql`）。技能仓库按数据源类型自动装配，无需改配置 |
 | Redis ≥ 6 | 缓存、分布式锁、AgentScope 分布式状态 |
 | Milvus v2.6.13 | 知识库向量存储与检索（gRPC `19530`） |
-| SnailJob | 定时任务调度承载（`ruoyi-extend/ruoyi-snailjob-server`，未启动只影响定时触发） |
 
 ### 9.2 AI 平台配置（前缀 `bizbuddy.ai`）
 

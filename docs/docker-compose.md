@@ -9,15 +9,15 @@
 |---|---|---|
 | 目录 | [`deploy/deploy-pg/`](../deploy/deploy-pg) | [`deploy/deploy-mysql/`](../deploy/deploy-mysql) |
 | Compose 项目名 | `bizbuddy` | `bizbuddy-mysql` |
-| 前端 / 后端 / 调度控制台 | `80` / `8080` / `8800` | `81` / `8081` / `8801` |
+| 前端 / 后端 | `80` / `8080` | `81` / `8081` |
 | 数据库 / Redis / Milvus | `5432` / `6379` / `19530` | `3306` / `6380` / `19531` |
 | 平台 MinIO（控制台） | `9000`（`9001`） | `9002`（`9003`） |
 
-`up` 起来的是：数据库 + Redis + Milvus（standalone，含 etcd / minio）+ 后端 `ruoyi-admin` + 调度服务端 `snailjob-server` + Nginx（托管前端 `dist`）+ 平台 MinIO（一次性 `minio-init` 建桶并上传演示文档）。
+`up` 起来的是：数据库 + Redis + Milvus（standalone，含 etcd / minio）+ 后端 `ruoyi-admin` + Nginx（托管前端 `dist`）+ 平台 MinIO（一次性 `minio-init` 建桶并上传演示文档）。
 
 > 下文命令除注明外，均在**仓库根目录（`biz-buddy/`）**执行；`cd deploy/deploy-pg` 之类表示进入该子目录。
 
-## 1. 前置：先在宿主机构建三个产物
+## 1. 前置：先在宿主机构建两个产物
 
 镜像里**只放 jar / dist、不在镜像内编译**，所以 `up` 之前必须先构建：
 
@@ -26,11 +26,8 @@
 cd code/back-end
 ./mvnw clean package -DskipTests                 # Windows: .\mvnw.cmd clean package -DskipTests
 
-# ② 调度服务端 jar → ruoyi-extend/ruoyi-snailjob-server/target/ruoyi-snailjob-server.jar
-./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
-
-# ③ 前端静态资源 → code/front-end/dist
-cd ../../code/front-end
+# ② 前端静态资源 → code/front-end/dist
+cd ../front-end
 pnpm install && pnpm build:prod
 ```
 
@@ -49,7 +46,6 @@ docker compose up -d --build
 |---|---|
 | 前端 | <http://localhost/> |
 | 后端接口文档 | <http://localhost:8080/swagger-ui.html> |
-| 调度控制台 | <http://localhost:8800/snail-job> |
 | 初始账号 | `admin / admin123`（另有 `test / 666666`、`test1 / 666666`） |
 
 ## 3. 启动 MySQL 8.0 栈
@@ -64,7 +60,6 @@ docker compose up -d --build
 |---|---|
 | 前端 | <http://localhost:81/> |
 | 后端接口文档 | <http://localhost:8081/swagger-ui.html> |
-| 调度控制台 | <http://localhost:8801/snail-job> |
 | 初始账号 | `admin / admin123` |
 
 > 两栈可**同时运行**（上表端口已错开），适合并排对照；只跑一个也可以。中间件口令在各目录的 `.env.example`（默认值仅供本地）。

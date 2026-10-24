@@ -88,7 +88,7 @@ biz-buddy/
 | 多数据源 | dynamic-datasource | 4.5.0 |
 | 缓存 / 客户端 | Redisson | 4.7.0 |
 | 分布式锁 | Lock4j | 2.2.7 |
-| 定时调度 | SnailJob | 2.0.2 |
+| 定时调度 | 应用内调度器（`ScheduledExecutorService`） | — |
 | 工作流引擎 | Warm-Flow | 1.8.9 |
 | 规则编排 | LiteFlow | 2.16.2.1 |
 | 接口文档 | SpringDoc + therapi-runtime-javadoc | 3.1.1 / 0.15.0 |
@@ -112,10 +112,9 @@ code/back-end
 ├── ruoyi-modules        # 业务模块
 │   ├── ruoyi-system     # 系统管理（RBAC、字典、日志、OSS、消息）
 │   ├── ruoyi-workflow   # 工作流（Warm-Flow + LiteFlow）
-│   ├── ruoyi-job        # 调度任务实现（@JobExecutor 处理器）
 │   ├── ruoyi-gen        # 代码生成器
 │   └── biz-buddy        # BizBuddy AI 能力模块（AgentScope 智能体宿主）
-└── ruoyi-extend         # 扩展服务（monitor-admin 监控端、snailjob-server 调度端）
+└── ruoyi-extend         # 扩展服务（monitor-admin 监控端）
 ```
 
 ### biz-buddy 模块
@@ -130,7 +129,7 @@ code/back-end
 | `core/mcp` | 自建 MCP 出口与 MCP 客户端封装（含访问口令校验、工具名归一化） |
 | `core/channel` | 多渠道入站（飞书 / 企业微信 / 钉钉 / GitHub）、运行时注册与入站多媒体装配 |
 | `controller` / `service` | 模型配置、智能体、会话、路由、知识库、文档、MCP、渠道、审计、用量、配额、技能、记忆、场景包、平台运行日报等管理接口 |
-| `job` | 定时 Agent 任务执行器（由 SnailJob 调度） |
+| `job` | 定时 Agent 任务应用内调度器（`AiAgentTaskDispatchScheduler`，每 60 秒派发） |
 
 关键机制：
 
@@ -156,7 +155,7 @@ code/back-end
 ### 后端（`code/back-end/ruoyi-admin/src/main/resources/`）
 
 - `application.yml` —— 通用配置：端口 `8080`、Sa-Token、MyBatis-Plus、接口加解密、统一消息推送、Warm-Flow、LiteFlow、MQTT、Easy-Es 等
-- `application-dev.yml` / `application-prod.yml` —— 环境配置：数据源、SnailJob 客户端、SQL 日志等
+- `application-dev.yml` / `application-prod.yml` —— 环境配置：数据源、SQL 日志等
 
 数据源（`application-dev.yml`）：
 
@@ -208,7 +207,7 @@ code/back-end/ruoyi-modules/biz-buddy/target/site/jacoco/jacoco.csv   # 机器�
 - `AiDbDialectIntegrationTest`（`biz-buddy`）——裸 JDBC 拉取 PostgreSQL / MySQL 两栈的**真实 schema** 逐项对比：AI 表 / 列 / `idx_ai_` 索引 / `sys_menu` 的 `ai:` 权限，并显式断言 6 个 `create_time` 索引两方言都在；
 - `AiEntitySchemaIntegrationTest`（`biz-buddy`）——以**实体元数据**为准反查真库：`org.dromara.ai.domain` 下带 `@TableName` 的实体按 MyBatis-Plus 映射规则算出期望列，缺表 / 缺列即失败（补「两方言**同时**漏改」这一方言对比抓不到的盲区）；
 - `AiSkillRepositoryIntegrationTest`（`biz-buddy`）——直接调生产装配 `AgentScopeConfig#aiSkillRepository` 建出**方言专属**技能仓库（PG / MySQL 两分支），用临时技能走「裸 JDBC 写 → 框架仓库读」，验证 `ai_skill` / `ai_skill_resource` 列结构兼容与只读契约，收尾删除；
-- `AiContextIntegrationTest`（`ruoyi-admin`）——`@SpringBootTest`（随机端口、`snail-job.enabled=false`）验证整套 Bean 能否装配、运行期配置走真 Redis（覆盖优先）、审计超期统计走真库。
+- `AiContextIntegrationTest`（`ruoyi-admin`）——`@SpringBootTest`（随机端口）验证整套 Bean 能否装配、运行期配置走真 Redis（覆盖优先）、审计超期统计走真库。
 
 ```bash
 # 在 code/back-end 目录下；先设 BIZBUDDY_IT=true（PowerShell：$env:BIZBUDDY_IT='true'）

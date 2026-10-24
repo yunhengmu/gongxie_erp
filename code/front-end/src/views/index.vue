@@ -263,7 +263,6 @@ const bizEntries = [
   { icon: 'process-definition', title: '流程定义', desc: '设计并发布业务流程', path: '/workflow/processDefinition' },
   { icon: 'category', title: '流程分类', desc: '维护业务流程分类目录', path: '/workflow/category' },
   { icon: 'tree-table', title: '流程实例', desc: '查看流程运行情况', path: '/workflow/processMonitor/processInstance' },
-  { icon: 'job', title: '任务调度中心', desc: '定时任务与重试管控', path: '/monitor/snailjob' },
   { icon: 'user', title: '用户管理', desc: '账号与部门归属', path: '/system/user' },
   { icon: 'peoples', title: '角色管理', desc: '角色与权限分配', path: '/system/role' }
 ];

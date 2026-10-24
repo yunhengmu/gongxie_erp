@@ -5,7 +5,7 @@
 | 文件 | 内容 |
 |---|---|
 | `code/back-end/ruoyi-admin/src/main/resources/application.yml` | 通用配置 + **AI 平台配置 `bizbuddy.ai.*`** + 安全排除路径 |
-| `.../application-dev.yml` | 开发环境：数据源、Redis、SnailJob 客户端、SQL 日志 |
+| `.../application-dev.yml` | 开发环境：数据源、Redis、SQL 日志 |
 | `.../application-prod.yml` | 生产环境：同上（日志更安静、连接池更大） |
 | `.env`（可选，见 `deploy/deploy-pg/.env.example`） | 容器化部署的端口与口令变量 |
 
@@ -166,10 +166,9 @@
 | `application.yml` | `security.excludes` | 免鉴权路径；渠道入站回调 `/ai/channel/callback/**` 在此放开（安全靠验签/口令） |
 | `application.yml` | `api-decrypt` | 接口加解密开关与 RSA 密钥对；**生产必须替换**（环境变量 `API_DECRYPT_PUBLIC_KEY` / `API_DECRYPT_PRIVATE_KEY`），需与前端 `.env.*` 的 `VITE_APP_RSA_*` 成对更换 |
 | `application.yml` | `sa-token` | 认证：token 名、并发登录、JWT 秘钥（环境变量 `SA_TOKEN_JWT_SECRET_KEY`，**生产必须替换**） |
-| `application.yml` / `application-prod.yml` | `ProductionConfigGuard`（启动自检） | **所有 profile 启动时**逐项比对出厂示例值（JWT 秘钥 / 接口加密密钥对 / `bizbuddy.ai.crypto-key` / 数据库·Redis·Milvus 口令 / SnailJob 令牌），命中即**拒绝启动**并列出命中项。原实现只认 `prod`，而两套编排默认 profile 是 `dev`，于是「按默认方式部署」恰好绕过护栏；现默认对所有 profile 生效，非 `prod` 可用 `bizbuddy.security.guard.mode=warn`（环境变量 `BIZBUDDY_SECURITY_GUARD_MODE`）显式降级为仅告警（本地开发逃生口），`prod` 下该开关无效 |
+| `application.yml` / `application-prod.yml` | `ProductionConfigGuard`（启动自检） | **所有 profile 启动时**逐项比对出厂示例值（JWT 秘钥 / 接口加密密钥对 / `bizbuddy.ai.crypto-key` / 数据库·Redis·Milvus 口令），命中即**拒绝启动**并列出命中项。原实现只认 `prod`，而两套编排默认 profile 是 `dev`，于是「按默认方式部署」恰好绕过护栏；现默认对所有 profile 生效，非 `prod` 可用 `bizbuddy.security.guard.mode=warn`（环境变量 `BIZBUDDY_SECURITY_GUARD_MODE`）显式降级为仅告警（本地开发逃生口），`prod` 下该开关无效 |
 | `application-dev.yml` | `spring.datasource.dynamic.datasource.master.*` | 主数据源连接（dynamic-datasource）：PostgreSQL 14 或 MySQL 8.0，仅 JDBC URL 不同（驱动由 Hikari 按 URL 自动匹配，不在配置中声明） |
 | `application-dev.yml` | `spring.data.redis.*` / `redisson.*` | Redis 连接与 Redisson 连接池；dev 配置**要求必须设置 Redis 密码** |
-| `application-dev.yml` | `snail-job.*` | 调度客户端：`enabled`、`group`、`token`、`namespace`、服务端地址 |
 | 数据库表 `sys_oss_config`（**不在 yaml**） | `endpoint` / `domain_url` / `access_policy` | 平台文件存储（OSS）坐标：`endpoint` 供**服务端读写**（容器部署写 `minio:9000`，容器网络内可达），`domain_url` 供**前端展示**（返回给浏览器的 URL，必须**浏览器可达**——PG 栈 `http://localhost:9000`、MySQL 8.0 栈 `http://localhost:9002`），`access_policy` 容器部署为 **`0`（私有桶）**。私有桶下文件访问统一由后端**读取时现算预签名 URL**（对外按 `domain_url`、服务端按 `endpoint` 签名），故 `domain_url` 配错会导致前端预览 / 下载失败。容器部署由 `deploy/deploy-*/sql/50-oss-endpoint.sql` 在首次建库时写入，**存量数据卷不会重跑**，需按部署文档手工补一次 |
 | `application.yml` | `oss.presign-expire-seconds` | 私有桶预签名 URL 有效期（秒），默认 `120`；过短会导致预览 / 下载中途失效，过长则弱化私有桶的访问控制（改后需重启 `ruoyi-admin`） |
 
@@ -185,8 +184,7 @@
 | 4 | `sa-token.jwt-secret-key` | `SA_TOKEN_JWT_SECRET_KEY` | 默认值为示例 |
 | 5 | 数据库 / Redis / Milvus 口令 | `POSTGRES_PASSWORD`（MySQL 栈 `MYSQL_PASSWORD`） / `REDIS_PASSWORD` / `MILVUS_PASSWORD` | 默认口令仅用于本地 |
 | 6 | `bizbuddy.ai.chat.current-time-zone` | `BIZBUDDY_AI_CHAT_CURRENT_TIME_ZONE` | 容器未挂 tzdata 时会退化为 UTC（默认 `Asia/Shanghai`，一般无需改） |
-| 7 | `snail-job.token` | `SNAILJOB_TOKEN` | 接入令牌默认随源码公开；须与 `sj_group_config` 表一致 |
-| 8 | 数据库表 `sys_oss_config.domain_url` | —（数据库配置） | 必须是**浏览器可达**地址；容器部署默认给 `localhost`，从其它机器 / 公网访问需改成实际域名或 IP（各栈端口见部署文档） |
+| 7 | 数据库表 `sys_oss_config.domain_url` | —（数据库配置） | 必须是**浏览器可达**地址；容器部署默认给 `localhost`，从其它机器 / 公网访问需改成实际域名或 IP（各栈端口见部署文档） |
 
 > 环境变量名与部署侧的登记见 `deploy/deploy-pg/.env.example` / `deploy/deploy-mysql/.env.example` 的「出厂默认值收口自检」段。
 

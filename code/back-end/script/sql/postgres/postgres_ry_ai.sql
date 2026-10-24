@@ -14,10 +14,9 @@
 --      四、内置业务工具种子（ai_tool）
 --      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家 / BizBuddy项目介绍专家及其工具绑定，
 --          含演示知识库「BizBuddy介绍演示库」与文档「BizBuddy简介.txt」及其 OSS 记录 sys_oss）
---      六、SnailJob 派发任务登记（sj_job）
 --   3. 全部语句幂等（create table / index if not exists、on conflict do nothing），可重复执行；
 --      重复执行不会产生重复数据。
---   4. 依赖：先执行 postgres_ry_vue.sql（sys_menu 等底座表）与 postgres_ry_job.sql（sj_job）。
+--   4. 依赖：先执行 postgres_ry_vue.sql（sys_menu 等底座表）。
 --   5. 菜单 ID 段与 postgres_ry_vue.sql / postgres_ry_workflow.sql 不冲突；菜单仅对超级管理员
 --      自动可见，普通角色需在「系统管理 → 角色管理」中勾选后再可见。
 --   6. 模型种子（ai_model_config）预置四个示例模型（阿里云百炼 / DashScope；协议各异，详见第三节），
@@ -41,7 +40,6 @@
 --   delete from sys_oss where oss_id = 1761400000000021101;
 --   delete from ai_knowledge_base where id = 1761400000000021001;
 --   delete from ai_model_config where id in (1761400000000020400, 1761400000000020401);
---   delete from sj_job where biz_id = 'bizbuddy-agent-task-dispatch';
 --   delete from sys_menu where menu_id between 1761400000000020000 and 1761400000000020999;
 --   drop table if exists ai_scenario_pack_skill;
 --   drop table if exists ai_scenario_pack_mcp_tool;
@@ -2299,29 +2297,3 @@ values (1761400000000020601,
         now(),
         '0')
 on conflict do nothing;
-
--- ============================================================
--- 六、SnailJob 派发任务登记（sj_job）
--- ============================================================
---   调度承载为 SnailJob：这里只登记**一个每 60 秒的派发任务**，应用侧按各任务 Cron
---   判定到点、并以 last_run_time 原子抢占去重。说明：
---   a. 仅当启用 SnailJob（snail-job.enabled = true）时才会被调度；未启用时页面「立即执行」仍可用。
---   b. namespace_id 与 snail-job.namespace 一致（dev / prod）；group_name 与 snail-job.group 一致。
---   c. bucket_index 为分片键：单节点部署下框架把全部桶分配给唯一节点，取值不影响触发；
---      多节点下如需精确分片，在 SnailJob 控制台重新保存该任务即可由服务端重算。
---   d. next_trigger_at 取当前时间 + 60 秒，避免插入瞬间的历史触发堆积。
---   e. 前置修复：ry_job.sql 以显式 id 插入示例任务但未推进 sj_job.id 序列，导致后续插入
---      会撞主键；此处先把序列水位对齐到 max(id)+1。
--- ============================================================
-select setval(pg_get_serial_sequence('sj_job', 'id'), coalesce(max(id), 0) + 1, false) from sj_job;
-insert into sj_job (namespace_id, biz_id, group_name, job_name, args_str, args_type, next_trigger_at,
-                    job_status, task_type, route_key, executor_type, executor_info, trigger_type,
-                    trigger_interval, block_strategy, executor_timeout, max_retry_times, parallel_num,
-                    retry_interval, bucket_index, resident, notify_ids, labels, description, ext_attrs, deleted)
-values ('dev', 'bizbuddy-agent-task-dispatch', 'ruoyi_group', 'bizbuddy-agent-task-dispatch', null, 1,
-        (extract(epoch from now()) * 1000)::bigint + 60000,
-        1, 1, 4, 1, 'aiAgentTaskDispatchExecutor', 2,
-        '60', 1, 1800, 0, 1,
-        0, 0, 0, '', '',
-        'BizBuddy 定时 Agent 任务派发（每 60 秒扫描到点任务）', '', 0)
-on conflict (namespace_id, biz_id) do nothing;

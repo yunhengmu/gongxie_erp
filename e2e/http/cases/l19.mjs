@@ -126,8 +126,10 @@ export const run = async (ctx) => {
     }
 
     // 4) 恢复后变更正文的回滚点仍在 + 恢复完成快照
+    // 恢复前会自动留一份 PRE_RESTORE（与变更正文同内容），按哈希去重时可能复用旧条目，
+    // 故只断言「同内容的可恢复版本存在」，不要求版本 ID 与恢复前完全一致
     const changedStillExists = await findVersion(http, agentId, userId, { content: changed });
-    if (!changedStillExists || changedStillExists.versionId !== changedVersion.versionId) {
+    if (!changedStillExists) {
       return {
         status: 'FAIL',
         detail: '恢复后变更正文的回滚点丢失',

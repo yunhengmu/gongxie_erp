@@ -4,10 +4,9 @@ SET NAMES utf8mb4;
 -- BizBuddy 平台（AgentScope 智能体内核）数据库初始化脚本（MySQL 8.0 版）
 -- ----------------------------
 -- 说明：
---   注：本文件是 PostgreSQL 版 postgres_ry_ai.sql 的等价 MySQL 8.0 转写；差异仅三处——
+--   注：本文件是 PostgreSQL 版 postgres_ry_ai.sql 的等价 MySQL 8.0 转写；差异仅两处——
 --      ① PostgreSQL 的 WHERE del_flag='0' 部分唯一索引在 MySQL 用「函数键部分
---         (if(del_flag='0',0,null))」等价实现；② 时间列用 datetime、长文本用 longtext；
---      ③ 仓库五省略了 sj_job 序列对齐语句。
+--         (if(del_flag='0',0,null))」等价实现；② 时间列用 datetime、长文本用 longtext。
 --   1. 本脚本是 AI 模块的**当前状态基线**：面向全新数据库一次性建好全部对象，按对象组织
 --      （菜单 → 建表 → 种子），不含历史增量段，也不含任何「先建后删」语句。已下线的功能
 --      一律不再出现：沙箱与执行环境（REQ-AI-20 撤销）、技能来源配置（REQ-AI-12 收口）、
@@ -20,10 +19,9 @@ SET NAMES utf8mb4;
 --      四、内置业务工具种子（ai_tool）
 --      五、内置智能体种子（入口小Z + 机构管理专家 / 公告管理专家 / BizBuddy项目介绍专家及其工具绑定，
 --          含演示知识库「BizBuddy介绍演示库」与文档「BizBuddy简介.txt」及其 OSS 记录 sys_oss）
---      六、SnailJob 派发任务登记（sj_job）
 --   3. 全部语句幂等（create table if not exists、on duplicate key update），可重复执行；
 --      重复执行不会产生重复数据。
---   4. 依赖：先执行 ry_vue.sql（sys_menu 等底座表）与 ry_job.sql（sj_job）。
+--   4. 依赖：先执行 ry_vue.sql（sys_menu 等底座表）。
 --   5. 菜单 ID 段与 ry_vue.sql / ry_workflow.sql 不冲突；菜单仅对超级管理员
 --      自动可见，普通角色需在「系统管理 → 角色管理」中勾选后再可见。
 --   6. 模型种子（ai_model_config）预置四个示例模型（阿里云百炼 / DashScope；协议各异，详见第三节），
@@ -47,7 +45,6 @@ SET NAMES utf8mb4;
 --   delete from sys_oss where oss_id = 1761400000000021101;
 --   delete from ai_knowledge_base where id = 1761400000000021001;
 --   delete from ai_model_config where id in (1761400000000020400, 1761400000000020401);
---   delete from sj_job where biz_id = 'bizbuddy-agent-task-dispatch';
 --   delete from sys_menu where menu_id between 1761400000000020000 and 1761400000000020999;
 --   drop table if exists ai_scenario_pack_skill;
 --   drop table if exists ai_scenario_pack_mcp_tool;
@@ -2055,28 +2052,3 @@ values (1761400000000020601,
         now(),
         '0')
 on duplicate key update id = id;
-
--- ============================================================
--- 六、SnailJob 派发任务登记（sj_job）
--- ============================================================
---   调度承载为 SnailJob：这里只登记**一个每 60 秒的派发任务**，应用侧按各任务 Cron
---   判定到点、并以 last_run_time 原子抢占去重。说明：
---   a. 仅当启用 SnailJob（snail-job.enabled = true）时才会被调度；未启用时页面「立即执行」仍可用。
---   b. namespace_id 与 snail-job.namespace 一致（dev / prod）；group_name 与 snail-job.group 一致。
---   c. bucket_index 为分片键：单节点部署下框架把全部桶分配给唯一节点，取值不影响触发；
---      多节点下如需精确分片，在 SnailJob 控制台重新保存该任务即可由服务端重算。
---   d. next_trigger_at 取当前时间 + 60 秒，避免插入瞬间的历史触发堆积。
---   e. 前置修复：PostgreSQL 版需先把 sj_job.id 序列水位对齐到 max(id)+1，否则后续插入会撞主键；
---      MySQL 的 sj_job.id 为 AUTO_INCREMENT，显式插 id 会自动推进自增水位，无此问题，故省略该语句。
--- ============================================================
-insert into sj_job (namespace_id, biz_id, group_name, job_name, args_str, args_type, next_trigger_at,
-                    job_status, task_type, route_key, executor_type, executor_info, trigger_type,
-                    trigger_interval, block_strategy, executor_timeout, max_retry_times, parallel_num,
-                    retry_interval, bucket_index, resident, notify_ids, labels, description, ext_attrs, deleted)
-values ('dev', 'bizbuddy-agent-task-dispatch', 'ruoyi_group', 'bizbuddy-agent-task-dispatch', null, 1,
-        (unix_timestamp(now()) * 1000 + 60000),
-        1, 1, 4, 1, 'aiAgentTaskDispatchExecutor', 2,
-        '60', 1, 1800, 0, 1,
-        0, 0, 0, '', '',
-        'BizBuddy 定时 Agent 任务派发（每 60 秒扫描到点任务）', '', 0)
-on duplicate key update namespace_id = namespace_id, biz_id = biz_id;

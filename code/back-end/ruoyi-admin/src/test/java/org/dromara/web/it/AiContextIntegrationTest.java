@@ -36,9 +36,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code SpringDocConfig} 依赖 Web 自动配置提供的 {@code ServerProperties}，{@code webEnvironment = NONE}
  * 会让装配直接失败（实测）。随机端口既避开与正在运行的容器争抢 {@code 8080}，又能覆盖 Web 层装配。</p>
  *
- * <p><b>关掉调度客户端</b>（{@code snail-job.enabled=false}）：其端口取自 {@code 2${server.port}}，
- * 随机端口下会退化成无效端口；关掉后不注册客户端，也不影响本测试关注点（定时任务链路由端到端测试覆盖）。</p>
- *
  * @author BizBuddy
  */
 @EnabledIfEnvironmentVariable(named = "BIZBUDDY_IT", matches = "(?i)true")
@@ -46,7 +43,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     // 本测试刻意以 dev + 出厂配置装配真 Redis / 真库，故把配置收口自检显式降级为「仅告警」
     properties = {
-        "snail-job.enabled=false",
         "bizbuddy.security.guard.mode=warn"
     })
 @DisplayName("集成测试：上下文装配 + AI 配置（真 Redis）与明细统计（真库）")

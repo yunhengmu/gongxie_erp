@@ -13,8 +13,8 @@ import java.time.LocalDateTime;
 /**
  * AI 定时任务对象 ai_agent_task
  *
- * <p>任务定义在本项目维护，调度由 SnailJob 承载：SnailJob 侧只登记一个「派发」任务
- * （每 60 秒触发），由应用按 {@code cron_expression} 判定到点任务并执行。</p>
+ * <p>任务定义在本项目维护，调度由应用内派发器承载（每 60 秒触发），
+ * 由应用按 {@code cron_expression} 判定到点任务并执行。</p>
  *
  * @author BizBuddy
  */

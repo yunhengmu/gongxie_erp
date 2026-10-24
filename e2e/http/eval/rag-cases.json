@@ -98,15 +98,15 @@
   },
   {
     "category": "term",
-    "query": "SnailJob 客户端用什么注解声明任务处理器，入参类型是什么？",
+    "query": "定时 Agent 任务的到点判定与多实例去重是怎么实现的？",
     "expectDocs": ["05-任务调度与代码生成.md"],
-    "expectKeywords": ["@JobExecutor", "JobArgs"]
+    "expectKeywords": ["AiAgentTaskDispatchScheduler", "last_run_time"]
   },
   {
     "category": "term",
-    "query": "演示 DAG 工作流的账单处理示例包含哪几个任务类？",
+    "query": "代码生成器支持哪些前端框架的页面模板？",
     "expectDocs": ["05-任务调度与代码生成.md"],
-    "expectKeywords": ["WechatBillTask", "AlipayBillTask", "SummaryBillTask"]
+    "expectKeywords": ["index.vue.ftl", "index.tsx.ftl"]
   },
   {
     "category": "term",

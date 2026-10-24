@@ -61,11 +61,6 @@
             <groupId>org.dromara</groupId>
             <artifactId>ruoyi-common-mcp</artifactId>
         </dependency>
-        <!-- 任务调度：定时 Agent 任务的派发执行器（SnailJob，见决策 D7） -->
-        <dependency>
-            <groupId>org.dromara</groupId>
-            <artifactId>ruoyi-common-job</artifactId>
-        </dependency>
         <!--
           技能仓库（REQ-AI-10）：技能的持久化由 AgentScope 官方技能仓库实现提供——
           PostgreSQL 版（默认）与 MySQL 版各一，运行时按数据源类型二选一装配

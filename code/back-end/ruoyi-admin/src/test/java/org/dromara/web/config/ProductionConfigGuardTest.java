@@ -60,7 +60,6 @@ class ProductionConfigGuardTest {
         assertTrue(ex.getMessage().contains("sa-token.jwt-secret-key"));
         assertTrue(ex.getMessage().contains("bizbuddy.ai.crypto-key"));
         assertTrue(ex.getMessage().contains("api-decrypt.privateKey"));
-        assertTrue(ex.getMessage().contains("snail-job.token"));
     }
 
     @Test

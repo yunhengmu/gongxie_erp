@@ -11,9 +11,8 @@ import java.util.Collection;
 /**
  * AI 定时任务 Service 接口
  *
- * <p>调度承载为 SnailJob（决策 D7）：SnailJob 侧只登记一个「派发」任务，
- * 每 60 秒调用 {@link #dispatchDueTasks()}，由本服务按 {@code cron_expression}
- * 判定到点任务并提交执行。</p>
+ * <p>调度由应用内调度器承载：每 60 秒调用 {@link #dispatchDueTasks()}，由本服务按
+ * {@code cron_expression} 判定到点任务并提交执行。</p>
  *
  * @author BizBuddy
  */
@@ -78,7 +77,7 @@ public interface IAiAgentTaskService {
     PageResult<AiAgentTaskRunVo> queryRunPageList(Long taskId, PageQuery pageQuery);
 
     /**
-     * 派发到点任务（由 SnailJob 的派发执行器周期性调用）。
+     * 派发到点任务（由应用内调度器周期性调用）。
      *
      * <p>以「计划执行时间」做原子抢占，抢占成功者才提交执行，多实例部署下也不会重复执行。</p>
      *

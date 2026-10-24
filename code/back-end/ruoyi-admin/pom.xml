@@ -80,12 +80,6 @@
             <artifactId>ruoyi-system</artifactId>
         </dependency>
 
-        <!-- 调度任务模块 -->
-        <dependency>
-            <groupId>org.dromara</groupId>
-            <artifactId>ruoyi-job</artifactId>
-        </dependency>
-
         <!-- BizBuddy AI 能力模块 -->
         <dependency>
             <groupId>org.dromara</groupId>

@@ -44,7 +44,6 @@
         <!-- 缓存、锁与任务调度相关依赖版本 -->
         <redisson.version>4.7.0</redisson.version>
         <lock4j.version>2.2.7</lock4j.version>
-        <snailjob.version>2.0.2</snailjob.version>
 
         <!-- 智能体内核：AgentScope Harness（详见 docs/agentscope/07 与 docs/11） -->
         <agentscope.version>2.0.4</agentscope.version>
@@ -397,25 +396,6 @@
                 <version>${fory.version}</version>
             </dependency>
 
-            <!-- SnailJob Client -->
-            <dependency>
-                <groupId>com.aizuda</groupId>
-                <artifactId>snail-job-client-starter</artifactId>
-                <version>${snailjob.version}</version>
-            </dependency>
-            <!-- SnailJob 重试核心 -->
-            <dependency>
-                <groupId>com.aizuda</groupId>
-                <artifactId>snail-job-client-retry-core</artifactId>
-                <version>${snailjob.version}</version>
-            </dependency>
-            <!-- SnailJob 任务核心 -->
-            <dependency>
-                <groupId>com.aizuda</groupId>
-                <artifactId>snail-job-client-job-core</artifactId>
-                <version>${snailjob.version}</version>
-            </dependency>
-
             <!-- 加密包引入 -->
             <dependency>
                 <groupId>org.bouncycastle</groupId>
@@ -496,13 +476,6 @@
             <dependency>
                 <groupId>org.dromara</groupId>
                 <artifactId>ruoyi-system</artifactId>
-                <version>${revision}</version>
-            </dependency>
-
-            <!-- 调度任务模块 -->
-            <dependency>
-                <groupId>org.dromara</groupId>
-                <artifactId>ruoyi-job</artifactId>
                 <version>${revision}</version>
             </dependency>
 

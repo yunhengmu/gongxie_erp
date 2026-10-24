@@ -15,7 +15,7 @@ import java.util.function.UnaryOperator;
  * 配置收口自检：校验「出厂示例密钥 / 口令」是否仍未替换，命中即按收口模式处置。
  *
  * <p>背景：框架与平台在配置里自带一批可直接使用的示例密钥（Sa-Token JWT 秘钥、接口加解密 RSA 密钥对、
- * 模型密钥加密根、数据库 / Redis / Milvus 口令、SnailJob 接入令牌），默认值随源码公开，若原样投入使用
+ * 模型密钥加密根、数据库 / Redis / Milvus 口令），默认值随源码公开，若原样投入使用
  * 等同于把认证根交出去。本类把这些「示例值」集中登记，启动时逐项比对，而不是等出了问题再排查。</p>
  *
  * <p><b>为何对全部 profile 生效</b>：护栏原先只认 {@code prod}，而两套容器编排的默认 profile 是 {@code dev}
@@ -79,8 +79,7 @@ public class ProductionConfigGuard implements InitializingBean {
         new SampleSecret("api-decrypt.privateKey", SAMPLE_API_DECRYPT_PRIVATE_KEY, "接口加密请求私钥"),
         new SampleSecret("spring.datasource.dynamic.datasource.master.password", "Zl@2026", "数据库口令"),
         new SampleSecret("spring.data.redis.password", "Zl@2026", "Redis 口令"),
-        new SampleSecret("bizbuddy.ai.milvus.password", "Milvus", "Milvus 口令"),
-        new SampleSecret("snail-job.token", "SJ_cKqBTPzCsWA3VyuCfFoccmuIEGXjr5KT", "SnailJob 接入令牌")
+        new SampleSecret("bizbuddy.ai.milvus.password", "Milvus", "Milvus 口令")
     );
 
     private final Environment environment;

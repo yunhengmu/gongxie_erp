@@ -45,8 +45,8 @@ import java.util.Set;
 /**
  * AI 定时任务 Service 业务层处理
  *
- * <p>调度承载为 SnailJob（决策 D7）：SnailJob 侧登记一个「派发」任务（每 60 秒），
- * 调用 {@link #dispatchDueTasks()} 后由本服务按 Cron 判定到点任务并提交执行。</p>
+ * <p>调度由应用内调度器承载（每 60 秒），调用 {@link #dispatchDueTasks()} 后由本服务
+ * 按 Cron 判定到点任务并提交执行。</p>
  *
  * @author BizBuddy
  */
