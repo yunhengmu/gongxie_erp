@@ -2,7 +2,6 @@ package org.dromara.ai.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiEmbeddingClient;
@@ -29,6 +28,7 @@ import org.dromara.ai.service.IAiVectorService;
 import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.utils.StringUtils;
 import org.dromara.common.satoken.utils.LoginHelper;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -46,7 +46,6 @@ import java.util.Set;
  * @author BizBuddy
  */
 @Slf4j
-@RequiredArgsConstructor
 @Service
 public class AiVectorServiceImpl implements IAiVectorService {
 
@@ -110,6 +109,31 @@ public class AiVectorServiceImpl implements IAiVectorService {
      * 安全事件留痕
      */
     private final IAiSafetyEventService safetyEventService;
+
+    /**
+     * 用量统计以 {@code @Lazy} 注入：本类位于工具工厂的依赖链上，而用量统计又依赖智能体服务，
+     * 直接构造会与 {@code AiAgentServiceImpl → AiToolServiceImpl → AiMcpServerServiceImpl → AiToolFactory}
+     * 形成循环依赖；延迟到首次入库记账时再解析即可，不影响向量化主流程。
+     */
+    public AiVectorServiceImpl(AiChunkMapper chunkMapper, AiDocumentMapper documentMapper,
+                               AiModelConfigMapper modelConfigMapper, IAiKnowledgeBaseService knowledgeBaseService,
+                               IAiModelConfigService modelConfigService, AiEmbeddingClient embeddingClient,
+                               @Lazy IAiUsageStatService usageStatService, AiVectorStore vectorStore,
+                               AiRerankClient rerankClient, AiProperties aiProperties, AiSafetyGuard safetyGuard,
+                               IAiSafetyEventService safetyEventService) {
+        this.chunkMapper = chunkMapper;
+        this.documentMapper = documentMapper;
+        this.modelConfigMapper = modelConfigMapper;
+        this.knowledgeBaseService = knowledgeBaseService;
+        this.modelConfigService = modelConfigService;
+        this.embeddingClient = embeddingClient;
+        this.usageStatService = usageStatService;
+        this.vectorStore = vectorStore;
+        this.rerankClient = rerankClient;
+        this.aiProperties = aiProperties;
+        this.safetyGuard = safetyGuard;
+        this.safetyEventService = safetyEventService;
+    }
 
     @Override
     public AiDocumentVo vectorizeDocument(Long docId) {
