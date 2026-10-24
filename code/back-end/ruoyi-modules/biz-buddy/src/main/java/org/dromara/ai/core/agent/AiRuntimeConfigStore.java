@@ -12,6 +12,7 @@ import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
 import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.bo.AiSecurityConfigBo;
+import org.dromara.ai.domain.bo.AiSecurityConfigPatchBo;
 import org.dromara.ai.domain.bo.AiWorkspaceConfigBo;
 import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.redis.utils.RedisUtils;
@@ -290,15 +291,64 @@ public class AiRuntimeConfigStore {
     }
 
     /**
-     * 保存安全合规配置（写入 Redis 覆盖值，下一次对话 / 编排即生效）。
+     * 保存安全合规配置（按字段合并后写入 Redis 覆盖值，下一次对话 / 编排即生效）。
      *
-     * @param bo 安全合规配置
+     * <p>页面按「内容审核 / PII 脱敏」两个页签分别保存，每次只提交本页签字段；
+     * 未提交的字段沿用当前生效值，避免保存一个页签时覆盖另一个页签未提交的修改。</p>
+     *
+     * @param patch 安全合规配置的部分更新（字段为 {@code null} 表示不修改）
      */
-    public void updateSecurity(AiSecurityConfigBo bo) {
-        // 密钥留空表示不修改：前端不回显密钥、始终以空值提交，须沿用已存值，
+    public synchronized void updateSecurity(AiSecurityConfigPatchBo patch) {
+        AiSecurityConfigBo bo = security();
+        if (patch.getEnabled() != null) {
+            bo.setEnabled(patch.getEnabled());
+        }
+        if (patch.getEngine() != null) {
+            bo.setEngine(patch.getEngine());
+        }
+        if (patch.getAction() != null) {
+            bo.setAction(patch.getAction());
+        }
+        if (patch.getInputCheck() != null) {
+            bo.setInputCheck(patch.getInputCheck());
+        }
+        if (patch.getOutputCheck() != null) {
+            bo.setOutputCheck(patch.getOutputCheck());
+        }
+        if (patch.getChannelOutCheck() != null) {
+            bo.setChannelOutCheck(patch.getChannelOutCheck());
+        }
+        if (patch.getToolResultMask() != null) {
+            bo.setToolResultMask(patch.getToolResultMask());
+        }
+        if (patch.getKbIngestCheck() != null) {
+            bo.setKbIngestCheck(patch.getKbIngestCheck());
+        }
+        if (patch.getMcpOutCheck() != null) {
+            bo.setMcpOutCheck(patch.getMcpOutCheck());
+        }
+        if (patch.getJevOutboundCheck() != null) {
+            bo.setJevOutboundCheck(patch.getJevOutboundCheck());
+        }
+        if (patch.getPromptHardening() != null) {
+            bo.setPromptHardening(patch.getPromptHardening());
+        }
+        if (patch.getMaskPii() != null) {
+            bo.setMaskPii(patch.getMaskPii());
+        }
+        if (patch.getHoldBackChars() != null) {
+            bo.setHoldBackChars(patch.getHoldBackChars());
+        }
+        if (patch.getExcerptChars() != null) {
+            bo.setExcerptChars(patch.getExcerptChars());
+        }
+        if (patch.getProviderEndpoint() != null) {
+            bo.setProviderEndpoint(patch.getProviderEndpoint());
+        }
+        // 密钥留空 / 未提交均表示不修改：前端不回显密钥，须沿用已存值，
         // 否则会把已配置的外部审核引擎密钥覆盖成空
-        if (StringUtils.isBlank(bo.getProviderApiKey())) {
-            bo.setProviderApiKey(security().getProviderApiKey());
+        if (StringUtils.isNotBlank(patch.getProviderApiKey())) {
+            bo.setProviderApiKey(patch.getProviderApiKey());
         }
         RedisUtils.setCacheObject(SECURITY_KEY, JsonUtils.toJsonString(bo));
         log.info("安全合规配置已更新：enabled={}, engine={}, action={}, input/output/channelOut={}/{}/{}, "

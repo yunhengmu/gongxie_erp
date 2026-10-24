@@ -10,6 +10,7 @@ import org.dromara.ai.domain.bo.AiJevConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
 import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
 import org.dromara.ai.domain.bo.AiSecurityConfigBo;
+import org.dromara.ai.domain.bo.AiSecurityConfigPatchBo;
 import org.dromara.ai.domain.vo.AiJevConfigVo;
 import org.dromara.ai.domain.vo.AiModelConfigVo;
 import org.dromara.ai.domain.vo.AiSecurityConfigVo;
@@ -124,12 +125,13 @@ public class AiRuntimeController extends BaseController {
 
     /**
      * 保存安全合规配置（运行期生效，下一次对话 / 编排即按新策略执行）
+     *
+     * <p>支持部分更新：页面按「内容审核 / PII 脱敏」两个页签分别提交，未提交的字段沿用当前生效值。</p>
      */
     @SaCheckPermission("ai:runtime:security:edit")
     @Log(title = "AI安全合规配置", businessType = BusinessType.UPDATE)
     @PutMapping("/security")
-    public R<Void> updateSecurity(@Validated @RequestBody AiSecurityConfigBo bo) {
-        // 密钥留空表示不修改，由 store 沿用已存值（前端不回显密钥，始终以空值提交）
+    public R<Void> updateSecurity(@Validated @RequestBody AiSecurityConfigPatchBo bo) {
         runtimeConfigStore.updateSecurity(bo);
         return R.ok();
     }

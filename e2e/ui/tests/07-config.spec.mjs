@@ -21,7 +21,8 @@ import { apiGetData, callViaPage } from '../lib/api.mjs';
 import { CONFIG, stackSkipReason } from '../lib/config.mjs';
 
 /** 三页的保存成功提示（用于 await 保存完成，文案取自各页 `modal.msgSuccess`） */
-const SAVED_SECURITY = '保存成功，下一次对话 / 编排即按新策略生效';
+const SAVED_SECURITY = '内容审核配置已保存，下一次对话 / 编排即生效';
+const SAVED_SECURITY_PII = 'PII 脱敏配置已保存，下一次对话 / 编排即生效';
 const SAVED_JEV = '保存成功，下一次编排即按新模式 / 阈值生效';
 const SAVED_PREF = '保存成功，下一轮对话即生效';
 
@@ -96,7 +97,7 @@ test.describe('配置页：保存 → 重载 → 生效', () => {
     expect(snapshot.providerApiKey, 'GET /ai/runtime/security 仍回显明文密钥').toBeUndefined();
     expect(snapshot, '缺少密钥掩码字段 providerApiKeyMask').toHaveProperty('providerApiKeyMask');
 
-    // 该字段在「内容审核」卡片内（另一个 PII 卡片也有保存按钮，故用容器限定）
+    // 该字段在「内容审核」页签内（两个页签各有保存按钮，故限定可见页签容器）
     const field = page.locator('.el-form-item:has-text("命中留证片段字符数") input').first();
     const before = Number(snapshot.excerptChars ?? 200);
     expect(Number(await field.inputValue()), '页面初始值与接口不一致（初始回填就有问题）').toBe(before);
@@ -105,7 +106,7 @@ test.describe('配置页：保存 → 重载 → 生效', () => {
     try {
       await field.fill(String(next));
       await field.blur();
-      await saveAndWait(page, 'div.table-panel:not(.pii-panel) button:has-text("保存")', SAVED_SECURITY);
+      await saveAndWait(page, '.el-tab-pane:visible button:has-text("保存")', SAVED_SECURITY);
 
       // 重载后 UI 回填为新值
       await reloadAndWait(page);
@@ -117,6 +118,37 @@ test.describe('配置页：保存 → 重载 → 生效', () => {
       // 再读接口确认服务端也是新值（区分"只改了前端本地状态"）
       const persisted = await apiGetData(page, '/ai/runtime/security', CONFIG.clientId);
       expect(Number(persisted?.excerptChars), '服务端未落库新值').toBe(next);
+    } finally {
+      await restore(page, '/ai/runtime/security', snapshot);
+    }
+  });
+
+  test('安全合规配置：PII 页签独立保存，不覆盖内容审核字段', async ({ page }) => {
+    test.skip(!CONFIG.stackUp, stackSkipReason());
+
+    await openPage(page, '/bizbuddy/safety/security');
+    const snapshot = await apiGetData(page, '/ai/runtime/security', CONFIG.clientId);
+    test.skip(!snapshot, '读取安全合规配置失败（GET /ai/runtime/security 无数据）——请确认接口可用且已登录');
+
+    const contentBefore = {
+      enabled: Boolean(snapshot.enabled),
+      engine: snapshot.engine,
+      excerptChars: Number(snapshot.excerptChars)
+    };
+    const piiBefore = Boolean(snapshot.maskPii);
+
+    try {
+      await page.getByRole('tab', { name: 'PII 脱敏' }).click();
+      const piiSwitch = page.locator('.el-tab-pane:visible .el-form-item:has-text("PII 脱敏") .el-switch').first();
+      await expect(piiSwitch).toBeVisible();
+      await piiSwitch.click();
+      await saveAndWait(page, '.el-tab-pane:visible button:has-text("保存")', SAVED_SECURITY_PII);
+
+      const persisted = await apiGetData(page, '/ai/runtime/security', CONFIG.clientId);
+      expect(Boolean(persisted?.maskPii), 'PII 开关未落库').toBe(!piiBefore);
+      expect(Number(persisted?.excerptChars), '保存 PII 时覆盖了未提交的内容审核字段').toBe(contentBefore.excerptChars);
+      expect(persisted?.engine, '保存 PII 时覆盖了审核引擎').toBe(contentBefore.engine);
+      expect(Boolean(persisted?.enabled), '保存 PII 时覆盖了内容审核总开关').toBe(contentBefore.enabled);
     } finally {
       await restore(page, '/ai/runtime/security', snapshot);
     }

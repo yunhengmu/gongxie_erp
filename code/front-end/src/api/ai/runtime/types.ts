@@ -78,6 +78,9 @@ export interface SecurityConfig {
   providerApiKeyMask?: string;
 }
 
+/** 安全合规配置的部分更新：按页签保存时只提交本页签字段，未提交字段沿用当前生效值 */
+export type SecurityConfigPatch = Partial<Omit<SecurityConfig, 'providerApiKeyMask'>>;
+
 /** 结构化决策路由配置（docs/21；决策模型连接信息统一由「模型配置」管理，此处只引用模型主键） */
 export interface JevConfig {
   /** 总开关：关闭＝零外呼、路由完全由小Z 负责 */

@@ -6,6 +6,8 @@ import org.dromara.ai.domain.bo.AiMcpServerConfigBo;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
 import org.dromara.ai.domain.bo.AiPlanConfigBo;
 import org.dromara.ai.domain.bo.AiRouteBudgetConfigBo;
+import org.dromara.ai.domain.bo.AiSecurityConfigBo;
+import org.dromara.ai.domain.bo.AiSecurityConfigPatchBo;
 import org.dromara.ai.domain.bo.AiWorkspaceConfigBo;
 import org.dromara.common.json.utils.JsonUtils;
 import org.dromara.common.redis.utils.RedisUtils;
@@ -13,6 +15,7 @@ import org.dromara.ai.test.AiTestSupport;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 import java.util.List;
@@ -22,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 
@@ -37,6 +41,7 @@ class AiRuntimeConfigStoreTest {
     private static final String WORKSPACE_KEY = "bizbuddy:ai:runtime:workspace";
     private static final String MCP_SERVER_KEY = "bizbuddy:ai:runtime:mcp-server";
     private static final String ROUTE_BUDGET_KEY = "bizbuddy:ai:runtime:route-budget";
+    private static final String SECURITY_KEY = "bizbuddy:ai:runtime:security";
 
     private final AiProperties aiProperties = new AiProperties();
     private final AiRuntimeConfigStore store = new AiRuntimeConfigStore(aiProperties);
@@ -231,6 +236,59 @@ class AiRuntimeConfigStoreTest {
         try (MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
             store.updateRouteBudget(new AiRouteBudgetConfigBo());
             redis.verify(() -> RedisUtils.setCacheObject(anyString(), anyString()));
+        }
+    }
+
+    @Test
+    @DisplayName("安全合规部分更新只改本页签提交的字段")
+    void shouldMergeSecurityPatch() {
+        AiSecurityConfigBo cached = new AiSecurityConfigBo();
+        cached.setEnabled(true);
+        cached.setEngine("external");
+        cached.setAction("mask");
+        cached.setExcerptChars(300);
+        cached.setProviderEndpoint("https://example.com/moderate");
+        cached.setProviderApiKey("secret-key");
+
+        AiSecurityConfigPatchBo patch = new AiSecurityConfigPatchBo();
+        patch.setMaskPii(false);
+
+        try (MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
+            redis.when(() -> RedisUtils.getCacheObject(SECURITY_KEY)).thenReturn(JsonUtils.toJsonString(cached));
+            store.updateSecurity(patch);
+            ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
+            redis.verify(() -> RedisUtils.setCacheObject(eq(SECURITY_KEY), json.capture()));
+            AiSecurityConfigBo saved = JsonUtils.parseObject(json.getValue(), AiSecurityConfigBo.class);
+            assertFalse(saved.isMaskPii(), "PII 开关应被本次提交覆盖");
+            assertTrue(saved.isEnabled(), "内容审核开关未提交，应沿用已存值");
+            assertEquals("external", saved.getEngine());
+            assertEquals("mask", saved.getAction());
+            assertEquals(300, saved.getExcerptChars());
+            assertEquals("https://example.com/moderate", saved.getProviderEndpoint());
+            assertEquals("secret-key", saved.getProviderApiKey());
+        }
+    }
+
+    @Test
+    @DisplayName("安全合规部分更新不改未提交字段且密钥留空沿用已存值")
+    void shouldKeepUnsubmittedSecurityFields() {
+        AiSecurityConfigBo cached = new AiSecurityConfigBo();
+        cached.setMaskPii(false);
+        cached.setProviderApiKey("secret-key");
+
+        AiSecurityConfigPatchBo patch = new AiSecurityConfigPatchBo();
+        patch.setExcerptChars(400);
+        patch.setProviderApiKey("");
+
+        try (MockedStatic<RedisUtils> redis = mockStatic(RedisUtils.class)) {
+            redis.when(() -> RedisUtils.getCacheObject(SECURITY_KEY)).thenReturn(JsonUtils.toJsonString(cached));
+            store.updateSecurity(patch);
+            ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
+            redis.verify(() -> RedisUtils.setCacheObject(eq(SECURITY_KEY), json.capture()));
+            AiSecurityConfigBo saved = JsonUtils.parseObject(json.getValue(), AiSecurityConfigBo.class);
+            assertFalse(saved.isMaskPii(), "未提交的 PII 开关应沿用已存值");
+            assertEquals("secret-key", saved.getProviderApiKey(), "密钥留空应沿用已存值");
+            assertEquals(400, saved.getExcerptChars(), "本次提交的字段应生效");
         }
     }
 }

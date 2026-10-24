@@ -1,4 +1,4 @@
-import type { CompactionConfig, JevConfig, PlanConfig, RouteBudgetConfig, SecurityConfig } from '@/api/ai/runtime/types';
+import type { CompactionConfig, JevConfig, PlanConfig, RouteBudgetConfig, SecurityConfig, SecurityConfigPatch } from '@/api/ai/runtime/types';
 import type { AxiosPromise } from '@/utils/api-types';
 import request from '@/utils/request';
 
@@ -79,10 +79,10 @@ export const getSecurityConfig = (): AxiosPromise<SecurityConfig> => {
 };
 
 /**
- * 保存安全合规配置（运行期生效）
- * @param data 安全合规配置
+ * 保存安全合规配置（运行期生效；按页签部分更新，未提交字段沿用当前生效值）
+ * @param data 安全合规配置的部分字段
  */
-export const updateSecurityConfig = (data: SecurityConfig): AxiosPromise<void> => {
+export const updateSecurityConfig = (data: SecurityConfigPatch): AxiosPromise<void> => {
   return request({
     url: '/ai/runtime/security',
     method: 'put',
