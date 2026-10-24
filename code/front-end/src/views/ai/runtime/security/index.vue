@@ -210,14 +210,6 @@
             </div>
           </template>
 
-          <el-alert
-            class="security-alert"
-            type="warning"
-            :closable="false"
-            show-icon
-            title="默认开启；关闭「启用内容审核」不会停用本项。两个页签共用同一份配置，保存仅提交本页签字段，另一页签未保存的修改不会生效。"
-          />
-
           <el-form :model="form" label-width="220px" class="config-form">
             <el-form-item label="PII 脱敏" prop="maskPii">
               <el-switch v-model="form.maskPii" />
