@@ -183,20 +183,23 @@
         </el-form-item>
         <el-divider content-position="left">提示词</el-divider>
         <el-form-item label="快速生成">
-          <div class="gen-row">
-            <el-select
-              v-model="templateKey"
-              placeholder="套用提示词模板"
-              clearable
-              style="width: 190px"
-              @change="handleApplyTemplate"
-            >
-              <el-option v-for="tpl in EXPERT_PROMPT_TEMPLATES" :key="tpl.key" :label="tpl.label" :value="tpl.key" />
-            </el-select>
-            <el-button type="primary" plain icon="MagicStick" :loading="generating" @click="handleGenerate">
-              AI 生成
-            </el-button>
-            <span class="text-muted">按名称 / 描述 / 已选工具与知识库，生成「描述 + 系统提示词」</span>
+          <div class="gen-col">
+            <div class="gen-row">
+              <el-select
+                v-model="templateKey"
+                placeholder="套用提示词模板"
+                clearable
+                style="width: 190px"
+                @change="handleApplyTemplate"
+              >
+                <el-option v-for="tpl in EXPERT_PROMPT_TEMPLATES" :key="tpl.key" :label="tpl.label" :value="tpl.key" />
+              </el-select>
+              <el-button type="primary" plain icon="MagicStick" :loading="generating" @click="handleGenerate">
+                AI 生成
+              </el-button>
+            </div>
+            <!-- 说明较长，单独占一行，避免与按钮挤在同一行导致换行错位 -->
+            <div class="gen-hint text-muted">按名称 / 描述 / 已选工具与知识库，生成「描述 + 系统提示词」</div>
           </div>
         </el-form-item>
         <el-form-item label="系统提示词" prop="sysPrompt">
@@ -1183,12 +1186,23 @@ loadOptions();
   font-size: 12px;
 }
 
-/* 快速生成行：模板下拉 + AI 生成 + 说明 */
+/* 快速生成：模板下拉 + AI 生成一行，说明文字另起一行 */
+.gen-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
 .gen-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
+}
+
+.gen-hint {
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 /* 工具授权 / 角色模型 / 配额：与 el-form-item 内容区对齐的窄列表 */
