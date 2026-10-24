@@ -7,7 +7,7 @@
  * 计算必记召回、污染率、PII 出境与 needs_context 缺失，并按门禁阈值给出退出码。</p>
  *
  * 用法：
- *   node e2e/memory-eval/shadow-gate.mjs \
+ *   node e2e-http/memory-eval/shadow-gate.mjs \
  *     --samples shadow-samples.jsonl --labels shadow-labels.jsonl \
  *     [--memory MEMORY.md] [--out shadow-gate.md] [--gate]
  *

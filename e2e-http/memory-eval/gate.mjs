@@ -8,10 +8,10 @@
  *
  * <p>用法：
  * <pre>
- *   node e2e/memory-eval/gate.mjs --gate
- *   node e2e/memory-eval/gate.mjs --only date-format,currency-cny      # 快速验证
- *   node e2e/memory-eval/gate.mjs --out gate-report.md                 # 额外输出 Markdown
- *   BIZBUDDY_DOCKER="wsl -e docker" node e2e/memory-eval/gate.mjs      # 指定 docker 入口
+ *   node e2e-http/memory-eval/gate.mjs --gate
+ *   node e2e-http/memory-eval/gate.mjs --only date-format,currency-cny      # 快速验证
+ *   node e2e-http/memory-eval/gate.mjs --out gate-report.md                 # 额外输出 Markdown
+ *   BIZBUDDY_DOCKER="wsl -e docker" node e2e-http/memory-eval/gate.mjs      # 指定 docker 入口
  * </pre></p>
  *
  * <p>依赖：已运行的后端容器（默认 bizbuddy-admin）与可用的 docker 命令。

@@ -4,7 +4,7 @@ import url from 'node:url';
 import { execFileSync } from 'node:child_process';
 
 /**
- * 配置解析：环境变量 > `e2e/.env.local` > 默认值；
+ * 配置解析：环境变量 > `e2e-http/.env.local` > 默认值；
  * RSA 密钥对缺省时回退读前端 `code/front-end/.env.development`（该密钥对前端已公开，非机密）。
  */
 

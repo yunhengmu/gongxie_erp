@@ -1,7 +1,7 @@
 /**
  * e2e-ui 配置解析。
  *
- * 原则与 `../e2e/lib/env.mjs` 一致：**凭证只有一个来源**——复用 `../e2e/.env.local`
+ * 原则与 `../e2e-http/lib/env.mjs` 一致：**凭证只有一个来源**——复用 `../e2e-http/.env.local`
  * （该文件已 gitignore），默认值与后端 e2e 相同（超管 admin / admin123）。
  * 与后端 e2e 的唯一差别是「访问地址」：后端直连 `:8080`，前端要经 **nginx**。
  *
@@ -63,10 +63,10 @@ const parseEnvFile = (file) => {
   return result;
 };
 
-const fileEnv = parseEnvFile(path.join(REPO_ROOT, 'e2e', '.env.local'));
+const fileEnv = parseEnvFile(path.join(REPO_ROOT, 'e2e-http', '.env.local'));
 
 /**
- * 取值优先级：进程环境变量 > ../e2e/.env.local > 默认值。
+ * 取值优先级：进程环境变量 > ../e2e-http/.env.local > 默认值。
  *
  * @param {string} key 键名
  * @param {string} fallback 默认值

@@ -1,7 +1,7 @@
 /**
  * 关键路径 ⑩：「重新生成」按钮接线。
  *
- * 后端判定矩阵由 `AiSessionServiceImplTest` 覆盖、接口闭环由 `../e2e` L15 覆盖；
+ * 后端判定矩阵由 `AiSessionServiceImplTest` 覆盖、接口闭环由 `../e2e-http` L15 覆盖；
  * 本条只验前端接线：按钮是否在最后一轮出现、预检被拒时是否置灰、允许时是否
  * 发起 regenerate SSE 并替换旧回答（该轮助手消息仍为 1 条）。
  */

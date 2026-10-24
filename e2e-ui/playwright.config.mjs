@@ -1,7 +1,7 @@
 /**
  * BizBuddy 前端关键路径 e2e（Playwright）。
  *
- * <p>与 `../e2e`(HTTP 层，零依赖) 互补：本套件跑**真实浏览器 + 真实容器栈**，
+ * <p>与 `../e2e-http`(HTTP 层，零依赖) 互补：本套件跑**真实浏览器 + 真实容器栈**，
  * 覆盖登录、菜单可达性与会话主路径。判定标准见 `lib/observe.mjs`。</p>
  *
  * <p>前置：容器栈已起（PG `http://localhost` / MySQL `http://localhost:81`），

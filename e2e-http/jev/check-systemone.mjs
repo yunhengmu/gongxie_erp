@@ -15,12 +15,12 @@
  *
  * <p>用法：
  * <pre>
- *   node e2e/jev/check-systemone.mjs                        # 用环境变量 / e2e/.env.local
- *   node e2e/jev/check-systemone.mjs --probe-all             # 依次探测所有候选 endpoint
- *   node e2e/jev/check-systemone.mjs --base-url https://xxx.cn-beijing.maas.aliyuncs.com/compatible-mode
+ *   node e2e-http/jev/check-systemone.mjs                        # 用环境变量 / e2e-http/.env.local
+ *   node e2e-http/jev/check-systemone.mjs --probe-all             # 依次探测所有候选 endpoint
+ *   node e2e-http/jev/check-systemone.mjs --base-url https://xxx.cn-beijing.maas.aliyuncs.com/compatible-mode
  * </pre></p>
  *
- * <p>配置项（环境变量优先，其次 {@code e2e/.env.local}，复用 e2e/lib/env.mjs 的解析）：
+ * <p>配置项（环境变量优先，其次 {@code e2e-http/.env.local}，复用 e2e-http/lib/env.mjs 的解析）：
  * <ul>
  *   <li>{@code BIZBUDDY_JEV_API_KEY}：百炼 API Key；缺省回退 {@code BIZBUDDY_LLM_API_KEY}（同一把百炼密钥）</li>
  *   <li>{@code BIZBUDDY_JEV_WORKSPACE_ID}：业务空间 ID（百炼决策模型的 endpoint 主机前缀）</li>
@@ -86,7 +86,7 @@ const parseArgs = (argv) => {
 };
 
 /**
- * 载入配置：环境变量 > e2e/.env.local > 默认值。
+ * 载入配置：环境变量 > e2e-http/.env.local > 默认值。
  *
  * @param {object} args 命令行参数
  * @returns {object} 配置
@@ -331,7 +331,7 @@ const main = async () => {
 
   const cfg = loadConfig(args);
   if (!cfg.apiKey) {
-    console.error('✗ 缺少 API Key：请设置 BIZBUDDY_JEV_API_KEY（或 BIZBUDDY_LLM_API_KEY）到环境变量或 e2e/.env.local');
+    console.error('✗ 缺少 API Key：请设置 BIZBUDDY_JEV_API_KEY（或 BIZBUDDY_LLM_API_KEY）到环境变量或 e2e-http/.env.local');
     process.exit(EXIT.USAGE);
   }
 

@@ -18,15 +18,15 @@
 
 ```bash
 # 只打印每条用例的抽取输入，不调模型（CI 可用）
-node e2e/memory-eval/run.mjs --dry-run
+node e2e-http/memory-eval/run.mjs --dry-run
 
 # 真实评测（以 DashScope 兼容模式为例）
-BIZBUDDY_LLM_API_KEY=sk-xxx node e2e/memory-eval/run.mjs \
+BIZBUDDY_LLM_API_KEY=sk-xxx node e2e-http/memory-eval/run.mjs \
   --base-url https://dashscope.aliyuncs.com/compatible-mode/v1 \
   --model qwen-plus --gate
 
 # 输出 Markdown 报告
-node e2e/memory-eval/run.mjs ... --out memory-eval-report.md
+node e2e-http/memory-eval/run.mjs ... --out memory-eval-report.md
 ```
 
 参数：
@@ -75,16 +75,16 @@ node e2e/memory-eval/run.mjs ... --out memory-eval-report.md
 
 ```bash
 # 全量 37 个会话；脚本总是按门槛判定，退出码 0 通过 / 1 未通过 / 2 环境或参数错误
-node e2e/memory-eval/gate.mjs
+node e2e-http/memory-eval/gate.mjs
 
 # 只跑部分用例做快速回归
-node e2e/memory-eval/gate.mjs --only date-format,currency-cny
+node e2e-http/memory-eval/gate.mjs --only date-format,currency-cny
 
 # 额外输出 Markdown 报告
-node e2e/memory-eval/gate.mjs --out gate-report.md
+node e2e-http/memory-eval/gate.mjs --out gate-report.md
 
 # 本机没有 docker 时（默认会自动回退到 wsl -e docker）
-BIZBUDDY_DOCKER="wsl -e docker" node e2e/memory-eval/gate.mjs
+BIZBUDDY_DOCKER="wsl -e docker" node e2e-http/memory-eval/gate.mjs
 ```
 
 `gate.mjs` 编排的事：
@@ -117,13 +117,13 @@ BIZBUDDY_DOCKER="wsl -e docker" node e2e/memory-eval/gate.mjs
 docker cp bizbuddy-admin:/ruoyi/server/data/agent-workspace/<entryCode>/<userId>/MEMORY.md memory-before.md
 
 # 2) 跑标注流量（自动切 shadow、抽样率 1.0、每轮抽取；跑完恢复原配置并关闭会话）
-node e2e/memory-eval/shadow-traffic.mjs --labels-out labels.jsonl [--limit 10] [--only id1,id2]
+node e2e-http/memory-eval/shadow-traffic.mjs --labels-out labels.jsonl [--limit 10] [--only id1,id2]
 
 # 3) 导出影子样本
 docker cp bizbuddy-admin:/ruoyi/server/data/agent-workspace/<entryCode>/<userId>/memory/.extract_shadow/YYYY-MM-DD.jsonl samples.jsonl
 
 # 4) 判门禁（退出码 0 通过 / 1 未通过）
-node e2e/memory-eval/shadow-gate.mjs \
+node e2e-http/memory-eval/shadow-gate.mjs \
   --samples samples.jsonl --labels labels.jsonl --memory memory-before.md --gate
 
 # 5) 还原 MEMORY.md 并清理影子样本，避免测试偏好留在开发账号

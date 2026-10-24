@@ -2,14 +2,14 @@
  * L12 结构化决策闸门（桩服务四分支）：用**本地桩服务**覆盖「网关档」的四条分支 + 关闭档零写入。
  *
  * <p><b>为何需要桩</b>：判定结果（高 / 低置信、越界、异常）要确定性可控，真实决策模型做不到。
- * 桩（{@code e2e/jev/SystemOneStub.java}）按请求 {@code state} 里的 ASCII 标记返回对应响应，
+ * 桩（{@code e2e-http/jev/SystemOneStub.java}）按请求 {@code state} 里的 ASCII 标记返回对应响应，
  * 后端把它当百炼决策模型解析，即可稳定复现四条分支。</p>
  *
  * <p><b>桩必须跑进 compose 网络</b>：容器解析不到 {@code host.docker.internal}（docker 网关是 WSL 主机），
  * 故桩不能跑在 Windows 上。操作者需**先在 WSL 内**启动桩（用例本身不 shell out，保持纯 HTTP）：</p>
  * <pre>
  *   wsl -d &lt;distro&gt; -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \
- *     -v &lt;repo&gt;/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080
+ *     -v &lt;repo&gt;/e2e-http/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080
  * </pre>
  * <p>{@code <distro>}／{@code <repo>} 按本机替换：发行版名取 {@code wsl --list --verbose} 里带 {@code *}
  * 的那项（开发环境存在 Ubuntu-22.04 与 Ubuntu-24.04 两种）；{@code <repo>} 为仓库根在 WSL 下的绝对路径。
@@ -54,7 +54,7 @@ const TEMP_MODEL_PREFIX = 'E2E_L12_决策模型_';
 /** 桩启动命令（写进 SKIP 提示；操作者需先在 WSL 内执行）。发行版名与仓库路径按本机自动解析，不写死 */
 const STUB_START_COMMAND = [
   `wsl -d ${wslDistro()} -- docker run -d --rm --name jev-stub --network bizbuddy_default -p 18080:8080 \\`,
-  `  -v ${wslRepoPath()}/e2e/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080`
+  `  -v ${wslRepoPath()}/e2e-http/jev:/app bellsoft/liberica-openjdk-rocky:21.0.12-cds java /app/SystemOneStub.java 8080`
 ].join('\n');
 
 /** 五个子场景：前四条依赖桩（gate 档四分支），最后一条关闭档零写入（不依赖桩） */

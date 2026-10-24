@@ -11,11 +11,11 @@
  *
  * <p>用法：
  * <pre>
- *   node e2e/jev/verify-shadow.mjs                   # 用 e2e/.env.local 的业务空间地址，自动选决策模型
- *   node e2e/jev/verify-shadow.mjs --keep-enabled    # 跑完不恢复「关闭」（留着采集影子数据）
- *   node e2e/jev/verify-shadow.mjs --model-config-id 9
- *   node e2e/jev/verify-shadow.mjs --base-url http://localhost:8081
- *   node e2e/jev/verify-shadow.mjs --message "帮我看看有哪些公告"
+ *   node e2e-http/jev/verify-shadow.mjs                   # 用 e2e-http/.env.local 的业务空间地址，自动选决策模型
+ *   node e2e-http/jev/verify-shadow.mjs --keep-enabled    # 跑完不恢复「关闭」（留着采集影子数据）
+ *   node e2e-http/jev/verify-shadow.mjs --model-config-id 9
+ *   node e2e-http/jev/verify-shadow.mjs --base-url http://localhost:8081
+ *   node e2e-http/jev/verify-shadow.mjs --message "帮我看看有哪些公告"
  * </pre></p>
  *
  * <p>退出码：{@code 0} 全流程通过 / {@code 1} 有断言失败 / {@code 2} 配置缺失 / {@code 3} 参数错误。</p>

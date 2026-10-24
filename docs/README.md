@@ -21,7 +21,7 @@
 | 改对话交互 / 前端页面 | `code/front-end`（对话工作台：`src/views/ai/agent/chat`） |
 | 调整模型 / 压缩 / 记忆等运行策略 | [configuration.md](configuration.md) |
 | 部署到服务器 | PostgreSQL 栈 [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md)、MySQL 8.0 栈 [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md)（均含构建前置与已知坑） |
-| **验证「真的跑通了」** | [../e2e/](../e2e)（接口层，零依赖 Node）与 [../e2e-ui/](../e2e-ui)（浏览器层，Playwright），见下文常用命令 |
+| **验证「真的跑通了」** | [../e2e-http/](../e2e-http)（接口层，零依赖 Node）与 [../e2e-ui/](../e2e-ui)（浏览器层，Playwright），见下文常用命令 |
 | **发版前要过哪些检查** | [release-checklist.md](release-checklist.md)（五道门禁，含 L12 桩的起停命令） |
 
 ## 常用命令
@@ -42,13 +42,13 @@ cd ../../code/front-end && pnpm install && pnpm dev
 
 ### 端到端（e2e）回归
 
-单测基于 Mockito 打桩、**不起 Spring 容器**；要验证「模型连通 / 知识库检索 / 专家编排 / 写工具人工确认 / 安全合规 / MCP 双向」在真实环境下的行为，用仓库根目录的 `e2e/`（Node.js 零依赖，对**已运行**的栈发真实 HTTP 断言）：
+单测基于 Mockito 打桩、**不起 Spring 容器**；要验证「模型连通 / 知识库检索 / 专家编排 / 写工具人工确认 / 安全合规 / MCP 双向」在真实环境下的行为，用仓库根目录的 `e2e-http/`（Node.js 零依赖，对**已运行**的栈发真实 HTTP 断言）：
 
 ```bash
 cd ..                       # 回到仓库根（biz-buddy/）
-node e2e/run.mjs                                  # 全量（未配置密钥的层自动 SKIP）
-node e2e/run.mjs --only L1,L3 --verbose            # 指定层级
-node e2e/run.mjs --base-url http://localhost:8081  # 指向 MySQL 栈（PG 栈默认 8080）
+node e2e-http/run.mjs                                  # 全量（未配置密钥的层自动 SKIP）
+node e2e-http/run.mjs --only L1,L3 --verbose            # 指定层级
+node e2e-http/run.mjs --base-url http://localhost:8081  # 指向 MySQL 栈（PG 栈默认 8080）
 
 # 浏览器层 e2e-ui（Playwright 驱动真实 chromium：页面渲染 / 动态菜单 / 前端关键路径）
 cd e2e-ui
@@ -56,8 +56,8 @@ pnpm install && pnpm run install-browser            # 首次需装依赖与 chro
 BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test  # MySQL 栈（PG 栈默认 http://localhost）
 ```
 
-- 覆盖 **L1~L17**（L14 已并入 L3）：模型连通 → 提示词生成 → 知识库生命周期（解析/批量/向量化/检索）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（需本地桩，见 [release-checklist.md](release-checklist.md)）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索；另含 **RAG 检索质量评测**（`e2e/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；
-- 配置见 `e2e/.env.example`（唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**，放 `e2e/.env.local`，已 gitignore）；
+- 覆盖 **L1~L17**（L14 已并入 L3）：模型连通 → 提示词生成 → 知识库生命周期（解析/批量/向量化/检索）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（需本地桩，见 [release-checklist.md](release-checklist.md)）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索；另含 **RAG 检索质量评测**（`e2e-http/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；
+- 配置见 `e2e-http/.env.example`（唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**，放 `e2e-http/.env.local`，已 gitignore）；
 - 退出码 `0/1/2/3` = 无失败 / 有 FAIL / 前置检查失败 / 参数错误；**L5 默认「拒绝」路径无副作用**，`--allow-writes` 才真写并在收尾自动清理；
 - 它不进 `mvn test`，与单测互不影响；**改了工具 / 装配 / 路由后，建议「单测 + e2e」两道都过**。
 

@@ -353,7 +353,7 @@ AI 能力全部落在后端模块 `biz-buddy`（包 `org.dromara.ai`），前端
 - **Rerank 重排**（**按每个知识库的「检索重排」开关决定**，未启用则保持向量原序）：重排模型在「模型配置」登记为 `rerank` 类型（`baseUrl` 填**完整重排端点**、`apiKey` 为该模型**自带**）；稠密召回 `max(topK, rerank-top-n)` → 重排 → 融合 → 截断 `topK`；融合模式可选 `replace` / `rank_rrf` / `score_fusion`（默认分数归一化加权）；
 - **上下文装配**（默认开启）：对返回集做确定性去重与相邻切片合并，并受字符 / Token 上限约束，**不改排序**。
 
-量化口径见仓库自带的 `e2e/eval/eval-rag.mjs`（hit@1 / hit@3 / hit@5 / MRR 分类汇总）。
+量化口径见仓库自带的 `e2e-http/eval/eval-rag.mjs`（hit@1 / hit@3 / hit@5 / MRR 分类汇总）。
 
 ## 6. 工具与集成
 

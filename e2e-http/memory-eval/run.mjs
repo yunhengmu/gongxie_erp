@@ -7,8 +7,8 @@
  * memory/.extract_shadow/YYYY-MM-DD.jsonl，另行人工复核。</p>
  *
  * 用法：
- *   node e2e/memory-eval/run.mjs --dry-run
- *   BIZBUDDY_LLM_API_KEY=... node e2e/memory-eval/run.mjs \
+ *   node e2e-http/memory-eval/run.mjs --dry-run
+ *   BIZBUDDY_LLM_API_KEY=... node e2e-http/memory-eval/run.mjs \
  *     --base-url https://dashscope.aliyuncs.com/compatible-mode/v1 --model qwen-plus --gate
  */
 

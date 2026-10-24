@@ -2,15 +2,15 @@
 
 测的是**已部署的容器栈**（真实浏览器 + 真实前后端），覆盖登录、菜单可达性与会话主路径。
 
-与 [`../e2e`](../e2e/) 的分工：
+与 [`../e2e-http`](../e2e-http/) 的分工：
 
-| | `../e2e`（HTTP 层） | 本目录（浏览器层） |
+| | `../e2e-http`（HTTP 层） | 本目录（浏览器层） |
 |---|---|---|
 | 手段 | 零依赖纯 Node，直接发 HTTP/SSE | Playwright 驱动 chromium |
 | 覆盖 | 接口契约、编排行为、SSE 事件序列 | 页面渲染、动态菜单、前端关键路径 |
 | 依赖 | **零 npm 依赖** | `@playwright/test`（重依赖，故独立目录承载） |
 
-> 之所以另建目录：`../e2e` 的零依赖是刻意设计（无需 `npm i` 即可在任意机器跑），
+> 之所以另建目录：`../e2e-http` 的零依赖是刻意设计（无需 `npm i` 即可在任意机器跑），
 > 浏览器依赖会破坏这一点。
 
 ## 前置
@@ -24,7 +24,7 @@
    pnpm run install-browser      # 下载 chromium
    ```
 
-3. 登录凭证复用 [`../e2e/.env.local`](../e2e/.env.example)（默认 `admin` / `admin123`，超管）。也可用环境变量覆盖：`BIZBUDDY_UI_BASE_URL` / `BIZBUDDY_USERNAME` / `BIZBUDDY_PASSWORD`。
+3. 登录凭证复用 [`../e2e-http/.env.local`](../e2e-http/.env.example)（默认 `admin` / `admin123`，超管）。也可用环境变量覆盖：`BIZBUDDY_UI_BASE_URL` / `BIZBUDDY_USERNAME` / `BIZBUDDY_PASSWORD`。
 
 ## 运行
 
@@ -48,7 +48,7 @@ BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test
 
 ## SKIP 语义（不是 FAIL）
 
-栈不可达、入口智能体未启用、对话链路前置不满足（如未配模型密钥）→ **SKIP**。理由与 `../e2e` 一致：本套件测的是「已部署的栈」，前置不满足属环境问题而非代码缺陷。
+栈不可达、入口智能体未启用、对话链路前置不满足（如未配模型密钥）→ **SKIP**。理由与 `../e2e-http` 一致：本套件测的是「已部署的栈」，前置不满足属环境问题而非代码缺陷。
 
 ## 实跑记录与三个坑（2026-10-16，PG 栈）
 
@@ -87,7 +87,7 @@ clientid: import.meta.env.VITE_APP_CLIENT_ID
 ### 坑 3：WSL 发行版名不写死（环境适配）
 
 本地开发环境同时存在 **Ubuntu-22.04 与 Ubuntu-24.04**，所以脚本与文档里一律不写死发行版名。
-`../e2e` 的 [`lib/env.mjs`](../e2e/lib/env.mjs) 提供两个解析器，L12 的 SKIP 提示与 `docs/release-checklist.md` 的起桩命令都由它们生成／占位：
+`../e2e-http` 的 [`lib/env.mjs`](../e2e-http/lib/env.mjs) 提供两个解析器，L12 的 SKIP 提示与 `docs/release-checklist.md` 的起桩命令都由它们生成／占位：
 
 | 解析器 | 作用 | 取值优先级 |
 |---|---|---|
@@ -144,5 +144,5 @@ clientid: import.meta.env.VITE_APP_CLIENT_ID
 
 ## 与发版门禁的关系
 
-建议作为发版门禁的**第 2b 道**（两栈各跑一遍，零 FAIL）：与 `../e2e` 的第 2 道互补——
+建议作为发版门禁的**第 2b 道**（两栈各跑一遍，零 FAIL）：与 `../e2e-http` 的第 2 道互补——
 后者证明「接口对」，本层证明「**页面真的能用**」。OT（纯后端发版）可跳过本层。

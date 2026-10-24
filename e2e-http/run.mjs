@@ -7,9 +7,9 @@
  *
  * <p>用法：
  * <pre>
- *   node e2e/run.mjs                       # 跑全部（未配密钥的层自动 SKIP）
- *   node e2e/run.mjs --only L1,L3 --verbose
- *   node e2e/run.mjs --allow-writes        # L5 走「接受」路径（会真建公告，收尾自动清理）
+ *   node e2e-http/run.mjs                       # 跑全部（未配密钥的层自动 SKIP）
+ *   node e2e-http/run.mjs --only L1,L3 --verbose
+ *   node e2e-http/run.mjs --allow-writes        # L5 走「接受」路径（会真建公告，收尾自动清理）
  * </pre></p>
  */
 
@@ -116,7 +116,7 @@ const parseArgs = (argv) => {
 
 const usage = () => `BizBuddy 端到端集成测试（e2e）
 
-用法：node e2e/run.mjs [选项]
+用法：node e2e-http/run.mjs [选项]
 
 选项：
   --only L1,L3        只跑指定层级（默认全部；可选 ${CASES.map((item) => item.meta.layer).join(' / ')}）
@@ -136,7 +136,7 @@ const usage = () => `BizBuddy 端到端集成测试（e2e）
      L12 为结构化决策闸门（桩服务四分支）：桩不可达 / 配置接口不可读 / 无对话密钥时 SKIP。
      L14 为知识库文档批量链路（批量解析 / 状态轮询 / 批量向量化）：缺演示文档或向量密钥时 SKIP。
 
-环境变量：见 e2e/.env.example（机密仅 BIZBUDDY_LLM_API_KEY）
+环境变量：见 e2e-http/.env.example（机密仅 BIZBUDDY_LLM_API_KEY）
 
 退出码：0 无失败 / 1 有 FAIL / 2 前置检查失败 / 3 参数错误`;
 

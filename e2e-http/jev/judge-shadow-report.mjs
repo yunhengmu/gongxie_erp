@@ -14,10 +14,10 @@
  *
  * <p>用法：
  * <pre>
- *   node e2e/jev/judge-shadow-report.mjs                      # 默认近 7 天
- *   node e2e/jev/judge-shadow-report.mjs --days 30 --limit 500
- *   node e2e/jev/judge-shadow-report.mjs --json e2e/.judge-shadow-report.json
- *   node e2e/jev/judge-shadow-report.mjs --base-url http://localhost:8081
+ *   node e2e-http/jev/judge-shadow-report.mjs                      # 默认近 7 天
+ *   node e2e-http/jev/judge-shadow-report.mjs --days 30 --limit 500
+ *   node e2e-http/jev/judge-shadow-report.mjs --json e2e-http/.judge-shadow-report.json
+ *   node e2e-http/jev/judge-shadow-report.mjs --base-url http://localhost:8081
  * </pre></p>
  *
  * <p>退出码：{@code 0} 正常（数据不足不是错误）/ {@code 2} 配置缺失或登录失败 / {@code 3} 参数错误。</p>
@@ -454,7 +454,7 @@ const printInsufficientHint = () => {
   console.log('⚠ 当前窗口内没有任何「有判定数据」的编排（judgedRows=0），无法计算一致率。');
   console.log('  请先打开影子档并跑若干轮对话：');
   console.log('    · 页面：「安全合规配置 → 结构化决策路由」切到「影子」档，或');
-  console.log('    · 命令行：node e2e/jev/verify-shadow.mjs --keep-enabled（跑完保留影子档继续采集）');
+  console.log('    · 命令行：node e2e-http/jev/verify-shadow.mjs --keep-enabled（跑完保留影子档继续采集）');
   console.log('  采集后重跑本脚本即可。');
 };
 

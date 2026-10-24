@@ -8,11 +8,11 @@
  *
  * <p>用法：
  * <pre>
- *   node e2e/eval/eval-rag.mjs                                  # 库已存在则复用，跑完保留
- *   node e2e/eval/eval-rag.mjs --rebuild                        # 先删旧评测库再重建
- *   node e2e/eval/eval-rag.mjs --corpus d:/some/md --top-k 5    # 指定语料目录与召回条数
- *   node e2e/eval/eval-rag.mjs --rewrite                        # 【已失效】P0-② 已回退，仅兼容旧命令，无实际作用
- *   node e2e/eval/eval-rag.mjs --clean                          # 跑完删除评测库及其文档
+ *   node e2e-http/eval/eval-rag.mjs                                  # 库已存在则复用，跑完保留
+ *   node e2e-http/eval/eval-rag.mjs --rebuild                        # 先删旧评测库再重建
+ *   node e2e-http/eval/eval-rag.mjs --corpus d:/some/md --top-k 5    # 指定语料目录与召回条数
+ *   node e2e-http/eval/eval-rag.mjs --rewrite                        # 【已失效】P0-② 已回退，仅兼容旧命令，无实际作用
+ *   node e2e-http/eval/eval-rag.mjs --clean                          # 跑完删除评测库及其文档
  * </pre></p>
  *
  * <p>接口依据（源码实测）：
@@ -85,13 +85,13 @@ const parseArgs = (argv) => {
   return args;
 };
 
-const usage = () => `BizBuddy RAG 检索质量评测（e2e/eval）
+const usage = () => `BizBuddy RAG 检索质量评测（e2e-http/eval）
 
-用法：node e2e/eval/eval-rag.mjs [选项]
+用法：node e2e-http/eval/eval-rag.mjs [选项]
 
 选项：
   --base-url <url>   后端地址（默认 http://localhost:8080）
-  --corpus <dir>     语料目录（默认取文档仓 docs/，回退 e2e/eval/corpus/；按用例引用挑 ~${CORPUS_LIMIT} 篇）
+  --corpus <dir>     语料目录（默认取文档仓 docs/，回退 e2e-http/eval/corpus/；按用例引用挑 ~${CORPUS_LIMIT} 篇）
   --top-k <n>        召回条数（默认 ${DEFAULT_TOP_K}；hit@1/3/5 与 MRR@5 均基于该结果）
   --rewrite          已失效（P0-② 查询改写 + RRF 实测无收益，已整体回退；仅保留该参数以兼容旧命令）
   --rerank           检索时透传 rerank=true（强制开启重排）；**不传则跟随服务端配置**（现已默认开启）
@@ -107,20 +107,20 @@ const usage = () => `BizBuddy RAG 检索质量评测（e2e/eval）
 指标：hit@1 / hit@3 / hit@5、recall@5、MRR@5、平均 top1 分数、平均检索耗时；并按 category（fact/term/synonym/colloquial/crossdoc）分组输出。
 判定：topK 命中中存在 docName ∈ expectDocs 且其 content 含任一 expectKeywords 记为命中。
 装配（--assemble）：额外输出「装配前 → 装配后」的片段条数 / 总字符数 / 估算 Token 数 / 期望关键词覆盖率 / 冗余率（整体 + 分类别）。
-报告：e2e/.e2e-report-rag-<时间戳>.json（已被 .gitignore 忽略，含 byCategory / assembleSummary）`;
+报告：e2e-http/.e2e-report-rag-<时间戳>.json（已被 .gitignore 忽略，含 byCategory / assembleSummary）`;
 
 /**
  * 解析语料目录与文件清单。
  *
- * <p>默认取文档仓 `docs/`（从 `e2e/` 看是 `../docs`）；优先挑选**被用例引用的**文档，
- * 保证「语料 = 评测目标」一致；不足时按字母序补齐；目录不存在则回退 `e2e/eval/corpus/`。</p>
+ * <p>默认取文档仓 `docs/`（从 `e2e-http/` 看是 `../docs`）；优先挑选**被用例引用的**文档，
+ * 保证「语料 = 评测目标」一致；不足时按字母序补齐；目录不存在则回退 `e2e-http/eval/corpus/`。</p>
  *
  * @param {string|null} cliDir 命令行指定的语料目录
  * @param {Set<string>} caseDocs 用例中引用到的期望文档名集合
  * @returns {{ dir: string, files: string[] }} 语料目录与文件绝对路径（已排序）
  */
 const resolveCorpus = (cliDir, caseDocs) => {
-  // 文档仓在 `biz-buddy/` 的上一层仓库根（从 `e2e/` 看是 `../../docs`）
+  // 文档仓在 `biz-buddy/` 的上一层仓库根（从 `e2e-http/` 看是 `../../docs`）
   const candidates = cliDir
     ? [path.resolve(cliDir)]
     : [path.join(repoRoot, '..', 'docs'), path.join(e2eDir, 'docs'), path.join(here, 'corpus')];
@@ -258,7 +258,7 @@ const ensureKb = async (http, args, embeddingModel, log) => {
     body: {
       kbName: KB_NAME,
       kbCode: KB_CODE,
-      description: 'RAG 检索质量评测库（e2e/eval/eval-rag.mjs 自动创建）',
+      description: 'RAG 检索质量评测库（e2e-http/eval/eval-rag.mjs 自动创建）',
       embeddingModelId: embeddingModel.id,
       // dimension 留空由后端取向量模型配置的维度（种子为 1024）
       chunkSize: 500,

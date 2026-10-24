@@ -11,7 +11,7 @@
  * MEMORY.md 还原，避免测试偏好留在开发账号里。</p>
  *
  * 用法：
- *   node e2e/memory-eval/shadow-traffic.mjs --labels-out /tmp/labels.jsonl [--limit 10] [--only id1,id2]
+ *   node e2e-http/memory-eval/shadow-traffic.mjs --labels-out /tmp/labels.jsonl [--limit 10] [--only id1,id2]
  */
 
 import fs from 'node:fs';
