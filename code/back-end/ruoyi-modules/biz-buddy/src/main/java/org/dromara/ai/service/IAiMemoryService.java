@@ -1,0 +1,189 @@
+package org.dromara.ai.service;
+
+import org.dromara.ai.core.memory.spi.MemoryBackendStats;
+import org.dromara.ai.domain.bo.AiMemoryContentBo;
+import org.dromara.ai.domain.bo.AiMemoryDeclaredBo;
+import org.dromara.ai.domain.vo.AiMemoryContentVo;
+import org.dromara.ai.domain.vo.AiMemoryDeclaredVo;
+import org.dromara.ai.domain.vo.AiMemoryFileVo;
+import org.dromara.ai.domain.vo.AiMemoryQualityVo;
+import org.dromara.ai.domain.vo.AiMemoryVersionVo;
+
+import java.util.List;
+
+/**
+ * AI 长期记忆 Service 接口（REQ-AI-09）。
+ *
+ * <p>记忆按用户隔离存放于智能体工作区，本接口提供记忆文件的查看、编辑与手动触发合并。</p>
+ *
+ * @author BizBuddy
+ */
+public interface IAiMemoryService {
+
+    /**
+     * 查询指定智能体与用户下的记忆文件清单（长期记忆 + 每日流水）。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 记忆文件清单
+     */
+    List<AiMemoryFileVo> listFiles(Long agentId, Long userId);
+
+    /**
+     * 读取记忆文件内容。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @param path    工作区相对路径
+     * @return 文件内容
+     */
+    AiMemoryContentVo readContent(Long agentId, Long userId, String path);
+
+    /**
+     * 保存记忆文件内容（人工编辑）。
+     *
+     * @param bo 写入参数
+     */
+    void writeContent(AiMemoryContentBo bo);
+
+    /**
+     * 手动触发记忆合并（把每日流水合并进 {@code MEMORY.md}）。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     */
+    void consolidate(Long agentId, Long userId);
+
+    /**
+     * 手动触发记忆合并，并限制单轮最大批次数（自动合并使用较小上限，避免占用线程过久）。
+     *
+     * @param agentId    智能体主键
+     * @param userId     记忆归属用户主键
+     * @param maxBatches 单轮最大批次数
+     */
+    void consolidate(Long agentId, Long userId, int maxBatches);
+
+    /**
+     * 判断该用户是否存在合并水位之后的待合并流水。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 存在待合并流水时返回 true
+     */
+    boolean hasPendingLedger(Long agentId, Long userId);
+
+    /**
+     * 归档超过保留期的每日流水（移动到记忆目录下的 {@code archive/} 子目录，保留证据、释放上下文）。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 归档的文件数
+     */
+    int archiveDaily(Long agentId, Long userId);
+
+    /**
+     * 清理超过保留期的记忆文件与会话日志（流水按每日保留天数，会话日志按会话保留天数）。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 删除的文件数
+     */
+    int cleanup(Long agentId, Long userId);
+
+    /**
+     * 删除某用户的全部长期记忆（{@code MEMORY.md} + {@code memory/}，并清除合并水位）。
+     *
+     * <p>用于回滚 / 合规删除：删除后该用户在小Z 与专家侧都不再带历史记忆。</p>
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     */
+    void deleteAll(Long agentId, Long userId);
+
+    /**
+     * 列出工作区中存在记忆数据（{@code memory/} 目录或 {@code MEMORY.md}）的用户主键。
+     *
+     * <p>用于覆盖「手工写入记忆但从未对话」的用户，避免维护任务只扫描会话表造成遗漏。</p>
+     *
+     * @param agentId 智能体主键
+     * @return 用户主键列表（升序）
+     */
+    List<Long> listMemoryUserIds(Long agentId);
+
+    /**
+     * 查询某用户的记忆规模与维护状态。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 记忆统计
+     */
+    MemoryBackendStats stats(Long agentId, Long userId);
+
+    /**
+     * 查询近 N 天的记忆运行健康指标（抽取、合并、失败数）。
+     *
+     * @param userId 记忆归属用户主键
+     * @param days   统计窗口（天，1~30）
+     * @return 运行健康指标
+     */
+    AiMemoryQualityVo quality(Long userId, Integer days);
+
+    /**
+     * 查询用户的显式记忆（用户明确要求记住的条目）。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @return 显式记忆列表（含已撤销项，供审计）
+     */
+    List<AiMemoryDeclaredVo> listDeclared(Long agentId, Long userId);
+
+    /**
+     * 新增一条显式记忆（管理端人工写入，仍走净化）。
+     *
+     * @param bo 写入参数
+     * @return 落库后的条目
+     */
+    AiMemoryDeclaredVo addDeclared(AiMemoryDeclaredBo bo);
+
+    /**
+     * 撤销一条显式记忆。
+     *
+     * @param agentId 智能体主键
+     * @param userId  记忆归属用户主键
+     * @param entryId 条目主键
+     * @return 是否撤销成功
+     */
+    boolean revokeDeclared(Long agentId, Long userId, String entryId);
+
+    /**
+     * 列出 MEMORY.md 历史版本（新→旧）。
+     *
+     * @param agentId 智能体主键
+     * @param userId  用户主键
+     * @return 版本列表
+     */
+    List<AiMemoryVersionVo> listVersions(Long agentId, Long userId);
+
+    /**
+     * 读取版本详情（含正文）。
+     *
+     * @param agentId   智能体主键
+     * @param userId    用户主键
+     * @param versionId 版本 ID
+     * @return 版本详情
+     */
+    AiMemoryVersionVo readVersion(Long agentId, Long userId, String versionId);
+
+    /**
+     * 恢复到指定版本。
+     *
+     * @param agentId   智能体主键
+     * @param userId    用户主键
+     * @param versionId 版本 ID
+     * @param mode      CONTENT / CONTENT_AND_WATERMARK
+     * @param note      备注
+     * @return 恢复后生成的新版本
+     */
+    AiMemoryVersionVo restoreVersion(Long agentId, Long userId, String versionId, String mode, String note);
+
+}

@@ -8,9 +8,9 @@ BizBuddy 是一个**企业级智能业务运行平台**：在成熟中后台底�
 
 | 层 | 组件 | 说明 |
 |---|---|---|
-| 前端 | `plus-ui-Vue` | Vue 3 + TypeScript + Element Plus，流式对话走 SSE |
-| 后端 | `RuoYi-Vue-Plus` | Spring Boot 4.1.1 + JDK 21，多模块 Maven |
-| 业务底座 | RuoYi-Vue-Plus 6.0.0 | RBAC、工作流、调度、代码生成、OSS、统一消息推送 |
+| 前端 | `code/front-end` | Vue 3 + TypeScript + Element Plus，流式对话走 SSE |
+| 后端 | `code/back-end` | Spring Boot 4.1.1 + JDK 21，多模块 Maven |
+| 业务底座 | 开源中后台框架 6.0.0 | RBAC、工作流、调度、代码生成、OSS、统一消息推送 |
 | 智能体内核 | **AgentScope Harness 2.0.4** | 工具循环、中间件、权限三态、HITL、状态存储、上下文压缩、技能 |
 | 数据 | PostgreSQL 14 / Redis / Milvus | 业务与审计 / 会话状态与锁 / 向量检索 |
 
@@ -58,7 +58,7 @@ flowchart LR
 专家  ： agentId # __expert__ # R:<sig>
 ```
 
-- `<sig>` 是会话资源集（选的场景包 / 工具 / 技能 / MCP 工具）压成的确定性签名；
+- `<sig>` 是会话资源集（选的场景包 / 技能 / MCP 工具；历史会话中的 `tool` 资源仅兼容读取）压成的确定性签名；
 - 资源**内容**变更（工具停用、决策改动、提示词改动等）由装配**指纹**触发重建；
 - 因此「改选择后下一轮生效」，且同一资源组合的多个会话**共享**实例。
 
@@ -66,7 +66,7 @@ flowchart LR
 
 ### 会话资源集（重要）
 
-**小Z 的工具来自会话级资源集**，不是平台全局配置：对话底栏 `+` 里选中的工具 / 技能 / MCP 工具，在**下一轮**生效，且**每个会话各自一份**。
+**小Z 的工具来自会话级资源集**，不是平台全局配置：对话底栏 `+` 里选中的**场景包 / 技能 / MCP 工具**（业务工具不再提供直选入口），在**下一轮**生效，且**每个会话各自一份**。
 
 > 常见误区：在「MCP 客户端」页配好连接 ≠ 小Z 就能用。前者只是让工具**可被选中**，还需在会话里选中它。
 
@@ -116,7 +116,7 @@ flowchart LR
 
 ## 7. 定时与多渠道
 
-- **定时任务**：AI 任务由 SnailJob 调度（`ruoyi-extend/ruoyi-snailjob-server` + `ruoyi-job`）——任务只按 cron 调用智能体并记执行记录（`ai_agent_task_run`），**不承载场景化投递**（场景产出由智能体自己用工具完成）。无人值守链路**没有人类可确认**：命中「需确认」档的写工具被改写为**拒绝**（不暂停、不悬挂），只有**显式配为「允许」**的写工具才会执行——典型例子是**平台运行日报**：专家 `platform_ops` 调 `write_daily_digest` 把五块结果 upsert 进 `ai_daily_digest`（落库属于「记录」，不是状态变更）；
+- **定时任务**：AI 任务由应用内调度器承载（`AiAgentTaskDispatchScheduler`，每 60 秒派发一次）——任务只按 cron 调用智能体并记执行记录（`ai_agent_task_run`），**不承载场景化投递**（场景产出由智能体自己用工具完成）。无人值守链路**没有人类可确认**：命中「需确认」档的写工具被改写为**拒绝**（不暂停、不悬挂），只有**显式配为「允许」**的写工具才会执行——典型例子是**平台运行日报**：专家 `platform_ops` 调 `write_daily_digest` 把五块结果 upsert 进 `ai_daily_digest`（落库属于「记录」，不是状态变更）；
 - **渠道入站**：**Webhook 平台**（飞书 / 企业微信 / GitHub）由外部平台回调驱动，安全边界由平台验签 / 解密与渠道口令承担（见 `application.yml` 的 `security.excludes`）；**长连接**渠道（钉钉、飞书 `mode=ws`）由应用主动外连、**免公网 IP 与回调地址**——生命周期统一由 `AiChannelRuntimeRegistry` 承载（应用就绪后拉起、配置变更**先停后建**、关闭时全停），入站报文经各平台 mapper 归一化后走**同一条**无人值守链路（钉钉零依赖自实现，飞书用官方 Larksuite OAPI SDK 薄封装）。**入站多媒体**：图片转图片内容块、可解析文档（PDF / docx / xlsx / pptx / 文本类）抽取后内联、语音 / 视频仅用平台转写；钉钉群聊图片下发为 `richText`，由运行时补归一化，媒体下载失败 / 不支持的类型降级为标记文本。渠道管理面另提供「按手机号查外部用户标识」辅助接口（`GET /ai/channel/{id}/external-user-id`，仅钉钉 / 飞书；由无状态客户端 `AiChannelUserLookupClient` 用渠道已存凭据调平台通讯录接口）。
 
 ## 8. 相关文档
@@ -125,4 +125,4 @@ flowchart LR
 - [development.md](development.md) —— 加一个业务工具（最常见的扩展）
 - [configuration.md](configuration.md) —— 配置项参考
 - [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md) / [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md) —— 两套容器编排（PostgreSQL 14 / MySQL 8.0，端口错开可并存）
-- [../e2e/](../e2e) —— 端到端脚本（在真实栈上验证上述链路：模型连通、知识库检索、专家编排、HITL 闭环）
+- [../e2e/http/](../e2e/http) —— 端到端脚本（在真实栈上验证上述链路：模型连通、知识库检索、专家编排、HITL 闭环）

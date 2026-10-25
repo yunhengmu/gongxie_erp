@@ -2,21 +2,21 @@
 # BizBuddy 全栈一键部署（PostgreSQL 版）
 #
 # 组件：PostgreSQL 14 + Redis + Milvus（standalone：etcd + 复用平台 MinIO 作对象存储）
-#       + ruoyi-admin（后端） + ruoyi-snailjob-server（调度服务端） + nginx（前端 + 反向代理）
+#       + ruoyi-admin（后端） + nginx（前端 + 反向代理）
 #
-# 与 `RuoYi-Vue-Plus/script/docker/docker-compose.yml`（上游模板，MySQL 且无 Milvus）的区别：
+# 与 `code/back-end/script/docker/docker-compose.yml`（上游模板，MySQL 且无 Milvus）的区别：
 #   本文件针对**本项目的真实技术栈**（PostgreSQL 14 + Milvus），并把建库脚本按依赖顺序挂进
 #   PostgreSQL 的初始化目录，因此 `docker compose up -d` 后即是「有表、有数据、可登录」的可用环境。
 #
 # ------------------------------------------------------------------------------------------
 # 使用步骤（首次）
 #
-#   1) 构建后端与调度服务端 jar（Dockerfile 从 target/ 取 jar，故需先在宿主机构建）：
-#        cd RuoYi-Vue-Plus
+#   1) 构建后端 jar（Dockerfile 从 target/ 取 jar，故需先在宿主机构建）：
+#        cd code/back-end
 #        ./mvnw clean package -DskipTests          # Windows: .\mvnw.cmd clean package -DskipTests
 #
 #   2) 构建前端静态资源（由 nginx 直接托管 dist）：
-#        cd plus-ui-Vue
+#        cd code/front-end
 #        pnpm install && pnpm build:prod
 #
 #   3) 启动（本目录）：
@@ -26,7 +26,6 @@
 #   4) 访问：
 #        前端         http://localhost/            （端口可用 WEB_PORT 覆盖）
 #        后端接口文档  http://localhost:8080/swagger-ui.html
-#        调度控制台    http://localhost:8800/snail-job
 #        初始账号      admin / admin123            （另：test / 666666、test1 / 666666）
 #
 # ------------------------------------------------------------------------------------------
@@ -46,12 +45,10 @@
 
 name: bizbuddy
 
-# 后端与调度服务端共用的基础环境
+# 后端应用的基础环境
 x-java-env: &java-env
   TZ: ${TZ:-Asia/Shanghai}
   SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-  # 建库脚本会创建 dev / prod 两个 SnailJob 命名空间，此处须与其中之一一致
-  SNAIL_JOB_NAMESPACE: ${SPRING_PROFILES_ACTIVE:-dev}
   # 出厂默认值收口自检（ProductionConfigGuard）：默认 enforce，命中出厂示例口令 / 密钥即拒绝启动
   # （对全部 profile 生效——默认部署走 dev，若只认 prod 就恰好落在盲区）。
   # 本地开发要沿用出厂值，就在 .env 里把下面这项设为 warn（仅非 prod 生效；prod 下恒为 enforce）。
@@ -64,11 +61,6 @@ x-java-env: &java-env
   REDIS_HOST: redis
   REDIS_PORT_INNER: "6379"
   REDIS_PASSWORD: ${REDIS_PASSWORD:-Zl@2026}
-  # 注意变量名：`SNAILJOB_SERVER_HOST` 才对应 `snail-job.server.host`（服务端地址）。
-  # 不能用 `SNAILJOB_HOST`——按 Spring 松散绑定它会落到 `snail-job.host`（**客户端自己的 IP**），
-  # 导致客户端把自己的 IP 注册成服务端主机名，调度回连执行器全部失败。
-  SNAILJOB_SERVER_HOST: snailjob-server
-  SNAILJOB_PORT_INNER: "17888"
   MILVUS_HOST: milvus
   MILVUS_USERNAME: ${MILVUS_USERNAME:-root}
   MILVUS_PASSWORD: ${MILVUS_PASSWORD:-Milvus}
@@ -92,16 +84,11 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       # 初始化脚本按**文件名排序**执行，故用数字前缀保证依赖顺序：
-      # 框架与系统管理（含 sys_user 初始账号）→ 工作流 → 调度（sj_*）→ BizBuddy AI
+      # 框架与系统管理（含 sys_user 初始账号）→ 工作流 → BizBuddy AI
       #
-      # 注意顺序：AI 脚本**依赖调度脚本**——其末尾要向 sj_job 登记「定时 Agent 任务派发」，
-      # 故 postgres_ry_job.sql 必须早于 postgres_ry_ai.sql（脚本头部第 4 条亦声明该依赖）。
-      # 若顺序颠倒，会报 relation "sj_job" does not exist；且容器仍会 healthy ——
-      # 因为 initdb 期间单条语句失败不会阻断启动，故障是**静默**的，务必核对初始化日志。
-      - ../../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_vue.sql:/docker-entrypoint-initdb.d/10-framework-system.sql:ro
-      - ../../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_workflow.sql:/docker-entrypoint-initdb.d/20-workflow.sql:ro
-      - ../../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_job.sql:/docker-entrypoint-initdb.d/30-snailjob.sql:ro
-      - ../../RuoYi-Vue-Plus/script/sql/postgres/postgres_ry_ai.sql:/docker-entrypoint-initdb.d/40-bizbuddy-ai.sql:ro
+      - ../../code/back-end/script/sql/postgres/postgres_ry_vue.sql:/docker-entrypoint-initdb.d/10-framework-system.sql:ro
+      - ../../code/back-end/script/sql/postgres/postgres_ry_workflow.sql:/docker-entrypoint-initdb.d/20-workflow.sql:ro
+      - ../../code/back-end/script/sql/postgres/postgres_ry_ai.sql:/docker-entrypoint-initdb.d/40-bizbuddy-ai.sql:ro
       # 5 号脚本（最后执行）：把 sys_oss_config 的端点从 127.0.0.1 改为容器服务名 minio:9000
       - ./sql/50-oss-endpoint.sql:/docker-entrypoint-initdb.d/50-oss-endpoint.sql:ro
     healthcheck:
@@ -240,48 +227,18 @@ services:
       retries: 10
 
   # ------------------------------------------------------------------ 应用
-  snailjob-server:
-    build:
-      # 注意：项目的 Dockerfile 用的是 `ADD ./target/xxx.jar ./app.jar`，
-      # 即以**模块目录**为构建上下文（上游 compose 直接用成品镜像，未暴露这点）。
-      # 若把上下文设成仓库根，`./target/*.jar` 解析不到，报 not found。
-      context: ../../RuoYi-Vue-Plus/ruoyi-extend/ruoyi-snailjob-server
-      dockerfile: Dockerfile
-    container_name: bizbuddy-snailjob-server
-    # 本容器不加载配置收口护栏（pom 不含 ruoyi-admin，扫描包仅 org.dromara.snailjob），
-    # 不存在「配置不合格即 fail-fast」的前提，故保留 unless-stopped 以自愈依赖抖动；
-    # 只有 ruoyi-admin 用 on-failure:3。
-    restart: unless-stopped
-    environment:
-      <<: *java-env
-      # 标准（非动态数据源）配置，环境变量即可覆盖 jar 内的 application-dev.yml
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-biz_buddy}?useUnicode=true&characterEncoding=utf8&useSSL=false&autoReconnect=true&reWriteBatchedInserts=true
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-Zl@2026}
-      # 本编排不含 ruoyi-monitor-admin，关闭监控注册避免无谓重试
-      SPRING_BOOT_ADMIN_CLIENT_ENABLED: "false"
-    ports:
-      - "${SNAILJOB_DASHBOARD_PORT:-8800}:8800"
-      - "${SNAILJOB_SERVER_PORT:-17888}:17888"
-    volumes:
-      - snailjob-logs:/ruoyi/snailjob/logs
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   ruoyi-admin:
     build:
       # 同上：上下文必须是模块目录，jar 由 `./target/ruoyi-admin.jar` 取用
-      context: ../../RuoYi-Vue-Plus/ruoyi-admin
+      context: ../../code/back-end/ruoyi-admin
       dockerfile: Dockerfile
     container_name: bizbuddy-admin
     # 应用容器的启动会因配置不合格而 fail-fast（如配置收口护栏命中出厂值），这类失败重试无用；
-    # on-failure:3 让它重试 3 次后停下，避免无限崩溃重启刷日志（基础设施与 snailjob-server 仍用 unless-stopped 自愈）。
+    # on-failure:3 让它重试 3 次后停下，避免无限崩溃重启刷日志（基础设施仍用 unless-stopped 自愈）。
     restart: on-failure:3
     environment:
       <<: *java-env
       SERVER_PORT: "8080"
-      SNAIL_JOB_PORT: "28080"
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
@@ -299,8 +256,6 @@ services:
         condition: service_healthy
       milvus:
         condition: service_healthy
-      snailjob-server:
-        condition: service_started
 
   web:
     image: nginx:1.27-alpine
@@ -313,11 +268,9 @@ services:
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       # 前端静态资源：需先执行 pnpm build:prod
-      - ../../plus-ui-Vue/dist:/usr/share/nginx/html:ro
+      - ../../code/front-end/dist:/usr/share/nginx/html:ro
     depends_on:
       ruoyi-admin:
-        condition: service_started
-      snailjob-server:
         condition: service_started
 
 volumes:
@@ -326,6 +279,5 @@ volumes:
   minio-data:
   milvus-etcd-data:
   milvus-data:
-  snailjob-logs:
   admin-logs:
   admin-data:

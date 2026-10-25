@@ -1,0 +1,6 @@
+# e2e/ui 产物（不入库）
+node_modules/
+.artifacts/
+playwright-report/
+test-results/
+.env.local

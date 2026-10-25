@@ -1,8 +1,8 @@
 # 一键部署（PostgreSQL 版）
 
-用 Docker Compose 拉起 BizBuddy 全栈：**PostgreSQL 14 + Redis + Milvus standalone（etcd + 复用平台 MinIO）+ 后端 + 调度服务端 + Nginx（前端）**。
+用 Docker Compose 拉起 BizBuddy 全栈：**PostgreSQL 14 + Redis + Milvus standalone（etcd + 复用平台 MinIO）+ 后端 + Nginx（前端）**。
 
-> 与 `RuoYi-Vue-Plus/script/docker/docker-compose.yml` 的区别：那个是上游 RuoYi 模板（MySQL、无 Milvus、直接用成品镜像）；本目录针对本项目的**真实技术栈**，并把建库脚本按依赖顺序挂进 PostgreSQL 的初始化目录，`up` 完即是「有表、有数据、可登录」的环境。
+> 与 `code/back-end/script/docker/docker-compose.yml` 的区别：那个是上游 RuoYi 模板（MySQL、无 Milvus、直接用成品镜像）；本目录针对本项目的**真实技术栈**，并把建库脚本按依赖顺序挂进 PostgreSQL 的初始化目录，`up` 完即是「有表、有数据、可登录」的环境。
 
 > 需要 **MySQL 8.0** 时，用并列的 [`deploy-mysql/`](../deploy-mysql)（组件一致，仅数据库 / JDBC 驱动 / 技能仓库实现不同；项目按数据源自动装配，无需改配置）。两套编排的项目名与端口已错开，可同时运行。
 
@@ -12,14 +12,11 @@
 
 ```bash
 # 后端 jar（ruoyi-admin/target/ruoyi-admin.jar）
-cd RuoYi-Vue-Plus
+cd code/back-end
 ./mvnw clean package -DskipTests          # Windows: .\mvnw.cmd clean package -DskipTests
 
-# 调度服务端 jar（ruoyi-extend/ruoyi-snailjob-server/target/ruoyi-snailjob-server.jar）
-./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
-
-# 前端静态资源（plus-ui-Vue/dist，由 Nginx 直接托管）
-cd ../../plus-ui-Vue
+# 前端静态资源（code/front-end/dist，由 Nginx 直接托管）
+cd code/front-end
 pnpm install && pnpm build:prod
 ```
 
@@ -41,7 +38,6 @@ docker compose up -d --build
 |---|---|
 | 前端 | <http://localhost/> |
 | 后端接口文档 | <http://localhost:8080/swagger-ui.html> |
-| 调度控制台 | <http://localhost:8800/snail-job> |
 | 初始账号 | `admin / admin123`（另：`test / 666666`、`test1 / 666666`） |
 
 ## 3. 首次启动后必做：配置模型密钥
@@ -81,6 +77,17 @@ alter table ai_channel add column if not exists mode varchar(16) not null defaul
 comment on column ai_channel.mode is '接入形态：webhook Webhook 回调（默认，需平台公网可达） / ws 长连接（应用主动外连、免公网 IP；仅飞书区分）';
 ```
 
+### 升级须知（2026-10-25 知识库混合检索）
+
+知识库新增 `retrieval_mode`（`vector` 默认 / `hybrid` 向量 + BM25）与 `bm25_index_status` 两列。BM25 索引存 Milvus 独立集合 `<collection>_bm25`（原生 BM25 Function + 中文分词），**不落关系库**；切换到 `hybrid` 后平台异步重建，也可在知识库列表手动重建。建表脚本已含这两列与注释，存量库需手工迁移：
+
+```sql
+alter table ai_knowledge_base add column if not exists retrieval_mode varchar(16) not null default 'vector';
+alter table ai_knowledge_base add column if not exists bm25_index_status varchar(16) not null default 'none';
+comment on column ai_knowledge_base.retrieval_mode is '检索方式（vector 向量 / hybrid 向量+BM25）';
+comment on column ai_knowledge_base.bm25_index_status is 'BM25 索引状态（none/building/ready/failed）';
+```
+
 ## 4. 实测结论（2026-10-09，WSL2 + Docker 29.3 / Compose v5.1.1）
 
 `docker compose up -d --build` 后：
@@ -89,8 +96,7 @@ comment on column ai_channel.mode is '接入形态：webhook Webhook 回调（�
 |---|---|
 | bizbuddy-postgres / redis / milvus / milvus-etcd | Up (healthy) |
 | bizbuddy-minio（平台 OSS，Milvus 复用其 `milvus-bucket` 桶） | Up (healthy)；`minio-init` 一次性建桶 / 上传演示文档后退出 |
-| bizbuddy-admin | Up，日志 `RuoYi-Vue-Plus启动成功`，无 ERROR |
-| bizbuddy-snailjob-server | Up，无 ERROR |
+| bizbuddy-admin | Up，启动成功日志，无 ERROR |
 | bizbuddy-web | Up |
 
 连通性：
@@ -100,21 +106,20 @@ comment on column ai_channel.mode is '接入形态：webhook Webhook 回调（�
 | `GET http://localhost/`（前端） | 200 |
 | `GET http://localhost/prod-api/auth/code`（Nginx → 后端代理） | 200 |
 | `GET http://localhost:8080/auth/code`（后端直连） | 200 |
-| `GET http://localhost:8800/snail-job/`（调度控制台） | 200 |
 | 后端数据源 | HikariPool 初始化成功 |
 | 后端 Redis | Redisson 已连接 `redis:6379` |
-| 建库结果 | 98 张表（`ai_*` **40** / `sj_*` 23 / `sys_*` 20 / `flow_*` 10 / `test_*` 3 / `gen_*` 2）；`admin` 等初始账号在位；`sys_menu` BizBuddy 段 **136** 行（6 分组 / **34** 功能页 / **95** 按钮）；`ai_tool` **30**、入口小Z 1、专家 **4**（机构管理 / 公告管理 / 演示「BizBuddy项目介绍专家」/ **平台运维助手**）、技能 **1**（平台运行日报）、定时任务 **1**、`ai_model_config` **4**（`api_key` 留空）；演示种子一套（知识库 `bizbuddy_demo_kb` + 文档 `BizBuddy简介.txt` + `sys_oss` 行）；`sj_job` 已有派发任务 |
+| 建库结果 | 75 张表（`ai_*` **40** / `sys_*` 20 / `flow_*` 10 / `test_*` 3 / `gen_*` 2）；`admin` 等初始账号在位；`sys_menu` BizBuddy 段 **136** 行（6 分组 / **34** 功能页 / **95** 按钮）；`ai_tool` **30**、入口小Z 1、专家 **4**（机构管理 / 公告管理 / 演示「BizBuddy项目介绍专家」/ **平台运维助手**）、技能 **1**（平台运行日报）、定时任务 **1**、`ai_model_config` **4**（`api_key` 留空）；演示种子一套（知识库 `bizbuddy_demo_kb` + 文档 `BizBuddy简介.txt` + `sys_oss` 行） |
 
-> **可一键自检**：仓库自带端到端测试脚本 [`../../e2e/`](../../e2e)——对**已运行**的栈发真实 HTTP 断言，覆盖 **L1~L17**（L14 已并入 L3）：「模型连通 → 专家提示词生成 → 知识库生命周期（解析/批量/向量化/检索）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（JEV 桩）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索」；另含 RAG 检索质量评测（`e2e/eval/`）。用法：
+> **可一键自检**：仓库自带端到端测试脚本 [`../../e2e/http/`](../../e2e/http)——对**已运行**的栈发真实 HTTP 断言，覆盖 **L1~L19**（无 L14，已并入 L3）：「模型连通 → 专家提示词生成 → 知识库生命周期（解析/批量/向量化/检索/**hybrid+BM25**）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（JEV 桩）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索 → 长期记忆分批合并 → 长期记忆版本恢复」；另含 RAG 检索质量评测（`e2e/http/eval/`）。用法：
 
 ```bash
 cd biz-buddy
-node e2e/run.mjs                        # 全量；未配密钥的层自动 SKIP
-node e2e/run.mjs --only L1,L3 --verbose # 指定层级
-node e2e/run.mjs --allow-writes         # L5 走「接受」路径（会真建公告，收尾自动清理）
+node e2e/http/run.mjs                        # 全量；未配密钥的层自动 SKIP
+node e2e/http/run.mjs --only L1,L3 --verbose # 指定层级
+node e2e/http/run.mjs --allow-writes         # L5 走「接受」路径（会真建公告，收尾自动清理）
 ```
 
-> 密钥放 `e2e/.env.local`（模板见 `e2e/.env.example`，已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**；L12 需 JEV 桩已启动（否则 SKIP），L13~L17 走平台密钥（真跑模型）。退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败（栈不可达、登录失败、种子缺失）/ `3` 参数错误。详见 [docs/14 §85](../../../docs/14-BizBuddy未覆盖项与已知限制.md#s85) 与 [docs/17 §85](../../../docs/17-BizBuddy实施过程与验证记录.md#s85)。
+> 密钥放 `e2e/http/.env.local`（模板见 `e2e/http/.env.example`，已 gitignore）；唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**（作为瞬时入参下发、不落库），L2~L6 走「模型配置」里已保存的密钥，L7~L11 走拒答 / 失败路径或只读协议调用、**不触发模型调用**；L12 需 JEV 桩已启动（否则 SKIP），L13~L17 走平台密钥（真跑模型）。退出码：`0` 无失败（含 SKIP）/ `1` 有 FAIL / `2` 前置检查失败（栈不可达、登录失败、种子缺失）/ `3` 参数错误。详见 [docs/14 §85](../../../docs/14-BizBuddy未覆盖项与已知限制.md#s85) 与 [docs/17 §85](../../../docs/17-BizBuddy实施过程与验证记录.md#s85)。
 
 ## 5. 已知坑（都踩过，按此排查）
 
@@ -136,21 +141,7 @@ docker tag  docker.m.daocloud.io/bellsoft/liberica-openjdk-rocky:21.0.12-cds \
 现象：`failed to calculate checksum … "/target/ruoyi-admin.jar": not found`。
 原因：Dockerfile 里是 `ADD ./target/xxx.jar`，上下文必须是**该模块目录**。若把 `context` 设成仓库根就找不到（上游 compose 直接用成品镜像，没暴露这一点）。本目录已按模块设置。
 
-**④ 初始化脚本顺序：AI 依赖调度**
-现象：容器 healthy，但日志里有 `relation "sj_job" does not exist`。
-原因：`postgres_ry_ai.sql` 末尾要向 `sj_job` 登记「定时 Agent 任务派发」，依赖 `postgres_ry_job.sql`。
-**关键提醒：initdb 期间单条语句失败不会阻断启动，容器照样 healthy —— 故障是静默的**，务必核对日志：
-
-```bash
-docker logs bizbuddy-postgres 2>&1 | grep -E 'docker-entrypoint-initdb.d|ERROR'
-```
-
-**⑤ 环境变量名撞键：`SNAILJOB_HOST` ≠ `snail-job.server.host`**
-现象：后端日志 `Snail-Job 客户端IP为: snailjob-server`，调度服务端刷 `GrpcClientInvokeHandlerV2 / JobExecutorRetryListener` 报错（回连执行器失败）。
-原因：Spring 松散绑定下 `SNAILJOB_HOST` 落到 **`snail-job.host`（客户端自己的 IP）**，而服务端地址是 `snail-job.server.host`（对应 `SNAILJOB_SERVER_HOST`）。
-处置：本目录已改用 `SNAILJOB_SERVER_HOST`。正确时应看到 `客户端IP为: 172.22.0.x`（容器真实 IP），且调度端 ERROR 归零。
-
-**⑥ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
+**④ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
 现象：上传文档失败，后端日志 `S3StorageException: Unable to execute HTTP request: Connection refused: /127.0.0.1:9000`。
 原因：**平台文件存储（OSS）的坐标不在 yaml 里，而在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。容器里 `127.0.0.1` 是容器自身，自然连不上。
 处置：本目录已备好两件事——① 平台 MinIO 服务 `minio`（9000/9001；**Milvus 复用同一实例**，向量数据放独立桶 `milvus-bucket`，与平台文件桶 `ruoyi` 分开）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`；对应 `sys_oss_config.access_policy=0`，且**框架不会自动建桶**）。文件访问由后端**读取时现算预签名 URL**（有效期 `oss.presign-expire-seconds`，默认 120s）。建桶复用 `minio` 镜像**自带的 `mc`**——`minio/mc` 独立镜像在部分镜像源上拉不到（403）。
@@ -196,14 +187,14 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 
 > 建库脚本**只在数据卷为空时执行**。改了口令/库名等变量要生效，需 `down -v` 重建。
 
-> **重启策略**：只有 `ruoyi-admin` 为 `restart: on-failure:3`——配置不合格时应用会 fail-fast 退出，重试 3 次后容器停在 `exited`，日志里最后一次启动报错即根因（**这是设计如此，不是容器故障**）；`ruoyi-snailjob-server`、基础设施与 nginx 为 `unless-stopped`，依赖抖动可自愈（snailjob-server 不依赖 ruoyi-admin、不加载配置收口护栏，没有 fail-fast 前提）。
+> **重启策略**：只有 `ruoyi-admin` 为 `restart: on-failure:3`——配置不合格时应用会 fail-fast 退出，重试 3 次后容器停在 `exited`，日志里最后一次启动报错即根因（**这是设计如此，不是容器故障**）；基础设施与 nginx 为 `unless-stopped`，依赖抖动可自愈。
 
 > 启动/恢复请用**不带服务名**的 `docker compose up -d`：只 `up` 某一个服务不会补齐其它缺失的容器，容易留下「前端能打开、上传却失败」这类半残状态（典型如平台 MinIO 容器缺失 → 上传报 `UnknownHostException: minio`）。用 `docker compose ps` 对照 compose 文件核对服务是否齐全。
 
 ## 7. 变量
 
 见 [.env.example](.env.example)（端口、数据库/Redis 口令、Milvus 用户名口令、`MINIO_IMAGE`、`SPRING_PROFILES_ACTIVE`、`JAVA_OPTS`）。
-`SPRING_PROFILES_ACTIVE` 须为 `dev` 或 `prod`——建库脚本只创建这两个 SnailJob 命名空间。
+`SPRING_PROFILES_ACTIVE` 须为 `dev` 或 `prod`。
 
 ## 8. 相关文档
 

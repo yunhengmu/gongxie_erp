@@ -1,6 +1,6 @@
 # 一键部署（MySQL 8.0 版）
 
-用 Docker Compose 拉起 BizBuddy 全栈：**MySQL 8.0 + Redis + Milvus standalone（etcd + 复用平台 MinIO）+ 后端 + 调度服务端 + Nginx（前端）**。
+用 Docker Compose 拉起 BizBuddy 全栈：**MySQL 8.0 + Redis + Milvus standalone（etcd + 复用平台 MinIO）+ 后端 + Nginx（前端）**。
 
 > 与 [`deploy-pg/`](../deploy-pg)（PostgreSQL 版）是**并列的两套编排**，技术栈差异只在数据库（及随之为其准备的 JDBC 驱动 / 技能仓库实现），其余组件一致。
 > 本项目已同时支持 PostgreSQL 与 MySQL 8.0：**技能仓库按数据源类型自动装配**（`AgentScopeConfig#aiSkillRepository`，PostgreSQL 版 `PostgresSkillRepository` / MySQL 版 `MysqlSkillRepository`），无需改代码。
@@ -13,7 +13,7 @@
 | 数据库镜像 | `postgres:14` | `mysql:8.0` |
 | 建库脚本 | `script/sql/postgres/*.sql` | `script/sql/*.sql`（MySQL 方言，含 `ry_ai.sql`） |
 | compose 项目名 | `bizbuddy` | `bizbuddy-mysql` |
-| 默认端口 | 80 / 8080 / 8800 / 17888 / 5432 / 6379 / 19530 / 9000 / 9001 | **81 / 8081 / 8801 / 17889 / 3306 / 6380 / 19531 / 9002 / 9003** |
+| 默认端口 | 80 / 8080 / 5432 / 6379 / 19530 / 9000 / 9001 | **81 / 8081 / 3306 / 6380 / 19531 / 9002 / 9003** |
 
 > MySQL 8 的部分唯一索引：PostgreSQL 脚本用 `WHERE del_flag='0'` 的部分唯一索引，MySQL 不支持该语法，`ry_ai.sql` 用 MySQL 8.0 的**函数键部分** `(if(del_flag='0', 0, null))` 等价实现（未删除行取 0 参与唯一约束，已删除行取 NULL，而 MySQL 唯一索引允许多个 NULL）。
 
@@ -23,14 +23,11 @@
 
 ```bash
 # 后端 jar（ruoyi-admin/target/ruoyi-admin.jar）
-cd RuoYi-Vue-Plus
+cd code/back-end
 ./mvnw clean package -DskipTests          # Windows: .\mvnw.cmd clean package -DskipTests
 
-# 调度服务端 jar（ruoyi-extend/ruoyi-snailjob-server/target/ruoyi-snailjob-server.jar）
-./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
-
-# 前端静态资源（plus-ui-Vue/dist，由 Nginx 直接托管）
-cd ../../plus-ui-Vue
+# 前端静态资源（code/front-end/dist，由 Nginx 直接托管）
+cd code/front-end
 pnpm install && pnpm build:prod
 ```
 
@@ -52,7 +49,6 @@ docker compose up -d --build
 |---|---|
 | 前端 | <http://localhost:81/> |
 | 后端接口文档 | <http://localhost:8081/swagger-ui.html> |
-| 调度控制台 | <http://localhost:8801/snail-job> |
 | 初始账号 | `admin / admin123`（另：`test / 666666`、`test1 / 666666`） |
 
 ## 4. 实测结论（2026-10-08，WSL2 + Docker 29.3 / Compose v5.1.1）
@@ -64,7 +60,6 @@ docker compose up -d --build
 | bizbuddy-mysql / redis / milvus / milvus-etcd | Up (healthy) |
 | bizbuddy-mysql-minio（平台 OSS，Milvus 复用其 `milvus-bucket` 桶） | Up (healthy)；`minio-init` 一次性建桶 / 上传演示文档后退出 |
 | bizbuddy-mysql-admin | Up，日志 `MysqlSkillRepository initialized with database: biz_buddy, skills table: ai_skill, resources table: ai_skill_resource`、`Started DromaraApplication in ~26s`，无 ERROR |
-| bizbuddy-mysql-snailjob-server | Up，Tomcat 8800、上下文 `/snail-job`，无 ERROR |
 | bizbuddy-mysql-web | Up |
 
 连通性：
@@ -74,8 +69,7 @@ docker compose up -d --build
 | `GET http://localhost:81/`（前端） | 200 |
 | `GET http://localhost:81/prod-api/auth/code`（Nginx → 后端代理） | 200 |
 | `GET http://localhost:8081/auth/code`（后端直连） | 200 |
-| `GET http://localhost:8801/snail-job/`（调度控制台） | 200 |
-| 建库结果 | 98 张表（与 PostgreSQL 版一致）；`ai_*` 40 张；`sys_menu` BizBuddy 段 136 行（6 分组 / 34 功能页 / 95 按钮）；`ai_tool` 30、入口小Z 1、专家 4、专家工具绑定 25 行；`ai_model_config` **4**（`api_key` 留空）；`sj_job` 已有派发任务 |
+| 建库结果 | 75 张表（与 PostgreSQL 版一致）；`ai_*` 40 张；`sys_menu` BizBuddy 段 136 行（6 分组 / 34 功能页 / 95 按钮）；`ai_tool` 30、入口小Z 1、专家 4、专家工具绑定 25 行；`ai_model_config` **4**（`api_key` 留空） |
 | 中文数据 | `sys_menu.menu_name='BizBuddy'`、`sys_user.nick_name='本部门及以下 密码666666'` 均完好（库字符集 `utf8mb4` / `utf8mb4_unicode_ci`） |
 | 部分唯一索引 | `ai_tool.uk_ai_tool_code` 的表达式落库为 `if((del_flag = '0'),0,NULL)`，即 MySQL 「函数键部分」等价实现 |
 | OSS 端点 | `sys_oss_config.endpoint = minio:9000` |
@@ -115,6 +109,15 @@ alter table ai_knowledge_base add column rerank_model_id bigint(20);
 alter table ai_channel add column mode varchar(16) not null default 'webhook' comment '接入形态：webhook Webhook 回调（默认，需平台公网可达） / ws 长连接（应用主动外连、免公网 IP；仅飞书区分）';
 ```
 
+### 升级须知（2026-10-25 知识库混合检索）
+
+知识库新增 `retrieval_mode`（`vector` 默认 / `hybrid` 向量 + BM25）与 `bm25_index_status` 两列。BM25 索引存 Milvus 独立集合 `<collection>_bm25`（原生 BM25 Function + 中文分词），**不落关系库**；切换到 `hybrid` 后平台异步重建，也可在知识库列表手动重建。建表脚本已含这两列，存量库需手工迁移（重复执行会报 `Duplicate column name`，可忽略）：
+
+```sql
+alter table ai_knowledge_base add column retrieval_mode varchar(16) not null default 'vector' comment '检索方式（vector 向量 / hybrid 向量+BM25）';
+alter table ai_knowledge_base add column bm25_index_status varchar(16) not null default 'none' comment 'BM25 索引状态（none/building/ready/failed）';
+```
+
 ## 6. 已知坑（与 PostgreSQL 版相同，附 MySQL 增量项）
 
 **① 用 Docker Hub 拉 `bellsoft/liberica-openjdk-rocky` 反复失败**
@@ -130,20 +133,7 @@ docker tag  docker.m.daocloud.io/bellsoft/liberica-openjdk-rocky:21.0.12-cds \
 
 **③ 构建上下文必须是模块目录**：Dockerfile 里是 `ADD ./target/xxx.jar`，`context` 必须是**该模块目录**，否则报 `not found`。
 
-**④ 初始化脚本顺序：AI 依赖调度**
-现象：容器 healthy，但日志里有 `Table 'sj_job' doesn't exist`。
-原因：`ry_ai.sql` 末尾要向 `sj_job` 登记「定时 Agent 任务派发」，依赖 `ry_job.sql`。
-**关键提醒：初始化期间单条语句失败不会阻断启动，容器照样 healthy —— 故障是静默的**，务必核对日志：
-
-```bash
-docker logs bizbuddy-mysql 2>&1 | grep -iE 'docker-entrypoint|ERROR'
-```
-
-**⑤ 环境变量名撞键：`SNAILJOB_HOST` ≠ `snail-job.server.host`**
-现象：后端日志 `Snail-Job 客户端IP为: snailjob-server`，调度端刷 `GrpcClientInvokeHandlerV2` 报错。
-原因：Spring 松散绑定下 `SNAILJOB_HOST` 落到 **`snail-job.host`（客户端自己的 IP）**。本目录已改用 `SNAILJOB_SERVER_HOST`。
-
-**⑥ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
+**④ 知识库/文件上传报 `Connection refused: /127.0.0.1:9000`**
 原因：**平台文件存储（OSS）坐标存在数据库表 `sys_oss_config`**（框架种子写的是本地开发机的 `127.0.0.1:9000`）。本目录已备好两件事——① 平台 MinIO 服务 `minio`（9002/9003；**Milvus 复用同一实例**，向量数据放独立桶 `milvus-bucket`，与平台文件桶 `ruoyi` 分开）；② 一次性初始化 `minio-init` 建桶（**私有桶**，以 `mc anonymous set none` 取代 `mc anonymous set download`）。`deploy/deploy-mysql/sql/50-oss-endpoint.sql` 会在首次建库时把端点改成 `minio:9000`、`domain_url` 写成宿主机可达地址、`access_policy` 置 `0`（私有，文件访问走后端下发的预签名 URL）；**已初始化过的数据卷不会重跑**，需手动补一次：
 
 ```bash
@@ -153,15 +143,15 @@ docker compose restart ruoyi-admin      # 让 OSS 配置重新加载
 
 MinIO 控制台：<http://localhost:9003>（`ruoyi` / `ruoyi123`）。
 
-**⑦ MySQL 8 认证插件**
+**⑤ MySQL 8 认证插件**
 现象：后端报 `Public Key Retrieval is not allowed` 或 `Unable to load authentication plugin`。
 原因：MySQL 8 默认 `caching_sha2_password`，JDBC 在非 SSL 连接下需显式允许取公钥。
 处置：本目录已在 JDBC 参数里带 `allowPublicKeyRetrieval=true&useSSL=false`，无需额外处理。
 
-**⑧ 上传成功，但图片 / 文档在页面上「加载失败」**
+**⑥ 上传成功，但图片 / 文档在页面上「加载失败」**
 现象：后端能读到文件（模型识图、文档解析都正常），**浏览器却加载不出来**（聊天里的图片、知识库文档的下载 / 在线预览）。
 原因：`sys_oss_config` 有两个坐标——`endpoint`（后端读写用，容器网络内的 `minio:9000`）与 `domain_url`（**返回给前端的对外地址**）。若只改了 `endpoint`，`domain_url` 仍是框架种子的 `127.0.0.1:9000`，浏览器解析不到。
-处置：`50-oss-endpoint.sql` 已**同时**写入 `endpoint = minio:9000`、`domain_url = http://localhost:9002`（本栈平台 MinIO 映射在宿主机的 **9002**，与 PG 栈的 9000 错开；**2026-10-09 修正**——此前该脚本漏了 `domain_url`）与 `access_policy = 0`（**私有桶**，文件访问走后端下发的预签名 URL）。**存量数据卷不会重跑该脚本**，需手动补一次（见 ⑥ 的命令，脚本本身包含这三条 `update`：`endpoint` / `domain_url` / `access_policy`），随后 `docker compose restart ruoyi-admin`。
+处置：`50-oss-endpoint.sql` 已**同时**写入 `endpoint = minio:9000`、`domain_url = http://localhost:9002`（本栈平台 MinIO 映射在宿主机的 **9002**，与 PG 栈的 9000 错开；**2026-10-09 修正**——此前该脚本漏了 `domain_url`）与 `access_policy = 0`（**私有桶**，文件访问走后端下发的预签名 URL）。**存量数据卷不会重跑该脚本**，需手动补一次（见 ④ 的命令，脚本本身包含这三条 `update`：`endpoint` / `domain_url` / `access_policy`），随后 `docker compose restart ruoyi-admin`。
 若改了 `MINIO_API_PORT`，或需从其它机器 / 公网访问，把 `domain_url` 改成实际可达的地址即可（后端返回的 URL 以此为准，无需改数据行）。
 > 私有桶下 `domain_url` 是**硬前置**：预签名 URL 按它生成，留空或指向不可达地址会导致前端预览 / 下载失败（后端解析不受影响，它走 `endpoint`）。
 
@@ -178,7 +168,7 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 
 > 建库脚本**只在数据卷为空时执行**。改了口令/库名等变量要生效，需 `down -v` 重建。
 
-> **重启策略**：只有 `ruoyi-admin` 为 `restart: on-failure:3`——配置不合格时应用会 fail-fast 退出，重试 3 次后容器停在 `exited`，日志里最后一次启动报错即根因（**这是设计如此，不是容器故障**）；`ruoyi-snailjob-server`、基础设施与 nginx 为 `unless-stopped`，依赖抖动可自愈（snailjob-server 不依赖 ruoyi-admin、不加载配置收口护栏，没有 fail-fast 前提）。
+> **重启策略**：只有 `ruoyi-admin` 为 `restart: on-failure:3`——配置不合格时应用会 fail-fast 退出，重试 3 次后容器停在 `exited`，日志里最后一次启动报错即根因（**这是设计如此，不是容器故障**）；基础设施与 nginx 为 `unless-stopped`，依赖抖动可自愈。
 
 > 人工排查时用 `docker exec ... mysql` 查中文，请带 `--default-character-set=utf8mb4`：MySQL 官方镜像不带 locale，客户端会退回 latin1，中文会显示成 `?`（**读到的乱码不代表库里是乱码**，用 `hex()` 可验证）。建库脚本各自自带 `SET NAMES utf8mb4`，初始化不受此影响。
 >
@@ -187,10 +177,10 @@ docker compose down -v                     # 停止并删除数据卷（下次�
 ## 8. 变量
 
 见 [.env.example](.env.example)（端口、数据库/Redis 口令、Milvus 用户名口令、`MINIO_IMAGE`、`MYSQL_IMAGE`、`SPRING_PROFILES_ACTIVE`、`JAVA_OPTS`）。
-`SPRING_PROFILES_ACTIVE` 须为 `dev` 或 `prod`——建库脚本只创建这两个 SnailJob 命名空间。
+`SPRING_PROFILES_ACTIVE` 须为 `dev` 或 `prod`——决定后端加载的配置文件与日志级别。
 
 ## 9. 相关文档
 
 - 部署总览（PostgreSQL 版，含更多背景说明）：[../deploy-pg/README.md](../deploy-pg/README.md)
-- 后端配置项：[../../RuoYi-Vue-Plus/docs/configuration.md](../../RuoYi-Vue-Plus/docs/configuration.md)
-- 架构与二次开发：[../../RuoYi-Vue-Plus/docs/README.md](../../RuoYi-Vue-Plus/docs/README.md)
+- 后端配置项：[../../docs/configuration.md](../../docs/configuration.md)
+- 架构与二次开发：[../../docs/README.md](../../docs/README.md)

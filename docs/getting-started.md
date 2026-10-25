@@ -18,25 +18,23 @@
 
 先建库 `biz_buddy`，再按顺序导入对应方言的脚本（**PostgreSQL 为默认，MySQL 8.0 为并列支持**）：
 
-PostgreSQL（`RuoYi-Vue-Plus/script/sql/postgres/`）：
+PostgreSQL（`code/back-end/script/sql/postgres/`）：
 
 ```
 postgres_ry_vue.sql        # 框架基础表 + 系统管理数据（含菜单、字典、初始账号）
 postgres_ry_workflow.sql   # 工作流（Warm-Flow）表
-postgres_ry_job.sql        # 调度任务（SnailJob）表：sj_*
 postgres_ry_ai.sql         # AI 平台表（ai_* 表结构 + 种子数据）
 ```
 
-MySQL 8.0（`RuoYi-Vue-Plus/script/sql/`）：
+MySQL 8.0（`code/back-end/script/sql/`）：
 
 ```
 ry_vue.sql        # 框架基础表 + 系统管理数据（含菜单、字典、初始账号）
 ry_workflow.sql   # 工作流（Warm-Flow）表
-ry_job.sql        # 调度任务（SnailJob）表：sj_*
 ry_ai.sql         # AI 平台表（ai_* 表结构 + 种子数据）
 ```
 
-> 顺序要求：`*_ry_ai.sql` **依赖** `*_ry_job.sql` —— 它末尾要向 `sj_job` 登记「定时 Agent 任务派发」。若先执行 AI 脚本会报 `relation "sj_job" does not exist`（PostgreSQL）/ `Table 'sj_job' doesn't exist`（MySQL）。
+> 顺序要求：先 `*_ry_vue.sql`（底座表），再 `*_ry_workflow.sql`（按需）、最后 `*_ry_ai.sql`（AI 表与种子）。
 
 > **脚本是「当前状态基线」，只在空库执行**：面向全新数据库一次性建好全部对象（按对象组织，不含历史增量段），重复执行幂等。已运行的存量库若结构落后，需按对应版本的变更说明手工补 DDL（例如新增列）。
 > Oracle / SQLServer 方言的历史脚本仍保留在仓库中，但**不维护**。两套编排见 [`../deploy/deploy-pg/`](../deploy/deploy-pg)（PostgreSQL 版）与 [`../deploy/deploy-mysql/`](../deploy/deploy-mysql)（MySQL 8.0 版），可按需二选一或同时运行（端口已错开）。
@@ -45,7 +43,7 @@ ry_ai.sql         # AI 平台表（ai_* 表结构 + 种子数据）
 ## 3. 启动后端
 
 ```bash
-cd RuoYi-Vue-Plus
+cd code/back-end
 
 # 构建（Windows；Linux / macOS 用 ./mvnw）
 ./mvnw.cmd clean install -DskipTests
@@ -54,20 +52,20 @@ cd RuoYi-Vue-Plus
 ./mvnw.cmd -pl ruoyi-admin spring-boot:run
 ```
 
-或在 IDE 中直接运行 `ruoyi-admin` 模块的 [`org.dromara.DromaraApplication`](../RuoYi-Vue-Plus/ruoyi-admin/src/main/java/org/dromara/DromaraApplication.java)。
+或在 IDE 中直接运行 `ruoyi-admin` 模块的 [`org.dromara.DromaraApplication`](../code/back-end/ruoyi-admin/src/main/java/org/dromara/DromaraApplication.java)。
 
 - 默认激活 `dev` 环境（见 `pom.xml` 的 `<profiles>`），接口文档地址：`http://localhost:8080/swagger-ui.html`
 - 初始账号：`admin` / `admin123`
-- 监控中心 `ruoyi-monitor-admin`（`9090`）、调度服务端 `ruoyi-snailjob-server`（`17888` / 控制台 `8800`）按需单独启动
+- 监控中心 `ruoyi-monitor-admin`（`9090`）按需单独启动
 
 ## 4. 启动前端
 
 ```bash
-cd plus-ui-Vue
+cd code/front-end
 
 pnpm install
 pnpm dev          # 开发模式，默认端口 80
 pnpm build:prod   # 生产构建
 ```
 
-> 连接坐标（后端地址、端口、客户端 id 等）见 [configuration.md](configuration.md) 与 `plus-ui-Vue/.env.*`。
+> 连接坐标（后端地址、端口、客户端 id 等）见 [configuration.md](configuration.md) 与 `code/front-end/.env.*`。

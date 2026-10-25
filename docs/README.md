@@ -11,6 +11,17 @@
 | [configuration.md](configuration.md) | 配置项参考（`bizbuddy.ai.*`）与生产必改清单 |
 | [release-checklist.md](release-checklist.md) | **发版门禁清单**：五道门禁（集成测试 / e2e 全量 / 重建冒烟 / 日志与体检 / 存量库升级）与实测基线 |
 
+## 仓库目录
+
+| 目录 | 说明 |
+|---|---|
+| `code/back-end/` | 后端工程：Spring Boot 4.1.1 + JDK 21，AI 能力在 `ruoyi-modules/biz-buddy` |
+| `code/front-end/` | 前端工程：Vue 3 + TypeScript + Element Plus + Vite |
+| `deploy/deploy-pg/`、`deploy/deploy-mysql/` | 两套全栈容器编排（PostgreSQL / MySQL 8.0），端口错开可同时运行 |
+| `docs/` | 本目录：开发者文档、平台功能说明 [BizBuddy平台功能说明.md](BizBuddy平台功能说明.md) 与界面截图 `images/` |
+| `e2e/http/` | 接口层端到端（Node.js 零依赖，`node e2e/http/run.mjs`） |
+| `e2e/ui/` | 浏览器层端到端（Playwright，`cd e2e/ui && pnpm test`） |
+
 ## 我要改哪里？
 
 | 想做的事 | 从哪里入手 |
@@ -18,17 +29,17 @@
 | 加一个业务工具 | [development.md](development.md) |
 | 改智能体装配 / 路由 / 权限 | `biz-buddy` 的 `core/agent`（先读 [architecture.md](architecture.md)） |
 | **做「定时任务 × 技能」的无人值守产出** | 参考「平台运行日报」样板：只读工具 + 写工具（`core/agent/tools`）+ 落库服务（`core/digest`）+ 技能正文 + 1 行任务配置；注意无人值守下写工具须配「允许」 |
-| 改对话交互 / 前端页面 | `plus-ui-Vue`（对话工作台：`src/views/ai/agent/chat`） |
+| 改对话交互 / 前端页面 | `code/front-end`（对话工作台：`src/views/ai/agent/chat`） |
 | 调整模型 / 压缩 / 记忆等运行策略 | [configuration.md](configuration.md) |
 | 部署到服务器 | PostgreSQL 栈 [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md)、MySQL 8.0 栈 [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md)（均含构建前置与已知坑） |
-| **验证「真的跑通了」** | [../e2e/](../e2e)（接口层，零依赖 Node）与 [../e2e-ui/](../e2e-ui)（浏览器层，Playwright），见下文常用命令 |
+| **验证「真的跑通了」** | [../e2e/http/](../e2e/http)（接口层，零依赖 Node）与 [../e2e/ui/](../e2e/ui)（浏览器层，Playwright），见下文常用命令 |
 | **发版前要过哪些检查** | [release-checklist.md](release-checklist.md)（五道门禁，含 L12 桩的起停命令） |
 
 ## 常用命令
 
 ```bash
 # AI 模块单测（改动 core/agent 后必做）
-cd RuoYi-Vue-Plus
+cd code/back-end
 ./mvnw -o -pl ruoyi-modules/biz-buddy test
 # 覆盖率报告：ruoyi-modules/biz-buddy/target/site/jacoco/index.html
 # 集成测试（4 类：真库方言一致性 / 实体↔schema / 技能仓库 / 上下文装配；需两栈已运行，设 BIZBUDDY_IT=true 才跑）
@@ -37,27 +48,27 @@ BIZBUDDY_IT=true ./mvnw -o -pl ruoyi-admin -am test
 # 后端
 ./mvnw -pl ruoyi-admin spring-boot:run
 # 前端
-cd plus-ui-Vue && pnpm install && pnpm dev
+cd ../../code/front-end && pnpm install && pnpm dev
 ```
 
 ### 端到端（e2e）回归
 
-单测基于 Mockito 打桩、**不起 Spring 容器**；要验证「模型连通 / 知识库检索 / 专家编排 / 写工具人工确认 / 安全合规 / MCP 双向」在真实环境下的行为，用仓库根目录的 `e2e/`（Node.js 零依赖，对**已运行**的栈发真实 HTTP 断言）：
+单测基于 Mockito 打桩、**不起 Spring 容器**；要验证「模型连通 / 知识库检索 / 专家编排 / 写工具人工确认 / 安全合规 / MCP 双向」在真实环境下的行为，用仓库根目录的 `e2e/http/`（Node.js 零依赖，对**已运行**的栈发真实 HTTP 断言）：
 
 ```bash
-cd ..                       # 回到仓库根（biz-buddy/）
-node e2e/run.mjs                                  # 全量（未配置密钥的层自动 SKIP）
-node e2e/run.mjs --only L1,L3 --verbose            # 指定层级
-node e2e/run.mjs --base-url http://localhost:8081  # 指向 MySQL 栈（PG 栈默认 8080）
+cd ../..                    # 回到仓库根（biz-buddy/）
+node e2e/http/run.mjs                                  # 全量（未配置密钥的层自动 SKIP）
+node e2e/http/run.mjs --only L1,L3 --verbose            # 指定层级
+node e2e/http/run.mjs --base-url http://localhost:8081  # 指向 MySQL 栈（PG 栈默认 8080）
 
-# 浏览器层 e2e-ui（Playwright 驱动真实 chromium：页面渲染 / 动态菜单 / 前端关键路径）
-cd e2e-ui
+# 浏览器层 e2e/ui（Playwright 驱动真实 chromium：页面渲染 / 动态菜单 / 前端关键路径）
+cd e2e/ui
 pnpm install && pnpm run install-browser            # 首次需装依赖与 chromium
 BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test  # MySQL 栈（PG 栈默认 http://localhost）
 ```
 
-- 覆盖 **L1~L17**（L14 已并入 L3）：模型连通 → 提示词生成 → 知识库生命周期（解析/批量/向量化/检索）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（需本地桩，见 [release-checklist.md](release-checklist.md)）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索；另含 **RAG 检索质量评测**（`e2e/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；
-- 配置见 `e2e/.env.example`（唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**，放 `e2e/.env.local`，已 gitignore）；
+- 覆盖 **L1~L19**（无 L14，已并入 L3）：模型连通 → 提示词生成 → 知识库生命周期（解析/批量/向量化/检索/**hybrid+BM25**）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（需本地桩，见 [release-checklist.md](release-checklist.md)）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索 → 长期记忆分批合并 → 长期记忆版本恢复；另含 **RAG 检索质量评测**（`e2e/http/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；
+- 配置见 `e2e/http/.env.example`（唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**，放 `e2e/http/.env.local`，已 gitignore）；
 - 退出码 `0/1/2/3` = 无失败 / 有 FAIL / 前置检查失败 / 参数错误；**L5 默认「拒绝」路径无副作用**，`--allow-writes` 才真写并在收尾自动清理；
 - 它不进 `mvn test`，与单测互不影响；**改了工具 / 装配 / 路由后，建议「单测 + e2e」两道都过**。
 
@@ -76,4 +87,4 @@ AI 能力集中在 `ruoyi-modules/biz-buddy`（包 `org.dromara.ai`）：
 
 ## 许可与署名
 
-本项目采用 [MIT License](../LICENSE)。后端底座源自 [Dromara RuoYi-Vue-Plus](https://gitee.com/dromara/RuoYi-Vue-Plus)（MIT），智能体内核为 AgentScope Harness。二次分发时请保留署名。
+本项目采用 [MIT License](../LICENSE)，智能体内核为 AgentScope Harness。二次分发时请保留 `LICENSE` 中的版权与许可声明。

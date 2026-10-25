@@ -26,15 +26,6 @@ spring:
       port: ${REDIS_PORT_INNER:6379}
       password: ${REDIS_PASSWORD:Zl@2026}
 
-# 定时任务的调度服务端地址（容器名），客户端端口随主端口漂移为 2${server.port}
-snail-job:
-  namespace: ${SNAIL_JOB_NAMESPACE:dev}
-  enabled: true
-  server:
-    # 变量名必须是 SNAILJOB_SERVER_HOST：SNAILJOB_HOST 会绑定到 snail-job.host（客户端自身 IP）
-    host: ${SNAILJOB_SERVER_HOST:snailjob-server}
-    port: ${SNAILJOB_PORT_INNER:17888}
-
 # 容器内不输出完整 SQL，避免日志刷屏
 mybatis-plus:
   sql-log:

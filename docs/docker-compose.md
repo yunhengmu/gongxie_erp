@@ -9,33 +9,30 @@
 |---|---|---|
 | 目录 | [`deploy/deploy-pg/`](../deploy/deploy-pg) | [`deploy/deploy-mysql/`](../deploy/deploy-mysql) |
 | Compose 项目名 | `bizbuddy` | `bizbuddy-mysql` |
-| 前端 / 后端 / 调度控制台 | `80` / `8080` / `8800` | `81` / `8081` / `8801` |
+| 前端 / 后端 | `80` / `8080` | `81` / `8081` |
 | 数据库 / Redis / Milvus | `5432` / `6379` / `19530` | `3306` / `6380` / `19531` |
 | 平台 MinIO（控制台） | `9000`（`9001`） | `9002`（`9003`） |
 
-`up` 起来的是：数据库 + Redis + Milvus（standalone，含 etcd / minio）+ 后端 `ruoyi-admin` + 调度服务端 `snailjob-server` + Nginx（托管前端 `dist`）+ 平台 MinIO（一次性 `minio-init` 建桶并上传演示文档）。
+`up` 起来的是：数据库 + Redis + Milvus（standalone，含 etcd / minio）+ 后端 `ruoyi-admin` + Nginx（托管前端 `dist`）+ 平台 MinIO（一次性 `minio-init` 建桶并上传演示文档）。
 
 > 下文命令除注明外，均在**仓库根目录（`biz-buddy/`）**执行；`cd deploy/deploy-pg` 之类表示进入该子目录。
 
-## 1. 前置：先在宿主机构建三个产物
+## 1. 前置：先在宿主机构建两个产物
 
 镜像里**只放 jar / dist、不在镜像内编译**，所以 `up` 之前必须先构建：
 
 ```bash
-# ① 后端 jar → RuoYi-Vue-Plus/ruoyi-admin/target/ruoyi-admin.jar
-cd RuoYi-Vue-Plus
+# ① 后端 jar → code/back-end/ruoyi-admin/target/ruoyi-admin.jar
+cd code/back-end
 ./mvnw clean package -DskipTests                 # Windows: .\mvnw.cmd clean package -DskipTests
 
-# ② 调度服务端 jar → ruoyi-extend/ruoyi-snailjob-server/target/ruoyi-snailjob-server.jar
-./mvnw -o -pl ruoyi-extend/ruoyi-snailjob-server -am package -DskipTests
-
-# ③ 前端静态资源 → plus-ui-Vue/dist
-cd ../plus-ui-Vue
+# ② 前端静态资源 → code/front-end/dist
+cd ../front-end
 pnpm install && pnpm build:prod
 ```
 
 > 只调中间件时可跳过构建，例如只要一个 PostgreSQL：`cd deploy/deploy-pg && docker compose up -d postgres`。
-> **前端产物 `dist/` 不入库**（见 `plus-ui-Vue/.gitignore`）：改了 `plus-ui-Vue/src` 下任何源码（含页面 / 文案）都必须重新 `pnpm build:prod`，否则 Nginx 托管的仍是旧包。
+> **前端产物 `dist/` 不入库**（见 `code/front-end/.gitignore`）：改了 `code/front-end/src` 下任何源码（含页面 / 文案）都必须重新 `pnpm build:prod`，否则 Nginx 托管的仍是旧包。
 
 ## 2. 启动 PostgreSQL 栈
 
@@ -49,7 +46,6 @@ docker compose up -d --build
 |---|---|
 | 前端 | <http://localhost/> |
 | 后端接口文档 | <http://localhost:8080/swagger-ui.html> |
-| 调度控制台 | <http://localhost:8800/snail-job> |
 | 初始账号 | `admin / admin123`（另有 `test / 666666`、`test1 / 666666`） |
 
 ## 3. 启动 MySQL 8.0 栈
@@ -64,7 +60,6 @@ docker compose up -d --build
 |---|---|
 | 前端 | <http://localhost:81/> |
 | 后端接口文档 | <http://localhost:8081/swagger-ui.html> |
-| 调度控制台 | <http://localhost:8801/snail-job> |
 | 初始账号 | `admin / admin123` |
 
 > 两栈可**同时运行**（上表端口已错开），适合并排对照；只跑一个也可以。中间件口令在各目录的 `.env.example`（默认值仅供本地）。
@@ -107,9 +102,9 @@ docker compose down -v                   # 停止并删数据卷：下次启动�
 栈起来后可跑端到端脚本，对**真实运行**的环境做断言（模型连通 / 知识库检索 / 专家编排 / 写工具确认闭环）：
 
 ```bash
-node e2e/run.mjs                                   # PostgreSQL 栈（后端默认 8080）
-node e2e/run.mjs --base-url http://localhost:8081  # MySQL 栈
+node e2e/http/run.mjs                                   # PostgreSQL 栈（后端默认 8080）
+node e2e/http/run.mjs --base-url http://localhost:8081  # MySQL 栈
 ```
 
-> 上述命令需在**仓库根目录**执行；脚本说明与前置条件见 [../e2e/](../e2e)（唯一机密 `BIZBUDDY_LLM_API_KEY` 见 `e2e/.env.example`）。
+> 上述命令需在**仓库根目录**执行；脚本说明与前置条件见 [../e2e/http/](../e2e/http)（唯一机密 `BIZBUDDY_LLM_API_KEY` 见 `e2e/http/.env.example`）。
 > 部署排障：PostgreSQL 栈见 [`deploy/deploy-pg/README.md`](../deploy/deploy-pg/README.md)，MySQL 栈见 [`deploy/deploy-mysql/README.md`](../deploy/deploy-mysql/README.md)（含 OSS 对外地址、MySQL 认证插件、端口改动等已知坑）。
