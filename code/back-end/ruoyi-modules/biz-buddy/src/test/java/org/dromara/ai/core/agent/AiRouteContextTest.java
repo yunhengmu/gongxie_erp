@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AiRouteContextTest {
 
     private static AiExpertCandidate candidate(Long id, String key, String name) {
-        return new AiExpertCandidate(id, key, name, null, "能力");
+        return new AiExpertCandidate(id, key, name, "能力");
     }
 
     private AiRouteContext newContext(List<AiExpertCandidate> candidates) {

@@ -151,8 +151,8 @@ public class AiExpertDirectory {
      * @return 候选专家
      */
     private AiExpertCandidate toCandidate(AiExpertAgent agent) {
-        // 专家直答修订（2026-10-03）：不再携带输出契约
+        // 专家直答修订后不再携带领域标签与输出契约
         return AiExpertCandidate.of(agent.getId(), agent.getAgentCode(), agent.getAgentName(),
-            agent.getExpertDomain(), agent.getCapabilityDesc(), agent.getDescription());
+            agent.getCapabilityDesc(), agent.getDescription());
     }
 }

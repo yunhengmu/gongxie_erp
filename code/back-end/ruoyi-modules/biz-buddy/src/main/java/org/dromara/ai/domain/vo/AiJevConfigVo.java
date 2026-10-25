@@ -37,7 +37,7 @@ public class AiJevConfigVo implements Serializable {
     private int timeoutSeconds;
 
     /**
-     * 执行模式：shadow 影子 / gate 闸门 / preselect 候选预筛
+     * 执行模式：shadow 影子 / gate 闸门 / preselect 候选预筛（尚未实现，按影子语义执行）
      */
     private String mode;
 

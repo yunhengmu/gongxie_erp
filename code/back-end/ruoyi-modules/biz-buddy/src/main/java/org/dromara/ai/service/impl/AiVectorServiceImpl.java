@@ -571,14 +571,7 @@ public class AiVectorServiceImpl implements IAiVectorService {
      * @return 是否写入成功
      */
     private boolean writeBm25Page(AiKnowledgeBase knowledgeBase, AiDocument document, List<AiChunk> chunks) {
-        List<AiBm25Store.Bm25Doc> docs = new ArrayList<>(chunks.size());
-        for (AiChunk chunk : chunks) {
-            docs.add(new AiBm25Store.Bm25Doc(
-                String.valueOf(chunk.getId()),
-                document.getId(),
-                chunk.getChunkIndex(),
-                chunk.getContent()));
-        }
+        List<AiBm25Store.Bm25Doc> docs = toBm25Docs(document, chunks);
         try {
             bm25Store.add(knowledgeBase.getCollectionName(), docs);
             return true;
@@ -587,6 +580,25 @@ public class AiVectorServiceImpl implements IAiVectorService {
                 knowledgeBase.getId(), document.getId(), docs.size(), e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 把切片转换为 BM25 写入项（chunkId 作为主键，docId / chunkIndex 用于清理与溯源）。
+     *
+     * @param document 文档
+     * @param chunks   切片
+     * @return BM25 写入项
+     */
+    private List<AiBm25Store.Bm25Doc> toBm25Docs(AiDocument document, List<AiChunk> chunks) {
+        List<AiBm25Store.Bm25Doc> docs = new ArrayList<>(chunks.size());
+        for (AiChunk chunk : chunks) {
+            docs.add(new AiBm25Store.Bm25Doc(
+                String.valueOf(chunk.getId()),
+                document.getId(),
+                chunk.getChunkIndex(),
+                chunk.getContent()));
+        }
+        return docs;
     }
 
     /**
@@ -626,11 +638,7 @@ public class AiVectorServiceImpl implements IAiVectorService {
                 for (int from = 0; from < chunks.size(); from += WRITE_PAGE_SIZE) {
                     int to = Math.min(from + WRITE_PAGE_SIZE, chunks.size());
                     List<AiChunk> page = chunks.subList(from, to);
-                    bm25Store.add(collection, page.stream()
-                        .map(chunk -> new AiBm25Store.Bm25Doc(
-                            String.valueOf(chunk.getId()), document.getId(),
-                            chunk.getChunkIndex(), chunk.getContent()))
-                        .toList());
+                    bm25Store.add(collection, toBm25Docs(document, page));
                     chunkCount += page.size();
                 }
             }

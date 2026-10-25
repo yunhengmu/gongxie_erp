@@ -507,10 +507,8 @@ public class AiAgentServiceImpl implements IAiAgentService {
         vo.setAgentId(agent.getId());
         vo.setAgentKey(agent.getAgentCode());
         vo.setAgentName(agent.getAgentName());
-        vo.setExpertDomain(agent.getExpertDomain());
         vo.setCapabilityDesc(StringUtils.isBlank(agent.getCapabilityDesc())
             ? agent.getDescription() : agent.getCapabilityDesc());
-        vo.setOutputContract(agent.getOutputContract());
         vo.setAutoRoute(agent.getAutoRoute());
         return vo;
     }

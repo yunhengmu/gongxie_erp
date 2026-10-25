@@ -824,7 +824,7 @@ const batchTagOptions = computed<ToolTagVO[]>(() => {
   }
   const merged = new Map<string | number, ToolTagVO>();
   selectedTools.value.forEach((tool) => (tool.tags ?? []).forEach((tag) => merged.set(tag.id, tag)));
-  return Array.from(merged.values()).sort((a, b) => a.tagName.localeCompare(b.tagName, 'zh-Hans-CN'));
+  return Array.from(merged.values()).toSorted((a, b) => a.tagName.localeCompare(b.tagName, 'zh-Hans-CN'));
 });
 
 /** 标签选项文案（含使用计数） */

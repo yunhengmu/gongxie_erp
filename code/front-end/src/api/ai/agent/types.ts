@@ -49,8 +49,6 @@ export interface AgentVO {
   remark?: string;
   /** 编排角色（entry 入口 / expert 专家；REQ-AI-33 起由后端按实体类型填充） */
   role?: string;
-  /** 专家领域标签（2026-10-02 起已停用；仅历史数据可能非空） */
-  expertDomain?: string;
   /** 能力描述（注入入口智能体的路由提示词；为空回落 description） */
   capabilityDesc?: string;
   /** 专家是否允许使用写工具（定义页已移除该开关，恒为 1） */
@@ -173,8 +171,6 @@ export interface ExpertOptionVO {
   agentKey?: string;
   /** 专家名称 */
   agentName?: string;
-  /** 领域标签 */
-  expertDomain?: string;
   /** 能力描述（为空回落 description） */
   capabilityDesc?: string;
   /** 是否自动路由（1 自动候选 / 0 仅手动指定；REQ-AI-33） */

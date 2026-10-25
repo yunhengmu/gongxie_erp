@@ -18,8 +18,8 @@ const REFUSAL_TEXT = '抱歉，该内容不符合平台安全规范，已拦截�
 /** 临时敏感词分类（便于识别与收尾清理） */
 const WORD_CATEGORY = 'e2e';
 
-/** 安全配置带 2s 快照缓存（`AiSafetyGuard`），改配置后需等其过期才生效 */
-const CONFIG_PROPAGATE_MS = 2600;
+/** 安全配置带 2s 快照缓存（`AiSafetyGuard`），改配置后需等其过期才生效；全量跑时留足余量 */
+const CONFIG_PROPAGATE_MS = 5000;
 
 /**
  * @param {object} ctx 运行上下文

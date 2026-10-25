@@ -37,24 +37,13 @@ public class AiExpertAgent extends AiAgent {
     public static final String AUTO_ROUTE_OFF = "0";
 
     /**
-     * 专家领域标签（**2026-10-02 起已停用**：定义页移除该输入项、换专家阶梯取消；列保留）
-     */
-    private String expertDomain;
-
-    /**
      * 能力描述（注入入口智能体的路由提示词；为空回落 {@code description}）
      */
     private String capabilityDesc;
 
     /**
-     * 默认输出契约（**已废弃**：专家直答修订 2026-10-03 起不再下发与校验，定义页已移除该输入项；
-     * 列保留兼容存量数据，代码不再读取）
-     */
-    private String outputContract;
-
-    /**
      * 专家是否允许使用写工具（0 不允许＝专家强制只读；1 允许按「允许」档生效）。
-     * 定义页已移除该开关，恒为 '1'。
+     * 定义页无此开关，服务端保存时恒置 {@link AiAgent#WRITE_ENABLED}。
      */
     private String expertWriteEnabled;
 

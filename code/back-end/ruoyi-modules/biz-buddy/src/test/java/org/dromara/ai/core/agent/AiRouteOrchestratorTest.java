@@ -126,7 +126,7 @@ class AiRouteOrchestratorTest {
     }
 
     private static AiExpertCandidate candidate() {
-        return new AiExpertCandidate(10L, "k1", "专家一", null, "能力");
+        return new AiExpertCandidate(10L, "k1", "专家一", "能力");
     }
 
     @Test

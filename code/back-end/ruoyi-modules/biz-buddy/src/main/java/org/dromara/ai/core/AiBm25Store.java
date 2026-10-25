@@ -80,7 +80,7 @@ public class AiBm25Store {
      * @param collection 稠密向量集合名
      * @return BM25 集合名
      */
-    public String collectionName(String collection) {
+    private String collectionName(String collection) {
         return collection + COLLECTION_SUFFIX;
     }
 
@@ -136,7 +136,6 @@ public class AiBm25Store {
                 .annsField(SPARSE_FIELD)
                 .data(List.of(new EmbeddedText(query)))
                 .topK(topK)
-                .outputFields(List.of(CONTENT_FIELD))
                 .build());
         } catch (Exception e) {
             throw new ServiceException("BM25 检索失败：" + rootMessage(e));
@@ -152,7 +151,7 @@ public class AiBm25Store {
                     chunkId = String.valueOf(row.getId());
                 }
                 if (StringUtils.isNotBlank(chunkId)) {
-                    hits.add(new Bm25Hit(chunkId, row.getScore() == null ? 0.0 : row.getScore().doubleValue()));
+                    hits.add(new Bm25Hit(chunkId));
                 }
             }
         }
@@ -207,7 +206,7 @@ public class AiBm25Store {
      * @param name 完整集合名（含后缀）
      * @return 是否存在
      */
-    public boolean exists(String name) {
+    private boolean exists(String name) {
         if (ensured.contains(name)) {
             return true;
         }
@@ -373,12 +372,11 @@ public class AiBm25Store {
     }
 
     /**
-     * BM25 命中结果。
+     * BM25 命中结果（仅保留主键，融合只使用排名）。
      *
      * @param chunkId 切片主键
-     * @param score   BM25 得分
      */
-    public record Bm25Hit(String chunkId, double score) {
+    public record Bm25Hit(String chunkId) {
     }
 
 }

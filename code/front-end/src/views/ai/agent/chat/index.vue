@@ -1937,7 +1937,7 @@ const canRegenerate = (msg: LocalMessage) =>
 
 /** 会话最后一轮的用户提问 */
 const lastRoundUserMessage = computed(() =>
-  [...messages.value].reverse().find((item) => item.role === 'user')
+  messages.value.toReversed().find((item) => item.role === 'user')
 );
 
 /** 只采用与当前最后一轮匹配的预检结果（防止切换会话后误用旧结果） */

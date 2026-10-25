@@ -93,9 +93,9 @@ class RouteJudgeServiceTest {
      */
     private AiRouteContext route(int candidateCount) {
         List<AiExpertCandidate> candidates = new ArrayList<>();
-        candidates.add(new AiExpertCandidate(11L, "notice_admin_expert", "公告专家", null, "公告的创建、查询与维护"));
+        candidates.add(new AiExpertCandidate(11L, "notice_admin_expert", "公告专家", "公告的创建、查询与维护"));
         for (int i = 2; i <= candidateCount; i++) {
-            candidates.add(new AiExpertCandidate(10L + i, "expert_" + i, "专家" + i, null, "候选能力" + i));
+            candidates.add(new AiExpertCandidate(10L + i, "expert_" + i, "专家" + i, "候选能力" + i));
         }
         return new AiRouteContext(9L, SESSION_ID, USER_ID, 4L, ENTRY_AGENT_ID, candidates, 6L, null);
     }

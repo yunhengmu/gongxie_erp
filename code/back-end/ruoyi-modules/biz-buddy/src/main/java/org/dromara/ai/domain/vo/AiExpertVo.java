@@ -35,19 +35,9 @@ public class AiExpertVo implements Serializable {
     private String agentName;
 
     /**
-     * 领域标签（**2026-10-02 起已停用**：定义页移除该字段、换专家阶梯取消；列保留，前端仅在历史数据上可能非空）
-     */
-    private String expertDomain;
-
-    /**
      * 能力描述（注入入口智能体的路由提示词；为空回落 description）
      */
     private String capabilityDesc;
-
-    /**
-     * 默认输出契约（JSON Schema 文本，可空）
-     */
-    private String outputContract;
 
     /**
      * 是否自动路由（1 进入口智能体的自动候选清单；0 只能被用户手动指定；REQ-AI-33）

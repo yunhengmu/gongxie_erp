@@ -496,7 +496,7 @@ class AiChatFacadeTest {
         AiAgent definition = mock(AiAgent.class);
         AiSessionResourceSet resources = AiSessionResourceSet.empty();
         HarnessAgent agent = mock(HarnessAgent.class);
-        AiExpertCandidate candidate = AiExpertCandidate.of(8L, "fin", "财务专家", "财务", "擅长财务", "财务答疑");
+        AiExpertCandidate candidate = AiExpertCandidate.of(8L, "fin", "财务专家", "擅长财务", "财务答疑");
         String report = "【专家结论不可用】编排侧原因：专家调用超时\n请如实告知用户。";
         when(sessionService.getOwnedSession(SESSION_ID)).thenReturn(session);
         when(messageMapper.selectById(MESSAGE_ID)).thenReturn(message);

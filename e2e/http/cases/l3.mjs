@@ -133,6 +133,11 @@ export const run = async (ctx) => {
   // ⑦ 混合检索：切换为「向量 + BM25」→ 等待 BM25 索引就绪 → 检索命中 → 还原为向量
   const kbDetail = await http.request('GET', `/ai/kb/${resolved.demoKbId}`);
   const updateBody = { ...kbDetail, retrievalMode: 'hybrid' };
+  // 演示库可能残留「启用重排但未绑模型」的历史脏数据；后端会拒绝这种保存，这里先归一化
+  if (updateBody.rerankEnabled === '1' && !updateBody.rerankModelId) {
+    updateBody.rerankEnabled = '0';
+    updateBody.rerankModelId = null;
+  }
   await http.request('PUT', '/ai/kb', { body: updateBody });
   const bm25Ready = await pollKb(http, resolved.demoKbId, (row) => row.bm25IndexStatus === 'ready', 180_000);
   evidence.hybridStatus = bm25Ready?.bm25IndexStatus;

@@ -510,8 +510,8 @@ class AiVectorServiceImplTest {
                 new AiVectorStore.VectorHit("1", "10", 0, 0.9),
                 new AiVectorStore.VectorHit("2", "10", 1, 0.8)));
         when(bm25Store.search("col", "q", 30)).thenReturn(List.of(
-            new AiBm25Store.Bm25Hit("2", 5.0),
-            new AiBm25Store.Bm25Hit("3", 3.0)));
+            new AiBm25Store.Bm25Hit("2"),
+            new AiBm25Store.Bm25Hit("3")));
         when(chunkMapper.selectByIds(any()))
             .thenReturn(List.of(chunk(1L, "C1"), chunk(2L, "C2"), chunk(3L, "C3")));
         AiDocument doc = new AiDocument();

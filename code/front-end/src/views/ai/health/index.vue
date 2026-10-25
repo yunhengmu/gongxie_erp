@@ -211,7 +211,7 @@ const visibleItems = computed(() => {
     }
     return true;
   });
-  return filtered.sort((left, right) => (SEVERITY[left.status] ?? 9) - (SEVERITY[right.status] ?? 9));
+  return filtered.toSorted((left, right) => (SEVERITY[left.status] ?? 9) - (SEVERITY[right.status] ?? 9));
 });
 
 /** 状态 → 标签配色 */

@@ -2,7 +2,6 @@ package org.dromara.ai.domain.bo;
 
 import io.github.linpeilie.annotations.AutoMapper;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.dromara.ai.domain.AiExpertAgent;
@@ -25,23 +24,12 @@ public class AiExpertAgentBo extends AiAgentBo {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 专家领域标签（**2026-10-02 起已停用**：定义页不再提交；列保留）
-     */
-    private String expertDomain;
-
-    /**
      * 能力描述（注入入口智能体的路由提示词；为空回落 description）
      */
     private String capabilityDesc;
 
     /**
-     * 默认输出契约（JSON Schema 文本，可空）；任务级契约优先，再缺省用平台兜底契约
-     */
-    @Size(max = 20000, message = "默认输出契约过长（不超过 20000 字符）", groups = {AddGroup.class, EditGroup.class})
-    private String outputContract;
-
-    /**
-     * 专家是否允许使用写工具（0 不允许 / 1 允许；定义页已移除该开关，服务端恒置 '1'）
+     * 专家是否允许使用写工具（0 不允许 / 1 允许；定义页无此开关，服务端恒置 '1'）
      */
     @Pattern(regexp = "[01]", message = "专家写工具开关只能是 0 不允许 / 1 允许", groups = {AddGroup.class, EditGroup.class})
     private String expertWriteEnabled;

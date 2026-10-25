@@ -46,7 +46,7 @@ class RouteDecisionToolTest {
 
     private static AiRouteContext newRoute() {
         AiExpertCandidate candidate =
-            new AiExpertCandidate(1L, "finance_agent", "财务专家", "finance", "擅长财务");
+            new AiExpertCandidate(1L, "finance_agent", "财务专家", "擅长财务");
         return new AiRouteContext(1L, 2L, 100L, 3L, 4L, List.of(candidate), 5L, null);
     }
 

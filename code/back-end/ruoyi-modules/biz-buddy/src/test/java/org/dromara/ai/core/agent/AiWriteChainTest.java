@@ -290,7 +290,7 @@ class AiWriteChainTest {
      */
     private AiRouteContext newRoute(AiStreamState entryState) {
         AiExpertCandidate candidate =
-            new AiExpertCandidate(EXPERT_AGENT_ID, EXPERT_KEY, "公告管理专家", null, "公告维护");
+            new AiExpertCandidate(EXPERT_AGENT_ID, EXPERT_KEY, "公告管理专家", "公告维护");
         AiRouteContext route = new AiRouteContext(ROUTE_RUN_ID, SESSION_ID, USER_ID, 4L, ENTRY_AGENT_ID,
             List.of(candidate), 6L, emitter);
         route.entryState = entryState;

@@ -49,7 +49,8 @@ public class AiJevConfigBo implements Serializable {
     private int timeoutSeconds = 1;
 
     /**
-     * 执行模式：shadow 影子（只留痕不接管）/ gate 闸门（高置信接管）/ preselect 候选预筛（可选）
+     * 执行模式：shadow 影子（只留痕不接管）/ gate 闸门（高置信接管）/
+     * preselect 候选预筛（尚未实现，按影子语义执行）
      */
     @Pattern(regexp = "^(shadow|gate|preselect)$", message = "执行模式只能是 shadow / gate / preselect")
     private String mode = "shadow";

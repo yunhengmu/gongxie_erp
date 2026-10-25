@@ -300,9 +300,9 @@ public class AiRouteOrchestrator {
      * @return 候选
      */
     private AiExpertCandidate candidateOf(AiExpertAgent definition) {
-        // 专家直答修订（2026-10-03）：不再携带输出契约
+        // 专家直答修订后不再携带领域标签与输出契约
         return AiExpertCandidate.of(definition.getId(), definition.getAgentCode(), definition.getAgentName(),
-            definition.getExpertDomain(), definition.getCapabilityDesc(), definition.getDescription());
+            definition.getCapabilityDesc(), definition.getDescription());
     }
 
     /**

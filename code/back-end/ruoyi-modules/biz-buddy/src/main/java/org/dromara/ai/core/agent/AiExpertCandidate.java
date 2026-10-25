@@ -15,12 +15,10 @@ import org.dromara.common.core.utils.StringUtils;
  * @param agentId       专家智能体主键
  * @param agentKey      专家标识（{@code ai_agent.agent_code}，模型提交的 {@code expert_agent_key}）
  * @param agentName     专家名称
- * @param expertDomain  领域标签（**2026-10-02 起已停用**：定义页移除该字段、换专家阶梯取消；列保留、不参与提示词渲染与筛选）
  * @param capabilityDesc 能力描述（注入路由提示词；为空回落 description）
  * @author BizBuddy
  */
-public record AiExpertCandidate(Long agentId, String agentKey, String agentName, String expertDomain,
-                                String capabilityDesc) {
+public record AiExpertCandidate(Long agentId, String agentKey, String agentName, String capabilityDesc) {
 
     /**
      * 构造候选（能力描述为空时回落 description）。
@@ -28,22 +26,18 @@ public record AiExpertCandidate(Long agentId, String agentKey, String agentName,
      * @param agentId     专家主键
      * @param agentKey    专家标识
      * @param agentName   专家名称
-     * @param domain      领域标签
      * @param capability  能力描述
      * @param description 一句话职责说明（兜底）
      * @return 候选专家
      */
-    static AiExpertCandidate of(Long agentId, String agentKey, String agentName, String domain,
+    static AiExpertCandidate of(Long agentId, String agentKey, String agentName,
                                 String capability, String description) {
         String capabilityDesc = StringUtils.isBlank(capability) ? description : capability;
-        return new AiExpertCandidate(agentId, agentKey, agentName, domain, capabilityDesc);
+        return new AiExpertCandidate(agentId, agentKey, agentName, capabilityDesc);
     }
 
     /**
-     * 渲染为路由提示词中的一行。
-     *
-     * <p>2026-10-02 起**不再输出「领域」**；2026-10-03 专家直答修订后**不再输出「默认契约字段」**
-     * （已无输出契约），小Z 仅按「名称 + 擅长（能力描述，为空回落一句话职责说明）」判断该找谁。</p>
+     * 渲染为路由提示词中的一行：仅输出「名称 + 擅长」（能力描述，为空回落一句话职责说明）。
      *
      * @return 形如 {@code - key=finance_agent | 名称=财务专家 | 擅长=…} 的文本
      */

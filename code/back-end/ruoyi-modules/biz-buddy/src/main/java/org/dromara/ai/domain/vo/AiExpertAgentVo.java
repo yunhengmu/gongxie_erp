@@ -24,22 +24,12 @@ public class AiExpertAgentVo extends AiAgentVo {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 专家领域标签（**2026-10-02 起已停用**；列保留）
-     */
-    private String expertDomain;
-
-    /**
      * 能力描述（注入入口智能体的路由提示词；为空回落 {@code description}）
      */
     private String capabilityDesc;
 
     /**
-     * 默认输出契约（JSON Schema 文本，可空）
-     */
-    private String outputContract;
-
-    /**
-     * 专家是否允许使用写工具（定义页已移除该开关，恒为 '1'）
+     * 专家是否允许使用写工具（定义页无此开关，恒为 '1'）
      */
     private String expertWriteEnabled;
 
