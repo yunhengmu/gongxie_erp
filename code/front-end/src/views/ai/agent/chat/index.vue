@@ -577,8 +577,8 @@
 </template>
 
 <script setup name="AiAgentChat" lang="ts">
-import { optionAgent, optionAgentExperts, optionAgentTool } from '@/api/ai/agent';
-import type { AgentVO, ExpertOptionVO, ToolOptionVO } from '@/api/ai/agent/types';
+import { optionAgent, optionAgentExperts } from '@/api/ai/agent';
+import type { AgentVO, ExpertOptionVO } from '@/api/ai/agent/types';
 import {
   addChatResources,
   buildChatRegenerateUrl,
@@ -740,7 +740,7 @@ interface ResourceMenuItem {
   selected?: boolean;
   /** 分组小标题（MCP 按 Server 分组；非空时本项为标题行、不可点击） */
   section?: string;
-  /** 选择指令（expert:/scenario:/tool:/skill:/mcp: 前缀，交 handleResourceSelect 分派） */
+  /** 选择指令（expert:/scenario:/skill:/mcp: 前缀，交 handleResourceSelect 分派；工具入口已移除） */
   command?: string;
 }
 
@@ -762,7 +762,6 @@ const expertOptions = ref<ExpertOptionVO[]>([]);
 const sidebarCollapsed = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches);
 
 const packOptions = ref<ScenarioPackOptionVO[]>([]);
-const toolOptions = ref<ToolOptionVO[]>([]);
 const skillOptions = ref<SkillOptionVO[]>([]);
 const mcpOptions = ref<ScenarioPackMcpOptionVO[]>([]);
 const sessions = ref<ChatSessionVO[]>([]);
@@ -1397,18 +1396,16 @@ const toLocalMessage = (item: ChatMessageVO, tools: ToolCallLogVO[]): LocalMessa
   };
 };
 
-/** 加载资源选项（专家 / 场景 / 工具 / 技能 / MCP 工具）：逐项降级，单个失败仅置空该项 */
+/** 加载资源选项（专家 / 场景 / 技能 / MCP 工具）：逐项降级，单个失败仅置空该项 */
 const loadResourceOptions = async () => {
-  const [experts, packs, tools, skills, mcp] = await Promise.allSettled([
+  const [experts, packs, skills, mcp] = await Promise.allSettled([
     optionAgentExperts(),
     scenarioPackOptions(),
-    optionAgentTool(),
     visibleSkillOptions(),
     scenarioPackMcpOptions()
   ]);
   expertOptions.value = experts.status === 'fulfilled' ? experts.value.data ?? [] : [];
   packOptions.value = packs.status === 'fulfilled' ? packs.value.data ?? [] : [];
-  toolOptions.value = tools.status === 'fulfilled' ? tools.value.data ?? [] : [];
   skillOptions.value = skills.status === 'fulfilled' ? skills.value.data ?? [] : [];
   mcpOptions.value = mcp.status === 'fulfilled' ? mcp.value.data ?? [] : [];
 };
@@ -1490,20 +1487,6 @@ const resourceGroups = computed<ResourceMenuGroup[]>(() => [
     }))
   },
   {
-    key: 'tool',
-    label: '工具',
-    count: toolOptions.value.length,
-    items: toolOptions.value.map((item) => ({
-      key: `tool-${item.toolCode}`,
-      label: item.toolName,
-      tip: `${item.toolType === '1' ? '写入（需确认）' : '只读'} · ${item.toolCode}${
-        item.description ? ' · ' + item.description : ''
-      }`,
-      selected: isResourceSelected('tool', item.toolCode),
-      command: `tool:${item.toolCode}`
-    }))
-  },
-  {
     key: 'skill',
     label: '技能',
     count: skillOptions.value.length,
@@ -1570,8 +1553,6 @@ const handleResourceSelect = async (index: string) => {
     await toggleExpertResource(parts[1]);
   } else if (group === 'scenario') {
     await toggleResource('scenario', parts[1]);
-  } else if (group === 'tool') {
-    await toggleResource('tool', parts[1]);
   } else if (group === 'skill') {
     await toggleResource('skill', parts[1]);
   } else if (group === 'mcp') {
@@ -1690,20 +1671,6 @@ const buildResourceItem = (type: ChatResourceType, token: string, key?: string):
       resourceKey: pack.packCode,
       displayName: pack.packName,
       subLabel: `场景 · ${packSummary(pack)}`
-    };
-  }
-  if (type === 'tool') {
-    const tool = toolOptions.value.find((item) => item.toolCode === token);
-    if (!tool || tool.id === undefined || tool.id === null) {
-      return undefined;
-    }
-    return {
-      resourceType: 'tool',
-      resourceId: tool.id,
-      resourceKey: tool.toolCode,
-      displayName: tool.toolName,
-      subLabel: tool.toolType === '1' ? '工具（写入，需确认）' : '工具（只读）',
-      toolType: tool.toolType
     };
   }
   if (type === 'skill') {
