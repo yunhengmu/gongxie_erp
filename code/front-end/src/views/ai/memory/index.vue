@@ -52,26 +52,8 @@
               </template>
               <el-switch v-model="form.enabled" />
             </el-form-item>
-            <el-form-item label="记忆管道模式" prop="pipelineMode">
-              <template #label>
-                <span class="label-tip">
-                  记忆管道模式
-                  <el-tooltip placement="top">
-                    <template #content>
-                      <div class="tip-content">
-                        framework：框架负责抽取/合并；shadow：平台抽取只留痕；platform：关闭框架记忆 hooks，
-                        由平台接管注入、抽取、合并与维护。
-                      </div>
-                    </template>
-                    <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
-                  </el-tooltip>
-                </span>
-              </template>
-              <el-select v-model="form.pipelineMode" style="width: 100%">
-                <el-option label="框架托管（现状）" value="framework" />
-                <el-option label="影子模式（只记录不写入）" value="shadow" />
-                <el-option label="平台托管（关闭框架记忆）" value="platform" />
-              </el-select>
+            <el-form-item label="记忆管道">
+              <span style="color: var(--el-text-color-regular)">平台托管（抽取 / 注入 / 合并 / 维护均由平台接管）</span>
             </el-form-item>
             <el-form-item label="记忆注入上限（Token）" prop="maxContextTokens">
               <template #label>
@@ -337,7 +319,7 @@
                 <h3>显式记忆</h3>
                 <p>
                   用户在对话中明确要求「记住」的个人偏好。独立存放、不参与自动合并，注入时固定排在长期记忆之前；
-                  平台托管模式下模型可通过 remember_user_preference / forget_user_preference 工具写入与撤销。
+                  模型可通过 remember_user_preference / forget_user_preference 工具写入与撤销。
                 </p>
               </div>
               <div class="toolbar-actions">
@@ -582,7 +564,6 @@ const activeTab = ref('config');
 /** 表单默认值（仅用于首屏占位，加载后以服务端解析结果为准） */
 const form = ref<MemoryConfig>({
   enabled: false,
-  pipelineMode: 'framework',
   extractContextMessages: 6,
   extractContextMaxChars: 8000,
   extractKnownMemoryMaxChars: 2000,
@@ -598,7 +579,6 @@ const form = ref<MemoryConfig>({
 });
 
 const rules = {
-  pipelineMode: [{ required: true, message: '记忆管道模式不能为空', trigger: 'change' }],
   maxContextTokens: [{ required: true, message: '记忆注入上限不能为空', trigger: 'blur' }],
   flushMode: [{ required: true, message: '事实抽取策略不能为空', trigger: 'change' }],
   flushThrottleMinutes: [{ required: true, message: '抽取节流间隔不能为空', trigger: 'blur' }],

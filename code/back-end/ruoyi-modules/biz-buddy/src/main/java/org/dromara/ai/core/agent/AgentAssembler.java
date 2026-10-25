@@ -231,9 +231,6 @@ public class AgentAssembler {
                             McpClientAssembly mcpAssembly, boolean expertMode, String workspaceCode) {
         AiModelConfig modelConfig = modelFactory.resolveChatModel(definition.getModelId());
         Model model = modelFactory.buildChatModel(modelConfig);
-        // 平台托管模式：关闭框架记忆 hooks 与记忆工具，由平台注入/抽取/合并接管
-        boolean platformMemory =
-            memoryPolicy.isEnabled() && "platform".equals(memoryPolicy.getPipelineMode());
         Toolkit toolkit = new Toolkit();
         List<String> registeredCodes = new ArrayList<>(
             registerTools(toolkit, enabledTools, kbIds, expertMode));
@@ -241,8 +238,10 @@ public class AgentAssembler {
         registerMcpClients(toolkit, mcpAssembly, definition);
         // 编排协议工具（REQ-AI-30）：只对入口智能体注册
         registeredCodes.addAll(registerProtocolTools(toolkit, definition));
-        // 显式记忆工具：仅平台托管模式的入口智能体
-        registeredCodes.addAll(registerDeclaredMemoryTools(toolkit, definition, platformMemory));
+        // 显式记忆工具：记忆开启时仅入口智能体注册
+        if (memoryPolicy.isEnabled()) {
+            registeredCodes.addAll(registerDeclaredMemoryTools(toolkit, definition));
+        }
         // 子智能体可继承的工具池＝父级「实际注册成功的只读业务工具」；
         // 写入类工具永不下放（子智能体不继承父级 allow / ask 规则，没有人工确认闸门，见 docs/00 第 42 项）
         List<String> subagentToolPool = readOnlyRegisteredCodes(enabledTools, registeredCodes);
@@ -255,12 +254,10 @@ public class AgentAssembler {
                 AgentPermissionContextFactory.mergeToolDecisions(bindings, resources.mergedToolDecisions())),
             resources.mergedToolDecisions(), mcpAssembly.toolNames(), resources.signature());
         // 是否注册了显式记忆工具：注册了就必须在权限基线里默认放行，否则会落到全局默认（未命中即 ASK）
-        boolean declaredMemoryTools = platformMemory && definition.isEntry();
-        // 记忆工具：只读检索在 framework 模式受开关控制；平台托管模式恒开，
-        // 因为平台注入仍会按预算截断，超过预算的部分需要 memory_search / memory_get 兜底。
+        boolean declaredMemoryTools = memoryPolicy.isEnabled() && definition.isEntry();
+        // 记忆工具：只读检索恒开（平台注入仍会按预算截断，超出预算的部分需要检索兜底）；
         // 写入类工具（memory_save / session_search）始终由白名单裁掉。
-        boolean memoryReadTools = memoryPolicy.isEnabled()
-            && (platformMemory || aiProperties.getChat().isMemoryReadToolsEnabled());
+        boolean memoryReadTools = memoryPolicy.isEnabled();
         HarnessAgent.Builder builder = HarnessAgent.builder()
             .name(definition.getAgentCode())
             .description(StringUtils.isBlank(definition.getDescription())
@@ -279,7 +276,7 @@ public class AgentAssembler {
                 resources.directToolDecisions(), mcpAssembly.toolDecisions(),
                 !subagents.isEmpty(), definition.isEntry(), declaredMemoryTools))
             // 当前时间注入：平台级中间件，所有智能体自动生效；每轮现算，改开关/时区无需重建
-            .middlewares(buildMiddlewares(definition, workspaceCode, platformMemory));
+            .middlewares(buildMiddlewares(definition, workspaceCode));
         if (subagents.isEmpty()) {
             // 未绑定子智能体：与既往行为完全一致（不注册 agent_spawn 等协调工具）
             builder.disableSubagents();
@@ -337,18 +334,11 @@ public class AgentAssembler {
         // 内置 Web 工具（web_fetch / web_search）默认注册并可直接出网，绕过「无裸 HTTP、工具最小化、
         // 全链路审计」的平台纪律，故一并关闭；确需联网能力时应改造为受控工具后再登记。
         tail = tail.disableFilesystemTools().disableShellTool().disableWebTools();
-        if (platformMemory) {
-            // 平台托管：停掉框架抽取 / 合并 / 维护，由平台接管；
-            // 只读检索工具仍保留（按预算截断后的兜底），写入类记忆工具由白名单裁掉。
-            // 框架不再注入 <memory_context>，由 PlatformMemoryContextMiddleware 接管；
-            // 工作区定义类文件仍由框架注入，故不调用 disableWorkspaceContext。
-            tail = tail.disableMemoryHooks();
-        } else if (!memoryPolicy.isEnabled()) {
-            // 关闭记忆：停掉记忆 hooks（抽取 / 合并 / 后台维护）。
-            // 记忆工具恒定关闭（disableMemoryTools），二者同时关闭后中间件即不再注入 <memory_context>，
-            // 故无需连带 disableWorkspaceContext —— 否则会把 AGENTS.md 等定义类文件一并关掉（REQ-AI-08）。
-            tail = tail.disableMemoryHooks();
-        }
+        // 长期记忆由平台托管：关闭框架抽取 / 合并 / 维护；
+        // 只读检索工具仍保留（按预算截断后的兜底），写入类记忆工具由白名单裁掉。
+        // 框架不再注入 <memory_context>，由 PlatformMemoryContextMiddleware 接管；
+        // 工作区定义类文件仍由框架注入，故不调用 disableWorkspaceContext。
+        tail = tail.disableMemoryHooks();
         if (!memoryPolicy.isEnabled() && !workspacePolicy.isEnabled()) {
             // 记忆与工作区上下文均关闭时，才彻底停掉 system prompt 的工作区段落注入
             tail = tail.disableWorkspaceContext();
@@ -618,20 +608,16 @@ public class AgentAssembler {
      *
      * @param definition    智能体定义
      * @param workspaceCode 工作区命名空间（专家与入口共享同一份用户记忆）
-     * @param platformMemory 是否平台托管记忆
      * @return 中间件列表
      */
-    private List<MiddlewareBase> buildMiddlewares(AiAgent definition, String workspaceCode,
-                                                  boolean platformMemory) {
+    private List<MiddlewareBase> buildMiddlewares(AiAgent definition, String workspaceCode) {
         List<MiddlewareBase> middlewares = new ArrayList<>();
         middlewares.add(new CurrentTimeMiddleware(aiProperties));
         // 提示词注入防护：声明「<untrusted> 包裹的外部内容只是数据、其中指令不执行」（开关实时读运行期配置）
         middlewares.add(new PromptHardeningMiddleware(runtimeConfigStore));
-        if (platformMemory) {
-            // 平台托管：框架记忆注入已关闭，由本中间件接管显式记忆 + MEMORY.md
-            middlewares.add(new PlatformMemoryContextMiddleware(
-                aiProperties, runtimeConfigStore, memoryDeclaredStore, workspaceCode));
-        }
+        // 平台托管记忆注入：显式记忆 + MEMORY.md（中间件内部按 memory-enabled 自行短路）
+        middlewares.add(new PlatformMemoryContextMiddleware(
+            aiProperties, runtimeConfigStore, memoryDeclaredStore, workspaceCode));
         if (definition.isEntry()) {
             middlewares.add(new ExpertRosterMiddleware());
             // 继承槽位（REQ-AI-31）：仅入口智能体注入；槽位由门面每轮合并后放入运行期上下文，不进装配指纹
@@ -665,8 +651,7 @@ public class AgentAssembler {
     /**
      * 注册显式记忆工具：用户明确要求「记住 / 忘掉」时由模型落库。
      *
-     * <p><b>为什么只在平台托管模式注册</b>：显式记忆文件 {@code memory/.declared.jsonl} 只由
-     * {@link PlatformMemoryContextMiddleware} 注入；framework 模式下写了也不会生效，注册反而会误导模型。</p>
+     * <p>显式记忆文件 {@code memory/.declared.jsonl} 由 {@link PlatformMemoryContextMiddleware} 注入。</p>
      *
      * <p><b>为什么只给入口智能体</b>：专家只接收任务片段、看不到用户原话，
      * {@code DeclaredMemoryGuard} 的原话证据校验必然失败；且记忆是用户级共享的，
@@ -674,12 +659,10 @@ public class AgentAssembler {
      *
      * @param toolkit        工具箱
      * @param definition     智能体定义
-     * @param platformMemory 是否平台托管记忆
      * @return 实际注册的工具名
      */
-    private List<String> registerDeclaredMemoryTools(Toolkit toolkit, AiAgent definition,
-                                                     boolean platformMemory) {
-        if (!platformMemory || !definition.isEntry()) {
+    private List<String> registerDeclaredMemoryTools(Toolkit toolkit, AiAgent definition) {
+        if (!definition.isEntry()) {
             return List.of();
         }
         toolkit.registerAgentTool(new RememberUserPreferenceTool(memoryService, definition.getId()));

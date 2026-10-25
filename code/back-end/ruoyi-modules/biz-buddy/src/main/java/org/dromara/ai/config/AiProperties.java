@@ -462,23 +462,6 @@ public class AiProperties {
         private boolean memoryEnabled = true;
 
         /**
-         * 是否放行只读记忆检索工具（{@code memory_search} / {@code memory_get}）。
-         *
-         * <p>默认关闭：开启后框架会注册全部记忆工具，再由 {@code ToolsConfig} 白名单裁掉
-         * {@code memory_save} / {@code session_search}；仅在确认只读检索收益后按环境开启（A1 POC）。
-         * 平台托管模式下框架记忆工具恒不注册，本开关仅对 framework 模式生效。</p>
-         */
-        private boolean memoryReadToolsEnabled = false;
-
-        /**
-         * 记忆管道模式：framework 框架托管（现状）/ shadow 平台抽取影子 / platform 平台全托管。
-         *
-         * <p>platform 模式会关闭框架记忆 hooks 与记忆工具，由平台负责抽取、注入、合并与维护；
-         * 切换必须同时保证平台注入中间件生效，否则会出现记忆失忆。</p>
-         */
-        private String memoryPipelineMode = "framework";
-
-        /**
          * 平台抽取时携带的只读上下文消息条数（用于理解“这样 / 这个格式 / 那就 B”等指代）
          */
         private int memoryExtractContextMessages = 6;
@@ -502,11 +485,6 @@ public class AiProperties {
          * 平台自动合并单轮最大批次数（人工/维护合并仍为 20）
          */
         private int memoryAutoConsolidateMaxBatches = 5;
-
-        /**
-         * 影子抽取抽样比例（0~1）：仅 memory-pipeline-mode=shadow 时生效
-         */
-        private double memoryExtractShadowSampleRate = 0.1;
 
         /**
          * 记忆注入 system prompt 的上下文 Token 上限（超出时截断）
@@ -550,11 +528,6 @@ public class AiProperties {
          * 记忆审计日志（memory/audit.jsonl）保留天数
          */
         private int memoryAuditRetentionDays = 180;
-
-        /**
-         * 影子抽取样本（memory/.extract_shadow）保留天数
-         */
-        private int memoryShadowRetentionDays = 30;
 
         /**
          * MEMORY.md 版本快照保留份数

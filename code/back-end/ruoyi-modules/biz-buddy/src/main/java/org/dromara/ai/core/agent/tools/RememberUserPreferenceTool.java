@@ -16,8 +16,7 @@ import java.util.Map;
 /**
  * 显式记忆写入工具：把用户**明确要求记住**的个人偏好写入长期记忆。
  *
- * <p>只在平台托管模式（{@code memory-pipeline-mode=platform}）下注册，且只注册给入口智能体：
- * 显式记忆由 {@code PlatformMemoryContextMiddleware} 在下一轮注入，framework 模式不会读取它；
+ * <p>只注册给入口智能体：显式记忆由 {@code PlatformMemoryContextMiddleware} 在下一轮注入；
  * 专家只拿到任务片段、看不到用户原话，无法通过 {@link DeclaredMemoryGuard} 的证据校验。</p>
  *
  * <p>写入落在 {@code memory/.declared.jsonl}（权威存储），不参与合并、不会被 MEMORY.md 覆盖。

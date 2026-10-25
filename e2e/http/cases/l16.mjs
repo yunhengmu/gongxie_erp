@@ -55,9 +55,7 @@ export const run = async (ctx) => {
   if (!config.enabled) {
     return { status: 'SKIP', detail: '长期记忆未开启（enabled=false），无法验证生命周期' };
   }
-  // 两种管道的落盘形态不同：framework 写「Memory Flush」段，platform 直接写抽取条目
-  const platformPipeline = config.pipelineMode === 'platform';
-
+  // 长期记忆只保留平台托管管道
   const profile = await http.request('GET', '/system/user/profile');
   const userId = profile?.user?.userId;
   const agentId = resolved.entryAgentId;
@@ -98,8 +96,7 @@ export const run = async (ctx) => {
       return { status: 'FAIL', detail: '对话未在超时内完成，无法触发记忆抽取' };
     }
 
-    // 2) 等待落盘：framework 写「Memory Flush」段；platform 可能由显式记忆工具写入 .declared.jsonl，
-    //    也可能由抽取写入当日流水——两者任一出现即视为记住
+    // 2) 等待落盘：平台抽取写当日流水，显式记忆工具写 .declared.jsonl；两者任一出现即视为记住
     const deadline = Date.now() + 45000;
     let ledger = originalLedger;
     let declared = declaredBefore;
@@ -110,17 +107,11 @@ export const run = async (ctx) => {
       await sleep(2000);
       ledger = await readMemory(http, agentId, userId, ledgerPath);
       declared = await listDeclared(http, agentId, userId);
-      if (!platformPipeline && ledger.includes('Memory Flush')) {
-        break;
-      }
-      if (platformPipeline && landed()) {
+      if (landed()) {
         break;
       }
     }
-    if (!platformPipeline && !ledger.includes('Memory Flush')) {
-      return { status: 'FAIL', detail: '记忆抽取未落盘（45s 内当日流水无新增 Memory Flush 段）' };
-    }
-    if (platformPipeline && !landed()) {
+    if (!landed()) {
       return {
         status: 'FAIL',
         detail: '记忆未落盘（45s 内当日流水无新增条目，显式记忆也无新增）'

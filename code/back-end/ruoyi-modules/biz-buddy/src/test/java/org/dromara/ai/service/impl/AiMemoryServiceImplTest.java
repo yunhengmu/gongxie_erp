@@ -460,38 +460,6 @@ class AiMemoryServiceImplTest {
     }
 
     /**
-     * 验证长期未合并的过期流水会被识别为「需要补合并」。
-     */
-    @Test
-    @DisplayName("过期流水未合并时返回需要补合并")
-    void shouldDetectUnconsolidatedExpiringLedger() throws IOException {
-        WorkspaceManager workspace = stubWorkspace();
-        String expired = LocalDate.now().minusDays(100) + ".md";
-        Files.writeString(tempDir.resolve(expired), "- 用户偏好简洁回答");
-        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
-        when(runtimeConfigStore.memory()).thenReturn(policy());
-
-        assertTrue(memoryService.hasUnconsolidatedExpiringLedger(1L, 7L));
-    }
-
-    /**
-     * 验证过期流水已在水位之前合并时不再重复触发合并。
-     */
-    @Test
-    @DisplayName("过期流水已合并时不再补合并")
-    void shouldSkipWhenExpiringLedgerAlreadyConsolidated() throws IOException {
-        WorkspaceManager workspace = stubWorkspace();
-        String expired = LocalDate.now().minusDays(100) + ".md";
-        Files.writeString(tempDir.resolve(expired), "- 用户偏好简洁回答");
-        Files.writeString(tempDir.resolve(".consolidation_state"),
-            java.time.Instant.now().plusSeconds(60).toString());
-        when(workspace.getMemoryDir(any())).thenReturn(tempDir);
-        when(runtimeConfigStore.memory()).thenReturn(policy());
-
-        assertFalse(memoryService.hasUnconsolidatedExpiringLedger(1L, 7L));
-    }
-
-    /**
      * 验证用户覆盖扫描：只收集存在记忆数据且目录名为用户主键的用户。
      */
     @Test

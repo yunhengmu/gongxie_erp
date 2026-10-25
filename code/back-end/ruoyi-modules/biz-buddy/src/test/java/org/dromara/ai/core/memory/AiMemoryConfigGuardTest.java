@@ -22,16 +22,6 @@ class AiMemoryConfigGuardTest {
     }
 
     @Test
-    @DisplayName("未知管道模式时拒绝")
-    void shouldRejectUnknownPipelineMode() {
-        AiMemoryConfigBo policy = policy(90, 365, 8000, 4000);
-        policy.setPipelineMode("auto");
-        ServiceException e = assertThrows(ServiceException.class,
-            () -> AiMemoryConfigGuard.validate(policy));
-        assertEquals("记忆管道模式只能是 framework / shadow / platform", e.getMessage());
-    }
-
-    @Test
     @DisplayName("归档保留期短于流水保留期时拒绝")
     void shouldRejectArchiveShorterThanDaily() {
         ServiceException e = assertThrows(ServiceException.class,

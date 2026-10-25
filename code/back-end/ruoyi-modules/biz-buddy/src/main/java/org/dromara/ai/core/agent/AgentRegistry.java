@@ -525,7 +525,7 @@ public class AgentRegistry {
             return false;
         }
         AiMemoryConfigBo policy = runtimeConfigStore.memory();
-        return policy != null && policy.isEnabled() && "platform".equals(policy.getPipelineMode());
+        return policy != null && policy.isEnabled();
     }
 
     /**

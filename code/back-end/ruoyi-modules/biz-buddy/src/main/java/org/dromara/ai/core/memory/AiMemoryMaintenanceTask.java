@@ -168,18 +168,10 @@ public class AiMemoryMaintenanceTask {
      */
     private boolean consolidateExpiring(Long agentId, Long userId) {
         try {
-            AiMemoryConfigBo policy = runtimeConfigStore.memory();
-            if ("platform".equals(policy.getPipelineMode())) {
-                // 平台托管：框架 hooks 已关闭，每日维护必须合并所有 pending，而不是只等流水临近过期
-                if (memoryService.hasPendingLedger(agentId, userId)) {
-                    memoryService.consolidate(agentId, userId);
-                }
-                return true;
+            // 框架 hooks 已关闭，每日维护必须合并所有 pending，而不是只等流水临近过期
+            if (memoryService.hasPendingLedger(agentId, userId)) {
+                memoryService.consolidate(agentId, userId);
             }
-            if (!memoryService.hasUnconsolidatedExpiringLedger(agentId, userId)) {
-                return true;
-            }
-            memoryService.consolidate(agentId, userId);
             return true;
         } catch (Exception e) {
             log.warn("长期记忆合并失败，跳过该用户归档：userId={}, err={}", userId, e.getMessage());

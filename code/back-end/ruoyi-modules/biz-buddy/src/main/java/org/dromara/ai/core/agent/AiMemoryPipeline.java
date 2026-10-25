@@ -16,9 +16,9 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 /**
- * 平台托管记忆管道（A2 / T16）：轮末异步执行「抽取 → 自动合并」。
+ * 平台托管记忆管道：轮末异步执行「抽取 → 自动合并」。
  *
- * <p>只有在 {@code memory-pipeline-mode=platform} 时生效；framework / shadow 模式为空操作。</p>
+ * <p>长期记忆固定由平台托管（framework / shadow 已移除）。</p>
  *
  * <p>节流与并发：</p>
  * <ul>
@@ -91,10 +91,7 @@ public class AiMemoryPipeline {
             return;
         }
         AiMemoryConfigBo policy = runtimeConfigStore.memory();
-        String mode = policy.getPipelineMode();
-        boolean platform = "platform".equals(mode);
-        boolean shadow = "shadow".equals(mode);
-        if (!policy.isEnabled() || (!platform && !shadow)) {
+        if (!policy.isEnabled()) {
             return;
         }
         try {
@@ -111,10 +108,7 @@ public class AiMemoryPipeline {
     private void runQuietly(Long sessionId) {
         try {
             extractionService.extractIfDue(sessionId);
-            // 影子模式只做抽取留样，不触发合并
-            if ("platform".equals(runtimeConfigStore.memory().getPipelineMode())) {
-                consolidateIfDue(sessionId);
-            }
+            consolidateIfDue(sessionId);
         } catch (Exception e) {
             log.warn("平台记忆管道执行失败：sessionId={}, err={}", sessionId, e.getMessage());
         }

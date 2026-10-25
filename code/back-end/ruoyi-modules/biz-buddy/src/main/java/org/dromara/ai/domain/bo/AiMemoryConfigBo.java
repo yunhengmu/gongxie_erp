@@ -1,7 +1,5 @@
 package org.dromara.ai.domain.bo;
 
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -32,15 +30,6 @@ public class AiMemoryConfigBo implements Serializable {
      * 是否启用长期记忆（关闭时不注入记忆、不自动抽取事实）
      */
     private boolean enabled;
-
-    /**
-     * 记忆管道模式：framework / shadow / platform。
-     *
-     * <p>platform 会关闭框架记忆 hooks 与记忆工具，由平台接管抽取、注入、合并与维护。</p>
-     */
-    @Pattern(regexp = "^(framework|shadow|platform)$",
-        message = "记忆管道模式只能是 framework / shadow / platform")
-    private String pipelineMode;
 
     /**
      * 平台抽取时携带的只读上下文消息条数
@@ -76,13 +65,6 @@ public class AiMemoryConfigBo implements Serializable {
     @Min(value = 1, message = "自动合并批次数不能小于 1")
     @Max(value = 20, message = "自动合并批次数不能超过 20")
     private int autoConsolidateMaxBatches = 5;
-
-    /**
-     * 影子抽取抽样比例（0~1）
-     */
-    @DecimalMin(value = "0.0", message = "影子抽取比例不能小于 0")
-    @DecimalMax(value = "1.0", message = "影子抽取比例不能大于 1")
-    private double extractShadowSampleRate = 0.1;
 
     /**
      * 记忆注入 system prompt 的上下文 Token 上限
@@ -132,13 +114,6 @@ public class AiMemoryConfigBo implements Serializable {
     @Min(value = 1, message = "审计日志保留天数必须大于 0")
     @Max(value = 3650, message = "审计日志保留天数不能超过 3650")
     private int auditRetentionDays = 180;
-
-    /**
-     * 影子抽取样本保留天数
-     */
-    @Min(value = 1, message = "影子样本保留天数必须大于 0")
-    @Max(value = 3650, message = "影子样本保留天数不能超过 3650")
-    private int shadowRetentionDays = 30;
 
     /**
      * MEMORY.md 版本快照保留份数

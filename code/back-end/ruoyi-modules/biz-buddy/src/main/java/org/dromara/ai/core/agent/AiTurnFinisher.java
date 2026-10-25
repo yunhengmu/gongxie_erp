@@ -84,7 +84,7 @@ public class AiTurnFinisher {
     private final IAiTraceService traceService;
 
     /**
-     * 平台托管记忆管道（platform/shadow 模式轮末触发；framework 模式为空操作）
+     * 平台托管记忆管道（每轮结束异步触发抽取与合并）
      */
     private final AiMemoryPipeline memoryPipeline;
 

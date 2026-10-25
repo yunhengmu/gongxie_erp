@@ -4,6 +4,8 @@ import io.agentscope.core.agent.RuntimeContext;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.memory.AiMemoryDeclaredStore;
 import org.dromara.ai.domain.bo.AiMemoryConfigBo;
+import org.dromara.ai.test.AiTestSupport;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,13 +21,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 平台托管记忆注入：显式记忆优先、MEMORY.md 截断标记、非平台模式不注入。
+ * 平台托管记忆注入：显式记忆优先、MEMORY.md 截断标记、关闭记忆时不注入。
  */
 @DisplayName("平台记忆注入中间件")
 class PlatformMemoryContextMiddlewareTest {
 
     @TempDir
     Path tempDir;
+
+    @BeforeAll
+    static void initStaticContext() {
+        AiTestSupport.initialize();
+    }
 
     private AiProperties aiProperties;
 
@@ -50,7 +57,7 @@ class PlatformMemoryContextMiddlewareTest {
         Path userDir = tempDir.resolve("entry").resolve("7");
         Files.createDirectories(userDir);
         Files.writeString(userDir.resolve("MEMORY.md"), "用户偏好简洁回答", StandardCharsets.UTF_8);
-        Mockito.when(runtimeConfigStore.memory()).thenReturn(policy("platform"));
+        Mockito.when(runtimeConfigStore.memory()).thenReturn(policy(true));
 
         String prompt = middleware().onSystemPrompt(null, ctx, "BASE").block();
 
@@ -66,7 +73,7 @@ class PlatformMemoryContextMiddlewareTest {
         Path userDir = tempDir.resolve("entry").resolve("7");
         Files.createDirectories(userDir);
         Files.writeString(userDir.resolve("MEMORY.md"), "记忆".repeat(2000), StandardCharsets.UTF_8);
-        Mockito.when(runtimeConfigStore.memory()).thenReturn(policy("platform"));
+        Mockito.when(runtimeConfigStore.memory()).thenReturn(policy(true));
 
         String prompt = middleware().onSystemPrompt(null, ctx, "BASE").block();
 
@@ -74,9 +81,9 @@ class PlatformMemoryContextMiddlewareTest {
     }
 
     @Test
-    @DisplayName("framework 模式不注入")
-    void shouldNotInjectInFrameworkMode() {
-        Mockito.when(runtimeConfigStore.memory()).thenReturn(policy("framework"));
+    @DisplayName("关闭长期记忆时不注入")
+    void shouldNotInjectWhenMemoryDisabled() {
+        Mockito.when(runtimeConfigStore.memory()).thenReturn(policy(false));
 
         String prompt = middleware().onSystemPrompt(null, ctx, "BASE").block();
 
@@ -88,10 +95,9 @@ class PlatformMemoryContextMiddlewareTest {
         return new PlatformMemoryContextMiddleware(aiProperties, runtimeConfigStore, declaredStore, "entry");
     }
 
-    private AiMemoryConfigBo policy(String mode) {
+    private AiMemoryConfigBo policy(boolean enabled) {
         AiMemoryConfigBo policy = new AiMemoryConfigBo();
-        policy.setEnabled(true);
-        policy.setPipelineMode(mode);
+        policy.setEnabled(enabled);
         policy.setMaxContextTokens(500);
         policy.setInjectDeclaredMaxTokens(100);
         return policy;

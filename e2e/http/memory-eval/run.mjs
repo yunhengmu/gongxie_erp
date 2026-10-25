@@ -3,8 +3,7 @@
  * 长期记忆抽取评测（T10 / T15）。
  *
  * <p>用平台真实的 PLATFORM_EXTRACT_PROMPT 对标注用例跑抽取，计算必记召回与污染率。
- * 本脚本只评提示词与输入构造，不启动 Java 服务；真实流量影子样本由平台写入
- * memory/.extract_shadow/YYYY-MM-DD.jsonl，另行人工复核。</p>
+ * 本脚本只评提示词与输入构造，不启动 Java 服务。</p>
  *
  * 用法：
  *   node e2e/http/memory-eval/run.mjs --dry-run

@@ -6,8 +6,6 @@
 export interface MemoryConfig {
   /** 是否启用长期记忆 */
   enabled: boolean;
-  /** 记忆管道模式：framework 框架托管 / shadow 影子 / platform 平台托管 */
-  pipelineMode: 'framework' | 'shadow' | 'platform';
   /** 抽取时携带的只读上下文消息条数 */
   extractContextMessages: number;
   /** 抽取只读上下文字符上限 */

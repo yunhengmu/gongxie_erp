@@ -101,17 +101,6 @@ public interface IAiMemoryService {
     void deleteAll(Long agentId, Long userId);
 
     /**
-     * 判断该用户是否存在「即将归档且晚于合并水位」的每日流水。
-     *
-     * <p>每日维护任务据此只对不活跃用户补一次合并，避免把未合并的最后一轮流水直接移入归档目录。</p>
-     *
-     * @param agentId 智能体主键
-     * @param userId  记忆归属用户主键
-     * @return 需要先合并时返回 true
-     */
-    boolean hasUnconsolidatedExpiringLedger(Long agentId, Long userId);
-
-    /**
      * 列出工作区中存在记忆数据（{@code memory/} 目录或 {@code MEMORY.md}）的用户主键。
      *
      * <p>用于覆盖「手工写入记忆但从未对话」的用户，避免维护任务只扫描会话表造成遗漏。</p>

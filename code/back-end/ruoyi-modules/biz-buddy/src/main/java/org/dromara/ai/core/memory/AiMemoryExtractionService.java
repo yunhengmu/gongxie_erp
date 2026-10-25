@@ -43,7 +43,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -72,19 +71,9 @@ public class AiMemoryExtractionService {
     private static final String EXTRACT_STATE_FILE = ".extract_state.json";
 
     /**
-     * 影子抽取水位文件（与正式水位隔离）
-     */
-    private static final String SHADOW_STATE_FILE = ".extract_shadow_state.json";
-
-    /**
      * 水位文件中的「清空记忆截止消息 ID」：小于等于该值的消息不再抽取
      */
     private static final String CLEARED_AT_ID = "clearedAtId";
-
-    /**
-     * 影子抽取记录目录
-     */
-    private static final String SHADOW_DIR = ".extract_shadow";
 
     /**
      * 抽取 gate 前缀（按用户节流）
@@ -140,21 +129,14 @@ public class AiMemoryExtractionService {
     private final AiMessageMapper messageMapper;
 
     /**
-     * 按会话水位抽取一次；无新消息、非平台模式或未到节流间隔时返回 false。
+     * 按会话水位抽取一次；无新消息、未启用或未到节流间隔时返回 false。
      *
      * @param sessionId 会话主键
      * @return 是否实际执行了抽取
      */
     public boolean extractIfDue(Long sessionId) {
         AiMemoryConfigBo policy = runtimeConfigStore.memory();
-        boolean platform = "platform".equals(policy.getPipelineMode());
-        boolean shadow = "shadow".equals(policy.getPipelineMode());
-        if (!policy.isEnabled() || (!platform && !shadow)
-            || "never".equals(policy.getFlushMode())) {
-            return false;
-        }
-        if (shadow && ThreadLocalRandom.current().nextDouble() >= policy.getExtractShadowSampleRate()) {
-            // 影子抽样：未命中直接跳过，不占用节流窗口，下一轮仍有机会被抽中
+        if (!policy.isEnabled() || "never".equals(policy.getFlushMode())) {
             return false;
         }
         // 同会话串行：上一轮抽取未结束时短暂等待，避免用户快速追问的消息被漏抽
@@ -164,7 +146,7 @@ public class AiMemoryExtractionService {
             return false;
         }
         try {
-            return extractLocked(sessionId, shadow, policy);
+            return extractLocked(sessionId, policy);
         } finally {
             RedisUtils.deleteObject(lockKey);
         }
@@ -199,11 +181,10 @@ public class AiMemoryExtractionService {
      * 持锁执行一次抽取（调用方保证同会话互斥）。
      *
      * @param sessionId 会话主键
-     * @param shadow    是否影子模式（只留样、不写流水）
      * @param policy    记忆配置
      * @return 是否实际执行了抽取
      */
-    private boolean extractLocked(Long sessionId, boolean shadow, AiMemoryConfigBo policy) {
+    private boolean extractLocked(Long sessionId, AiMemoryConfigBo policy) {
         AiSession session = sessionMapper.selectById(sessionId);
         if (session == null || session.getUserId() == null
             || AiSession.SOURCE_TASK.equals(session.getSource())) {
@@ -219,7 +200,7 @@ public class AiMemoryExtractionService {
             .build();
         WorkspaceManager workspace = agentRegistry.get(entry).getWorkspaceManager();
         Path memoryDir = workspace.getMemoryDir(ctx);
-        long watermark = readWatermark(memoryDir, sessionId, shadow);
+        long watermark = readWatermark(memoryDir, sessionId);
         long clearedAtId = readClearedAtId(memoryDir);
         List<AiMessage> pending = loadPending(sessionId, watermark, clearedAtId,
             policy.getExtractContextMaxChars());
@@ -228,12 +209,12 @@ public class AiMemoryExtractionService {
         }
         // 先确认有新消息再抢 gate：避免空轮占用 30 分钟节流窗口
         if ("throttled".equals(policy.getFlushMode())
-            && !RedisUtils.setObjectIfAbsent(gateKey(entry.getId(), session.getUserId(), shadow), "1",
+            && !RedisUtils.setObjectIfAbsent(gateKey(entry.getId(), session.getUserId()), "1",
                 Duration.ofMinutes(Math.max(1, policy.getFlushThrottleMinutes())))) {
             return false;
         }
         try {
-            doExtract(entry, session, ctx, memoryDir, policy, pending, shadow);
+            doExtract(entry, session, ctx, memoryDir, policy, pending);
             return true;
         } catch (Exception e) {
             // 失败保留 gate，避免模型故障时每轮重试打爆下游；每日维护与手动合并可兜底
@@ -251,7 +232,7 @@ public class AiMemoryExtractionService {
      * 构造输入、调用模型、过滤与落盘。
      */
     private void doExtract(AiAgent entry, AiSession session, RuntimeContext ctx, Path memoryDir,
-                           AiMemoryConfigBo policy, List<AiMessage> pending, boolean shadow) {
+                           AiMemoryConfigBo policy, List<AiMessage> pending) {
         List<AiMessage> context = loadContext(session.getId(), pending.get(0).getId(),
             policy.getExtractContextMessages());
         String existing = readMemoryMd(memoryDir);
@@ -271,26 +252,23 @@ public class AiMemoryExtractionService {
 
         FilterResult filtered = filterContract(output, entry.getAgentCode(), session.getUserId());
         long lastId = pending.get(pending.size() - 1).getId();
-        if (shadow) {
-            // 影子模式只留样本，不写正式流水，也不影响 framework 的抽取结果
-            appendShadowRecord(memoryDir, session, pending, filtered, existing.length());
-        } else if (StringUtils.isNotBlank(filtered.content())) {
+        if (StringUtils.isNotBlank(filtered.content())) {
             appendLedger(memoryDir, filtered.content());
         }
-        writeWatermark(memoryDir, session.getId(), lastId, shadow);
+        writeWatermark(memoryDir, session.getId(), lastId);
         if (usage != null) {
             Long modelId = entry.getMemoryModelId() != null ? entry.getMemoryModelId() : entry.getModelId();
             usageStatService.accumulate(session.getUserId(), entry.getId(), modelId, usage, 0, 1);
         }
         auditLogger.record(entry.getId(), session.getUserId(),
-            shadow ? AiMemoryAuditLogger.EVENT_SHADOW_EXTRACT : AiMemoryAuditLogger.EVENT_FLUSH_WRITE, "OK",
-            Map.of("stage", shadow ? "extract_shadow" : "extract",
+            AiMemoryAuditLogger.EVENT_FLUSH_WRITE, "OK",
+            Map.of("stage", "extract",
                 "sessionId", String.valueOf(session.getId()),
                 "messages", pending.size(), "kept", filtered.kept(),
                 "needsContext", filtered.needsContext(), "lowConfidence", filtered.lowConfidence(),
                 "chars", StringUtils.length(filtered.content())));
-        log.info("平台记忆抽取完成：mode={}, sessionId={}, userId={}, messages={}, kept={}, needsContext={}, chars={}",
-            shadow ? "shadow" : "platform", session.getId(), session.getUserId(), pending.size(),
+        log.info("平台记忆抽取完成：sessionId={}, userId={}, messages={}, kept={}, needsContext={}, chars={}",
+            session.getId(), session.getUserId(), pending.size(),
             filtered.kept(), filtered.needsContext(), StringUtils.length(filtered.content()));
     }
 
@@ -433,41 +411,6 @@ public class AiMemoryExtractionService {
     }
 
     /**
-     * 写影子抽取样本：只用于离线评测，不进入正式流水。
-     *
-     * @param memoryDir   用户记忆目录
-     * @param session     会话
-     * @param pending     本次抽取消息
-     * @param filtered    过滤结果
-     * @param memoryChars 当前 MEMORY.md 字符数
-     */
-    private void appendShadowRecord(Path memoryDir, AiSession session, List<AiMessage> pending,
-                                    FilterResult filtered, int memoryChars) {
-        Path dir = memoryDir.resolve(SHADOW_DIR);
-        Path file = dir.resolve(LocalDate.now() + ".jsonl");
-        Map<String, Object> record = new LinkedHashMap<>();
-        record.put("createdAt", Instant.now().toString());
-        record.put("sessionId", String.valueOf(session.getId()));
-        record.put("userId", String.valueOf(session.getUserId()));
-        record.put("source", session.getSource());
-        record.put("fromMessageId", pending.get(0).getId());
-        record.put("toMessageId", pending.get(pending.size() - 1).getId());
-        record.put("messages", pending.size());
-        record.put("kept", filtered.kept());
-        record.put("needsContext", filtered.needsContext());
-        record.put("lowConfidence", filtered.lowConfidence());
-        record.put("memoryChars", memoryChars);
-        record.put("extracted", filtered.content());
-        try {
-            Files.createDirectories(dir);
-            Files.writeString(file, JsonUtils.toJsonString(record) + "\n", StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            throw new IllegalStateException("影子抽取样本写入失败：" + e.getMessage(), e);
-        }
-    }
-
-    /**
      * 读取已有 MEMORY.md（用于减少重复抽取）。
      */
     private String readMemoryMd(Path memoryDir) {
@@ -507,8 +450,8 @@ public class AiMemoryExtractionService {
     /**
      * 读取会话抽取水位。
      */
-    private long readWatermark(Path memoryDir, Long sessionId, boolean shadow) {
-        Path state = memoryDir.resolve(shadow ? SHADOW_STATE_FILE : EXTRACT_STATE_FILE);
+    private long readWatermark(Path memoryDir, Long sessionId) {
+        Path state = memoryDir.resolve(EXTRACT_STATE_FILE);
         if (!Files.isRegularFile(state)) {
             return 0L;
         }
@@ -568,7 +511,6 @@ public class AiMemoryExtractionService {
     public void markCleared(Path memoryDir) {
         long maxId = maxMessageId();
         writeClearedState(memoryDir.resolve(EXTRACT_STATE_FILE), maxId);
-        writeClearedState(memoryDir.resolve(SHADOW_STATE_FILE), maxId);
     }
 
     /**
@@ -619,8 +561,7 @@ public class AiMemoryExtractionService {
             .stream()
             .map(session -> String.valueOf(session.getId()))
             .collect(Collectors.toSet());
-        return pruneState(memoryDir.resolve(EXTRACT_STATE_FILE), alive)
-            + pruneState(memoryDir.resolve(SHADOW_STATE_FILE), alive);
+        return pruneState(memoryDir.resolve(EXTRACT_STATE_FILE), alive);
     }
 
     /**
@@ -666,8 +607,8 @@ public class AiMemoryExtractionService {
     /**
      * 推进会话抽取水位。
      */
-    private void writeWatermark(Path memoryDir, Long sessionId, long messageId, boolean shadow) {
-        Path state = memoryDir.resolve(shadow ? SHADOW_STATE_FILE : EXTRACT_STATE_FILE);
+    private void writeWatermark(Path memoryDir, Long sessionId, long messageId) {
+        Path state = memoryDir.resolve(EXTRACT_STATE_FILE);
         try {
             Map<String, Object> root = Files.isRegularFile(state)
                 ? JsonUtils.parseMap(Files.readString(state, StandardCharsets.UTF_8))
@@ -723,8 +664,8 @@ public class AiMemoryExtractionService {
             : new ChatTokenUsage((int) prompt, (int) completion, (int) (prompt + completion));
     }
 
-    private String gateKey(Long agentId, Long userId, boolean shadow) {
-        return GATE_PREFIX + (shadow ? "shadow:" : "platform:") + agentId + ":" + userId;
+    private String gateKey(Long agentId, Long userId) {
+        return GATE_PREFIX + "platform:" + agentId + ":" + userId;
     }
 
     private String roleLabel(AiMessage message) {

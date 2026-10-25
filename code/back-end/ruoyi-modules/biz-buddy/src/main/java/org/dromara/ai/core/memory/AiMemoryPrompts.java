@@ -48,9 +48,6 @@ public final class AiMemoryPrompts {
     /**
      * 平台托管抽取提示词（A2 / T14）：在 FLUSH_PROMPT 的内容范围之上，增加
      * 「上下文只读」「needs_context」「supersedes」「低置信丢弃」契约。
-     *
-     * <p>仅在 {@code memory-pipeline-mode=platform} 下使用；framework 模式仍用
-     * {@link #FLUSH_PROMPT}，避免平台标记进入框架流水。</p>
      */
     public static final String PLATFORM_EXTRACT_PROMPT = """
         你是长期记忆抽取器。只从「待抽取消息」中提取「跨会话仍然有用、且与用户本人有关」的信息。

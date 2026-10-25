@@ -404,11 +404,9 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
         removed += deleteExpiredSessionLogs(workspace, ctx, sessionCutoff);
         // 抽取水位按会话保留期同步裁剪，避免 sessions 映射只增不减
         int prunedWatermarks = extractionService.pruneWatermarks(memoryDir, userId, sessionCutoff);
-        // 净化原文备份与影子样本：按各自保留期清理，避免敏感原文与评测样本无限增长
+        // 净化原文备份：按保留期清理，避免敏感原文无限增长
         removed += deleteExpiredByMtime(memoryDir.resolve(QUARANTINE_DIR),
             LocalDate.now().minusDays(Math.max(1, policy.getQuarantineRetentionDays())));
-        removed += deleteExpiredByMtime(memoryDir.resolve(".extract_shadow"),
-            LocalDate.now().minusDays(Math.max(1, policy.getShadowRetentionDays())));
         // 审计日志按行时间裁剪，保留近期事件
         int auditPruned = pruneAudit(memoryDir.resolve(AiMemoryAuditLogger.AUDIT_FILE),
             LocalDate.now().minusDays(Math.max(1, policy.getAuditRetentionDays())));
@@ -454,29 +452,6 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
                 .anyMatch(path -> lastModified(path).isAfter(watermark));
         } catch (IOException e) {
             log.warn("读取待合并流水失败：userId={}, err={}", userId, e.getMessage());
-            return false;
-        }
-    }
-
-    @Override
-    public boolean hasUnconsolidatedExpiringLedger(Long agentId, Long userId) {
-        AiAgent definition = agentService.getEnabledAgent(agentId);
-        WorkspaceManager workspace = workspaceOf(definition);
-        RuntimeContext ctx = contextOf(userId);
-        Path memoryDir = workspace.getMemoryDir(ctx);
-        if (!Files.isDirectory(memoryDir)) {
-            return false;
-        }
-        LocalDate cutoff = LocalDate.now()
-            .minusDays(Math.max(1, runtimeConfigStore.memory().getDailyFileRetentionDays()));
-        Instant watermark = readConsolidationWatermark(memoryDir);
-        try (Stream<Path> files = Files.list(memoryDir)) {
-            // 只看「按文件名已过期」的流水：再过一轮就会被归档；其中任一文件晚于水位，说明尚未合并
-            return files.filter(Files::isRegularFile)
-                .filter(path -> isOnOrBefore(path, cutoff))
-                .anyMatch(path -> modifiedAfter(path, watermark));
-        } catch (IOException e) {
-            log.warn("读取即将归档流水失败：userId={}, err={}", userId, e.getMessage());
             return false;
         }
     }
@@ -569,8 +544,8 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
                 quality.setExtractFailures(quality.getExtractFailures() + 1);
                 return;
             }
-            // 影子样本不计入生产健康度
-            if (!"OK".equals(result) || "extract_shadow".equals(String.valueOf(detail.get("stage")))) {
+            // 只统计成功写入的生产抽取
+            if (!"OK".equals(result)) {
                 return;
             }
             int kept = auditInt(detail.get("kept"));
@@ -851,18 +826,6 @@ public class AiMemoryServiceImpl implements IAiMemoryService {
             return Instant.parse(Files.readString(state, StandardCharsets.UTF_8).strip());
         } catch (Exception e) {
             return Instant.EPOCH;
-        }
-    }
-
-    /**
-     * 判断文件最后修改时间是否晚于合并水位。
-     */
-    private boolean modifiedAfter(Path file, Instant watermark) {
-        try {
-            return Files.getLastModifiedTime(file).toInstant().isAfter(watermark);
-        } catch (IOException e) {
-            // 读不到修改时间时按「未合并」处理，宁可多合并一次也不丢事实
-            return true;
         }
     }
 

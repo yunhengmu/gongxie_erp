@@ -68,7 +68,7 @@ public class PlatformMemoryContextMiddleware implements MiddlewareBase {
     public Mono<String> onSystemPrompt(Agent agent, RuntimeContext ctx, String currentPrompt) {
         String base = currentPrompt == null ? "" : currentPrompt;
         AiMemoryConfigBo policy = runtimeConfigStore.memory();
-        if (!policy.isEnabled() || !"platform".equals(policy.getPipelineMode())) {
+        if (!policy.isEnabled()) {
             return Mono.just(base);
         }
         String userId = ctx == null ? null : ctx.getUserId();

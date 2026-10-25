@@ -35,12 +35,6 @@ public final class AiMemoryConfigGuard {
         if (policy == null) {
             return;
         }
-        // 护栏零：管道模式必须是已知三档，避免写入手工拼写导致装配期静默走错分支
-        String mode = policy.getPipelineMode();
-        if (mode != null && !mode.isBlank()
-            && !"framework".equals(mode) && !"shadow".equals(mode) && !"platform".equals(mode)) {
-            throw new ServiceException("记忆管道模式只能是 framework / shadow / platform");
-        }
         // 护栏一：归档保留期短于流水保留期时，刚归档的流水会在同一轮清理中被删除，等于没有归档
         if (policy.getArchiveRetentionDays() < policy.getDailyFileRetentionDays()) {
             throw new ServiceException("归档保留天数不能小于流水保留天数，否则归档后会立即被清理");
