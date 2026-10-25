@@ -36,7 +36,7 @@ BizBuddy 是一个**企业级智能业务运行平台**：它在成熟的开源�
 | [`code/back-end/`](code/back-end) | **后端工程**：Spring Boot 4.1.1 + JDK 21，多模块 Maven；AI 能力在 `ruoyi-modules/biz-buddy`（AgentScope 2.0.4 内核） |
 | [`code/front-end/`](code/front-end) | **前端工程**：Vue 3 + TypeScript + Element Plus + Vite，包管理 pnpm |
 | [`docs/`](docs/README.md) | **开发者文档**：一键运行（Docker Compose）与快速开始（源码手工跑）、运行时架构、二次开发（新增业务工具）、配置项参考 |
-| [`docs/BizBuddy平台功能说明.md`](docs/BizBuddy平台功能说明.md) | 平台功能说明（含 9 张运行界面截图） |
+| [`docs/BizBuddy平台功能说明.md`](docs/BizBuddy平台功能说明.md) | 平台功能说明（含 12 张运行界面截图） |
 | [`deploy/deploy-pg/`](deploy/deploy-pg) | **PostgreSQL 全栈容器编排**：PG 14 + Redis + Milvus + 后端 + 调度 + Nginx（`docker compose up -d --build` 即「有表有数据可登录」） |
 | [`deploy/deploy-mysql/`](deploy/deploy-mysql) | **MySQL 8.0 全栈容器编排**：组件与 PG 版一致，**项目名与端口整体错开，两栈可同时运行** |
 | [`e2e/http/`](e2e/http) | **端到端测试脚本（接口层）**（Node.js 零依赖）：对**已运行**的栈发真实 HTTP / SSE 断言，见下文「测试与覆盖率」 |
