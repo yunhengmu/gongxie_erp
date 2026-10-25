@@ -109,6 +109,15 @@ alter table ai_knowledge_base add column rerank_model_id bigint(20);
 alter table ai_channel add column mode varchar(16) not null default 'webhook' comment '接入形态：webhook Webhook 回调（默认，需平台公网可达） / ws 长连接（应用主动外连、免公网 IP；仅飞书区分）';
 ```
 
+### 升级须知（2026-10-25 知识库混合检索）
+
+知识库新增 `retrieval_mode`（`vector` 默认 / `hybrid` 向量 + BM25）与 `bm25_index_status` 两列。BM25 索引存 Milvus 独立集合 `<collection>_bm25`（原生 BM25 Function + 中文分词），**不落关系库**；切换到 `hybrid` 后平台异步重建，也可在知识库列表手动重建。建表脚本已含这两列，存量库需手工迁移（重复执行会报 `Duplicate column name`，可忽略）：
+
+```sql
+alter table ai_knowledge_base add column retrieval_mode varchar(16) not null default 'vector' comment '检索方式（vector 向量 / hybrid 向量+BM25）';
+alter table ai_knowledge_base add column bm25_index_status varchar(16) not null default 'none' comment 'BM25 索引状态（none/building/ready/failed）';
+```
+
 ## 6. 已知坑（与 PostgreSQL 版相同，附 MySQL 增量项）
 
 **① 用 Docker Hub 拉 `bellsoft/liberica-openjdk-rocky` 反复失败**

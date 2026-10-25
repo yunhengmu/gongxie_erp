@@ -15,14 +15,14 @@ BIZBUDDY_IT=true ./mvnw -o -pl ruoyi-admin -am test
 - **通过标准**：零失败、零错误。`biz-buddy` 与 `ruoyi-admin` 两个模块都要跑（一次覆盖 4 类集成测试：真库方言一致性 / 实体↔schema 对齐 / 技能仓库真库读写 / 上下文装配），坐标默认 `localhost:5432` 与 `localhost:3306`，可用 `BIZBUDDY_IT_PG_URL` / `BIZBUDDY_IT_MYSQL_URL` 覆盖；
 - **唯一预期跳过**：`JevClientSmokeTest#shouldParseChoiceAndNoulAnswersFromBailian`（需 `BIZBUDDY_JEV_SMOKE` 才外呼真实决策模型的选做冒烟）。**出现其它跳过一律视同异常**。
 
-## 2. 端到端全量（两栈各 13 层）
+## 2. 端到端全量（两栈各 18 层）
 
 ```bash
 node e2e/http/run.mjs                                    # PG 栈（后端 8080）
 node e2e/http/run.mjs --base-url http://localhost:8081   # MySQL 栈
 ```
 
-- **通过标准**：零 FAIL。`L12`（结构化决策闸门）需本地桩，未起桩会 **SKIP**——不算失败，但发版前应起桩跑掉，做到**零 FAIL、零 SKIP**。
+- **通过标准**：零 FAIL。层数为 **18**（L1~L13、L15~L19；无 L14，已并入 L3）。`L12`（结构化决策闸门）需本地桩，未起桩会 **SKIP**——不算失败，但发版前应起桩跑掉，做到**零 FAIL、零 SKIP**。
 - **前端关键路径（浏览器层 `e2e/ui`，Playwright）**：`cd e2e/ui && pnpm install && pnpm run install-browser`（首次），再 `pnpm test`（PG 栈默认 `http://localhost`，MySQL 栈用 `BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test`）。栈不可达按 SKIP 处理（不算失败，但发版前应起栈跑掉），**跑完要求零 FAIL**。详见 [../e2e/ui/README.md](../e2e/ui/README.md)。
 
 ### L12 的桩（起 / 停）
@@ -83,11 +83,13 @@ docker logs bizbuddy-mysql-admin --tail 500 2>&1 | grep -c ERROR   # 期望 0
 
 ---
 
-## 附：2026-10-15 实测基线（当前通过版本）
+## 附：实测基线（最近一次完整回归：2026-10-25）
 
 | 门禁 | 结果 |
 |---|---|
-| 集成测试（`BIZBUDDY_IT=true`） | `biz-buddy` **1408 / 0 / 0**（1 例为上述预期跳过）；`ruoyi-admin` **7 / 0 / 0**（含 40.9s 真库装配） |
-| e2e 全量 | PG 栈 **13/13 PASS**、MySQL 栈 **13/13 PASS**（均为起桩后的结果，零 FAIL、零 SKIP） |
+| 集成测试（`BIZBUDDY_IT=true`） | 沿用 2026-10-15 基线：`biz-buddy` **1408 / 0 / 0**（1 例为上述预期跳过）；`ruoyi-admin` **7 / 0 / 0**（含 40.9s 真库装配）。2026-10-25 未重跑本门禁 |
+| 单元测试（`biz-buddy`，`mvn test`） | **1542 通过 / 0 失败 / 7 跳过** |
+| e2e 全量 | PG 栈 **17 PASS / 1 SKIP**、MySQL 栈 **17 PASS / 1 SKIP**（均未起 L12 桩；其余零 FAIL） |
+| e2e UI（Playwright） | PG 栈 **17 passed**、MySQL 栈 **17 passed** |
 
 > 本项目**尚未接入 CI**；上表是「人工按本清单执行」的基线。接入 CI 后，第 1、2 项应直接成为硬件门禁。

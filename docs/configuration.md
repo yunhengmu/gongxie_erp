@@ -118,6 +118,7 @@
 | `rerank-alpha` | `0.5` | `score_fusion` 的重排权重（0~1） |
 | `rerank-rrf-k` | `60` | `rank_rrf` 的平滑常数 |
 | `rerank-trigger-margin` | `0` | 条件触发：首条与次条向量分差 ≥ 本值时跳过重排（`0`/负值＝总是重排） |
+| `bm25-top-n` | `30` | 混合检索时 BM25 单路召回条数（与向量路各自召回后按 RRF 融合） |
 | `assemble-dedup-enabled` | `true` | 上下文装配：确定性去重 |
 | `assemble-merge-adjacent-enabled` | `true` | 相邻切片合并 |
 | `assemble-merge-window` | `1` | 相邻合并窗口 |
@@ -125,7 +126,7 @@
 | `assemble-max-chars` | `6000` | 装配后正文的绝对字符上限 |
 | `assemble-max-tokens` | `6000` | 装配后正文的 Token 预算（与字符上限取小，`CJK≈1 token/字符`） |
 
-> **2026-10-14**：`rerank-enabled` / `rerank-model` / `rerank-endpoint` 已删除——重排的**模型与开关**已迁至「模型配置」（`model_type=rerank`，`baseUrl` 填完整重排端点、密钥为该模型自带）+「知识库」配置（`rerank_enabled` / `rerank_model_id`）；本节只保留**与模型无关的算法参数**。启用且绑定可用重排模型才重排，否则保持向量原序；未配密钥 / 非 2xx / 超时 / 结构异常一律**降级为原顺序**。上下文装配（`assemble-*`）只作用于返回集后处理，**不改排序**。改动后可用 `e2e/http/eval/eval-rag.mjs` 做 A/B。
+> **重排与混合检索**：重排的模型与开关取自「模型配置」（`model_type=rerank`，`baseUrl` 填完整重排端点、密钥为该模型自带）+「知识库」（`rerank_enabled` / `rerank_model_id`）；本节只保留与模型无关的算法参数。启用且绑定可用重排模型才重排，否则保持向量原序；未配密钥 / 非 2xx / 超时 / 结构异常一律降级为原顺序。知识库级 `retrieval_mode` 决定纯向量或「向量 + BM25」混合（BM25 索引存 Milvus 独立集合 `<collection>_bm25`，状态见 `bm25_index_status`，未就绪 / 异常自动降级纯向量）。上下文装配（`assemble-*`）只作用于返回集后处理，不改排序。改动后可用 `e2e/http/eval/eval-rag.mjs` 做 A/B。
 
 ### 2.8 安全合规（`bizbuddy.ai.security.*`）
 
@@ -193,4 +194,4 @@
 - [architecture.md](architecture.md) —— 这些配置在链路里作用于哪一环
 - [development.md](development.md) —— 新增业务工具
 - [../deploy/deploy-pg/README.md](../deploy/deploy-pg/README.md) / [../deploy/deploy-mysql/README.md](../deploy/deploy-mysql/README.md) —— 容器化部署、变量覆盖与已知坑（含 OSS 地址与「文档需先解析再向量化」）
-- [../e2e/http/](../e2e/http) —— 端到端脚本：改完配置后在真实栈上验证（L1~L11 + RAG 检索质量评测 `e2e/http/eval/`）
+- [../e2e/http/](../e2e/http) —— 端到端脚本：改完配置后在真实栈上验证（L1~L19 + RAG 检索质量评测 `e2e/http/eval/`）

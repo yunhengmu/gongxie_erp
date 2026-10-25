@@ -77,6 +77,17 @@ alter table ai_channel add column if not exists mode varchar(16) not null defaul
 comment on column ai_channel.mode is '接入形态：webhook Webhook 回调（默认，需平台公网可达） / ws 长连接（应用主动外连、免公网 IP；仅飞书区分）';
 ```
 
+### 升级须知（2026-10-25 知识库混合检索）
+
+知识库新增 `retrieval_mode`（`vector` 默认 / `hybrid` 向量 + BM25）与 `bm25_index_status` 两列。BM25 索引存 Milvus 独立集合 `<collection>_bm25`（原生 BM25 Function + 中文分词），**不落关系库**；切换到 `hybrid` 后平台异步重建，也可在知识库列表手动重建。建表脚本已含这两列与注释，存量库需手工迁移：
+
+```sql
+alter table ai_knowledge_base add column if not exists retrieval_mode varchar(16) not null default 'vector';
+alter table ai_knowledge_base add column if not exists bm25_index_status varchar(16) not null default 'none';
+comment on column ai_knowledge_base.retrieval_mode is '检索方式（vector 向量 / hybrid 向量+BM25）';
+comment on column ai_knowledge_base.bm25_index_status is 'BM25 索引状态（none/building/ready/failed）';
+```
+
 ## 4. 实测结论（2026-10-09，WSL2 + Docker 29.3 / Compose v5.1.1）
 
 `docker compose up -d --build` 后：
@@ -99,7 +110,7 @@ comment on column ai_channel.mode is '接入形态：webhook Webhook 回调（�
 | 后端 Redis | Redisson 已连接 `redis:6379` |
 | 建库结果 | 75 张表（`ai_*` **40** / `sys_*` 20 / `flow_*` 10 / `test_*` 3 / `gen_*` 2）；`admin` 等初始账号在位；`sys_menu` BizBuddy 段 **136** 行（6 分组 / **34** 功能页 / **95** 按钮）；`ai_tool` **30**、入口小Z 1、专家 **4**（机构管理 / 公告管理 / 演示「BizBuddy项目介绍专家」/ **平台运维助手**）、技能 **1**（平台运行日报）、定时任务 **1**、`ai_model_config` **4**（`api_key` 留空）；演示种子一套（知识库 `bizbuddy_demo_kb` + 文档 `BizBuddy简介.txt` + `sys_oss` 行） |
 
-> **可一键自检**：仓库自带端到端测试脚本 [`../../e2e/http/`](../../e2e/http)——对**已运行**的栈发真实 HTTP 断言，覆盖 **L1~L17**（L14 已并入 L3）：「模型连通 → 专家提示词生成 → 知识库生命周期（解析/批量/向量化/检索）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（JEV 桩）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索」；另含 RAG 检索质量评测（`e2e/http/eval/`）。用法：
+> **可一键自检**：仓库自带端到端测试脚本 [`../../e2e/http/`](../../e2e/http)——对**已运行**的栈发真实 HTTP 断言，覆盖 **L1~L19**（无 L14，已并入 L3）：「模型连通 → 专家提示词生成 → 知识库生命周期（解析/批量/向量化/检索/**hybrid+BM25**）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（JEV 桩）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索 → 长期记忆分批合并 → 长期记忆版本恢复」；另含 RAG 检索质量评测（`e2e/http/eval/`）。用法：
 
 ```bash
 cd biz-buddy

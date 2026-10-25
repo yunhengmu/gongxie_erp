@@ -22,8 +22,6 @@
 | `e2e/http/` | 接口层端到端（Node.js 零依赖，`node e2e/http/run.mjs`） |
 | `e2e/ui/` | 浏览器层端到端（Playwright，`cd e2e/ui && pnpm test`） |
 
-> **2026-10 目录重组**：后端 / 前端工程更名为 `back-end` / `front-end` 并收拢到 `code/`；平台功能说明与截图由 `back-end/docs/` 迁入本目录（`docs/`）；`e2e-http`、`e2e-ui` 收拢为 `e2e/http`、`e2e/ui`。
-
 ## 我要改哪里？
 
 | 想做的事 | 从哪里入手 |
@@ -69,7 +67,7 @@ pnpm install && pnpm run install-browser            # 首次需装依赖与 chro
 BIZBUDDY_UI_BASE_URL=http://localhost:81 pnpm test  # MySQL 栈（PG 栈默认 http://localhost）
 ```
 
-- 覆盖 **L1~L17**（L14 已并入 L3）：模型连通 → 提示词生成 → 知识库生命周期（解析/批量/向量化/检索）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（需本地桩，见 [release-checklist.md](release-checklist.md)）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索；另含 **RAG 检索质量评测**（`e2e/http/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；
+- 覆盖 **L1~L19**（无 L14，已并入 L3）：模型连通 → 提示词生成 → 知识库生命周期（解析/批量/向量化/检索/**hybrid+BM25**）→ 对话与专家编排（SSE）→ HITL 写工具确认 → 停止生成 → 安全合规 → 会话治理 → 鉴权边界 → MCP 出口协议 → MCP 客户端 → 结构化决策闸门（需本地桩，见 [release-checklist.md](release-checklist.md)）→ 停止生成（中断专家编排）→ 只读轮次重新生成 → 长期记忆生命周期 → 只读记忆检索 → 长期记忆分批合并 → 长期记忆版本恢复；另含 **RAG 检索质量评测**（`e2e/http/eval/eval-rag.mjs`，跑 hit@k / MRR 并分类汇总）；
 - 配置见 `e2e/http/.env.example`（唯一机密 `BIZBUDDY_LLM_API_KEY` **仅 L1 需要**，放 `e2e/http/.env.local`，已 gitignore）；
 - 退出码 `0/1/2/3` = 无失败 / 有 FAIL / 前置检查失败 / 参数错误；**L5 默认「拒绝」路径无副作用**，`--allow-writes` 才真写并在收尾自动清理；
 - 它不进 `mvn test`，与单测互不影响；**改了工具 / 装配 / 路由后，建议「单测 + e2e」两道都过**。
