@@ -286,6 +286,8 @@ create table if not exists ai_knowledge_base (
     retrieval_top_k      int       default 5 comment '默认召回条数',
     rerank_enabled       char(1)   not null default '0' comment '是否启用检索重排（0否 1是）',
     rerank_model_id      bigint(20) comment '重排模型（ai_model_config.id，model_type=rerank）',
+    retrieval_mode       varchar(16) not null default 'vector' comment '检索方式（vector 向量 / hybrid 向量+BM25）',
+    bm25_index_status    varchar(16) not null default 'none' comment 'BM25 索引状态（none/building/ready/failed）',
     similarity_threshold decimal(4, 3) default 0.500 comment '默认相似度阈值',
     status               char(1)       default '0' comment '状态（0正常 1停用）',
     remark               varchar(500),

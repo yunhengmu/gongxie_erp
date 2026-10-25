@@ -94,6 +94,16 @@ public class AiKnowledgeBase extends BaseEntity {
     private Long rerankModelId;
 
     /**
+     * 检索方式（vector 向量 / hybrid 向量+BM25），默认 vector
+     */
+    private String retrievalMode;
+
+    /**
+     * BM25 索引状态（none 未构建 / building 构建中 / ready 可用 / failed 失败）
+     */
+    private String bm25IndexStatus;
+
+    /**
      * 状态（0正常 1停用）
      */
     private String status;

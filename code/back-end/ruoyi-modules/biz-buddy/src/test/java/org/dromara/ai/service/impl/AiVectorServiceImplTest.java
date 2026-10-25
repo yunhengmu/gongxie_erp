@@ -1,6 +1,7 @@
 package org.dromara.ai.service.impl;
 
 import org.dromara.ai.config.AiProperties;
+import org.dromara.ai.core.AiBm25Store;
 import org.dromara.ai.core.AiEmbeddingClient;
 import org.dromara.ai.core.AiRerankClient;
 import org.dromara.ai.core.AiVectorStore;
@@ -14,6 +15,7 @@ import org.dromara.ai.domain.vo.AiDocumentVo;
 import org.dromara.ai.domain.vo.AiRetrievalHitVo;
 import org.dromara.ai.mapper.AiChunkMapper;
 import org.dromara.ai.mapper.AiDocumentMapper;
+import org.dromara.ai.mapper.AiKnowledgeBaseMapper;
 import org.dromara.ai.mapper.AiModelConfigMapper;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiModelConfigService;
@@ -53,6 +55,9 @@ class AiVectorServiceImplTest {
     private AiDocumentMapper documentMapper;
 
     @Mock
+    private AiKnowledgeBaseMapper knowledgeBaseMapper;
+
+    @Mock
     private AiModelConfigMapper modelConfigMapper;
 
     @Mock
@@ -69,6 +74,9 @@ class AiVectorServiceImplTest {
 
     @Mock
     private AiVectorStore vectorStore;
+
+    @Mock
+    private AiBm25Store bm25Store;
 
     @Mock
     private AiRerankClient rerankClient;
@@ -95,9 +103,9 @@ class AiVectorServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new AiVectorServiceImpl(chunkMapper, documentMapper, modelConfigMapper,
-            knowledgeBaseService, modelConfigService, embeddingClient, usageStatService, vectorStore, rerankClient,
-            aiProperties, safetyGuard, safetyEventService);
+        service = new AiVectorServiceImpl(chunkMapper, documentMapper, knowledgeBaseMapper, modelConfigMapper,
+            knowledgeBaseService, modelConfigService, embeddingClient, usageStatService, vectorStore, bm25Store,
+            rerankClient, aiProperties, safetyGuard, safetyEventService);
         // 融合相关配置复位到与「纯替换」等价，避免用例间相互影响；召回条数固定 20 以匹配桩
         aiProperties.getRag().setRerankMode("replace");
         aiProperties.getRag().setRerankTriggerMargin(0);
@@ -485,6 +493,69 @@ class AiVectorServiceImplTest {
         assertEquals(1, result.size());
         assertEquals("C1", result.get(0).getContent());
         assertEquals(0.9, result.get(0).getScore().doubleValue());
+    }
+
+    @Test
+    @DisplayName("混合检索：向量 + BM25 两路命中按 RRF 融合，双路命中优先")
+    void shouldFuseDenseAndBm25WhenHybrid() {
+        AiKnowledgeBase kb = kb(2L, 3, 7L);
+        kb.setRetrievalMode("hybrid");
+        AiModelConfig model = model(7L);
+        when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb);
+        when(modelConfigMapper.selectById(7L)).thenReturn(model);
+        when(modelConfigService.decryptApiKey(7L)).thenReturn("key");
+        when(embeddingClient.embedOne(model, "key", "q")).thenReturn(new double[]{1, 2, 3});
+        when(vectorStore.search(eq("col"), eq(3), any(double[].class), eq(5), eq(0.3)))
+            .thenReturn(List.of(
+                new AiVectorStore.VectorHit("1", "10", 0, 0.9),
+                new AiVectorStore.VectorHit("2", "10", 1, 0.8)));
+        when(bm25Store.search("col", "q", 30)).thenReturn(List.of(
+            new AiBm25Store.Bm25Hit("2", 5.0),
+            new AiBm25Store.Bm25Hit("3", 3.0)));
+        when(chunkMapper.selectByIds(any()))
+            .thenReturn(List.of(chunk(1L, "C1"), chunk(2L, "C2"), chunk(3L, "C3")));
+        AiDocument doc = new AiDocument();
+        doc.setId(10L);
+        doc.setDocName("来源文档");
+        when(documentMapper.selectByIds(any())).thenReturn(List.of(doc));
+
+        List<AiRetrievalHitVo> result = service.retrieve(2L, "q", 5, null);
+
+        assertEquals(List.of("C2", "C1", "C3"),
+            result.stream().map(AiRetrievalHitVo::getContent).toList());
+        // 融合分归一化到 [0,1]，保持降序
+        assertEquals(1.0, result.get(0).getScore().doubleValue(), 1e-9);
+        assertTrue(result.get(0).getScore() > result.get(1).getScore());
+        assertTrue(result.get(1).getScore() > result.get(2).getScore());
+    }
+
+    @Test
+    @DisplayName("混合检索：BM25 异常时降级为纯向量结果")
+    void shouldDegradeToDenseWhenBm25Fails() {
+        AiKnowledgeBase kb = kb(2L, 3, 7L);
+        kb.setRetrievalMode("hybrid");
+        AiModelConfig model = model(7L);
+        when(knowledgeBaseService.getEnabledKnowledgeBase(2L)).thenReturn(kb);
+        when(modelConfigMapper.selectById(7L)).thenReturn(model);
+        when(modelConfigService.decryptApiKey(7L)).thenReturn("key");
+        when(embeddingClient.embedOne(model, "key", "q")).thenReturn(new double[]{1, 2, 3});
+        when(vectorStore.search(eq("col"), eq(3), any(double[].class), eq(5), eq(0.3)))
+            .thenReturn(List.of(
+                new AiVectorStore.VectorHit("1", "10", 0, 0.9),
+                new AiVectorStore.VectorHit("2", "10", 1, 0.8)));
+        when(bm25Store.search(any(), any(), anyInt())).thenThrow(new RuntimeException("bm25 down"));
+        when(chunkMapper.selectByIds(any())).thenReturn(List.of(chunk(1L, "C1"), chunk(2L, "C2")));
+        AiDocument doc = new AiDocument();
+        doc.setId(10L);
+        doc.setDocName("来源文档");
+        when(documentMapper.selectByIds(any())).thenReturn(List.of(doc));
+
+        List<AiRetrievalHitVo> result = service.retrieve(2L, "q", 5, null);
+
+        assertEquals(List.of("C1", "C2"),
+            result.stream().map(AiRetrievalHitVo::getContent).toList());
+        assertEquals(0.9, result.get(0).getScore().doubleValue());
+        assertEquals(0.8, result.get(1).getScore().doubleValue());
     }
 
     @Test

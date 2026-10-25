@@ -67,6 +67,16 @@ public class AiKnowledgeBaseVo implements Serializable {
     private String rerankModelName;
 
     /**
+     * 检索方式（vector 向量 / hybrid 向量+BM25）
+     */
+    private String retrievalMode;
+
+    /**
+     * BM25 索引状态（none / building / ready / failed）
+     */
+    private String bm25IndexStatus;
+
+    /**
      * 向量集合名称
      */
     private String collectionName;

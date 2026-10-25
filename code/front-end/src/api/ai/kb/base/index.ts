@@ -71,6 +71,17 @@ export const updateKnowledgeBase = (data: KnowledgeBaseForm) => {
 };
 
 /**
+ * 重建知识库 BM25 全文索引（切换为混合检索或索引失败后手动触发）
+ * @param id 知识库主键
+ */
+export const rebuildBm25Index = (id: string | number) => {
+  return request({
+    url: '/ai/kb/' + id + '/bm25/rebuild',
+    method: 'post'
+  });
+};
+
+/**
  * 删除知识库
  * @param id 主键或主键数组
  */

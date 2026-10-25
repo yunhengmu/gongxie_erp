@@ -5,7 +5,7 @@
 export interface RetrievalHitVO {
   /** 切片序号 */
   chunkIndex?: number;
-  /** 相似度得分（COSINE，越大越相关） */
+  /** 得分（纯向量检索为 COSINE；混合检索为 RRF 融合分归一化后的值，越大越相关） */
   score?: number;
   /** 切片正文 */
   content: string;

@@ -121,13 +121,81 @@ export const run = async (ctx) => {
       evidence
     };
   }
+  evidence.retrievalMode = demoKb.retrievalMode;
+  if (demoKb.retrievalMode === undefined || demoKb.bm25IndexStatus === undefined) {
+    return {
+      status: 'FAIL',
+      detail: '知识库接口未透出 retrievalMode / bm25IndexStatus 字段——请确认两方言建表已加列、且存量库已执行 ALTER',
+      evidence
+    };
+  }
+
+  // ⑦ 混合检索：切换为「向量 + BM25」→ 等待 BM25 索引就绪 → 检索命中 → 还原为向量
+  const kbDetail = await http.request('GET', `/ai/kb/${resolved.demoKbId}`);
+  const updateBody = { ...kbDetail, retrievalMode: 'hybrid' };
+  await http.request('PUT', '/ai/kb', { body: updateBody });
+  const bm25Ready = await pollKb(http, resolved.demoKbId, (row) => row.bm25IndexStatus === 'ready', 180_000);
+  evidence.hybridStatus = bm25Ready?.bm25IndexStatus;
+  if (bm25Ready?.bm25IndexStatus !== 'ready') {
+    await restoreVectorMode(http, updateBody);
+    return {
+      status: 'FAIL',
+      detail: `切换混合检索后 BM25 索引未就绪（bm25IndexStatus=${bm25Ready?.bm25IndexStatus ?? '未知'}）`,
+      evidence
+    };
+  }
+  const hybridHits = await http.request('GET', '/ai/kb/retrieval/test', {
+    timeoutMs: 60000,
+    query: { kbId: resolved.demoKbId, query: 'BizBuddy 是什么', topK: 5, threshold: 0.3 }
+  });
+  evidence.hybridHitCount = Array.isArray(hybridHits) ? hybridHits.length : 0;
+  evidence.hybridScore = hybridHits?.[0]?.score;
+  await restoreVectorMode(http, updateBody);
+  if (!Array.isArray(hybridHits) || hybridHits.length === 0) {
+    return { status: 'FAIL', detail: '混合检索无命中（BM25 已就绪仍返回空数组）', evidence };
+  }
 
   return {
     status: 'PASS',
     detail: `解析 ${evidence.chunkCount} 切片 → 批量解析/向量化完成 → 检索命中 ${evidence.hitCount} 条`
-      + `（最高分 ${evidence.topHit?.score ?? '-'}）；单文档向量化可用；rerankEnabled=${evidence.rerankEnabled}`,
+      + `（最高分 ${evidence.topHit?.score ?? '-'}）；混合检索命中 ${evidence.hybridHitCount} 条；`
+      + `rerankEnabled=${evidence.rerankEnabled}`,
     evidence
   };
+};
+
+/**
+ * 轮询知识库详情，直到满足完成判据。
+ *
+ * @param {import('../lib/http.mjs').HttpClient} http HTTP 客户端
+ * @param {string|number} kbId 知识库主键
+ * @param {(row: object) => boolean} done 完成判据
+ * @param {number} timeoutMs 超时
+ * @returns {Promise<object|null>} 最后一次观测到的知识库
+ */
+const pollKb = async (http, kbId, done, timeoutMs) => {
+  const deadline = Date.now() + timeoutMs;
+  let latest = null;
+  for (;;) {
+    latest = await http.request('GET', `/ai/kb/${kbId}`).catch(() => null);
+    if (latest && done(latest)) {
+      return latest;
+    }
+    if (Date.now() >= deadline) {
+      return latest;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+};
+
+/**
+ * 还原知识库为纯向量检索（避免污染后续用例）。
+ *
+ * @param {import('../lib/http.mjs').HttpClient} http HTTP 客户端
+ * @param {object} updateBody 切换混合检索时的知识库请求体
+ */
+const restoreVectorMode = async (http, updateBody) => {
+  await http.request('PUT', '/ai/kb', { body: { ...updateBody, retrievalMode: 'vector' } }).catch(() => undefined);
 };
 
 /**

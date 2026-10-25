@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
 import org.dromara.ai.config.AiProperties;
 import org.dromara.ai.core.AiEmbeddingClient;
+import org.dromara.ai.core.AiBm25Store;
 import org.dromara.ai.core.AiRankFusion;
 import org.dromara.ai.core.AiRerankClient;
 import org.dromara.ai.core.AiVectorStore;
@@ -19,6 +20,7 @@ import org.dromara.ai.domain.vo.AiDocumentVo;
 import org.dromara.ai.domain.vo.AiRetrievalHitVo;
 import org.dromara.ai.mapper.AiChunkMapper;
 import org.dromara.ai.mapper.AiDocumentMapper;
+import org.dromara.ai.mapper.AiKnowledgeBaseMapper;
 import org.dromara.ai.mapper.AiModelConfigMapper;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.ai.service.IAiModelConfigService;
@@ -74,9 +76,31 @@ public class AiVectorServiceImpl implements IAiVectorService {
      */
     private static final int WRITE_PAGE_SIZE = 50;
 
+    /**
+     * 检索方式：向量 + BM25 混合
+     */
+    private static final String MODE_HYBRID = "hybrid";
+
+    /**
+     * BM25 索引状态：可用
+     */
+    private static final String BM25_READY = "ready";
+
+    /**
+     * BM25 索引状态：构建中
+     */
+    private static final String BM25_BUILDING = "building";
+
+    /**
+     * BM25 索引状态：构建失败
+     */
+    private static final String BM25_FAILED = "failed";
+
     private final AiChunkMapper chunkMapper;
 
     private final AiDocumentMapper documentMapper;
+
+    private final AiKnowledgeBaseMapper knowledgeBaseMapper;
 
     private final AiModelConfigMapper modelConfigMapper;
 
@@ -92,6 +116,11 @@ public class AiVectorServiceImpl implements IAiVectorService {
     private final IAiUsageStatService usageStatService;
 
     private final AiVectorStore vectorStore;
+
+    /**
+     * BM25 全文索引（按知识库隔离；未启用混合检索时不写入）
+     */
+    private final AiBm25Store bm25Store;
 
     /**
      * 检索重排客户端（默认关闭；未配密钥 / 异常时降级为原顺序）
@@ -116,19 +145,22 @@ public class AiVectorServiceImpl implements IAiVectorService {
      * 形成循环依赖；延迟到首次入库记账时再解析即可，不影响向量化主流程。
      */
     public AiVectorServiceImpl(AiChunkMapper chunkMapper, AiDocumentMapper documentMapper,
-                               AiModelConfigMapper modelConfigMapper, IAiKnowledgeBaseService knowledgeBaseService,
+                               AiKnowledgeBaseMapper knowledgeBaseMapper, AiModelConfigMapper modelConfigMapper,
+                               IAiKnowledgeBaseService knowledgeBaseService,
                                IAiModelConfigService modelConfigService, AiEmbeddingClient embeddingClient,
                                @Lazy IAiUsageStatService usageStatService, AiVectorStore vectorStore,
-                               AiRerankClient rerankClient, AiProperties aiProperties, AiSafetyGuard safetyGuard,
-                               IAiSafetyEventService safetyEventService) {
+                               AiBm25Store bm25Store, AiRerankClient rerankClient, AiProperties aiProperties,
+                               AiSafetyGuard safetyGuard, IAiSafetyEventService safetyEventService) {
         this.chunkMapper = chunkMapper;
         this.documentMapper = documentMapper;
+        this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.modelConfigMapper = modelConfigMapper;
         this.knowledgeBaseService = knowledgeBaseService;
         this.modelConfigService = modelConfigService;
         this.embeddingClient = embeddingClient;
         this.usageStatService = usageStatService;
         this.vectorStore = vectorStore;
+        this.bm25Store = bm25Store;
         this.rerankClient = rerankClient;
         this.aiProperties = aiProperties;
         this.safetyGuard = safetyGuard;
@@ -197,9 +229,14 @@ public class AiVectorServiceImpl implements IAiVectorService {
         markStatus(docId, STATUS_RUNNING, "");
         // 入库成本归属：页面触发取当前登录人；批量线程没有登录上下文时退回文档创建人
         Long usageUserId = resolveUsageUserId(document);
+        boolean hybrid = hybridEnabled(knowledgeBase);
+        boolean bm25Failed = false;
         try {
             // 重建语义：按文档清理**全部**历史向量（含切片已重建、业务记录不再指向的孤儿）
             vectorStore.deleteByDocId(knowledgeBase.getCollectionName(), knowledgeBase.getDimension(), docId);
+            if (hybrid) {
+                bm25Store.deleteByDocId(knowledgeBase.getCollectionName(), docId);
+            }
 
             int pageCount = (chunks.size() + WRITE_PAGE_SIZE - 1) / WRITE_PAGE_SIZE;
             for (int page = 0; page < pageCount; page++) {
@@ -216,6 +253,12 @@ public class AiVectorServiceImpl implements IAiVectorService {
                 List<double[]> vectors = embedded.vectors();
                 validateDimension(vectors, knowledgeBase);
                 writePage(knowledgeBase, document, pageChunks, vectors);
+                if (hybrid) {
+                    bm25Failed |= !writeBm25Page(knowledgeBase, document, pageChunks);
+                }
+            }
+            if (hybrid) {
+                updateBm25Status(knowledgeBase.getId(), bm25Failed ? BM25_FAILED : BM25_READY);
             }
 
             AiDocument update = new AiDocument();
@@ -223,7 +266,8 @@ public class AiVectorServiceImpl implements IAiVectorService {
             update.setVectorStatus(STATUS_DONE);
             update.setVectorErrorMsg("");
             documentMapper.updateById(update);
-            log.info("文档向量化完成：docId={}, chunks={}, collection={}", docId, chunks.size(), knowledgeBase.getCollectionName());
+            log.info("文档向量化完成：docId={}, chunks={}, collection={}, hybrid={}",
+                docId, chunks.size(), knowledgeBase.getCollectionName(), hybrid);
         } catch (Exception e) {
             markStatus(docId, STATUS_FAILED, abbreviate(e.getMessage()));
             if (e instanceof ServiceException serviceException) {
@@ -324,14 +368,92 @@ public class AiVectorServiceImpl implements IAiVectorService {
         double[] queryVector = embeddingClient.embedOne(model, apiKey, query);
         List<AiVectorStore.VectorHit> hits = vectorStore.search(
             knowledgeBase.getCollectionName(), knowledgeBase.getDimension(), queryVector, recallLimit, scoreThreshold);
-        if (hits.isEmpty()) {
+        List<AiRetrievalHitVo> result = hybridEnabled(knowledgeBase)
+            ? hybridSearch(knowledgeBase, query, hits, recallLimit)
+            : (hits.isEmpty() ? List.of() : buildHits(hits));
+        if (result.isEmpty()) {
             return List.of();
         }
-        List<AiRetrievalHitVo> result = buildHits(hits);
         if (rerankModel == null) {
-            return result;
+            return truncate(result, limit);
         }
         return applyRerank(rerankModel, query, result, limit, resolveRerankMode(rerankMode));
+    }
+
+    /**
+     * 向量 + BM25 混合检索：两路各自召回后按 RRF 融合。
+     *
+     * <p><b>降级</b>：BM25 索引未构建 / 检索异常 / 无命中时，直接返回纯向量结果，不阻断检索。
+     * 融合分统一做 min-max 归一化到 [0,1]，便于与纯向量结果、跨知识库结果保持同一量纲展示。</p>
+     *
+     * @param knowledgeBase 知识库
+     * @param query         查询文本
+     * @param denseHits     向量路命中（已按相似度降序）
+     * @param recallLimit   融合后的候选上限
+     * @return 融合命中（按融合分降序）
+     */
+    private List<AiRetrievalHitVo> hybridSearch(AiKnowledgeBase knowledgeBase, String query,
+                                                List<AiVectorStore.VectorHit> denseHits, int recallLimit) {
+        List<String> denseIds = denseHits.stream()
+            .map(AiVectorStore.VectorHit::chunkId)
+            .filter(StringUtils::isNotBlank)
+            .toList();
+        List<String> bm25Ids;
+        try {
+            int bm25TopN = Math.max(recallLimit, aiProperties.getRag().getBm25TopN());
+            bm25Ids = bm25Store.search(knowledgeBase.getCollectionName(), query, bm25TopN).stream()
+                .map(AiBm25Store.Bm25Hit::chunkId)
+                .filter(StringUtils::isNotBlank)
+                .toList();
+        } catch (Exception e) {
+            log.warn("BM25 检索失败，本次降级为纯向量检索，kbId={}, cause={}", knowledgeBase.getId(), e.getMessage());
+            bm25Ids = List.of();
+        }
+        if (bm25Ids.isEmpty()) {
+            return denseHits.isEmpty() ? List.of() : buildHits(denseHits);
+        }
+        List<AiRankFusion.FusedKey> fused = AiRankFusion.reciprocalRankFusion(
+            denseIds, bm25Ids, aiProperties.getRag().getRerankRrfK(), recallLimit);
+        List<AiVectorStore.VectorHit> fusedHits = new ArrayList<>(fused.size());
+        for (AiRankFusion.FusedKey item : fused) {
+            fusedHits.add(new AiVectorStore.VectorHit(item.key(), null, null, item.score()));
+        }
+        List<AiRetrievalHitVo> result = buildHits(fusedHits);
+        normalizeScores(result);
+        return result;
+    }
+
+    /**
+     * 把命中得分 min-max 归一化到 [0,1]（仅用于展示与跨库排序，不改顺序）。
+     *
+     * @param hits 命中列表（已按融合分降序）
+     */
+    private void normalizeScores(List<AiRetrievalHitVo> hits) {
+        if (hits.isEmpty()) {
+            return;
+        }
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+        for (AiRetrievalHitVo hit : hits) {
+            double score = hit.getScore() == null ? 0.0 : hit.getScore();
+            min = Math.min(min, score);
+            max = Math.max(max, score);
+        }
+        double range = max - min;
+        for (AiRetrievalHitVo hit : hits) {
+            double score = hit.getScore() == null ? 0.0 : hit.getScore();
+            hit.setScore(range <= 1e-12 ? 1.0 : (score - min) / range);
+        }
+    }
+
+    /**
+     * 知识库是否启用「向量 + BM25」混合检索。
+     *
+     * @param knowledgeBase 知识库
+     * @return 是否混合检索
+     */
+    private boolean hybridEnabled(AiKnowledgeBase knowledgeBase) {
+        return MODE_HYBRID.equalsIgnoreCase(StringUtils.trim(knowledgeBase.getRetrievalMode()));
     }
 
     /**
@@ -438,6 +560,96 @@ public class AiVectorServiceImpl implements IAiVectorService {
         }
         AiKnowledgeBase knowledgeBase = knowledgeBaseService.getEnabledKnowledgeBase(kbId);
         return vectorStore.delete(knowledgeBase.getCollectionName(), knowledgeBase.getDimension(), vectorIds);
+    }
+
+    /**
+     * 写入一批切片的 BM25 全文索引（失败只告警，不阻断向量入库）。
+     *
+     * @param knowledgeBase 知识库
+     * @param document      文档
+     * @param chunks        本批切片
+     * @return 是否写入成功
+     */
+    private boolean writeBm25Page(AiKnowledgeBase knowledgeBase, AiDocument document, List<AiChunk> chunks) {
+        List<AiBm25Store.Bm25Doc> docs = new ArrayList<>(chunks.size());
+        for (AiChunk chunk : chunks) {
+            docs.add(new AiBm25Store.Bm25Doc(
+                String.valueOf(chunk.getId()),
+                document.getId(),
+                chunk.getChunkIndex(),
+                chunk.getContent()));
+        }
+        try {
+            bm25Store.add(knowledgeBase.getCollectionName(), docs);
+            return true;
+        } catch (Exception e) {
+            log.warn("写入 BM25 索引失败，kbId={}, docId={}, count={}, cause={}",
+                knowledgeBase.getId(), document.getId(), docs.size(), e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 回写知识库的 BM25 索引状态（失败只告警，不影响检索主流程）。
+     *
+     * @param kbId   知识库主键
+     * @param status BM25 索引状态
+     */
+    private void updateBm25Status(Long kbId, String status) {
+        try {
+            AiKnowledgeBase update = new AiKnowledgeBase();
+            update.setId(kbId);
+            update.setBm25IndexStatus(status);
+            knowledgeBaseMapper.updateById(update);
+        } catch (Exception e) {
+            log.warn("回写 BM25 索引状态失败，kbId={}, status={}, cause={}", kbId, status, e.getMessage());
+        }
+    }
+
+    @Override
+    public void rebuildBm25Index(Long kbId) {
+        AiKnowledgeBase knowledgeBase = knowledgeBaseService.queryEntity(kbId);
+        if (knowledgeBase == null) {
+            throw new ServiceException("知识库不存在或已被删除");
+        }
+        String collection = knowledgeBase.getCollectionName();
+        updateBm25Status(kbId, BM25_BUILDING);
+        try {
+            // 全量重建：先清空集合，再按「已向量化」的文档逐一切片写入（稀疏向量由服务端生成，无需再调模型）
+            bm25Store.dropCollection(collection);
+            List<AiDocument> documents = documentMapper.selectList(Wrappers.<AiDocument>lambdaQuery()
+                .eq(AiDocument::getKbId, kbId)
+                .eq(AiDocument::getVectorStatus, STATUS_DONE));
+            int chunkCount = 0;
+            for (AiDocument document : documents) {
+                List<AiChunk> chunks = listChunks(document.getId());
+                for (int from = 0; from < chunks.size(); from += WRITE_PAGE_SIZE) {
+                    int to = Math.min(from + WRITE_PAGE_SIZE, chunks.size());
+                    List<AiChunk> page = chunks.subList(from, to);
+                    bm25Store.add(collection, page.stream()
+                        .map(chunk -> new AiBm25Store.Bm25Doc(
+                            String.valueOf(chunk.getId()), document.getId(),
+                            chunk.getChunkIndex(), chunk.getContent()))
+                        .toList());
+                    chunkCount += page.size();
+                }
+            }
+            updateBm25Status(kbId, BM25_READY);
+            log.info("BM25 索引重建完成：kbId={}, docs={}, chunks={}", kbId, documents.size(), chunkCount);
+        } catch (Exception e) {
+            updateBm25Status(kbId, BM25_FAILED);
+            log.error("BM25 索引重建失败：kbId={}", kbId, e);
+            throw new ServiceException("BM25 索引重建失败：" + e.getMessage());
+        }
+    }
+
+    @Override
+    public void removeBm25ByDocId(Long kbId, Long docId) {
+        AiKnowledgeBase knowledgeBase = knowledgeBaseService.queryEntity(kbId);
+        if (knowledgeBase == null || !hybridEnabled(knowledgeBase)) {
+            return;
+        }
+        bm25Store.deleteByDocId(knowledgeBase.getCollectionName(), docId);
     }
 
     /**

@@ -99,4 +99,34 @@ class AiRankFusionTest {
         assertEquals(AiRankFusion.Mode.REPLACE, AiRankFusion.Mode.from("unknown"));
     }
 
+    @Test
+    @DisplayName("向量 + BM25：两路命中叠加得分，双路命中优先于单路")
+    void shouldFuseDenseAndBm25() {
+        List<AiRankFusion.FusedKey> fused = AiRankFusion.reciprocalRankFusion(
+            List.of("a", "b", "c"), List.of("c", "d"), 60, 10);
+        assertEquals(List.of("c", "a", "b", "d"),
+            fused.stream().map(AiRankFusion.FusedKey::key).toList());
+        // c：两路各第 3/1 名；a：仅向量第 1 名
+        assertTrue(fused.get(0).score() > fused.get(1).score());
+        assertTrue(fused.get(1).score() > fused.get(2).score());
+    }
+
+    @Test
+    @DisplayName("向量 + BM25：单路为空时退化为另一路顺序；重复主键只计首次；按 limit 截断")
+    void shouldHandleHybridBoundaries() {
+        List<AiRankFusion.FusedKey> onlyBm25 = AiRankFusion.reciprocalRankFusion(
+            List.of(), List.of("x", "y"), 60, 10);
+        assertEquals(List.of("x", "y"), onlyBm25.stream().map(AiRankFusion.FusedKey::key).toList());
+
+        List<AiRankFusion.FusedKey> bothEmpty = AiRankFusion.reciprocalRankFusion(List.of(), List.of(), 60, 10);
+        assertTrue(bothEmpty.isEmpty());
+
+        List<AiRankFusion.FusedKey> dedup = AiRankFusion.reciprocalRankFusion(
+            List.of("a", "a", "b"), List.of(), 60, 10);
+        assertEquals(List.of("a", "b"), dedup.stream().map(AiRankFusion.FusedKey::key).toList());
+
+        assertEquals(2, AiRankFusion.reciprocalRankFusion(
+            List.of("a", "b", "c"), List.of(), 60, 2).size());
+    }
+
 }

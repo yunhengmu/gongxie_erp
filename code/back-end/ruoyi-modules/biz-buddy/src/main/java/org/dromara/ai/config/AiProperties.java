@@ -677,6 +677,11 @@ public class AiProperties {
         private int rerankRrfK = 60;
 
         /**
+         * 混合检索时 BM25 单路召回条数（与向量路各自召回后按 RRF 融合）。
+         */
+        private int bm25TopN = 30;
+
+        /**
          * 条件触发阈值：仅当「首条与次条向量分差 &lt; 本阈值」时才真正调用重排（0 或负值=总是重排）。
          */
         private double rerankTriggerMargin = 0.0;

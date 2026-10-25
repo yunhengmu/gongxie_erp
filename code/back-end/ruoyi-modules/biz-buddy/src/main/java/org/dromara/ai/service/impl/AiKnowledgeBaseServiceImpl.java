@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.dromara.ai.core.AiBm25Store;
 import org.dromara.ai.core.AiVectorStore;
 import org.dromara.ai.domain.AiChunk;
 import org.dromara.ai.domain.AiDocument;
@@ -63,6 +64,16 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
     private static final String COLLECTION_PREFIX = "kb_";
 
     /**
+     * 检索方式：纯向量
+     */
+    private static final String MODE_VECTOR = "vector";
+
+    /**
+     * 检索方式：向量 + BM25 混合
+     */
+    private static final String MODE_HYBRID = "hybrid";
+
+    /**
      * 生效范围：公开（全平台可见与可用）
      */
     private static final String SCOPE_ALL = "0";
@@ -111,6 +122,11 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
      * 向量库门面（删除知识库时 drop 对应集合）
      */
     private final AiVectorStore vectorStore;
+
+    /**
+     * BM25 全文索引（知识库删除时一并清理）
+     */
+    private final AiBm25Store bm25Store;
 
     @Override
     public AiKnowledgeBaseVo queryById(Long id) {
@@ -349,6 +365,12 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
             log.warn("删除知识库向量集合异常，kbId={}, collection={}, cause={}",
                 knowledgeBase.getId(), knowledgeBase.getCollectionName(), e.getMessage());
         }
+        try {
+            bm25Store.dropCollection(knowledgeBase.getCollectionName());
+        } catch (Exception e) {
+            log.warn("删除知识库 BM25 集合异常，kbId={}, collection={}, cause={}",
+                knowledgeBase.getId(), knowledgeBase.getCollectionName(), e.getMessage());
+        }
     }
 
     /**
@@ -528,6 +550,8 @@ public class AiKnowledgeBaseServiceImpl implements IAiKnowledgeBaseService {
         if (StringUtils.isBlank(entity.getVisibleScope())) {
             entity.setVisibleScope(SCOPE_ALL);
         }
+        entity.setRetrievalMode(MODE_HYBRID.equalsIgnoreCase(StringUtils.trim(entity.getRetrievalMode()))
+            ? MODE_HYBRID : MODE_VECTOR);
         // 「本部门」需落归属部门；其余档位不写（保持空，避免残留旧部门导致误判）
         if (SCOPE_DEPT.equals(entity.getVisibleScope()) && entity.getOwnerDeptId() == null) {
             entity.setOwnerDeptId(LoginHelper.getDeptId());

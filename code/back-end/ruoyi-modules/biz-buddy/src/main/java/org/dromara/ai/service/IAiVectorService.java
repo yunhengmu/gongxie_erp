@@ -89,4 +89,22 @@ public interface IAiVectorService {
      */
     int removeVectors(Long kbId, Collection<String> vectorIds);
 
+    /**
+     * 删除指定文档的 BM25 全文索引（文档删除时调用；知识库未启用混合检索时为空操作）。
+     *
+     * @param kbId  知识库主键
+     * @param docId 文档主键
+     */
+    void removeBm25ByDocId(Long kbId, Long docId);
+
+    /**
+     * 全量重建知识库的 BM25 全文索引（按已向量化的文档切片重建）。
+     *
+     * <p>用于「切换为混合检索」或索引失败后的手动重建；构建中 / 完成 / 失败状态回写
+     * {@code ai_knowledge_base.bm25_index_status}。失败时抛出业务异常，由调用方决定是否提示。</p>
+     *
+     * @param kbId 知识库主键
+     */
+    void rebuildBm25Index(Long kbId);
+
 }

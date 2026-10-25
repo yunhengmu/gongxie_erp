@@ -33,6 +33,10 @@ export interface KnowledgeBaseVO {
   rerankModelId?: string | number;
   /** 重排模型名称 */
   rerankModelName?: string;
+  /** 检索方式（vector 向量 / hybrid 向量+BM25） */
+  retrievalMode?: string;
+  /** BM25 索引状态（none / building / ready / failed） */
+  bm25IndexStatus?: string;
   /** 状态（0正常 1停用） */
   status: string;
   /** 归属部门（visibleScope=1 本部门时生效） */
@@ -72,6 +76,8 @@ export interface KnowledgeBaseForm extends BaseEntity {
   rerankEnabled?: string;
   /** 重排模型主键（启用重排时必填） */
   rerankModelId?: string | number;
+  /** 检索方式（vector 向量 / hybrid 向量+BM25） */
+  retrievalMode?: string;
   /** 状态（0正常 1停用） */
   status?: string;
   /** 归属部门（visibleScope=1 本部门时生效） */

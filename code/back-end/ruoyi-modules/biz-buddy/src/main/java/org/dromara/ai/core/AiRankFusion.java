@@ -2,8 +2,10 @@ package org.dromara.ai.core;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * 检索「重排融合」纯函数工具：把「向量召回」与「文本重排」两路结果按所选模式融合为最终排序。
@@ -93,6 +95,71 @@ public final class AiRankFusion {
      * @param score 融合分（量纲随模式：REPLACE=重排分 / RRF=RRF 分 / SCORE_FUSION=归一化加权分）
      */
     public record Fused(int index, double score) {
+    }
+
+    /**
+     * 按业务主键融合的条目（用于向量 + BM25 两路召回）。
+     *
+     * @param key   业务主键（如切片主键）
+     * @param score RRF 融合分
+     */
+    public record FusedKey(String key, double score) {
+    }
+
+    /**
+     * 倒数排名融合（RRF）：把两路「按主键排序」的召回结果合并为统一排序。
+     *
+     * <p>第 r 名计 {@code 1/(k+r)}，两路相加；同一路内重复主键只按首次出现计。
+     * 输出按融合分降序；分数相同时保持「首次出现」先后（稳定）。</p>
+     *
+     * @param first  第一路主键（按相关度降序，如向量召回）
+     * @param second 第二路主键（按相关度降序，如 BM25 召回）
+     * @param rrfK   平滑常数（≤0 时取 {@link #DEFAULT_RRF_K}）
+     * @param limit  最多返回条数（≤0 表示不截断）
+     * @return 融合后的主键与分数（降序）
+     */
+    public static List<FusedKey> reciprocalRankFusion(List<String> first, List<String> second, int rrfK, int limit) {
+        int k = rrfK > 0 ? rrfK : DEFAULT_RRF_K;
+        Map<String, double[]> merged = new LinkedHashMap<>();
+        accumulateRanks(first, k, merged);
+        accumulateRanks(second, k, merged);
+        List<FusedKey> fused = new ArrayList<>(merged.size());
+        for (Map.Entry<String, double[]> entry : merged.entrySet()) {
+            fused.add(new FusedKey(entry.getKey(), entry.getValue()[0]));
+        }
+        fused.sort((left, right) -> {
+            int byScore = Double.compare(right.score(), left.score());
+            if (byScore != 0) {
+                return byScore;
+            }
+            return Double.compare(merged.get(left.key())[1], merged.get(right.key())[1]);
+        });
+        if (limit > 0 && fused.size() > limit) {
+            return new ArrayList<>(fused.subList(0, limit));
+        }
+        return fused;
+    }
+
+    /**
+     * 累计一路召回的倒数排名分。
+     *
+     * @param keys   主键列表（已降序）
+     * @param k      RRF 常数
+     * @param merged 主键 → [融合分, 首次出现序号]
+     */
+    private static void accumulateRanks(List<String> keys, int k, Map<String, double[]> merged) {
+        if (keys == null || keys.isEmpty()) {
+            return;
+        }
+        int rank = 1;
+        for (String key : keys) {
+            if (key == null) {
+                continue;
+            }
+            double[] item = merged.computeIfAbsent(key, ignored -> new double[]{0.0, merged.size()});
+            item[0] += 1.0 / (k + rank);
+            rank++;
+        }
     }
 
     /**

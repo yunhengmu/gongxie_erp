@@ -295,6 +295,8 @@ create table if not exists ai_knowledge_base (
     retrieval_top_k      integer       default 5,
     rerank_enabled       varchar(1)    not null default '0',
     rerank_model_id      bigint,
+    retrieval_mode       varchar(16)   not null default 'vector',
+    bm25_index_status    varchar(16)   not null default 'none',
     similarity_threshold numeric(4, 3) default 0.500,
     status               char(1)       default '0',
     remark               varchar(500),
@@ -318,6 +320,8 @@ comment on column ai_knowledge_base.chunk_overlap is '切片重叠长度（字�
 comment on column ai_knowledge_base.retrieval_top_k is '默认召回条数';
 comment on column ai_knowledge_base.rerank_enabled is '是否启用检索重排（0否 1是）';
 comment on column ai_knowledge_base.rerank_model_id is '重排模型（ai_model_config.id，model_type=rerank）';
+comment on column ai_knowledge_base.retrieval_mode is '检索方式（vector 向量 / hybrid 向量+BM25）';
+comment on column ai_knowledge_base.bm25_index_status is 'BM25 索引状态（none/building/ready/failed）';
 comment on column ai_knowledge_base.similarity_threshold is '默认相似度阈值';
 comment on column ai_knowledge_base.status is '状态（0正常 1停用）';
 comment on column ai_knowledge_base.owner_dept_id is '归属部门（visible_scope=1 时生效）';

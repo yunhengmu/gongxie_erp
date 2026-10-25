@@ -69,6 +69,13 @@ public class AiKnowledgeBaseBo implements Serializable {
     private Long rerankModelId;
 
     /**
+     * 检索方式（vector 向量 / hybrid 向量+BM25），默认 vector
+     */
+    @Pattern(regexp = "^(vector|hybrid)?$", message = "检索方式只能是 vector 或 hybrid",
+        groups = {AddGroup.class, EditGroup.class})
+    private String retrievalMode;
+
+    /**
      * 向量维度：留空时取向量模型配置的维度
      */
     private Integer dimension;

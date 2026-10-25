@@ -234,6 +234,8 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
             List<SlicePiece> pieces = splitPieces(text, knowledgeBase.getChunkSize(), knowledgeBase.getChunkOverlap());
             rebuildChunks(document, pieces, parsed.ranges());
             cleanVectors(knowledgeBase, oldChunks);
+            // 切片已重建：旧 BM25 索引同样失效，按文档清理，避免残留条目占用召回名额
+            aiVectorService.removeBm25ByDocId(knowledgeBase.getId(), id);
             AiDocument update = new AiDocument();
             update.setId(id);
             update.setContent(text);
@@ -271,6 +273,12 @@ public class AiDocumentServiceImpl implements IAiDocumentService {
             cleanVectors(knowledgeBase, chunks.stream()
                 .filter(chunk -> chunk.getDocId().equals(document.getId()))
                 .toList());
+            try {
+                aiVectorService.removeBm25ByDocId(document.getKbId(), document.getId());
+            } catch (Exception e) {
+                log.warn("清理 BM25 索引失败，kbId={}, docId={}, cause={}",
+                    document.getKbId(), document.getId(), e.getMessage());
+            }
         }
         chunkMapper.delete(chunkLqw);
         return baseMapper.deleteByIds(ids) > 0;

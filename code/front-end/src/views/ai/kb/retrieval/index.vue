@@ -5,7 +5,7 @@
         <div class="panel-heading">
           <div>
             <h3>检索测试</h3>
-            <p>输入问题，查看 Top-K 命中切片与相似度得分，用于上线前验证召回质量。</p>
+            <p>输入问题，查看 Top-K 命中切片与得分，用于上线前验证召回质量。</p>
           </div>
         </div>
       </template>
@@ -16,7 +16,7 @@
               <el-select v-model="query.kbId" placeholder="请选择知识库" style="width: 100%" @change="applyKbDefaults">
                 <el-option v-for="item in kbOptions" :key="item.id" :label="item.kbName" :value="item.id">
                   <span>{{ item.kbName }}</span>
-                  <span class="option-meta">{{ item.dimension }} 维 · {{ item.chunkSize }} 字切片</span>
+                  <span class="option-meta">{{ item.retrievalMode === 'hybrid' ? '向量+BM25' : '向量' }} · {{ item.dimension }} 维 · {{ item.chunkSize }} 字切片</span>
                 </el-option>
               </el-select>
             </el-form-item>
@@ -63,7 +63,7 @@
           <div class="table-heading">
             <h3>命中结果</h3>
             <p v-if="searched">
-              共命中 {{ hits.length }} 条<template v-if="hits.length"> ，最高相似度 {{ formatScore(hits[0]?.score) }}</template>
+              共命中 {{ hits.length }} 条<template v-if="hits.length"> ，最高得分 {{ formatScore(hits[0]?.score) }}</template>
             </p>
             <p v-else>尚未检索</p>
           </div>
@@ -123,10 +123,10 @@ const applyKbDefaults = () => {
   query.threshold = kb?.similarityThreshold ?? undefined;
 };
 
-/** 相似度展示 */
+/** 得分展示 */
 const formatScore = (score?: number) => (score === undefined || score === null ? '-' : score.toFixed(4));
 
-/** 相似度标签样式：越高越绿 */
+/** 得分标签样式：越高越绿 */
 const scoreType = (score?: number) => {
   if (score === undefined || score === null) {
     return 'info';

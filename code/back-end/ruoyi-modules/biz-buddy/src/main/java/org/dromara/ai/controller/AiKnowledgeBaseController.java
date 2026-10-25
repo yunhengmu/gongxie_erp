@@ -5,11 +5,13 @@ import cn.dev33.satoken.annotation.SaMode;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.dromara.ai.core.document.AiBm25IndexRunner;
 import org.dromara.ai.domain.bo.AiKnowledgeBaseBo;
 import org.dromara.ai.domain.vo.AiKnowledgeBaseVo;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
 import org.dromara.common.core.domain.PageResult;
 import org.dromara.common.core.domain.R;
+import org.dromara.common.core.exception.ServiceException;
 import org.dromara.common.core.validate.AddGroup;
 import org.dromara.common.core.validate.EditGroup;
 import org.dromara.common.core.validate.QueryGroup;
@@ -44,6 +46,8 @@ import java.util.List;
 public class AiKnowledgeBaseController extends BaseController {
 
     private final IAiKnowledgeBaseService aiKnowledgeBaseService;
+
+    private final AiBm25IndexRunner bm25IndexRunner;
 
     /**
      * 查询知识库列表
@@ -106,7 +110,30 @@ public class AiKnowledgeBaseController extends BaseController {
     @RepeatSubmit
     @PutMapping()
     public R<Void> edit(@Validated(EditGroup.class) @RequestBody AiKnowledgeBaseBo bo) {
-        return toAjax(aiKnowledgeBaseService.updateByBo(bo));
+        AiKnowledgeBaseVo before = bo.getId() == null ? null : aiKnowledgeBaseService.queryById(bo.getId());
+        boolean updated = aiKnowledgeBaseService.updateByBo(bo);
+        // 从纯向量切换为混合检索时异步重建 BM25 索引（不阻塞保存请求）
+        if (updated && "hybrid".equals(bo.getRetrievalMode())
+            && (before == null || !"hybrid".equals(before.getRetrievalMode()))) {
+            bm25IndexRunner.rebuild(bo.getId());
+        }
+        return toAjax(updated);
+    }
+
+    /**
+     * 重建知识库的 BM25 全文索引（切换为混合检索或索引失败后手动触发）。
+     *
+     * @param id 知识库主键
+     */
+    @SaCheckPermission("ai:kb:edit")
+    @Log(title = "AI知识库BM25索引", businessType = BusinessType.OTHER)
+    @PostMapping("/{id}/bm25/rebuild")
+    public R<Void> rebuildBm25(@NotNull(message = "主键不能为空") @PathVariable("id") Long id) {
+        if (aiKnowledgeBaseService.queryById(id) == null) {
+            throw new ServiceException("知识库不存在或已被删除");
+        }
+        bm25IndexRunner.rebuild(id);
+        return R.ok();
     }
 
     /**

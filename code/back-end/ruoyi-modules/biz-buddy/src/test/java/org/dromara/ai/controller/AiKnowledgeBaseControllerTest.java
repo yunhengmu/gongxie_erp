@@ -1,5 +1,6 @@
 package org.dromara.ai.controller;
 
+import org.dromara.ai.core.document.AiBm25IndexRunner;
 import org.dromara.ai.domain.bo.AiKnowledgeBaseBo;
 import org.dromara.ai.domain.vo.AiKnowledgeBaseVo;
 import org.dromara.ai.service.IAiKnowledgeBaseService;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -30,7 +32,9 @@ class AiKnowledgeBaseControllerTest {
 
     private final IAiKnowledgeBaseService service = mock(IAiKnowledgeBaseService.class);
 
-    private final AiKnowledgeBaseController controller = new AiKnowledgeBaseController(service);
+    private final AiBm25IndexRunner bm25IndexRunner = mock(AiBm25IndexRunner.class);
+
+    private final AiKnowledgeBaseController controller = new AiKnowledgeBaseController(service, bm25IndexRunner);
 
     @BeforeAll
     static void beforeAll() {
@@ -88,6 +92,14 @@ class AiKnowledgeBaseControllerTest {
         AiKnowledgeBaseBo bo = new AiKnowledgeBaseBo();
         when(service.updateByBo(bo)).thenReturn(false);
         assertFalse(R.isSuccess(controller.edit(bo)));
+    }
+
+    @Test
+    @DisplayName("重建 BM25 索引：知识库存在时提交异步重建")
+    void shouldRebuildBm25() {
+        when(service.queryById(2L)).thenReturn(new AiKnowledgeBaseVo());
+        assertTrue(R.isSuccess(controller.rebuildBm25(2L)));
+        verify(bm25IndexRunner).rebuild(2L);
     }
 
     @Test

@@ -75,6 +75,22 @@
             <span v-else>未启用</span>
           </template>
         </el-table-column>
+        <el-table-column label="检索方式" align="center" width="130">
+          <template #default="scope">
+            <el-tag :type="scope.row.retrievalMode === 'hybrid' ? 'warning' : 'info'" effect="plain" size="small">
+              {{ scope.row.retrievalMode === 'hybrid' ? '向量 + BM25' : '向量' }}
+            </el-tag>
+            <el-tag
+              v-if="scope.row.retrievalMode === 'hybrid'"
+              class="bm25-status"
+              :type="bm25StatusType(scope.row.bm25IndexStatus)"
+              effect="plain"
+              size="small"
+            >
+              {{ bm25StatusLabel(scope.row.bm25IndexStatus) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="维度" align="center" prop="dimension" width="80" />
         <el-table-column label="切片/重叠" align="center" width="120">
           <template #default="scope">{{ scope.row.chunkSize }} / {{ scope.row.chunkOverlap }}</template>
@@ -96,7 +112,7 @@
           </template>
         </el-table-column>
         <el-table-column label="创建时间" align="center" prop="createTime" width="170" />
-        <el-table-column label="操作" align="center" width="250" class-name="small-padding fixed-width">
+        <el-table-column label="操作" align="center" width="290" class-name="small-padding fixed-width">
           <template #default="scope">
             <el-tooltip content="查看" placement="top">
               <el-button
@@ -114,6 +130,15 @@
                 type="primary"
                 icon="Document"
                 @click="handleDocs(scope.row)"
+              ></el-button>
+            </el-tooltip>
+            <el-tooltip v-if="scope.row.retrievalMode === 'hybrid'" content="重建 BM25 索引" placement="top">
+              <el-button
+                v-hasPermi="['ai:kb:edit']"
+                link
+                type="warning"
+                icon="Refresh"
+                @click="handleRebuild(scope.row)"
               ></el-button>
             </el-tooltip>
             <el-tooltip content="修改" placement="top">
@@ -219,6 +244,26 @@
         <el-form-item label="相似度阈值" prop="similarityThreshold">
           <el-input-number v-model="form.similarityThreshold" :min="0" :max="1" :step="0.05" :precision="3" controls-position="right" />
         </el-form-item>
+        <el-form-item label="检索方式" prop="retrievalMode">
+          <template #label>
+            <span class="label-tip">
+              检索方式
+              <el-tooltip placement="top">
+                <template #content>
+                  <div class="tip-content">
+                    向量：仅按语义相似度召回。向量 + BM25：同时做语义召回与关键词全文召回，再按 RRF 融合；
+                    BM25 索引由平台在保存后自动构建，失败或未就绪时自动降级为纯向量检索。
+                  </div>
+                </template>
+                <el-icon class="label-tip__icon" tabindex="0"><InfoFilled /></el-icon>
+              </el-tooltip>
+            </span>
+          </template>
+          <el-radio-group v-model="form.retrievalMode">
+            <el-radio value="vector">向量</el-radio>
+            <el-radio value="hybrid">向量 + BM25</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="检索重排" prop="rerankEnabled">
           <template #label>
             <span class="label-tip">
@@ -295,6 +340,12 @@
           <el-descriptions-item label="检索重排">
             {{ detail.record.rerankEnabled === '1' ? (detail.record.rerankModelName || '已启用（未绑模型）') : '未启用' }}
           </el-descriptions-item>
+          <el-descriptions-item label="检索方式">
+            {{ detail.record.retrievalMode === 'hybrid' ? '向量 + BM25' : '向量' }}
+            <template v-if="detail.record.retrievalMode === 'hybrid'">
+              （BM25：{{ bm25StatusLabel(detail.record.bm25IndexStatus) }}）
+            </template>
+          </el-descriptions-item>
           <el-descriptions-item label="生效范围">
             <el-tag :type="scopeTagType(detail.record.visibleScope)" effect="plain" size="small">
               {{ scopeLabel(detail.record.visibleScope) }}
@@ -322,7 +373,7 @@
 </template>
 
 <script setup name="AiKnowledgeBase" lang="ts">
-import { addKnowledgeBase, delKnowledgeBase, getKnowledgeBase, listKnowledgeBase, updateKnowledgeBase } from '@/api/ai/kb/base';
+import { addKnowledgeBase, delKnowledgeBase, getKnowledgeBase, listKnowledgeBase, rebuildBm25Index, updateKnowledgeBase } from '@/api/ai/kb/base';
 import type { KnowledgeBaseForm, KnowledgeBaseQuery, KnowledgeBaseVO } from '@/api/ai/kb/base/types';
 import { optionModelConfig } from '@/api/ai/model/config';
 import type { ModelConfigVO } from '@/api/ai/model/config/types';
@@ -361,6 +412,7 @@ const initFormData: KnowledgeBaseForm = {
   similarityThreshold: 0.5,
   rerankEnabled: '0',
   rerankModelId: undefined,
+  retrievalMode: 'vector',
   status: '0',
   visibleScope: '0',
   remark: undefined
@@ -431,6 +483,22 @@ const scopeTagType = (value?: string) => {
   if (value === '2') return 'danger';
   if (value === '1') return 'warning';
   return 'success';
+};
+
+/** BM25 索引状态文案 */
+const bm25StatusLabel = (value?: string) => {
+  if (value === 'ready') return '索引可用';
+  if (value === 'building') return '构建中';
+  if (value === 'failed') return '构建失败';
+  return '未构建';
+};
+
+/** BM25 索引状态配色 */
+const bm25StatusType = (value?: string) => {
+  if (value === 'ready') return 'success';
+  if (value === 'building') return 'warning';
+  if (value === 'failed') return 'danger';
+  return 'info';
 };
 
 /** 查询可用向量模型 */
@@ -518,6 +586,14 @@ const handleDocs = (row: KnowledgeBaseVO) => {
   router.push({ path: '/bizbuddy/kb/doc', query: { kbId: String(row.id) } });
 };
 
+/** 重建 BM25 全文索引 */
+const handleRebuild = async (row: KnowledgeBaseVO) => {
+  await modal.confirm(`是否确认重建知识库「${row.kbName || row.id}」的 BM25 索引？`);
+  await rebuildBm25Index(row.id);
+  modal.msgSuccess('已提交重建，稍后刷新查看索引状态');
+  await getList();
+};
+
 /** 提交按钮 */
 const submitForm = () => {
   kbFormRef.value?.validate(async (valid: boolean) => {
@@ -580,5 +656,9 @@ getList();
 
 .detail-summary {
   margin-bottom: 12px;
+}
+
+.bm25-status {
+  margin-left: 4px;
 }
 </style>
