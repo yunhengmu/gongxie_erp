@@ -184,6 +184,11 @@ public class AiSessionServiceImpl implements IAiSessionService {
     @Transactional(rollbackFor = Exception.class)
     public AiSessionVo createSession(Long agentId, Long scenarioPackId, String title, Long pinnedExpertId) {
         AiAgent agent = agentService.getEnabledAgent(agentId);
+        // 专家必须落在提问用户的可见范围内：候选清单与「指定专家」下拉都过滤了，但建会话这条写路径
+        // 原先只校验「存在 ∩ 启用」，知道主键即可绕过 visible_scope 直接与部门专属专家对话
+        if (!agent.isEntry()) {
+            assertExpertVisible(agentId);
+        }
         // 场景包（可空）：必须存在、启用中且在当前用户生效范围内，才允许固化到会话
         scenarioPackService.validateSelectable(scenarioPackId);
         AiScenarioPack pack = scenarioPackService.getEnabledPackOrNull(scenarioPackId);
@@ -250,7 +255,20 @@ public class AiSessionServiceImpl implements IAiSessionService {
         if (expertAgentId == null) {
             return;
         }
-        AiExpertAgent expert = expertDirectory.visibleExpert(LoginHelper.getUserId(), LoginHelper.getDeptId(), expertAgentId);
+        assertExpertVisible(expertAgentId);
+    }
+
+    /**
+     * 校验专家对当前用户可见（启用 ∩ 可见范围），不可见即拒绝。
+     *
+     * <p>建会话与指定专家共用同一口径。刻意**不过滤 {@code auto_route}**：
+     * {@code auto_route='0'} 只表示不进自动候选清单，仍允许用户手动指定 / 直接对话。</p>
+     *
+     * @param expertAgentId 专家主键（非空）
+     */
+    private void assertExpertVisible(Long expertAgentId) {
+        AiExpertAgent expert = expertDirectory.visibleExpert(
+            LoginHelper.getUserId(), LoginHelper.getDeptId(), expertAgentId);
         if (expert == null) {
             throw new ServiceException("该专家不存在或不在你的可见范围内");
         }
